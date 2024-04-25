@@ -1,0 +1,21 @@
+services:
+  salt_master:
+    image: saltstack/salt
+    container_name: fastms-salt-master
+  redis:
+    image: redis:latest
+    container_name: fastms-redis
+    ports:
+      - '6379:6379'
+  backend:
+    build:
+      context: backend/
+      target: builder
+    container_name: fastms-application
+    environment:
+      PORT: 8000
+    ports:
+      - '8000:8000'
+    restart: "no"
+    depends_on:
+      - redis
