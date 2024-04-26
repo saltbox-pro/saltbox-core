@@ -17,7 +17,7 @@ async def main():
 
 
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
+    loop = asyncio.new_event_loop()
     for signame in {"SIGINT", "SIGTERM"}:
         loop.add_signal_handler(getattr(signal, signame), loop.stop)
 
