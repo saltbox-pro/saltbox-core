@@ -1,4 +1,6 @@
-FROM python:3.9 AS builder
+ARG PYTHON_VERSION
+
+FROM python:${PYTHON_VERSION} AS builder
 
 WORKDIR /code
 
