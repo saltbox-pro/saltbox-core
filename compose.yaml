@@ -4,9 +4,9 @@ services:
       context: salt/
       target: salt-master
       args:
-        ALPINE_VERSION: '3.18'
-        SALT_VERSION: '3006.7'
-        PYTHON_VERSION: '3.10'
+        ALPINE_VERSION: ${ALPINE_VERSION}
+        SALT_VERSION: ${SALT_VERSION}
+        PYTHON_VERSION: ${SALT_PYTHON_VERSION}
     container_name: fastms-salt-master
     environment:
       - SALT_MASTER=true
@@ -42,9 +42,9 @@ services:
       context: salt/
       target: salt-minion
       args:
-        ALPINE_VERSION: '3.18'
-        SALT_VERSION: '3006.7'
-        PYTHON_VERSION: '3.10'
+        ALPINE_VERSION: ${ALPINE_VERSION}
+        SALT_VERSION: ${SALT_VERSION}
+        PYTHON_VERSION: ${SALT_PYTHON_VERSION}
     # container_name: fastms-salt-minion
     environment:
       - SALT_MINION=true
