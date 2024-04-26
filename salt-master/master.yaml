@@ -1,0 +1,7 @@
+module_dirs:
+  - /srv/salt_extmod/
+engines:
+  - redis_bridge:
+      host: fastms-redis
+log_file: /var/log/salt/master
+auto_accept: true
