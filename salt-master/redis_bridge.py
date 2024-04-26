@@ -31,7 +31,7 @@ LOGGER = logging.getLogger(__name__)
 
 def __virtual__() -> Union[bool, tuple[bool, str]]:
     if __opts__['__role'] != 'master':
-        return (False, f'{__name__} runs on master only')
+        return False, f'{__name__} runs on master only'
     return True
 
 
