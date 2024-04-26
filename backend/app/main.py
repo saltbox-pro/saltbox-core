@@ -43,7 +43,8 @@ app = FastAPI(
     title='FastMS'
 )
 
-r = redis.Redis(host='fastms-redis', port=6379, db=0)
+from app.deps import RedisDep
+
 
 manager = ConnectionManager()
 
@@ -110,13 +111,13 @@ class JobResult(BaseModel):
 @app.get('/jobs')
 async def get_jobs_endpoint(
         start_datetime: datetime.datetime,
-        end_datetime: datetime.datetime
+        end_datetime: datetime.datetime, rdb: RedisDep
 ) -> List[Job]:
     start = get_jid(datatime_val=start_datetime)
     end = get_jid(datatime_val=end_datetime)
 
     # res_count = await r.zcount(name='jobs', min=start, max=end)
-    res_ = await r.zrange('jobs', start=end, end=start, desc=True, byscore=True)
+    res_ = await rdb.zrange('jobs', start=end, end=start, desc=True, byscore=True)
     res = [json.loads(i) for i in res_]
 
     try:
@@ -126,9 +127,8 @@ async def get_jobs_endpoint(
 
 
 @app.get('/jobs/{tag}')
-async def get_job_endpoint(tag: str) -> Job:
-    res_ = await r.zrange('jobs', start=int(tag), end=int(tag), byscore=True)
-
+async def get_job_endpoint(tag: str, rdb: RedisDep) -> Job:
+    res_ = await rdb.zrange('jobs', start=int(tag), end=int(tag), byscore=True)
 
     if not res_:
         raise HTTPException(status_code=404, detail='Job not found')
@@ -155,8 +155,8 @@ async def get_job_endpoint(tag: str) -> Job:
 
 
 @app.get('/jobs/{jid}/rets')
-async def get_job_rets_endpoint(jid: str) -> List[JobResult]:
-    res_ = await r.hgetall(name=f'job.rets:{jid}')
+async def get_job_rets_endpoint(jid: str, rdb: RedisDep) -> List[JobResult]:
+    res_ = await rdb.hgetall(name=f'job.rets:{jid}')
 
     res = []
     for _, ret in res_.items():
@@ -172,7 +172,7 @@ async def get_job_rets_endpoint(jid: str) -> List[JobResult]:
 
 
 @app.websocket('/ws_jobs')
-async def websocket_jobs_rets_endpoint(websocket: WebSocket):
+async def websocket_jobs_rets_endpoint(websocket: WebSocket, rdb: RedisDep):
     await manager.connect(websocket)
 
     async def reader(channel: redis.client.PubSub):
@@ -190,7 +190,7 @@ async def websocket_jobs_rets_endpoint(websocket: WebSocket):
                     ...
 
     try:
-        async with r.pubsub() as pubsub:
+        async with rdb.pubsub() as pubsub:
             await pubsub.psubscribe('job:*')
             # await pubsub.psubscribe('job:*', 'job.rets:*')
             future = asyncio.create_task(reader(pubsub))
@@ -202,7 +202,7 @@ async def websocket_jobs_rets_endpoint(websocket: WebSocket):
 
 
 @app.websocket('/ws_jobs/{jid}/rets')
-async def websocket_jobs_endpoint(websocket: WebSocket, jid: str):
+async def websocket_jobs_endpoint(websocket: WebSocket, jid: str, rdb: RedisDep):
     await manager.connect(websocket)
 
     async def reader(channel: redis.client.PubSub):
@@ -220,14 +220,13 @@ async def websocket_jobs_endpoint(websocket: WebSocket, jid: str):
                     ...
 
     try:
-        async with r.pubsub() as pubsub:
+        async with rdb.pubsub() as pubsub:
             await pubsub.psubscribe(f'job.rets:{jid}')
             future = asyncio.create_task(reader(pubsub))
             await future
 
     except WebSocketDisconnect:
         manager.disconnect(websocket)
-
 
 # html = """
 # <!DOCTYPE html>
