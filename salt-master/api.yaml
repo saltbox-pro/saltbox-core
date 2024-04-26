@@ -1,0 +1,12 @@
+rest_cherrypy:
+  port: 8000
+  ssl_crt: /etc/pki/tls/certs/localhost.crt
+  ssl_key: /etc/pki/tls/certs/localhost.key
+external_auth:
+  sharedsecret:
+    salt:
+      - .*
+      - '@wheel'
+      - '@jobs'
+      - '@runner'
+sharedsecret: mysecretpassword
