@@ -1,7 +1,20 @@
 services:
   salt_master:
-    image: saltstack/salt
+    build:
+      context: salt-master/
+      args:
+        ALPINE_VERSION: '3.14'
+        SALT_VERSION: '3006.4'
+        PYTHON_VERSION: '3.10'
     container_name: fastms-salt-master
+    environment:
+      - SALT_SHARED_SECRET=mysecretpassword
+      - 'SALT_MASTER_CONFIG={"module_dirs": [ "/srv/salt_extmod/" ],"engines": [ { "redis_bridge": { "host": "fastms-redis" } } ], "log_file": "/var/log/salt/master" }'
+    ports:
+      - '4505-4506:4505-4506'
+      - '8001:8000'
+    depends_on:
+      - redis
   redis:
     image: redis:latest
     container_name: fastms-redis
@@ -11,7 +24,11 @@ services:
     build:
       context: backend/
       target: builder
+      args:
+        PYTHON_VERSION: '3.12'
     container_name: fastms-application
+    env_file:
+      - .env
     environment:
       PORT: 8000
     ports:
@@ -19,3 +36,13 @@ services:
     restart: "no"
     depends_on:
       - redis
+  salt_minion:
+    build:
+      context: salt-minion/
+      args:
+        ALPINE_VERSION: '3.14'
+        SALT_VERSION: '3006.4'
+        PYTHON_VERSION: '3.10'
+    container_name: fastms-salt-minion
+    environment:
+      - 'SALT_MINION_CONFIG={"master": "fastms-salt-master" }'
