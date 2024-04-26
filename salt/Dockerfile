@@ -23,8 +23,8 @@ RUN echo "cython<3" > /tmp/constraint.txt
 RUN pip3 install --upgrade pip
 RUN PIP_CONSTRAINT=/tmp/constraint.txt USE_STATIC_REQUIREMENTS=1 \
     pip3 install --no-build-isolation --no-cache-dir \
-    salt=="${SALT_VERSION}" "$(if [ "${ALPINE_VERSION}" = "3.12" ]; \
-    then echo 'pygit2<1.4'; else echo 'pygit2<1.7'; fi)"
+    salt=="${SALT_VERSION}" "$(if [ "${ALPINE_VERSION}" = "3.14" ]; \
+    then echo 'pygit2<1.7'; else echo 'pygit2<1.12'; fi)"
 RUN su - salt -c 'salt-run salt.cmd tls.create_self_signed_cert'
 
 
