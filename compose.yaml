@@ -2,14 +2,15 @@ services:
   salt_master:
     build:
       context: salt-master/
+      target: salt-master
       args:
         ALPINE_VERSION: '3.14'
         SALT_VERSION: '3006.4'
         PYTHON_VERSION: '3.10'
     container_name: fastms-salt-master
     environment:
+      - SALT_MASTER=true
       - SALT_SHARED_SECRET=mysecretpassword
-      - 'SALT_MASTER_CONFIG={"module_dirs": [ "/srv/salt_extmod/" ],"engines": [ { "redis_bridge": { "host": "fastms-redis" } } ], "log_file": "/var/log/salt/master", "auto_accept": true }'
     ports:
       - '4505-4506:4505-4506'
       - '8001:8000'
@@ -38,11 +39,12 @@ services:
       - redis
   salt_minion:
     build:
-      context: salt-minion/
+      context: salt-master/
+      target: salt-minion
       args:
         ALPINE_VERSION: '3.14'
         SALT_VERSION: '3006.4'
         PYTHON_VERSION: '3.10'
     container_name: fastms-salt-minion
     environment:
-      - 'SALT_MINION_CONFIG={"master": "fastms-salt-master" }'
+      - SALT_MINION=true
