@@ -10,4 +10,8 @@ external_auth:
       - '@wheel'
       - '@jobs'
       - '@runner'
+  rest:
+    ^url: http://fastms-application:8000/cherrypy_run_auth_stub
+
+keep_acl_in_token: True
 sharedsecret: mysecretpassword
