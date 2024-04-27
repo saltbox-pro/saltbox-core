@@ -5,9 +5,11 @@ import json
 from typing import Union, List, Dict, Any
 
 import redis.asyncio as redis
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from pydantic import BaseModel
 from pydantic import ValidationError
+from fastapi.responses import JSONResponse
+from fastapi.encoders import jsonable_encoder
 # from salt.client import LocalClient
 
 
@@ -44,7 +46,6 @@ app = FastAPI(
 )
 
 from app.deps import RedisDep
-
 
 manager = ConnectionManager()
 
@@ -106,6 +107,14 @@ class JobResult(BaseModel):
     fun_kwarg: Union[None, Dict] = None
     user: str
     _stamp: str
+
+
+@app.post('/cherrypy_fake_rest_auth', status_code=200)
+async def run_fake_auth(request: Request):
+    await request.body()
+    data = ['.*', '@wheel', '@jobs', '@runner']
+    json_compatible_item_data = jsonable_encoder(data)
+    return JSONResponse(content=json_compatible_item_data)
 
 
 @app.get('/jobs')
