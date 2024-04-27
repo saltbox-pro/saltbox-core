@@ -31,6 +31,7 @@ RUN su - salt -c 'salt-run salt.cmd tls.create_self_signed_cert'
 FROM salt-base AS salt-master
 ADD master.yaml /etc/salt/master.d/master.conf
 ADD api.yaml /etc/salt/master.d/api.conf
+ADD netapi.yaml /etc/salt/master.d/netapi.conf
 RUN mkdir -p /srv/salt_extmod/engines
 ADD redis_bridge.py /srv/salt_extmod/engines/redis_bridge.py
 COPY ./requirements.txt /tmp/requirements.txt
