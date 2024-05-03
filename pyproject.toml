@@ -1,0 +1,38 @@
+[project]
+name = 'fastms-core'
+version = '0.0.0'
+requires-python = '>=3.9'
+license = { 'text' = 'N/A' }  # FIXME
+description = ''
+readme = 'README.md'
+dependencies = [ ]
+
+[project.optional-dependencies]
+dev = [
+  'flake8',
+  'flake8-pyproject',
+  'ipython',
+  'mypy',
+  'pre-commit',
+  'pylint',
+]
+
+[project.scripts]
+
+[metadata]
+url = 'https://gitlab/fastms'
+
+[build-system]
+requires = ['setuptools', 'setuptools-scm']
+build-backend = 'setuptools.build_meta'
+
+[tool.setuptools]
+package-dir = { '' = 'backend/' }
+
+[tool.flake8]
+max-line-length = 120
+extend-ignore = [ ]
+builtins = '__opts__'
+
+[tool.mypy]
+check_untyped_defs = true
