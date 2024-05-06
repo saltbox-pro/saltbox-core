@@ -8,9 +8,11 @@ import redis.asyncio as redis
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from pydantic import BaseModel
 from pydantic import ValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.encoders import jsonable_encoder
 # from salt.client import LocalClient
+
+from app.deps import RedisDep
 
 
 def get_jid(datatime_val: datetime.datetime) -> int:
@@ -45,7 +47,6 @@ app = FastAPI(
     title='FastMS'
 )
 
-from app.deps import RedisDep
 
 manager = ConnectionManager()
 
@@ -131,8 +132,8 @@ async def get_jobs_endpoint(
 
     try:
         return [Job(**i) for i in res]
-    except ValidationError as e:
-        raise HTTPException(status_code=404, detail=e.errors())
+    except ValidationError as err:
+        raise HTTPException(status_code=404, detail=err.errors())
 
 
 @app.get('/jobs/{tag}')
@@ -237,44 +238,45 @@ async def websocket_jobs_endpoint(websocket: WebSocket, jid: str, rdb: RedisDep)
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
-# html = """
-# <!DOCTYPE html>
-# <html>
-#     <head>
-#         <title>charon</title>
-#     </head>
-#     <body>
-#         <h1>salt charon</h1>
-#         <form action="" onsubmit="sendMessage(event)">
-#             <input type="text" id="messageText" autocomplete="off"/>
-#             <button>Send</button>
-#         </form>
-#         <ul id='messages'>
-#         </ul>
-#         <script>
-#             var ws = new WebSocket("ws://192.168.122.197:80/ws_jobs");
-#             ws.onmessage = function(event) {
-#                 var messages = document.getElementById('messages')
-#                 var message = document.createElement('li')
-#                 var content = document.createTextNode(event.data)
-#                 message.appendChild(content)
-#                 messages.appendChild(message)
-#             };
-#             function sendMessage(event) {
-#                 var input = document.getElementById("messageText")
-#                 ws.send(input.value)
-#                 input.value = ''
-#                 event.preventDefault()
-#             }
-#         </script>
-#     </body>
-# </html>
-# """
+html = """
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>charon</title>
+    </head>
+    <body>
+        <h1>salt charon</h1>
+        <form action="" onsubmit="sendMessage(event)">
+            <input type="text" id="messageText" autocomplete="off"/>
+            <button>Send</button>
+        </form>
+        <ul id='messages'>
+        </ul>
+        <script>
+            var ws = new WebSocket("ws://192.168.122.197:80/ws_jobs");
+            ws.onmessage = function(event) {
+                var messages = document.getElementById('messages')
+                var message = document.createElement('li')
+                var content = document.createTextNode(event.data)
+                message.appendChild(content)
+                messages.appendChild(message)
+            };
+            function sendMessage(event) {
+                var input = document.getElementById("messageText")
+                ws.send(input.value)
+                input.value = ''
+                event.preventDefault()
+            }
+        </script>
+    </body>
+</html>
+"""
 
-#
-# @app.get('/')
-# async def get():
-#     return HTMLResponse(html)
+
+@app.get('/')
+async def get():
+    # TODO
+    return HTMLResponse(html)
 
 
 # @app.get('/jobs/stat')
