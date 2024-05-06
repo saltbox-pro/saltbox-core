@@ -27,6 +27,10 @@ services:
       target: builder
       args:
         PYTHON_VERSION: '3.12'
+    develop:
+      watch:
+        - action: rebuild
+          path: backend/
     container_name: fastms-application
     env_file:
       - .env
