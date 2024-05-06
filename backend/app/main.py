@@ -2,17 +2,16 @@
 import asyncio
 import datetime
 import json
-from typing import Union, List, Dict, Any
+from typing import Union
 
 import redis.asyncio as redis
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
-from pydantic import BaseModel
 from pydantic import ValidationError
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.encoders import jsonable_encoder
-# from salt.client import LocalClient
 
 from app.deps import RedisDep
+from app.models.salt import Job, JobResult
 
 
 def get_jid(datatime_val: datetime.datetime) -> int:
@@ -35,7 +34,7 @@ class ConnectionManager:
         await websocket.send_text(message)
 
     @staticmethod
-    async def send_personal_json_message(message: Union[List, Dict], websocket: WebSocket):
+    async def send_personal_json_message(message: Union[list, dict], websocket: WebSocket):
         await websocket.send_json(message)
 
     async def broadcast(self, message: str):
@@ -51,65 +50,6 @@ app = FastAPI(
 manager = ConnectionManager()
 
 
-class Job(BaseModel):
-    # example:
-    # {
-    #     "jid": "20240422071217916112",
-    #     "tgt_type": "glob",
-    #     "tgt": "*",
-    #     "user": "root",
-    #     "fun": "test.ping",
-    #     "arg": [],
-    #     "minions": ["master.master"],
-    #     "missing": [],
-    #     "_stamp": "2024-04-22T07:12:17.932302"
-    # }
-    jid: str
-    tgt: str
-    tgt_type: str
-    user: str
-    fun: str
-    arg: Union[None, List] = None
-    kwarg: Union[None, Dict] = None
-    minions: List[str]
-    _stamp: str
-
-
-class JobPost(BaseModel):
-    tgt: str = '*'
-    tgt_type: str = "glob"
-    fun: str = 'test.ping'
-    arg: Union[None, List] = None
-    kwarg: Union[None, Dict] = None
-
-
-class JobResult(BaseModel):
-    # example:
-    # {
-    #     "cmd": "_return",
-    #     "id": "master.master",
-    #     "success": True,
-    #     "return": True,
-    #     "retcode": 0,
-    #     "jid": "20240422081827358198",
-    #     "fun": "test.ping",
-    #     "fun_args": [],
-    #     "user": "root",
-    #     "_stamp": "2024-04-22T08:18:27.509512"
-    # }
-    _cmd: str
-    id: str
-    success: bool
-    retdata: Any
-    retcode: int
-    jid: str
-    fun: str
-    fun_args: Union[None, List] = None
-    fun_kwarg: Union[None, Dict] = None
-    user: str
-    _stamp: str
-
-
 @app.post('/cherrypy_fake_rest_auth', status_code=200)
 async def run_fake_auth(request: Request):
     await request.body()
@@ -122,7 +62,7 @@ async def run_fake_auth(request: Request):
 async def get_jobs_endpoint(
         start_datetime: datetime.datetime,
         end_datetime: datetime.datetime, rdb: RedisDep
-) -> List[Job]:
+) -> list[Job]:
     start = get_jid(datatime_val=start_datetime)
     end = get_jid(datatime_val=end_datetime)
 
@@ -165,7 +105,7 @@ async def get_job_endpoint(tag: str, rdb: RedisDep) -> Job:
 
 
 @app.get('/jobs/{jid}/rets')
-async def get_job_rets_endpoint(jid: str, rdb: RedisDep) -> List[JobResult]:
+async def get_job_rets_endpoint(jid: str, rdb: RedisDep) -> list[JobResult]:
     res_ = await rdb.hgetall(name=f'job.rets:{jid}')
 
     res = []

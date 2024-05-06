@@ -10,7 +10,6 @@ dependencies = [ ]
 [project.optional-dependencies]
 dev = [
   'flake8',
-  'flake8-pyproject',
   'ipython',
   'mypy',
   'pre-commit',
@@ -29,11 +28,6 @@ build-backend = 'setuptools.build_meta'
 
 [tool.setuptools]
 package-dir = { '' = 'backend/' }
-
-[tool.flake8]
-max-line-length = 120
-extend-ignore = [ ]
-builtins = '__opts__'
 
 [tool.mypy]
 check_untyped_defs = true

@@ -1,4 +1,4 @@
-from collections.abc import Generator
+#  from collections.abc import Generator
 import redis.asyncio as redis
 from typing import Annotated
 from fastapi import Depends
