@@ -8,6 +8,7 @@ ARG SALT_VERSION
 
 ARG BUILD_DEPS="gcc g++ autoconf make libffi-dev libgit2-dev"
 
+# FIXME Use compose `serivice.{NAME}.init: true` instead of dumb-init
 RUN \
     apk add --no-cache binutils dumb-init libgit2 libffi openssl-dev && \
     addgroup -g 450 -S salt && adduser -s /bin/sh -SD -G salt salt && \
@@ -30,6 +31,7 @@ RUN \
     su - salt -c 'salt-run salt.cmd tls.create_self_signed_cert'
 
 ENTRYPOINT ["/usr/bin/dumb-init"]
+# TODO try one-command container for salt-api
 CMD ["/usr/local/bin/saltinit"]
 COPY saltinit.py /usr/local/bin/saltinit
 

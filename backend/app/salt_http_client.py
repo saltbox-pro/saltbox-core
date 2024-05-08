@@ -24,15 +24,46 @@ class SaltHttpClientBadResponse(SaltHttpClientError):
 
 
 class SaltHttpClient:
-    """ SaltStack Rest API client """
+    """ SaltStack CherryPy Rest API client """
     def __init__(self, salt_instance: str, strict_ssl=True) -> None:
         self._client_kwargs = {
             'verify': strict_ssl,
         }
         self._instance = salt_instance
+        self.token: Optional[str] = None
+        self.token_expire = 0.0
 
     def get_url(self, endpoint: str) -> str:
         return f'{self._instance}/{endpoint}'
+
+    async def login(self, username: str, password: str, eauth='sharedsecret') -> None:
+        data = {
+            'username': username,
+            'password': password,
+            'eauth': eauth,
+        }
+        headers = {
+            'Accept': 'application/json',
+        }
+        try:
+            async with httpx.AsyncClient(**self._client_kwargs) as http:
+                resp = await http.post(url=self.get_url('login'), headers=headers, data=data)
+        except (httpx.HTTPError, ssl.SSLCertVerificationError) as error:
+            msg = str(error)
+            if not msg:
+                msg = type(error).__name__
+            raise SaltHttpClientConnectionError(msg) from error
+
+        try:
+            resp.raise_for_status()
+        except httpx.HTTPStatusError as error:
+            raise SaltHttpClientBadResponse(error)
+
+        # TODO Handle errors
+        body = resp.json()
+        ret = body['return'][0]
+        self.token = ret['token']
+        self.token_expire = ret['expire']  # TODO Convert epoch?
 
     async def run_job(
         self,
@@ -54,10 +85,16 @@ class SaltHttpClient:
             'tgt': tgt,
             'tgt_type': tgt_type,
         }
+        headers = {
+            'X-Auth-Token': self.token,
+        }
+
+        # FIXME
+        print(f'>>> {headers}')
 
         try:
             async with httpx.AsyncClient(**self._client_kwargs) as http:
-                resp = await http.post(url=self.get_url('jobs'), data=data)
+                resp = await http.post(url=self.get_url('jobs'), headers=headers, data=data)
         except (httpx.HTTPError, ssl.SSLCertVerificationError) as error:
             msg = str(error)
             if not msg:

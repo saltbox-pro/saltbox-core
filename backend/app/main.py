@@ -1,4 +1,3 @@
-# uvicorn main:app --host 192.168.122.197 --port 80 --reload
 import asyncio
 import datetime
 import json
@@ -100,16 +99,18 @@ async def get_job_endpoint(tag: str, rdb: RedisDep) -> Job:
 # TODO http_errors for other EP
 # TODO Close salt_master:8001
 # TODO make one-command container for salt-api
+# TODO Delete SALT_SHARED_SECRET
 @app.post('/jobs')
 async def create_job_endpoint(item: JobPost) -> str:
+    # TODO
+    await SALT_CLIENT.login(username='salt', password='mysecretpassword')
     try:
         resp = await SALT_CLIENT.run_job(
             tgt=item.tgt,
             fun=item.fun,
             arg=item.arg,
             kwarg=item.kwarg,
-            tgt_type=item.tgt_type,
-        )
+            tgt_type=item.tgt_type)
     except SaltHttpClientError as error:
         raise http_errors.BadGateway(detail=str(error))
     jid = resp

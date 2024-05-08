@@ -14,10 +14,10 @@ services:
     container_name: fastms-salt-master
     environment:
       - SALT_MASTER=true
-      - SALT_SHARED_SECRET=mysecretpassword
+      - SALT_SHARED_SECRET=mysecretpassword  # FIXME Unused
     ports:
       - '4505-4506:4505-4506'
-      - '8001:8000'
+      - '8001:8000'  # FIXME do not expose
     depends_on:
       - redis
   redis:
