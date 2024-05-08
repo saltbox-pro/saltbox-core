@@ -17,10 +17,10 @@ class Job(BaseModel):
 
 class JobPost(BaseModel):
     tgt: str = '*'
-    tgt_type: str = "glob"
+    tgt_type: str = 'glob'
     fun: str = 'test.ping'
-    arg: Optional[list] = None
-    kwarg: Optional[dict] = None
+    arg: list = []
+    kwarg: dict = {}
 
 
 class JobResult(BaseModel):

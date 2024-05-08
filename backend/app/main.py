@@ -2,16 +2,22 @@
 import asyncio
 import datetime
 import json
+
 from typing import Union
 
 import redis.asyncio as redis
+
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
 from pydantic import ValidationError
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.encoders import jsonable_encoder
 
+from app import http_errors
 from app.deps import RedisDep
-from app.models.salt import Job, JobResult
+from app.models.salt import Job, JobPost, JobResult
+from app.salt_http_client import SaltHttpClient, SaltHttpClientError
+
+SALT_CLIENT = SaltHttpClient('https://fastms-salt-master:8000', strict_ssl=False)
 
 
 def get_jid(datatime_val: datetime.datetime) -> int:
@@ -91,17 +97,23 @@ async def get_job_endpoint(tag: str, rdb: RedisDep) -> Job:
         raise HTTPException(status_code=404, detail=e.errors())
 
 
-# @app.post('/jobs')
-# async def create_job_endpoint(item: JobPost) -> str:
-#     local_client = LocalClient()
-#     jid = local_client.cmd_async(
-#         tgt=item.tgt,
-#         tgt_type=item.tgt_type,
-#         fun=item.fun,
-#         arg=item.arg,
-#         kwarg=item.kwarg
-#     )
-#     return jid
+# TODO http_errors for other EP
+# TODO Close salt_master:8001
+# TODO make one-command container for salt-api
+@app.post('/jobs')
+async def create_job_endpoint(item: JobPost) -> str:
+    try:
+        resp = await SALT_CLIENT.run_job(
+            tgt=item.tgt,
+            fun=item.fun,
+            arg=item.arg,
+            kwarg=item.kwarg,
+            tgt_type=item.tgt_type,
+        )
+    except SaltHttpClientError as error:
+        raise http_errors.BadGateway(detail=str(error))
+    jid = resp
+    return jid
 
 
 @app.get('/jobs/{jid}/rets')

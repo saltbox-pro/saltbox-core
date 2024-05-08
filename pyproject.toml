@@ -11,11 +11,13 @@ readme = 'README.md'
 dev = [
     'Flake8-pyproject',
     'flake8',
+    'flake8-logging',
     'ipython',
     'mypy',
     'pre-commit',
     'pylint',
     'types-redis',
+    'python-lsp-server[all]',
 ]
 
 [project.scripts]
