@@ -1,5 +1,5 @@
-fastapi
-httpx
-pydantic
-redis
-uvicorn
+fastapi~=0.111.0
+httpx~=0.27.0
+pydantic~=2.7.1
+redis~=5.0.4
+uvicorn~=0.29.0

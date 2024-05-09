@@ -6,7 +6,7 @@ from typing import Union
 
 import redis.asyncio as redis
 
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from pydantic import ValidationError
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.encoders import jsonable_encoder
@@ -78,7 +78,7 @@ async def get_jobs_endpoint(
     try:
         return [Job(**i) for i in res]
     except ValidationError as err:
-        raise HTTPException(status_code=404, detail=err.errors())
+        raise http_errors.InternalServerError(detail=err.errors())
 
 
 @app.get('/jobs/{tag}')
@@ -86,14 +86,14 @@ async def get_job_endpoint(tag: str, rdb: RedisDep) -> Job:
     res_ = await rdb.zrange('jobs', start=int(tag), end=int(tag), byscore=True)
 
     if not res_:
-        raise HTTPException(status_code=404, detail='Job not found')
+        raise http_errors.NotFound(detail='Job not found')
 
     res = json.loads(res_[0])
 
     try:
         return Job(**res)
     except ValidationError as e:
-        raise HTTPException(status_code=404, detail=e.errors())
+        raise http_errors.InternalServerError(detail=e.errors())
 
 
 # TODO http_errors for other EP
@@ -129,7 +129,7 @@ async def get_job_rets_endpoint(jid: str, rdb: RedisDep) -> list[JobResult]:
         try:
             res.append(JobResult(**data))
         except ValidationError as e:
-            raise HTTPException(status_code=404, detail=e.errors())
+            raise http_errors.InternalServerError(detail=e.errors())
 
     return res
 

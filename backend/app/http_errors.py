@@ -1,5 +1,7 @@
 import abc
 
+from typing import Any, Optional
+
 from fastapi import HTTPException
 
 
@@ -8,8 +10,8 @@ class BaseHttpError(abc.ABC, HTTPException):
     @abc.abstractmethod
     def CODE(self) -> int: ...
 
-    def __init__(self, detail: str):
-        super().__init__(status_code=self.CODE, detail=detail)
+    def __init__(self, detail: Any, headers: Optional[dict[str, str]] = None):
+        super().__init__(status_code=self.CODE, detail=detail, headers=headers)
 
 
 class BadRequest(BaseHttpError):
