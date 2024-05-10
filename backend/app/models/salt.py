@@ -3,6 +3,11 @@ from typing import Any, Optional, Union
 from pydantic import BaseModel
 
 
+class SaltAuthPost(BaseModel):
+    username: str
+    password: str
+
+
 class Job(BaseModel):
     jid: str
     tgt: Union[str, list[str]]

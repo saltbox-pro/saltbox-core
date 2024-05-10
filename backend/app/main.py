@@ -6,7 +6,7 @@ from typing import Union
 
 import redis.asyncio as redis
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from pydantic import ValidationError
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.encoders import jsonable_encoder
@@ -14,7 +14,7 @@ from fastapi.encoders import jsonable_encoder
 from app import http_errors
 from app.config import SETTINGS
 from app.deps import RedisDep
-from app.models.salt import Job, JobPost, JobResult
+from app.models.salt import Job, JobPost, JobResult, SaltAuthPost
 from app.salt_http_client import SaltHttpClient, SaltHttpClientError
 
 SALT_CLIENT = SaltHttpClient(SETTINGS.salt_url, strict_ssl=False)
@@ -57,19 +57,13 @@ manager = ConnectionManager()
 
 
 @app.post('/salt_auth', status_code=200)
-async def salt_auth_endpoint(request: Request, rdb: RedisDep):
+async def salt_auth_endpoint(data: SaltAuthPost) -> JSONResponse:
     """ For salt.auth.rest """
-    await request.body()
-    #username = ...
-    #password = ...
-    username = await rdb.get('salt-api_username')
-    password = await rdb.get('salt-api_password')
-    #if username == ... and password_hash == ...:
-    #    ...
-    #    data = ['.*', '@wheel', '@jobs', '@runner']
-    #    return JSONResponse(content=jsonable_encoder(data))
-    #else:
-    #    return http_errors.Unauthorized()
+    if data.username == SETTINGS.salt_username and data.password == SETTINGS.salt_password:
+        acl = ['.*', '@wheel', '@jobs', '@runner']
+        return JSONResponse(content=jsonable_encoder(acl))
+    else:
+        raise http_errors.Unauthorized(f'Unknown user {data.username} or invalid password')
 
 
 @app.get('/jobs')
@@ -105,13 +99,10 @@ async def get_job_endpoint(tag: str, rdb: RedisDep) -> Job:
         raise http_errors.InternalServerError(detail=e.errors())
 
 
-# TODO http_errors for other EP
 # TODO Close salt_master:8001
 # TODO make one-command container for salt-api
-# TODO Delete SALT_SHARED_SECRET
 @app.post('/jobs')
 async def create_job_endpoint(item: JobPost) -> str:
-    print(f'>>> {SETTINGS.salt_password}')
     # TODO
     await SALT_CLIENT.login(username='salt', password='mysecretpassword')
     try:
@@ -237,7 +228,7 @@ html = """
 
 
 @app.get('/')
-async def get():
+async def get() -> HTMLResponse:
     # TODO
     return HTMLResponse(html)
 
