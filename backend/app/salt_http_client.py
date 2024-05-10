@@ -1,5 +1,6 @@
 import logging
 
+from functools import wraps
 from pprint import pformat
 from typing import Optional
 
@@ -23,31 +24,70 @@ class SaltHttpClientBadResponse(SaltHttpClientError):
     """ Raises on bad HTTP response (4XX, 5XX codes) """
 
 
+class SaltHttpClientUnauthorized(SaltHttpClientBadResponse):
+    ...
+
+
+def salt_http_client_login(fn):
+    @wraps(fn)
+    async def wrapper(self: 'SaltHttpClient', *args, **kwargs):
+        if not self._token or self.token_expires:
+            await self._login()
+        try:
+            return fn(*args, **kwargs)
+        except SaltHttpClientUnauthorized:
+            await self._login()
+            return fn(*args, **kwargs)
+    return wrapper
+
+
 class SaltHttpClient:
     """ SaltStack CherryPy Rest API client """
-    def __init__(self, salt_instance: str, strict_ssl=True) -> None:
+    TOKEN_HEADER = 'X-Auth-Token'
+
+    def __init__(
+        self,
+        salt_instance: str,
+        username: str,
+        password: str,
+        strict_ssl=True,
+        eauth='rest'
+    ) -> None:
         self._client_kwargs = {
             'verify': strict_ssl,
         }
         self._instance = salt_instance
-        self.token: Optional[str] = None
-        self.token_expire = 0.0
-
-    def get_url(self, endpoint: str) -> str:
-        return f'{self._instance}/{endpoint}'
-
-    async def login(self, username: str, password: str, eauth='sharedsecret') -> None:
-        data = {
+        self._login_data = {
             'username': username,
             'password': password,
             'eauth': eauth,
         }
-        headers = {
+        self._default_headers = {
             'Accept': 'application/json',
         }
+        self._http: Optional[httpx.AsyncClient] = None
+        self._token = ''
+        self._token_expire = 0.0
+
+    @property
+    def token_expires(self) -> bool:
+        # TODO
+        return False
+
+    def get_url(self, endpoint: str) -> str:
+        return f'{self._instance}/{endpoint}'
+
+    async def _login(self) -> None:
+        if self._http is not None:
+            await self._http.aclose()
+        self._http = httpx.AsyncClient(**self._client_kwargs)
+        self._default_headers.pop(self.TOKEN_HEADER)
+
         try:
-            async with httpx.AsyncClient(**self._client_kwargs) as http:
-                resp = await http.post(url=self.get_url('login'), headers=headers, data=data)
+            resp = await self._http.post(
+                url=self.get_url('login'),
+                headers=self._default_headers,
+                data=self._login_data)
         except (httpx.HTTPError, ssl.SSLCertVerificationError) as error:
             msg = str(error)
             if not msg:
@@ -62,9 +102,19 @@ class SaltHttpClient:
         # TODO Handle errors
         body = resp.json()
         ret = body['return'][0]
-        self.token = ret['token']
-        self.token_expire = ret['expire']  # TODO Convert epoch?
+        self._token = ret['token']
+        self._token_expire = ret['expire']  # TODO Convert epoch?
+        self._default_headers[self.TOKEN_HEADER] = self._token
 
+    def _raise_for_status(self, response: httpx.Response) -> None:
+        if response.status_code == 401:
+            raise SaltHttpClientError('Unexpectedly unauthorized')
+        try:
+            response.raise_for_status()
+        except httpx.HTTPStatusError as error:
+            raise SaltHttpClientBadResponse(error)
+
+    @salt_http_client_login
     async def run_job(
         self,
         tgt: str,
@@ -85,27 +135,21 @@ class SaltHttpClient:
             'tgt': tgt,
             'tgt_type': tgt_type,
         }
-        headers = {
-            'X-Auth-Token': self.token,
-        }
-
-        # FIXME
-        print(f'>>> {headers}')
 
         try:
             async with httpx.AsyncClient(**self._client_kwargs) as http:
-                resp = await http.post(url=self.get_url('jobs'), headers=headers, data=data)
+                resp = await http.post(
+                    url=self.get_url('jobs'),
+                    headers=self._default_headers,
+                    data=data)
         except (httpx.HTTPError, ssl.SSLCertVerificationError) as error:
             msg = str(error)
             if not msg:
                 msg = type(error).__name__
-            raise SaltHttpClientConnectionError(msg) from error
+            raise SaltHttpClientConnectionError(msg)
 
         LOGGER.debug('Response headers:\n%s', pformat(dict(resp.headers), indent=DEBUG_INDENT))
         LOGGER.debug('Response body:\n%s', resp.content.decode())
 
-        try:
-            resp.raise_for_status()
-        except httpx.HTTPStatusError as error:
-            raise SaltHttpClientBadResponse(error)
+        self._raise_for_status(resp)
         return resp.json()

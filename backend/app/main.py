@@ -17,7 +17,11 @@ from app.deps import RedisDep
 from app.models.salt import Job, JobPost, JobResult, SaltAuthPost
 from app.salt_http_client import SaltHttpClient, SaltHttpClientError
 
-SALT_CLIENT = SaltHttpClient(SETTINGS.salt_url, strict_ssl=False)
+SALT_CLIENT = SaltHttpClient(
+    SETTINGS.salt_url,
+    strict_ssl=False,
+    username=SETTINGS.salt_username,
+    password=SETTINGS.salt_password)
 
 
 def get_jid(datatime_val: datetime.datetime) -> int:
@@ -56,6 +60,7 @@ app = FastAPI(
 manager = ConnectionManager()
 
 
+# FIXME 422 Uprocessable Entyty
 @app.post('/salt_auth', status_code=200)
 async def salt_auth_endpoint(data: SaltAuthPost) -> JSONResponse:
     """ For salt.auth.rest """
@@ -104,7 +109,6 @@ async def get_job_endpoint(tag: str, rdb: RedisDep) -> Job:
 @app.post('/jobs')
 async def create_job_endpoint(item: JobPost) -> str:
     # TODO
-    await SALT_CLIENT.login(username='salt', password='mysecretpassword')
     try:
         resp = await SALT_CLIENT.run_job(
             tgt=item.tgt,
