@@ -14,7 +14,6 @@ services:
     container_name: fastms-salt-master
     environment:
       - SALT_MASTER=true
-      - SALT_SHARED_SECRET=mysecretpassword  # FIXME Unused
     ports:
       - '4505-4506:4505-4506'
       - '8001:8000'  # FIXME do not expose
@@ -39,6 +38,8 @@ services:
     env_file:
       - .env
     environment:
+      SALT_URL: 'https://fastms-salt-master:8000'
+      REDIS_URL: 'redis://fastms-redis:6379/0'
       PORT: 8000
     ports:
       - '8000:8000'

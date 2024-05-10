@@ -42,3 +42,4 @@ builtins = '__opts__'
 
 [tool.mypy]
 check_untyped_defs = true
+plugins = [ 'pydantic.mypy' ]
