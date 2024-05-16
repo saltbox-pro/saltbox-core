@@ -7,9 +7,10 @@ from typing import Union
 import redis.asyncio as redis
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from pydantic import ValidationError
-from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi_offline import FastAPIOffline
+from pydantic import ValidationError
 
 from app import http_errors
 from app.config import SETTINGS
@@ -52,12 +53,8 @@ class ConnectionManager:
             await connection.send_text(message)
 
 
-app = FastAPI(
-    title='FastMS'
-)
-
-
-manager = ConnectionManager()
+app = FastAPIOffline(title='FastMS')
+MANAGER = ConnectionManager()
 
 
 # FIXME 422 Uprocessable Entyty
@@ -141,7 +138,7 @@ async def get_job_rets_endpoint(jid: str, rdb: RedisDep) -> list[JobResult]:
 
 @app.websocket('/ws_jobs')
 async def websocket_jobs_rets_endpoint(websocket: WebSocket, rdb: RedisDep):
-    await manager.connect(websocket)
+    await MANAGER.connect(websocket)
 
     async def reader(channel: redis.client.PubSub):
         while True:
@@ -153,7 +150,7 @@ async def websocket_jobs_rets_endpoint(websocket: WebSocket, rdb: RedisDep):
 
                 try:
                     data = Job(**data)
-                    await manager.send_personal_json_message(data.model_dump(), websocket)
+                    await MANAGER.send_personal_json_message(data.model_dump(), websocket)
                 except ValidationError:
                     ...
 
@@ -166,12 +163,12 @@ async def websocket_jobs_rets_endpoint(websocket: WebSocket, rdb: RedisDep):
             await future
 
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        MANAGER.disconnect(websocket)
 
 
 @app.websocket('/ws_jobs/{jid}/rets')
 async def websocket_jobs_endpoint(websocket: WebSocket, jid: str, rdb: RedisDep):
-    await manager.connect(websocket)
+    await MANAGER.connect(websocket)
 
     async def reader(channel: redis.client.PubSub):
         while True:
@@ -183,7 +180,7 @@ async def websocket_jobs_endpoint(websocket: WebSocket, jid: str, rdb: RedisDep)
 
                 try:
                     data = JobResult(**data)
-                    await manager.send_personal_json_message(data.model_dump(), websocket)
+                    await MANAGER.send_personal_json_message(data.model_dump(), websocket)
                 except ValidationError:
                     ...
 
@@ -194,7 +191,7 @@ async def websocket_jobs_endpoint(websocket: WebSocket, jid: str, rdb: RedisDep)
             await future
 
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        MANAGER.disconnect(websocket)
 
 html = """
 <!DOCTYPE html>
