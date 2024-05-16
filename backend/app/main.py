@@ -107,8 +107,9 @@ async def get_job_endpoint(tag: str, rdb: RedisDep) -> Job:
 # TODO Close salt_master:8001
 # TODO make one-command container for salt-api
 @app.post('/jobs')
-async def create_job_endpoint(item: JobPost) -> str:
-    # TODO
+async def create_job_endpoint(item: JobPost) -> object:
+    # TODO Typification of return
+    await SALT_CLIENT._login()  # FIXME make auto
     try:
         resp = await SALT_CLIENT.run_job(
             tgt=item.tgt,
@@ -119,11 +120,6 @@ async def create_job_endpoint(item: JobPost) -> str:
     except SaltHttpClientError as error:
         raise http_errors.BadGateway(detail=str(error))
     jid = resp
-    try:
-        await SALT_CLIENT._login()
-    except SaltHttpClientError:
-        ...
-    jid = '0'
     return jid
 
 

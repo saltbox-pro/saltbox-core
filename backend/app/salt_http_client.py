@@ -34,10 +34,10 @@ def salt_http_client_login(fn):
         if not self._token or self.token_expires:
             await self._login()
         try:
-            return fn(*args, **kwargs)
+            return fn(self, *args, **kwargs)
         except SaltHttpClientUnauthorized:
             await self._login()
-            return fn(*args, **kwargs)
+            return fn(self, *args, **kwargs)
     return wrapper
 
 
@@ -81,7 +81,7 @@ class SaltHttpClient:
         if self._http is not None:
             await self._http.aclose()
         self._http = httpx.AsyncClient(**self._client_kwargs)
-        self._default_headers.pop(self.TOKEN_HEADER)
+        self._default_headers.pop(self.TOKEN_HEADER, None)
 
         try:
             resp = await self._http.post(
@@ -114,7 +114,7 @@ class SaltHttpClient:
         except httpx.HTTPStatusError as error:
             raise SaltHttpClientBadResponse(error)
 
-    @salt_http_client_login
+    #@salt_http_client_login
     async def run_job(
         self,
         tgt: str,
@@ -129,7 +129,7 @@ class SaltHttpClient:
             kwarg = {}
         data = {
             'arg': arg,
-            'client': 'local',
+            'client': 'local_async',
             'fun': fun,
             'kwarg': kwarg,
             'tgt': tgt,
