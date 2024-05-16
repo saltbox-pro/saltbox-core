@@ -1,12 +1,13 @@
 import asyncio
 import datetime
 import json
+import logging
 
-from typing import Union
+from typing import Annotated, Union
 
 import redis.asyncio as redis
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import Form, WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi_offline import FastAPIOffline
@@ -15,14 +16,17 @@ from pydantic import ValidationError
 from app import http_errors
 from app.config import SETTINGS
 from app.deps import RedisDep
-from app.models.salt import Job, JobPost, JobResult, SaltAuthPost
+from app.models.salt import Job, JobPost, JobResult
 from app.salt_http_client import SaltHttpClient, SaltHttpClientError
+
+FormStr = Annotated[str, Form()]
 
 SALT_CLIENT = SaltHttpClient(
     SETTINGS.salt_url,
     strict_ssl=False,
     username=SETTINGS.salt_username,
     password=SETTINGS.salt_password)
+LOGGER = logging.getLogger(__name__)
 
 
 def get_jid(datatime_val: datetime.datetime) -> int:
@@ -57,15 +61,14 @@ app = FastAPIOffline(title='FastMS')
 MANAGER = ConnectionManager()
 
 
-# FIXME 422 Uprocessable Entyty
-@app.post('/salt_auth', status_code=200)
-async def salt_auth_endpoint(data: SaltAuthPost) -> JSONResponse:
+@app.post('/salt_auth')
+async def salt_auth_endpoint(username: FormStr, password: FormStr) -> JSONResponse:
     """ For salt.auth.rest """
-    if data.username == SETTINGS.salt_username and data.password == SETTINGS.salt_password:
+    if username == SETTINGS.salt_username and password == SETTINGS.salt_password:
         acl = ['.*', '@wheel', '@jobs', '@runner']
         return JSONResponse(content=jsonable_encoder(acl))
     else:
-        raise http_errors.Unauthorized(f'Unknown user {data.username} or invalid password')
+        raise http_errors.Unauthorized(f'Unknown user {username} or invalid password')
 
 
 @app.get('/jobs')
@@ -116,6 +119,11 @@ async def create_job_endpoint(item: JobPost) -> str:
     except SaltHttpClientError as error:
         raise http_errors.BadGateway(detail=str(error))
     jid = resp
+    try:
+        await SALT_CLIENT._login()
+    except SaltHttpClientError:
+        ...
+    jid = '0'
     return jid
 
 
@@ -234,9 +242,10 @@ async def get() -> HTMLResponse:
     return HTMLResponse(html)
 
 
-# @app.get('/jobs/stat')
-# async def get_jobs():
-#     res_count = await r.zcard(name='jobs')
-#     first = await r.zrange('jobs', start=0, end=0)
-#     last = await r.zrange('jobs', start=-1, end=-1)
-#     return res_count, json.loads(first[0]), json.loads(last[0])
+@app.get('/jobs/stat')
+async def get_jobs_stat():
+    #res_count = await r.zcard(name='jobs')
+    #first = await r.zrange('jobs', start=0, end=0)
+    #last = await r.zrange('jobs', start=-1, end=-1)
+    #return res_count, json.loads(first[0]), json.loads(last[0])
+    raise http_errors.NotImplemented('KAMINSUN')
