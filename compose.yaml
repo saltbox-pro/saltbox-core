@@ -17,6 +17,8 @@ services:
     ports:
       - '4505-4506:4505-4506'
       - '8001:8000'  # FIXME do not expose
+    volumes:
+      - 'salt_master_pki:/etc/salt/pki/'
     depends_on:
       - redis
   redis:
@@ -64,3 +66,5 @@ services:
     deploy:
       mode: replicated
       replicas: ${MINION_REPLICAS:-1}
+volumes:
+  salt_master_pki: {}
