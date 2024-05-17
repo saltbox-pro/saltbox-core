@@ -6,7 +6,10 @@ from pprint import pformat
 from typing import Optional
 
 import httpx
+import pydantic
 import ssl
+
+from app.models.salt import AuthResponse
 
 
 LOGGER = logging.getLogger(__name__)
@@ -70,7 +73,7 @@ class SaltHttpClient:
         self._default_headers = {
             'Accept': 'application/json',
         }
-        self._http: Optional[httpx.AsyncClient] = None
+        self._http: Optional[httpx.AsyncClient] = None  # TODO Use or delete
         self._token = ''
         self._token_expire = datetime.fromtimestamp(0.0)
 
@@ -106,11 +109,13 @@ class SaltHttpClient:
         except httpx.HTTPStatusError as error:
             raise SaltHttpClientBadResponse(error)
 
-        # TODO Handle errors
-        body = resp.json()
-        ret = body['return'][0]
-        self._token = ret['token']
-        self._token_expire = datetime.fromtimestamp(ret['expire'])
+        try:
+            body = AuthResponse.model_validate_json(resp.text)
+        except pydantic.ValidationError as err:
+            raise SaltHttpClientBadResponse(err)
+        ret = body.return_[0]
+        self._token = ret.token
+        self._token_expire = datetime.fromtimestamp(ret.expire)
         self._default_headers[self.TOKEN_HEADER] = self._token
 
     def _raise_for_status(self, response: httpx.Response) -> None:

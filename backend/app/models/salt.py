@@ -1,6 +1,19 @@
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, conlist
+
+
+class AuthItem(BaseModel):
+    eauth: str
+    expire: float
+    perms: list[str]
+    start: float
+    token: str
+    user: str
+
+
+class AuthResponse(BaseModel):
+    return_: conlist(AuthItem, min_length=1) = Field(alias='return')
 
 
 class Job(BaseModel):
@@ -32,11 +45,11 @@ class JobResult(BaseModel):
 class PubData(BaseModel):
     """ Salt LocalClient.run_job response representation """
     jid: int
-    minions: list[str]
+    minions: conlist(str, min_length=1)
 
 
 class CreateJobResponse(BaseModel):
-    return_: list[PubData] = Field(alias='return')
+    return_: conlist(PubData, min_length=1) = Field(alias='return')
 
 
 class CreateJobRequest(BaseModel):
