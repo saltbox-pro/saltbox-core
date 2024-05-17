@@ -14,7 +14,7 @@ from fastapi_offline import FastAPIOffline
 from pydantic import ValidationError
 
 from app import http_errors
-from app.config import SETTINGS
+from app.config import APP_NAME, SETTINGS, LOG_CONFIG
 from app.deps import RedisDep
 from app.models.salt import (
     CreateJobRequest, CreateJobResponse, Job, JobResult
@@ -29,6 +29,8 @@ SALT_CLIENT = SaltHttpClient(
     username=SETTINGS.salt_username,
     password=SETTINGS.salt_password)
 LOGGER = logging.getLogger(__name__)
+
+logging.config.dictConfig(LOG_CONFIG.dict())
 
 
 def get_jid(datatime_val: datetime.datetime) -> int:
@@ -59,7 +61,7 @@ class ConnectionManager:
             await connection.send_text(message)
 
 
-app = FastAPIOffline(title='FastMS')
+app = FastAPIOffline(title=APP_NAME)
 MANAGER = ConnectionManager()
 
 
