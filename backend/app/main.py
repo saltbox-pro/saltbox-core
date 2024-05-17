@@ -106,11 +106,8 @@ async def get_job_endpoint(tag: str, rdb: RedisDep) -> Job:
         raise http_errors.InternalServerError(detail=e.errors())
 
 
-# TODO Close salt_master:8001
-# TODO make one-command container for salt-api
 @app.post('/jobs')
 async def create_job_endpoint(item: CreateJobRequest) -> CreateJobResponse:
-    await SALT_CLIENT._login()  # FIXME make auto
     try:
         ret = await SALT_CLIENT.run_job(
             tgt=item.tgt,
@@ -240,8 +237,8 @@ async def get() -> HTMLResponse:
 
 @app.get('/jobs/stat')
 async def get_jobs_stat():
-    #res_count = await r.zcard(name='jobs')
-    #first = await r.zrange('jobs', start=0, end=0)
-    #last = await r.zrange('jobs', start=-1, end=-1)
-    #return res_count, json.loads(first[0]), json.loads(last[0])
+    # res_count = await r.zcard(name='jobs')
+    # first = await r.zrange('jobs', start=0, end=0)
+    # last = await r.zrange('jobs', start=-1, end=-1)
+    # return res_count, json.loads(first[0]), json.loads(last[0])
     raise http_errors.NotImplemented('KAMINSUN')

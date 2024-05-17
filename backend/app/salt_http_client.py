@@ -1,5 +1,6 @@
 import logging
 
+from datetime import datetime, timedelta
 from functools import wraps
 from pprint import pformat
 from typing import Optional
@@ -10,6 +11,7 @@ import ssl
 
 LOGGER = logging.getLogger(__name__)
 DEBUG_INDENT = 2
+RETRIES_ON_AUTH_ERROR = 1
 
 
 class SaltHttpClientError(RuntimeError):
@@ -32,18 +34,21 @@ def salt_http_client_login(fn):
     @wraps(fn)
     async def wrapper(self: 'SaltHttpClient', *args, **kwargs):
         if not self._token or self.token_expires:
+            LOGGER.info('Authenticate salt client due missing or expiring token')
             await self._login()
-        try:
-            return fn(self, *args, **kwargs)
-        except SaltHttpClientUnauthorized:
-            await self._login()
-            return fn(self, *args, **kwargs)
+        for _ in range(1 + RETRIES_ON_AUTH_ERROR):
+            try:
+                return await fn(self, *args, **kwargs)
+            except SaltHttpClientUnauthorized:
+                LOGGER.warning('Try to reauthenticate salt client after authorization error')
+                await self._login()
     return wrapper
 
 
 class SaltHttpClient:
     """ SaltStack CherryPy Rest API client """
     TOKEN_HEADER = 'X-Auth-Token'
+    TOKEN_BEST_BEFORE_SEC = 3600
 
     def __init__(
         self,
@@ -67,12 +72,14 @@ class SaltHttpClient:
         }
         self._http: Optional[httpx.AsyncClient] = None
         self._token = ''
-        self._token_expire = 0.0
+        self._token_expire = datetime.fromtimestamp(0.0)
+
+    def token_expires_in(self, seconds) -> bool:
+        return datetime.now() - self._token_expire < timedelta(seconds=seconds)
 
     @property
     def token_expires(self) -> bool:
-        # TODO
-        return False
+        return self.token_expires_in(self.TOKEN_BEST_BEFORE_SEC)
 
     def get_url(self, endpoint: str) -> str:
         return f'{self._instance}/{endpoint}'
@@ -103,7 +110,7 @@ class SaltHttpClient:
         body = resp.json()
         ret = body['return'][0]
         self._token = ret['token']
-        self._token_expire = ret['expire']  # TODO Convert epoch?
+        self._token_expire = datetime.fromtimestamp(ret['expire'])
         self._default_headers[self.TOKEN_HEADER] = self._token
 
     def _raise_for_status(self, response: httpx.Response) -> None:
@@ -114,7 +121,7 @@ class SaltHttpClient:
         except httpx.HTTPStatusError as error:
             raise SaltHttpClientBadResponse(error)
 
-    #@salt_http_client_login
+    @salt_http_client_login
     async def run_job(
         self,
         tgt: str,
