@@ -1,6 +1,6 @@
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Job(BaseModel):
@@ -15,14 +15,6 @@ class Job(BaseModel):
     _stamp: str
 
 
-class JobPost(BaseModel):
-    tgt: str = '*'
-    tgt_type: str = 'glob'
-    fun: str = 'test.ping'
-    arg: list = []
-    kwarg: dict = {}
-
-
 class JobResult(BaseModel):
     _cmd: str
     id: str
@@ -35,3 +27,21 @@ class JobResult(BaseModel):
     fun_kwarg: Optional[dict] = None
     user: str
     _stamp: str
+
+
+class PubData(BaseModel):
+    """ Salt LocalClient.run_job response representation """
+    jid: int
+    minions: list[str]
+
+
+class CreateJobResponse(BaseModel):
+    return_: list[PubData] = Field(alias='return')
+
+
+class CreateJobRequest(BaseModel):
+    tgt: str = '*'
+    tgt_type: str = 'glob'
+    fun: str = 'test.ping'
+    arg: list = []
+    kwarg: dict = {}

@@ -122,7 +122,7 @@ class SaltHttpClient:
         arg: Optional[list] = None,
         kwarg: Optional[dict] = None,
         tgt_type='glob',
-    ) -> str:
+    ) -> dict[str, list]:
         if arg is None:
             arg = []
         if kwarg is None:
