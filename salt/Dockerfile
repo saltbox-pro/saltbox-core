@@ -42,4 +42,5 @@ CMD ["/usr/local/bin/saltinit"]
 
 FROM salt-base AS salt-minion
 COPY ./minion.yaml /etc/salt/minion.d/minion.conf
+# TODO Try to replace with supervisord
 CMD ["/usr/local/bin/salt-minion"]
