@@ -35,27 +35,6 @@ class SaltHttpClientUnauthorized(SaltHttpClientBadResponse):
     ...
 
 
-def salt_http_client_login(fn):
-    @wraps(fn)
-    async def wrapper(self: 'SaltHttpClient', *args, **kwargs) -> Awaitable:
-        if self.token_expires:
-            LOGGER.info(
-                'Authenticate salt client due to token expiration time %s',
-                self._token_expire.isoformat())
-            await self._login()
-        for try_n in range(1, 1 + RETRIES_ON_AUTH_ERROR):
-            if try_n > 0:
-                LOGGER.warning(
-                    'Try %i to reauthenticate salt client after authorization error',
-                    try_n)
-                await self._login()
-            with contextlib.suppress(SaltHttpClientUnauthorized):
-                return await fn(self, *args, **kwargs)
-        raise SaltHttpClientUnauthorized('Failed to authenticate client')
-
-    return wrapper
-
-
 class SaltHttpClient:
     """ SaltStack CherryPy Rest API client """
     TOKEN_BEST_BEFORE_SEC = 3600
@@ -111,7 +90,29 @@ class SaltHttpClient:
         ret = body.return_[0]
         self._token_expire = datetime.fromtimestamp(ret.expire)
 
-    def _raise_for_status(self, response: httpx.Response) -> None:
+    @staticmethod
+    def _login_decorator(fn):
+        @wraps(fn)
+        async def wrapper(self: 'SaltHttpClient', *args, **kwargs) -> Awaitable:
+            if self.token_expires:
+                LOGGER.info(
+                    'Authenticate salt client due to token expiration time %s',
+                    self._token_expire.isoformat())
+                await self._login()
+            for try_n in range(1, 1 + RETRIES_ON_AUTH_ERROR):
+                if try_n > 0:
+                    LOGGER.warning(
+                        'Try %i to reauthenticate salt client after authorization error',
+                        try_n)
+                    await self._login()
+                with contextlib.suppress(SaltHttpClientUnauthorized):
+                    return await fn(self, *args, **kwargs)
+            raise SaltHttpClientUnauthorized('Failed to authenticate client')
+
+        return wrapper
+
+    @staticmethod
+    def _raise_for_status(response: httpx.Response) -> None:
         if response.status_code == 401:
             raise SaltHttpClientError('Unexpectedly unauthorized')
         try:
@@ -119,7 +120,13 @@ class SaltHttpClient:
         except httpx.HTTPStatusError as error:
             raise SaltHttpClientBadResponse(error)
 
-    @salt_http_client_login
+    @staticmethod
+    def _log_response(response: httpx.Response) -> None:
+        LOGGER.debug(
+            'Response headers:\n%s', pformat(dict(response.headers), indent=DEBUG_INDENT))
+        LOGGER.debug('Response body:\n%s', response.content.decode())
+
+    @_login_decorator
     async def run_job(
         self,
         tgt: str,
@@ -149,8 +156,6 @@ class SaltHttpClient:
                 msg = type(error).__name__
             raise SaltHttpClientConnectionError(msg)
 
-        LOGGER.debug('Response headers:\n%s', pformat(dict(resp.headers), indent=DEBUG_INDENT))
-        LOGGER.debug('Response body:\n%s', resp.content.decode())
-
+        self._log_response(resp)
         self._raise_for_status(resp)
         return resp.json()
