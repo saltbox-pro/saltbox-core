@@ -1,0 +1,8 @@
+services:
+  salt_master:
+    ports:
+      - '4505-4506:4505-4506'
+      - '8001:8000'
+  redis:
+    ports:
+      - '6379:6379'
