@@ -7,6 +7,7 @@ services:
         ALPINE_VERSION: ${ALPINE_VERSION}
         SALT_VERSION: ${SALT_VERSION}
         PYTHON_VERSION: ${SALT_PYTHON_VERSION}
+    init: true
     develop:
       watch:
         - action: rebuild
@@ -21,7 +22,7 @@ services:
     depends_on:
       - redis
   redis:
-    image: redis:latest
+    image: redis:7.2-alpine
     container_name: fastms-redis
     ports:
       - '6379:6379'
@@ -55,6 +56,7 @@ services:
         ALPINE_VERSION: ${ALPINE_VERSION}
         SALT_VERSION: ${SALT_VERSION}
         PYTHON_VERSION: ${SALT_PYTHON_VERSION}
+    init: true
     develop:
       watch:
         - action: rebuild
