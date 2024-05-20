@@ -29,10 +29,6 @@ RUN \
     apk del $BUILD_DEPS && \
     su - salt -c 'salt-run salt.cmd tls.create_self_signed_cert'
 
-# TODO try one-command container for salt-api
-CMD ["/usr/local/bin/saltinit"]
-COPY saltinit.py /usr/local/bin/saltinit
-
 FROM salt-base AS salt-master
 COPY master.yaml /etc/salt/master.d/master.conf
 COPY api.yaml /etc/salt/master.d/api.conf
@@ -41,6 +37,9 @@ COPY redis_bridge.py /srv/salt_extmod/engines/redis_bridge.py
 COPY ./requirements.txt /tmp/requirements.txt
 RUN pip3 install --no-cache-dir --upgrade -r /tmp/requirements.txt
 EXPOSE 4505 4506 8000
+COPY saltinit.py /usr/local/bin/saltinit
+CMD ["/usr/local/bin/saltinit"]
 
 FROM salt-base AS salt-minion
 COPY ./minion.yaml /etc/salt/minion.d/minion.conf
+CMD ["/usr/local/bin/salt-minion"]

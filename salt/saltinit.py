@@ -1,24 +1,20 @@
 #!/usr/bin/env python3
 import asyncio
-import os
 import signal
 
 
 async def main():
     futures = []
-    if "SALT_MINION" in os.environ:
-        futures.append(await asyncio.create_subprocess_exec("salt-minion"))
 
-    if "SALT_MASTER" in os.environ:
-        futures.append(await asyncio.create_subprocess_exec("salt-api"))
-        futures.append(await asyncio.create_subprocess_exec("salt-master"))
+    futures.append(await asyncio.create_subprocess_exec('salt-api'))
+    futures.append(await asyncio.create_subprocess_exec('salt-master'))
 
     await asyncio.gather(*[future.communicate() for future in futures])
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     loop = asyncio.new_event_loop()
-    for signame in {"SIGINT", "SIGTERM"}:
+    for signame in {'SIGINT', 'SIGTERM'}:
         loop.add_signal_handler(getattr(signal, signame), loop.stop)
 
     try:
