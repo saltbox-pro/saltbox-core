@@ -6,3 +6,19 @@ services:
   redis:
     ports:
       - '6379:6379'
+  salt_minion:
+    build:
+      context: salt/
+      target: salt-minion
+      args:
+        ALPINE_VERSION: ${ALPINE_VERSION}
+        SALT_VERSION: ${SALT_VERSION}
+        PYTHON_VERSION: ${SALT_PYTHON_VERSION}
+    init: true
+    develop:
+      watch:
+        - action: rebuild
+          path: salt/
+    deploy:
+      mode: replicated
+      replicas: ${MINION_REPLICAS:-1}
