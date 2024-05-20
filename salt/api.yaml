@@ -3,15 +3,9 @@ rest_cherrypy:
   ssl_crt: /etc/pki/tls/certs/localhost.crt
   ssl_key: /etc/pki/tls/certs/localhost.key
   debug: True
+
 external_auth:
-  sharedsecret:
-    salt:
-      - .*
-      - '@wheel'
-      - '@jobs'
-      - '@runner'
   rest:
-    ^url: http://fastms-application:8000/cherrypy_run_auth_stub
+    ^url: http://fastms-application:8000/salt_auth
 
 keep_acl_in_token: True
-sharedsecret: mysecretpassword

@@ -1,6 +1,19 @@
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field, conlist
+
+
+class AuthItem(BaseModel):
+    eauth: str
+    expire: float
+    perms: list[str]
+    start: float
+    token: str
+    user: str
+
+
+class AuthResponse(BaseModel):
+    return_: conlist(AuthItem, min_length=1) = Field(alias='return')
 
 
 class Job(BaseModel):
@@ -15,14 +28,6 @@ class Job(BaseModel):
     _stamp: str
 
 
-class JobPost(BaseModel):
-    tgt: str = '*'
-    tgt_type: str = "glob"
-    fun: str = 'test.ping'
-    arg: Optional[list] = None
-    kwarg: Optional[dict] = None
-
-
 class JobResult(BaseModel):
     _cmd: str
     id: str
@@ -35,3 +40,21 @@ class JobResult(BaseModel):
     fun_kwarg: Optional[dict] = None
     user: str
     _stamp: str
+
+
+class PubData(BaseModel):
+    """ Salt LocalClient.run_job response representation """
+    jid: int
+    minions: conlist(str, min_length=1)
+
+
+class CreateJobResponse(BaseModel):
+    return_: conlist(PubData, min_length=1) = Field(alias='return')
+
+
+class CreateJobRequest(BaseModel):
+    tgt: str = '*'
+    tgt_type: str = 'glob'
+    fun: str = 'test.ping'
+    arg: list = []
+    kwarg: dict = {}

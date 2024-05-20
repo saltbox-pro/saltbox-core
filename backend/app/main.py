@@ -1,17 +1,36 @@
-# uvicorn main:app --host 192.168.122.197 --port 80 --reload
 import asyncio
 import datetime
 import json
-from typing import Union
+import logging
+
+from typing import Annotated, Union
 
 import redis.asyncio as redis
-from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect, Request
-from pydantic import ValidationError
-from fastapi.responses import JSONResponse, HTMLResponse
-from fastapi.encoders import jsonable_encoder
 
+from fastapi import Form, WebSocket, WebSocketDisconnect
+from fastapi.encoders import jsonable_encoder
+from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi_offline import FastAPIOffline
+from pydantic import ValidationError
+
+from app import http_errors
+from app.config import APP_NAME, SETTINGS, LOG_CONFIG
 from app.deps import RedisDep
-from app.models.salt import Job, JobResult
+from app.models.salt import (
+    CreateJobRequest, CreateJobResponse, Job, JobResult
+)
+from app.salt_http_client import SaltHttpClient, SaltHttpClientError
+
+FormStr = Annotated[str, Form()]
+
+SALT_CLIENT = SaltHttpClient(
+    SETTINGS.salt_url,
+    strict_ssl=False,
+    username=SETTINGS.salt_username,
+    password=SETTINGS.salt_password)
+LOGGER = logging.getLogger(__name__)
+
+logging.config.dictConfig(LOG_CONFIG.dict())
 
 
 def get_jid(datatime_val: datetime.datetime) -> int:
@@ -42,20 +61,18 @@ class ConnectionManager:
             await connection.send_text(message)
 
 
-app = FastAPI(
-    title='FastMS'
-)
+app = FastAPIOffline(title=APP_NAME)
+MANAGER = ConnectionManager()
 
 
-manager = ConnectionManager()
-
-
-@app.post('/cherrypy_fake_rest_auth', status_code=200)
-async def run_fake_auth(request: Request):
-    await request.body()
-    data = ['.*', '@wheel', '@jobs', '@runner']
-    json_compatible_item_data = jsonable_encoder(data)
-    return JSONResponse(content=json_compatible_item_data)
+@app.post('/salt_auth')
+async def salt_auth_endpoint(username: FormStr, password: FormStr) -> JSONResponse:
+    """ For salt.auth.rest """
+    if username == SETTINGS.salt_username and password == SETTINGS.salt_password:
+        acl = ['.*', '@wheel', '@jobs', '@runner']
+        return JSONResponse(content=jsonable_encoder(acl))
+    else:
+        raise http_errors.Unauthorized(f'Unknown user {username} or invalid password')
 
 
 @app.get('/jobs')
@@ -73,7 +90,7 @@ async def get_jobs_endpoint(
     try:
         return [Job(**i) for i in res]
     except ValidationError as err:
-        raise HTTPException(status_code=404, detail=err.errors())
+        raise http_errors.InternalServerError(detail=err.errors())
 
 
 @app.get('/jobs/{tag}')
@@ -81,27 +98,28 @@ async def get_job_endpoint(tag: str, rdb: RedisDep) -> Job:
     res_ = await rdb.zrange('jobs', start=int(tag), end=int(tag), byscore=True)
 
     if not res_:
-        raise HTTPException(status_code=404, detail='Job not found')
+        raise http_errors.NotFound(detail='Job not found')
 
     res = json.loads(res_[0])
 
     try:
         return Job(**res)
     except ValidationError as e:
-        raise HTTPException(status_code=404, detail=e.errors())
+        raise http_errors.InternalServerError(detail=e.errors())
 
 
-# @app.post('/jobs')
-# async def create_job_endpoint(item: JobPost) -> str:
-#     local_client = LocalClient()
-#     jid = local_client.cmd_async(
-#         tgt=item.tgt,
-#         tgt_type=item.tgt_type,
-#         fun=item.fun,
-#         arg=item.arg,
-#         kwarg=item.kwarg
-#     )
-#     return jid
+@app.post('/jobs')
+async def create_job_endpoint(item: CreateJobRequest) -> CreateJobResponse:
+    try:
+        ret = await SALT_CLIENT.run_job(
+            tgt=item.tgt,
+            fun=item.fun,
+            arg=item.arg,
+            kwarg=item.kwarg,
+            tgt_type=item.tgt_type)
+    except SaltHttpClientError as error:
+        raise http_errors.BadGateway(detail=str(error))
+    return CreateJobResponse.model_validate(ret)
 
 
 @app.get('/jobs/{jid}/rets')
@@ -116,14 +134,14 @@ async def get_job_rets_endpoint(jid: str, rdb: RedisDep) -> list[JobResult]:
         try:
             res.append(JobResult(**data))
         except ValidationError as e:
-            raise HTTPException(status_code=404, detail=e.errors())
+            raise http_errors.InternalServerError(detail=e.errors())
 
     return res
 
 
 @app.websocket('/ws_jobs')
 async def websocket_jobs_rets_endpoint(websocket: WebSocket, rdb: RedisDep):
-    await manager.connect(websocket)
+    await MANAGER.connect(websocket)
 
     async def reader(channel: redis.client.PubSub):
         while True:
@@ -135,7 +153,7 @@ async def websocket_jobs_rets_endpoint(websocket: WebSocket, rdb: RedisDep):
 
                 try:
                     data = Job(**data)
-                    await manager.send_personal_json_message(data.model_dump(), websocket)
+                    await MANAGER.send_personal_json_message(data.model_dump(), websocket)
                 except ValidationError:
                     ...
 
@@ -148,12 +166,12 @@ async def websocket_jobs_rets_endpoint(websocket: WebSocket, rdb: RedisDep):
             await future
 
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        MANAGER.disconnect(websocket)
 
 
 @app.websocket('/ws_jobs/{jid}/rets')
 async def websocket_jobs_endpoint(websocket: WebSocket, jid: str, rdb: RedisDep):
-    await manager.connect(websocket)
+    await MANAGER.connect(websocket)
 
     async def reader(channel: redis.client.PubSub):
         while True:
@@ -165,7 +183,7 @@ async def websocket_jobs_endpoint(websocket: WebSocket, jid: str, rdb: RedisDep)
 
                 try:
                     data = JobResult(**data)
-                    await manager.send_personal_json_message(data.model_dump(), websocket)
+                    await MANAGER.send_personal_json_message(data.model_dump(), websocket)
                 except ValidationError:
                     ...
 
@@ -176,7 +194,7 @@ async def websocket_jobs_endpoint(websocket: WebSocket, jid: str, rdb: RedisDep)
             await future
 
     except WebSocketDisconnect:
-        manager.disconnect(websocket)
+        MANAGER.disconnect(websocket)
 
 html = """
 <!DOCTYPE html>
@@ -214,14 +232,15 @@ html = """
 
 
 @app.get('/')
-async def get():
+async def get() -> HTMLResponse:
     # TODO
     return HTMLResponse(html)
 
 
-# @app.get('/jobs/stat')
-# async def get_jobs():
-#     res_count = await r.zcard(name='jobs')
-#     first = await r.zrange('jobs', start=0, end=0)
-#     last = await r.zrange('jobs', start=-1, end=-1)
-#     return res_count, json.loads(first[0]), json.loads(last[0])
+@app.get('/jobs/stat')
+async def get_jobs_stat():
+    # res_count = await r.zcard(name='jobs')
+    # first = await r.zrange('jobs', start=0, end=0)
+    # last = await r.zrange('jobs', start=-1, end=-1)
+    # return res_count, json.loads(first[0]), json.loads(last[0])
+    raise http_errors.NotImplemented('KAMINSUN')

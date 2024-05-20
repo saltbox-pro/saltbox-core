@@ -1,21 +1,23 @@
 [project]
+dynamic = [ 'dependencies' ]
 name = 'fastms-core'
 version = '0.0.0'
 requires-python = '>=3.9'
 license = { 'text' = 'N/A' }  # FIXME
 description = ''
 readme = 'README.md'
-dependencies = [ ]
 
 [project.optional-dependencies]
 dev = [
-  'flake8',
-  'Flake8-pyproject',
-  'ipython',
-  'mypy',
-  'pre-commit',
-  'pylint',
-  'types-redis',
+    'Flake8-pyproject',
+    'flake8',
+    'flake8-logging',
+    'ipython',
+    'mypy',
+    'pre-commit',
+    'pylint',
+    'types-redis',
+    'python-lsp-server[all]',
 ]
 
 [project.scripts]
@@ -27,8 +29,11 @@ url = 'https://gitlab/fastms'
 requires = ['setuptools', 'setuptools-scm']
 build-backend = 'setuptools.build_meta'
 
-[tool.setuptools]
-package-dir = { 'backend' = 'backend/' }
+[tool.setuptools.package-dir]
+'fastms_core.backend' = './backend/'
+
+[tool.setuptools.dynamic]
+dependencies = { file = ['backend/requirements.txt'] }
 
 [tool.flake8]
 max-line-length = 120
@@ -37,3 +42,4 @@ builtins = '__opts__'
 
 [tool.mypy]
 check_untyped_defs = true
+plugins = [ 'pydantic.mypy' ]
