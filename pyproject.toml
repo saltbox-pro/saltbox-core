@@ -38,7 +38,7 @@ dependencies = { file = ['backend/requirements.txt'] }
 [tool.flake8]
 max-line-length = 120
 extend-ignore = [ ]
-builtins = '__opts__'
+builtins = [ '__opts__', '__salt__' ]
 
 [tool.mypy]
 check_untyped_defs = true

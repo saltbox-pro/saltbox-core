@@ -1,19 +1,17 @@
 """
-В конфиг мастера:
+Salt master config:
 
     module_dirs:
-      - /srv/salt_extmod/  # Произвольная доп. директория с модулями для мастера.
-                           # Не стоит смешивать с /srv/salt/
+      - /srv/salt_extmod/  # Custom modules' dir for the master
+                           # better not to mix with /srv/salt/
 
     engines:
-      - redis_bridge:  # Дальше идут аргументы для start()
-          host: localhost  # Тут будет fastms-redis для контейнеров
+      - redis_bridge:  # start() args following
+          host: localhost  # Redis insance
 
-Модуль разместить в указанной в module_dirs директории в поддиректории enines:
-/srv/salt_extmod/engines/redis_bridge.py
+Put the module to /srv/salt_extmod/engines/redis_bridge.py
 
-Рестартнуть salt-master. Журнал и исключения будут в журнале salt-master.
-
+Restart salt-master. Log and exceptions will be in salt-master log.
 """
 
 import logging
@@ -27,6 +25,8 @@ from salt.utils.event import get_master_event
 from salt.utils import json
 
 LOGGER = logging.getLogger(__name__)
+__opts__: dict
+__salt__: dict
 
 
 def __virtual__() -> Union[bool, tuple[bool, str]]:
@@ -52,19 +52,17 @@ class RedisPusher:
 
         LOGGER.debug('%s got event with tag "%s"', __name__, tag)
 
-        match = tag_new.match(tag)
-        if match:
-            # Наблюдение: при вызове salt-call события salt/job/*/new нет
-            # (а salt/job/*/ret/* есть)
+        if match := tag_new.match(tag):
+            # Mention: on salt-call call there is no salt/job/*/new event
+            # (but on salt/job/*/ret/* it is)
             jid = match.group('jid')
             LOGGER.info('New job: %s', jid)
-            # self.redisset(name=f'job:{jid}', value=body)
             self.redis.zadd(name='jobs', mapping={body: int(jid)})
+            # _stamp keyword will not be in websocket message
             self.redis.publish(channel=f'job:{jid}', message=body)
             return
 
-        match = tag_ret.match(tag)
-        if match:
+        elif match := tag_ret.match(tag):
             jid = match.group('jid')
             mid = match.group('mid')
             LOGGER.info('New job return: %s: %s', jid, mid)
