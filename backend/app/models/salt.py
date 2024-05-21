@@ -28,7 +28,7 @@ class Job(BaseModel):
     arg: Optional[list] = None
     kwarg: Optional[dict] = None
     minions: list[str]
-    _stamp: str # FIXME Missing
+    stamp: str = Field(alias='_stamp')
 
     @computed_field(title='Timestamp decoded from JID')
     def fms_jid_timestamp(self) -> datetime:
@@ -36,7 +36,7 @@ class Job(BaseModel):
 
 
 class JobResult(BaseModel):
-    _cmd: str
+    cmd: str
     id: str
     success: bool
     retdata: Any
@@ -46,7 +46,7 @@ class JobResult(BaseModel):
     fun_args: Optional[list] = None
     fun_kwarg: Optional[dict] = None
     user: str
-    _stamp: str
+    stamp: str = Field(alias='_stamp')
 
 
 class PubData(BaseModel):
