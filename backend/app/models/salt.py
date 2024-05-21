@@ -1,6 +1,9 @@
+from datetime import datetime
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel, Field, conlist
+from pydantic import BaseModel, Field, conlist, computed_field
+
+from app.utilities.jid import jid_to_datetime
 
 
 class AuthItem(BaseModel):
@@ -25,7 +28,11 @@ class Job(BaseModel):
     arg: Optional[list] = None
     kwarg: Optional[dict] = None
     minions: list[str]
-    _stamp: str
+    _stamp: str # FIXME Missing
+
+    @computed_field(title='Timestamp decoded from JID')
+    def fms_jid_timestamp(self) -> datetime:
+        return jid_to_datetime(self.jid)
 
 
 class JobResult(BaseModel):

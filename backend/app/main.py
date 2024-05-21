@@ -20,6 +20,7 @@ from app.models.salt import (
     CreateJobRequest, CreateJobResponse, Job, JobResult
 )
 from app.salt_http_client import SaltHttpClient, SaltHttpClientError
+from app.utilities.jid import jid_from_datetime
 
 FormStr = Annotated[str, Form()]
 
@@ -31,10 +32,6 @@ SALT_CLIENT = SaltHttpClient(
 LOGGER = logging.getLogger(__name__)
 
 logging.config.dictConfig(LOG_CONFIG.dict())
-
-
-def get_jid(datatime_val: datetime.datetime) -> int:
-    return int("{:%Y%m%d%H%M%S%f}".format(datatime_val))
 
 
 class ConnectionManager:
@@ -80,10 +77,9 @@ async def get_jobs_endpoint(
         start_datetime: datetime.datetime,
         end_datetime: datetime.datetime, rdb: RedisDep
 ) -> list[Job]:
-    start = get_jid(datatime_val=start_datetime)
-    end = get_jid(datatime_val=end_datetime)
+    start = jid_from_datetime(start_datetime)
+    end = jid_from_datetime(end_datetime)
 
-    # res_count = await r.zcount(name='jobs', min=start, max=end)
     res_ = await rdb.zrange('jobs', start=end, end=start, desc=True, byscore=True)
     res = [json.loads(i) for i in res_]
 
@@ -119,6 +115,15 @@ async def create_job_endpoint(item: CreateJobRequest) -> CreateJobResponse:
             tgt_type=item.tgt_type)
     except SaltHttpClientError as error:
         raise http_errors.BadGateway(detail=str(error))
+    # TODO Check jid tz
+    # FIXME
+    '''
+    {
+      "return": [
+        {}
+      ]
+    }
+    '''
     return CreateJobResponse.model_validate(ret)
 
 
@@ -129,7 +134,7 @@ async def get_job_rets_endpoint(jid: str, rdb: RedisDep) -> list[JobResult]:
     res = []
     for _, ret in res_.items():
         data = json.loads(ret)
-        data['retdata'] = data.pop('return')
+        data['retdata'] = data.pop('return')  # FIXME And in other places
 
         try:
             res.append(JobResult(**data))
@@ -184,8 +189,8 @@ async def websocket_jobs_endpoint(websocket: WebSocket, jid: str, rdb: RedisDep)
                 try:
                     data = JobResult(**data)
                     await MANAGER.send_personal_json_message(data.model_dump(), websocket)
-                except ValidationError:
-                    ...
+                except ValidationError as err:
+                    LOGGER.error('%s', err, exc_info=False)
 
     try:
         async with rdb.pubsub() as pubsub:
