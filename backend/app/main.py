@@ -134,7 +134,6 @@ async def get_job_rets_endpoint(jid: str, rdb: RedisDep) -> list[JobResult]:
     res = []
     for _, ret in res_.items():
         data = json.loads(ret)
-        data['retdata'] = data.pop('return')  # FIXME And in other places
 
         try:
             res.append(JobResult(**data))
@@ -184,7 +183,6 @@ async def websocket_jobs_endpoint(websocket: WebSocket, jid: str, rdb: RedisDep)
             if message is not None:
                 decoded_data = message['data'].decode("utf-8")
                 data = json.loads(decoded_data)
-                data['retdata'] = data.pop('return')
 
                 try:
                     data = JobResult(**data)

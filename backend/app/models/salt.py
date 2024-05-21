@@ -39,7 +39,7 @@ class JobResult(BaseModel):
     cmd: str
     id: str
     success: bool
-    retdata: Any
+    return_: Any = Field(alias='return')
     retcode: int
     jid: str
     fun: str
