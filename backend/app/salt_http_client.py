@@ -37,7 +37,7 @@ class SaltHttpClientUnauthorized(SaltHttpClientBadResponse):
 
 class SaltHttpClient:
     """ SaltStack CherryPy Rest API client """
-    TOKEN_BEST_BEFORE_SEC = 3600
+    TOKEN_BEST_BEFORE_SEC = 60
 
     def __init__(
         self,
@@ -99,7 +99,7 @@ class SaltHttpClient:
                     'Authenticate salt client due to token expiration time %s',
                     self._token_expire.isoformat())
                 await self._login()
-            for try_n in range(1, 1 + RETRIES_ON_AUTH_ERROR):
+            for try_n in range(0, 1 + RETRIES_ON_AUTH_ERROR):
                 if try_n > 0:
                     LOGGER.warning(
                         'Try %i to reauthenticate salt client after authorization error',
