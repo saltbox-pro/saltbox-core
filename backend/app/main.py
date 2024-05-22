@@ -116,14 +116,6 @@ async def create_job_endpoint(item: CreateJobRequest) -> CreateJobResponse:
     except SaltHttpClientError as error:
         raise http_errors.BadGateway(detail=str(error))
     # TODO Check jid tz
-    # FIXME
-    '''
-    {
-      "return": [
-        {}
-      ]
-    }
-    '''
     return CreateJobResponse.model_validate(ret)
 
 

@@ -6,6 +6,11 @@ from pydantic import BaseModel, Field, conlist, computed_field
 from app.utilities.jid import jid_to_datetime
 
 
+class NullObj(BaseModel):
+    class Config:
+        extra = 'forbid'
+
+
 class AuthItem(BaseModel):
     eauth: str
     expire: float
@@ -56,7 +61,7 @@ class PubData(BaseModel):
 
 
 class CreateJobResponse(BaseModel):
-    return_: conlist(PubData, min_length=1) = Field(alias='return')
+    return_: conlist(Union[PubData, NullObj], min_length=1) = Field(alias='return')
 
 
 class CreateJobRequest(BaseModel):
