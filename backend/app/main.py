@@ -62,7 +62,6 @@ class ConnectionManager:
 APP = FastAPIOffline(title=APP_NAME)
 MANAGER = ConnectionManager()
 
-LOGGER.error(f'allow_origins={SETTINGS.origins}')
 APP.add_middleware(
     CORSMiddleware,
     allow_origins=SETTINGS.origins,
