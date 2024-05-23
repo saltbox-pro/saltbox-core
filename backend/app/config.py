@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 
 APP_NAME = 'FastMS core'
@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     salt_password: str
     redis_url: str
     debug: bool = False
+    origins: list[str] = Field(['*'], description='CORS allowed resources')
 
 
 class LogConfig(BaseModel):

@@ -10,6 +10,7 @@ import redis.asyncio as redis
 from fastapi import Form, WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi_offline import FastAPIOffline
 from pydantic import ValidationError
 
@@ -58,11 +59,20 @@ class ConnectionManager:
             await connection.send_text(message)
 
 
-app = FastAPIOffline(title=APP_NAME)
+APP = FastAPIOffline(title=APP_NAME)
 MANAGER = ConnectionManager()
 
+LOGGER.error(f'allow_origins={SETTINGS.origins}')
+APP.add_middleware(
+    CORSMiddleware,
+    allow_origins=SETTINGS.origins,
+    allow_credentials=True,
+    allow_methods=['*'],
+    allow_headers=['*'],
+)
 
-@app.post('/salt_auth')
+
+@APP.post('/salt_auth')
 async def salt_auth_endpoint(username: FormStr, password: FormStr) -> JSONResponse:
     """ For salt.auth.rest """
     if username == SETTINGS.salt_username and password == SETTINGS.salt_password:
@@ -72,7 +82,7 @@ async def salt_auth_endpoint(username: FormStr, password: FormStr) -> JSONRespon
         raise http_errors.Unauthorized(f'Unknown user {username} or invalid password')
 
 
-@app.get('/jobs')
+@APP.get('/jobs')
 async def get_jobs_endpoint(
         start_datetime: datetime.datetime,
         end_datetime: datetime.datetime, rdb: RedisDep
@@ -89,7 +99,7 @@ async def get_jobs_endpoint(
         raise http_errors.InternalServerError(detail=err.errors())
 
 
-@app.get('/jobs/{tag}')
+@APP.get('/jobs/{tag}')
 async def get_job_endpoint(tag: str, rdb: RedisDep) -> Job:
     res_ = await rdb.zrange('jobs', start=int(tag), end=int(tag), byscore=True)
 
@@ -104,7 +114,7 @@ async def get_job_endpoint(tag: str, rdb: RedisDep) -> Job:
         raise http_errors.InternalServerError(detail=e.errors())
 
 
-@app.post('/jobs')
+@APP.post('/jobs')
 async def create_job_endpoint(item: CreateJobRequest) -> CreateJobResponse:
     try:
         ret = await SALT_CLIENT.run_job(
@@ -119,7 +129,7 @@ async def create_job_endpoint(item: CreateJobRequest) -> CreateJobResponse:
     return CreateJobResponse.model_validate(ret)
 
 
-@app.get('/jobs/{jid}/rets')
+@APP.get('/jobs/{jid}/rets')
 async def get_job_rets_endpoint(jid: str, rdb: RedisDep) -> list[JobResult]:
     res_ = await rdb.hgetall(name=f'job.rets:{jid}')
 
@@ -135,7 +145,7 @@ async def get_job_rets_endpoint(jid: str, rdb: RedisDep) -> list[JobResult]:
     return res
 
 
-@app.websocket('/ws_jobs')
+@APP.websocket('/ws_jobs')
 async def websocket_jobs_rets_endpoint(websocket: WebSocket, rdb: RedisDep):
     await MANAGER.connect(websocket)
 
@@ -165,7 +175,7 @@ async def websocket_jobs_rets_endpoint(websocket: WebSocket, rdb: RedisDep):
         MANAGER.disconnect(websocket)
 
 
-@app.websocket('/ws_jobs/{jid}/rets')
+@APP.websocket('/ws_jobs/{jid}/rets')
 async def websocket_jobs_endpoint(websocket: WebSocket, jid: str, rdb: RedisDep):
     await MANAGER.connect(websocket)
 
@@ -226,13 +236,13 @@ html = """
 """
 
 
-@app.get('/')
+@APP.get('/')
 async def get() -> HTMLResponse:
     # TODO
     return HTMLResponse(html)
 
 
-@app.get('/jobs/stat')
+@APP.get('/jobs/stat')
 async def get_jobs_stat():
     # res_count = await r.zcard(name='jobs')
     # first = await r.zrange('jobs', start=0, end=0)
