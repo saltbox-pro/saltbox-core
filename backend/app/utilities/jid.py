@@ -1,6 +1,14 @@
+"""
+JID — Job ID — is a numeric value to exactly identify jobs in SaltStack.
+
+By default JIDs are monotonically increasing 20-digits values based on datetime.
+
+The module provides handful convertion functions for default datetime-based JID values.
+"""
+
 import re
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Union
 
 JID_FORMAT = '%Y%m%d%H%M%S%f'
@@ -29,7 +37,7 @@ def jid_from_datetime(value: datetime) -> int:
 
 def jid_to_datetime(jid: Union[int, str]) -> datetime:
     """
-    Convert JID to unawared datetime
+    Convert JID to UTC aware datetime
 
     :raises UnexpectedJidFormatError: on missformated JID
     """
@@ -43,6 +51,6 @@ def jid_to_datetime(jid: Union[int, str]) -> datetime:
     kwargs = {k: int(val) for k, val in match.groupdict().items()}
 
     try:
-        return datetime(**kwargs, tzinfo=None)
+        return datetime(**kwargs, tzinfo=timezone.utc)
     except ValueError as err:
         raise UnexpectedJidFormatError(err)
