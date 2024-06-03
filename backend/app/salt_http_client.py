@@ -12,21 +12,10 @@ import pydantic
 import ssl
 
 from app.models.salt import AuthResponse
-from app.config import SETTINGS
-
 
 LOGGER = logging.getLogger(__name__)
 DEBUG_INDENT = 2
 RETRIES_ON_AUTH_ERROR = 1
-
-
-def datetime_from_salt_timestamp(timestamp: float) -> datetime:
-    """
-    Convert Unix Epoch timestamp to naive datetime respecting salt-master timezone
-    """
-    salt_naive = datetime.fromtimestamp(timestamp)
-    aware = salt_naive.replace(tzinfo=SETTINGS.salt_master_timezone)
-    return aware.astimezone().replace(tzinfo=None)
 
 
 class SaltHttpClientError(RuntimeError):
@@ -98,7 +87,7 @@ class SaltHttpClient:
         except pydantic.ValidationError as err:
             raise SaltHttpClientBadResponse(err)
         ret = body.return_[0]
-        self._token_expire = datetime_from_salt_timestamp(ret.expire)
+        self._token_expire = datetime.fromtimestamp(ret.expire)
 
     @staticmethod
     def _login_decorator(fn):

@@ -1,7 +1,3 @@
-from zoneinfo import ZoneInfo
-
-import tzlocal
-
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings
 
@@ -15,13 +11,6 @@ class Settings(BaseSettings):
     redis_url: str
     debug: bool = False
     origins: list[str] = Field(['*'], description='CORS allowed resources')
-    salt_master_timezone_name: str = 'localtime'
-
-    @property
-    def salt_master_timezone(self) -> ZoneInfo:
-        if self.salt_master_timezone_name == 'localtime':
-            return tzlocal.get_localzone()
-        return ZoneInfo(self.salt_master_timezone_name)
 
 
 class LogConfig(BaseModel):
