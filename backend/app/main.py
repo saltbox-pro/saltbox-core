@@ -155,21 +155,18 @@ async def get_job_rets_endpoint(jid: str, rdb: RedisDep) -> list[JobResult]:
 
 @APP.websocket('/ws_jobs')
 async def websocket_jobs_rets_endpoint(websocket: WebSocket, rdb: RedisDep):
-    await MANAGER.connect(websocket)
+    await websocket.accept()
 
     async def reader(channel: redis.client.PubSub):
         while True:
+            #print('1') FIXME permaloop
             message = await channel.get_message(ignore_subscribe_messages=True)
             if message is not None:
                 # tag = message['channel'].decode("utf-8")
                 decoded_data = message['data'].decode("utf-8")
                 data = json.loads(decoded_data)
-
-                try:
-                    data = Job(**data)
-                    await MANAGER.send_json(data.model_dump(), websocket)
-                except ValidationError:
-                    ...
+                job = Job(**data)
+                await websocket.send_text(job.json())
 
     try:
         async with rdb.pubsub() as pubsub:
@@ -180,7 +177,7 @@ async def websocket_jobs_rets_endpoint(websocket: WebSocket, rdb: RedisDep):
             await future
 
     except WebSocketDisconnect:
-        MANAGER.disconnect(websocket)
+        LOGGER.info('Websocket for %s has been disconnected', websocket.client)
 
 
 @APP.websocket('/ws_jobs/{jid}/rets')
