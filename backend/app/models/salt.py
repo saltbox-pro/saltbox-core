@@ -1,7 +1,6 @@
-from datetime import datetime
 from typing import Any, Optional, Union
 
-from pydantic import BaseModel, Field, conlist, computed_field
+from pydantic import BaseModel, Field, PastDatetime, computed_field, conlist
 
 from app.utilities.jid import jid_to_datetime
 
@@ -36,7 +35,7 @@ class Job(BaseModel):
     stamp: str = Field(alias='_stamp')
 
     @computed_field(title='Timestamp decoded from JID')
-    def fms_jid_timestamp(self) -> datetime:
+    def fms_jid_timestamp(self) -> PastDatetime:
         return jid_to_datetime(self.jid)
 
 

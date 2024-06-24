@@ -1,10 +1,13 @@
+from __future__ import annotations
+
 import asyncio
 import datetime
 import json
 import logging
 
-from typing import Annotated, Union
+from typing import Annotated
 
+import pydantic
 import redis.asyncio as redis
 
 from fastapi import Form, WebSocket, WebSocketDisconnect
@@ -22,6 +25,7 @@ from app.models.salt import (
 )
 from app.salt_http_client import SaltHttpClient, SaltHttpClientError
 from app.utilities.jid import jid_from_datetime
+from app.utilities.types import Json
 
 FormStr = Annotated[str, Form()]
 
@@ -35,28 +39,32 @@ LOGGER = logging.getLogger(__name__)
 logging.config.dictConfig(LOG_CONFIG.dict())
 
 
+# TODO Use https://github.com/encode/broadcaster if need broadcasts
 class ConnectionManager:
     def __init__(self):
-        self.active_connections: list[WebSocket] = []
+        self.active_connections: set[WebSocket] = set()
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket) -> None:
         await websocket.accept()
-        self.active_connections.append(websocket)
+        self.active_connections.add(websocket)
+        LOGGER.debug(
+            '%s connected, total connections: %i',
+            websocket,
+            len(self.active_connections))
 
-    def disconnect(self, websocket: WebSocket):
-        self.active_connections.remove(websocket)
+    def disconnect(self, websocket: WebSocket) -> None:
+        try:
+            self.active_connections.remove(websocket)
+        except KeyError:
+            LOGGER.warning('Tried to disconnect %s, but not connected', websocket)
 
     @staticmethod
-    async def send_personal_message(message: str, websocket: WebSocket):
-        await websocket.send_text(message)
-
-    @staticmethod
-    async def send_personal_json_message(message: Union[list, dict], websocket: WebSocket):
+    async def send_json(message: Json, websocket: WebSocket) -> None:
         await websocket.send_json(message)
 
-    async def broadcast(self, message: str):
+    async def broadcast(self, message: Json) -> None:
         for connection in self.active_connections:
-            await connection.send_text(message)
+            await self.send_json(message, connection)
 
 
 APP = FastAPIOffline(title=APP_NAME)
@@ -83,8 +91,9 @@ async def salt_auth_endpoint(username: FormStr, password: FormStr) -> JSONRespon
 
 @APP.get('/jobs')
 async def get_jobs_endpoint(
-        start_datetime: datetime.datetime,
-        end_datetime: datetime.datetime, rdb: RedisDep
+        start_datetime: pydantic.PastDatetime,
+        end_datetime: datetime.datetime,
+        rdb: RedisDep,
 ) -> list[Job]:
     start = jid_from_datetime(start_datetime)
     end = jid_from_datetime(end_datetime)
@@ -158,7 +167,7 @@ async def websocket_jobs_rets_endpoint(websocket: WebSocket, rdb: RedisDep):
 
                 try:
                     data = Job(**data)
-                    await MANAGER.send_personal_json_message(data.model_dump(), websocket)
+                    await MANAGER.send_json(data.model_dump(), websocket)
                 except ValidationError:
                     ...
 
@@ -187,7 +196,7 @@ async def websocket_jobs_endpoint(websocket: WebSocket, jid: str, rdb: RedisDep)
 
                 try:
                     data = JobResult(**data)
-                    await MANAGER.send_personal_json_message(data.model_dump(), websocket)
+                    await MANAGER.send_json(data.model_dump(), websocket)
                 except ValidationError as err:
                     LOGGER.error('%s', err, exc_info=False)
 
