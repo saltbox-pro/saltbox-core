@@ -1,15 +1,25 @@
-#  from collections.abc import Generator
-import redis.asyncio as redis
+import logging
+
 from typing import Annotated
+
 from fastapi import Depends
+from redis.asyncio import ConnectionPool, Redis
 
 from app.config import SETTINGS
 
 
-def get_redis_db() -> redis.Redis:
-    redis_connection_pool: redis.ConnectionPool = \
-        redis.ConnectionPool.from_url(SETTINGS.redis_url)
-    return redis.Redis(connection_pool=redis_connection_pool)
+LOGGER = logging.getLogger(__name__)
 
 
-RedisDep = Annotated[redis.Redis, Depends(get_redis_db)]
+def _make_pool() -> ConnectionPool:
+    return ConnectionPool.from_url(SETTINGS.redis_url)
+
+
+POOL = _make_pool()
+
+
+def get_redis_db() -> Redis:
+    return Redis(connection_pool=POOL)
+
+
+RedisDep = Annotated[Redis, Depends(get_redis_db)]
