@@ -21,7 +21,8 @@ POOL = _make_pool()
 async def get_redis() -> AsyncGenerator[Redis, None]:
     redis = Redis(connection_pool=POOL)
     yield redis
-    await redis.close()
+    LOGGER.debug('Close redis connection now')
+    await redis.aclose()
 
 
-RedisDep = Annotated[Redis, Depends(get_redis)]
+RedisDependency = Annotated[Redis, Depends(get_redis)]

@@ -5,12 +5,13 @@ import datetime
 import json
 import logging
 
+from contextlib import asynccontextmanager
 from typing import Annotated
 
 import pydantic
-import redis.asyncio as redis
+from redis.asyncio.client import PubSub
 
-from fastapi import Form, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Form, WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,13 +20,12 @@ from pydantic import ValidationError
 
 from app import http_errors
 from app.config import APP_NAME, SETTINGS, LOG_CONFIG
-from app.redis import RedisDep
+from app.redis import POOL, RedisDependency
 from app.models.salt import (
     CreateJobRequest, CreateJobResponse, Job, JobResult
 )
 from app.salt_http_client import SaltHttpClient, SaltHttpClientError
 from app.utilities.jid import jid_from_datetime
-from app.utilities.types import Json
 
 FormStr = Annotated[str, Form()]
 
@@ -39,36 +39,13 @@ LOGGER = logging.getLogger(__name__)
 logging.config.dictConfig(LOG_CONFIG.dict())
 
 
-# TODO Use https://github.com/encode/broadcaster if need broadcasts
-class ConnectionManager:
-    def __init__(self):
-        self.active_connections: set[WebSocket] = set()
-
-    async def connect(self, websocket: WebSocket) -> None:
-        await websocket.accept()
-        self.active_connections.add(websocket)
-        LOGGER.debug(
-            '%s connected, total connections: %i',
-            websocket,
-            len(self.active_connections))
-
-    def disconnect(self, websocket: WebSocket) -> None:
-        try:
-            self.active_connections.remove(websocket)
-        except KeyError:
-            LOGGER.warning('Tried to disconnect %s, but not connected', websocket)
-
-    @staticmethod
-    async def send_json(message: Json, websocket: WebSocket) -> None:
-        await websocket.send_json(message)
-
-    async def broadcast(self, message: Json) -> None:
-        for connection in self.active_connections:
-            await self.send_json(message, connection)
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    yield
+    await POOL.aclose()
 
 
-APP = FastAPIOffline(title=APP_NAME)
-MANAGER = ConnectionManager()
+APP = FastAPIOffline(title=APP_NAME, lifespan=lifespan)
 
 APP.add_middleware(
     CORSMiddleware,
@@ -93,7 +70,7 @@ async def salt_auth_endpoint(username: FormStr, password: FormStr) -> JSONRespon
 async def get_jobs_endpoint(
         start_datetime: pydantic.PastDatetime,
         end_datetime: datetime.datetime,
-        rdb: RedisDep,
+        rdb: RedisDependency,
 ) -> list[Job]:
     start = jid_from_datetime(start_datetime)
     end = jid_from_datetime(end_datetime)
@@ -108,7 +85,7 @@ async def get_jobs_endpoint(
 
 
 @APP.get('/jobs/{tag}')
-async def get_job_endpoint(tag: str, rdb: RedisDep) -> Job:
+async def get_job_endpoint(tag: str, rdb: RedisDependency) -> Job:
     res_ = await rdb.zrange('jobs', start=int(tag), end=int(tag), byscore=True)
 
     if not res_:
@@ -138,7 +115,7 @@ async def create_job_endpoint(item: CreateJobRequest) -> CreateJobResponse:
 
 
 @APP.get('/jobs/{jid}/rets')
-async def get_job_rets_endpoint(jid: str, rdb: RedisDep) -> list[JobResult]:
+async def get_job_rets_endpoint(jid: str, rdb: RedisDependency) -> list[JobResult]:
     res_ = await rdb.hgetall(name=f'job.rets:{jid}')
 
     res = []
@@ -154,55 +131,62 @@ async def get_job_rets_endpoint(jid: str, rdb: RedisDep) -> list[JobResult]:
 
 
 @APP.websocket('/ws_jobs')
-async def websocket_jobs_rets_endpoint(websocket: WebSocket, rdb: RedisDep):
+async def websocket_jobs_rets_endpoint(websocket: WebSocket, rdb: RedisDependency):
     await websocket.accept()
 
-    async def reader(channel: redis.client.PubSub):
-        ...
-        #for message in channel.listen():
-        #    # tag = message['channel'].decode("utf-8")
-        #    decoded_data = message['data'].decode("utf-8")
-        #    data = json.loads(decoded_data)
-        #    job = Job(**data)
-        #    await websocket.send_text(job.json())
+    async def reader(pubsub: PubSub) -> None:
+        async for message in pubsub.listen():
+            if message['type'] not in PubSub.PUBLISH_MESSAGE_TYPES:
+                LOGGER.debug('Skipping service message: %s', message)
+                continue
+            decoded_data = message['data'].decode()
+            data = json.loads(decoded_data)
+            job = Job(**data)
+            await websocket.send_text(job.json())
 
     try:
         async with rdb.pubsub() as pubsub:
             await pubsub.psubscribe('job:*')
-            # await pubsub.psubscribe('job:*', 'job.rets:*')
-            future = asyncio.create_task(reader(pubsub))
-            # await r.publish("job:1", "Hello")
-            await future
+            await asyncio.create_task(reader(pubsub))
 
     except WebSocketDisconnect:
-        LOGGER.info('Websocket for %s has been disconnected', websocket.client)
+        client = websocket.client
+        if not client:
+            LOGGER.info('/ws_jobs websocket has been disconnected')
+        else:
+            LOGGER.info(
+                '/ws_jobs websocket for %s:%i has been disconnected',
+                client.host,
+                client.port)
 
 
 @APP.websocket('/ws_jobs/{jid}/rets')
-async def websocket_jobs_endpoint(websocket: WebSocket, jid: str, rdb: RedisDep):
-    await MANAGER.connect(websocket)
-
-    async def reader(channel: redis.client.PubSub):
-        while True:
-            message = await channel.get_message(ignore_subscribe_messages=True)
-            if message is not None:
-                decoded_data = message['data'].decode("utf-8")
-                data = json.loads(decoded_data)
-
-                try:
-                    data = JobResult(**data)
-                    await MANAGER.send_json(data.model_dump(), websocket)
-                except ValidationError as err:
-                    LOGGER.error('%s', err, exc_info=False)
+async def websocket_jobs_endpoint(websocket: WebSocket, jid: str, rdb: RedisDependency):
+    # TODO Use https://github.com/encode/broadcaster if need broadcasts
+    async def reader(pubsub: PubSub):
+        async for message in pubsub.listen():
+            if message['type'] not in PubSub.PUBLISH_MESSAGE_TYPES:
+                LOGGER.debug('Skipping service message: %s', message)
+                continue
+            decoded_data = message['data'].decode()
+            data = json.loads(decoded_data)
+            result = JobResult(**data)
+            await websocket.send_text(result.json())
 
     try:
         async with rdb.pubsub() as pubsub:
             await pubsub.psubscribe(f'job.rets:{jid}')
-            future = asyncio.create_task(reader(pubsub))
-            await future
+            await asyncio.create_task(reader(pubsub))
 
     except WebSocketDisconnect:
-        MANAGER.disconnect(websocket)
+        client = websocket.client
+        if not client:
+            LOGGER.info('/ws_jobs websocket has been disconnected')
+        else:
+            LOGGER.info(
+                '/ws_jobs websocket for %s:%i has been disconnected',
+                client.host,
+                client.port)
 
 html = """
 <!DOCTYPE html>
