@@ -1,6 +1,6 @@
 import logging
 
-from typing import Annotated
+from typing import Annotated, AsyncGenerator
 
 from fastapi import Depends
 from redis.asyncio import ConnectionPool, Redis
@@ -18,8 +18,10 @@ def _make_pool() -> ConnectionPool:
 POOL = _make_pool()
 
 
-def get_redis_db() -> Redis:
-    return Redis(connection_pool=POOL)
+async def get_redis() -> AsyncGenerator[Redis, None]:
+    redis = Redis(connection_pool=POOL)
+    yield redis
+    await redis.close()
 
 
-RedisDep = Annotated[Redis, Depends(get_redis_db)]
+RedisDep = Annotated[Redis, Depends(get_redis)]
