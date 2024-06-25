@@ -55,7 +55,7 @@ class JobResult(BaseModel):
 
 class PubData(BaseModel):
     """ Salt LocalClient.run_job response representation """
-    jid: int
+    jid: str
     minions: conlist(str, min_length=1)
 
 
