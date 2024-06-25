@@ -19,7 +19,7 @@ from pydantic import ValidationError
 
 from app import http_errors
 from app.config import APP_NAME, SETTINGS, LOG_CONFIG
-from app.deps import RedisDep
+from app.redis import RedisDep
 from app.models.salt import (
     CreateJobRequest, CreateJobResponse, Job, JobResult
 )
@@ -158,15 +158,13 @@ async def websocket_jobs_rets_endpoint(websocket: WebSocket, rdb: RedisDep):
     await websocket.accept()
 
     async def reader(channel: redis.client.PubSub):
-        while True:
-            #print('1') FIXME permaloop
-            message = await channel.get_message(ignore_subscribe_messages=True)
-            if message is not None:
-                # tag = message['channel'].decode("utf-8")
-                decoded_data = message['data'].decode("utf-8")
-                data = json.loads(decoded_data)
-                job = Job(**data)
-                await websocket.send_text(job.json())
+        ...
+        #for message in channel.listen():
+        #    # tag = message['channel'].decode("utf-8")
+        #    decoded_data = message['data'].decode("utf-8")
+        #    data = json.loads(decoded_data)
+        #    job = Job(**data)
+        #    await websocket.send_text(job.json())
 
     try:
         async with rdb.pubsub() as pubsub:
