@@ -172,8 +172,8 @@ async def websocket_jobs_endpoint(websocket: WebSocket, jid: str, rdb: RedisDepe
                 continue
             decoded_data = message['data'].decode()
             data = json.loads(decoded_data)
-            result = JobResult(**data)
-            await websocket.send_text(result.json())
+            result = JobResult(**data).model_dump_json(by_alias=True)
+            await websocket.send_text(result)
 
     try:
         async with rdb.pubsub() as pubsub:
@@ -189,52 +189,3 @@ async def websocket_jobs_endpoint(websocket: WebSocket, jid: str, rdb: RedisDepe
                 '/ws_jobs websocket for %s:%i has been disconnected',
                 client.host,
                 client.port)
-
-html = """
-<!DOCTYPE html>
-<html>
-    <head>
-        <title>charon</title>
-    </head>
-    <body>
-        <h1>salt charon</h1>
-        <form action="" onsubmit="sendMessage(event)">
-            <input type="text" id="messageText" autocomplete="off"/>
-            <button>Send</button>
-        </form>
-        <ul id='messages'>
-        </ul>
-        <script>
-            var ws = new WebSocket("ws://192.168.122.197:80/ws_jobs");
-            ws.onmessage = function(event) {
-                var messages = document.getElementById('messages')
-                var message = document.createElement('li')
-                var content = document.createTextNode(event.data)
-                message.appendChild(content)
-                messages.appendChild(message)
-            };
-            function sendMessage(event) {
-                var input = document.getElementById("messageText")
-                ws.send(input.value)
-                input.value = ''
-                event.preventDefault()
-            }
-        </script>
-    </body>
-</html>
-"""
-
-
-@APP.get('/')
-async def get() -> HTMLResponse:
-    # TODO
-    return HTMLResponse(html)
-
-
-@APP.get('/jobs/stat')
-async def get_jobs_stat():
-    # res_count = await r.zcard(name='jobs')
-    # first = await r.zrange('jobs', start=0, end=0)
-    # last = await r.zrange('jobs', start=-1, end=-1)
-    # return res_count, json.loads(first[0]), json.loads(last[0])
-    raise http_errors.NotImplemented('KAMINSUN')
