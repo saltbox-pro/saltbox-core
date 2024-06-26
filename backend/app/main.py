@@ -163,6 +163,8 @@ async def websocket_jobs_rets_endpoint(websocket: WebSocket, rdb: RedisDependenc
 @APP.websocket('/ws_jobs/{jid}/rets')
 async def websocket_jobs_endpoint(websocket: WebSocket, jid: str, rdb: RedisDependency):
     # TODO Use https://github.com/encode/broadcaster if need broadcasts
+    await websocket.accept()
+
     async def reader(pubsub: PubSub):
         async for message in pubsub.listen():
             if message['type'] not in PubSub.PUBLISH_MESSAGE_TYPES:
