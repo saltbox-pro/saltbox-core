@@ -1,11 +1,13 @@
 [project]
-dynamic = [ 'dependencies' ]
+dynamic = [ 'dependencies', 'version' ]
 name = 'fastms-core'
-version = '0.0.0'
 requires-python = '>=3.9'
 license = { 'text' = 'N/A' }  # FIXME
 description = ''
 readme = 'README.md'
+classifiers = [
+  'Topic :: System :: Systems Administration',
+]
 
 [project.optional-dependencies]
 dev = [
@@ -23,17 +25,19 @@ dev = [
 [project.scripts]
 
 [metadata]
-url = 'https://gitlab/fastms'
+url = 'https://gitlab.com/fastms'
+version = 'attr: package.__version__'
 
 [build-system]
-requires = ['setuptools', 'setuptools-scm']
+requires = ['setuptools>=57.4.0']
 build-backend = 'setuptools.build_meta'
 
 [tool.setuptools]
 packages = ['app']
 
 [tool.setuptools.dynamic]
-dependencies = { file = ['backend/requirements.txt'] }   # FIXME Move here and install with pyproject.toml
+dependencies = { file = ['backend/requirements.txt'] }
+version = { attr = 'app.__version__' }
 
 [tool.flake8]
 max-line-length = 120
