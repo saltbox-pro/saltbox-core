@@ -13,7 +13,7 @@ from redis.asyncio.client import PubSub
 
 from fastapi import FastAPI, Form, WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi_offline import FastAPIOffline
 from pydantic import ValidationError
@@ -68,10 +68,13 @@ async def salt_auth_endpoint(username: FormStr, password: FormStr) -> JSONRespon
 
 @APP.get('/jobs')
 async def get_jobs_endpoint(
-        start_datetime: pydantic.PastDatetime,
-        end_datetime: datetime.datetime,
         rdb: RedisDependency,
+        start_datetime: pydantic.PastDatetime,
+        end_datetime: datetime.datetime = None
 ) -> list[Job]:
+    if end_datetime is None:
+        end_datetime = datetime.datetime.now() + datetime.timedelta(hours=1)
+
     start = jid_from_datetime(start_datetime)
     end = jid_from_datetime(end_datetime)
 
