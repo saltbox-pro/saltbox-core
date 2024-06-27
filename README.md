@@ -17,17 +17,14 @@ After deploying dev enivronment install pre-commit hooks with
 
 ### Run
 
-To run in developement mode:
+To build core image:
 
 ```bash
-sudo docker compose -f compose.yaml -f compose-dev-override.yaml up --build --watch
+sudo docker build . --tag fastms-core
 ```
 
-`--build` flag rebuilds images, `--watch` flag rebuilds some images on src files
-changes. `compose-dev-override.yaml` exposes additional ports.
+Additional settings need to be passed as environment variables to start. Check
+[app/config.py](./app/config.py).
 
-To fix problems on start run before:
-
-```bash
-sudo docker system prune --force
-```
+Use [FastMS Compose](https://gitlab.com/fastms/fastms-compose) repo to run
+whole system.
