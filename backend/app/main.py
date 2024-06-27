@@ -145,7 +145,7 @@ async def websocket_jobs_rets_endpoint(websocket: WebSocket, rdb: RedisDependenc
             decoded_data = message['data'].decode()
             data = json.loads(decoded_data)
             job = Job(**data)
-            await websocket.send_text(job.json())
+            await websocket.send_text(job.model_dump_json(by_alias=True))
 
     try:
         async with rdb.pubsub() as pubsub:
