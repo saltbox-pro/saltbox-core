@@ -33,7 +33,7 @@ requires = ['setuptools>=57.4.0']
 build-backend = 'setuptools.build_meta'
 
 [tool.setuptools]
-packages = ['app']
+packages = ['app']  # TODO Move app -> fastms_core
 
 [tool.setuptools.dynamic]
 dependencies = { file = ['backend/requirements.txt'] }
