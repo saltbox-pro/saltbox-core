@@ -29,11 +29,11 @@ url = 'https://gitlab/fastms'
 requires = ['setuptools', 'setuptools-scm']
 build-backend = 'setuptools.build_meta'
 
-[tool.setuptools.package-dir]
-'fastms_core.backend' = './backend/'
+[tool.setuptools]
+packages = ['app']
 
 [tool.setuptools.dynamic]
-dependencies = { file = ['backend/requirements.txt'] }
+dependencies = { file = ['backend/requirements.txt'] }   # FIXME Move here and install with pyproject.toml
 
 [tool.flake8]
 max-line-length = 120
