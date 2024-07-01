@@ -1,12 +1,18 @@
 ARG PYTHON_VERSION='3.12'
 
 FROM python:${PYTHON_VERSION}-alpine
-LABEL name='fastms-core' version='0.1'
+LABEL name='fastms-core' version='0.2'
 
 ENV SALT_USERNAME="salt_api_user"
 
 WORKDIR /srv/fastms-core/
-CMD ["uvicorn", "app.main:APP", "--host", "0.0.0.0", "--port", "8000"]
+CMD [\
+  "uvicorn",\
+  "app.main:APP",\
+  "--host=0.0.0.0",\
+  "--port=8000",\
+  "--timeout-graceful-shutdown=5"\
+]
 EXPOSE 8000
 
 COPY requirements.txt ./
