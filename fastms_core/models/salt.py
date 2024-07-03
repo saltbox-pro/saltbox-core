@@ -1,8 +1,11 @@
-from typing import Any, Optional, Union
+from typing import Annotated, Any, Optional, Union
 
-from pydantic import BaseModel, Field, PastDatetime, computed_field, conlist
+from pydantic import BaseModel, Field, PastDatetime, computed_field
 
-from fastms_core.utilities.jid import jid_to_datetime
+from fastms_core.utilities.jid import jid_to_datetime, JID_REGEX
+
+IntJid = Annotated[int, Field(gt=int(1970E+16), lt=int(1E+20))]
+StrJid = Annotated[str, Field(pattern=JID_REGEX)]
 
 
 class NullObj(BaseModel):
@@ -20,11 +23,11 @@ class AuthItem(BaseModel):
 
 
 class AuthResponse(BaseModel):
-    return_: conlist(AuthItem, min_length=1) = Field(alias='return')
+    return_: list[AuthItem] = Field(alias='return', min_length=1)
 
 
 class Job(BaseModel):
-    jid: str
+    jid: StrJid
     tgt: Union[str, list[str]]
     tgt_type: str
     user: str
@@ -45,7 +48,7 @@ class JobResult(BaseModel):
     success: bool
     return_: Any = Field(alias='return')
     retcode: int
-    jid: str
+    jid: StrJid
     fun: str
     fun_args: Optional[list] = None
     fun_kwarg: Optional[dict] = None
@@ -55,12 +58,12 @@ class JobResult(BaseModel):
 
 class PubData(BaseModel):
     """ Salt LocalClient.run_job response representation """
-    jid: str
-    minions: conlist(str, min_length=1)
+    jid: StrJid
+    minions: list[str] = Field(min_length=1)
 
 
 class CreateJobResponse(BaseModel):
-    return_: conlist(Union[PubData, NullObj], min_length=1) = Field(alias='return')
+    return_: list[Union[PubData, NullObj]] = Field(alias='return', min_length=1)
 
 
 class CreateJobRequest(BaseModel):

@@ -22,7 +22,7 @@ from fastms_core import http_errors
 from fastms_core.config import APP_NAME, SETTINGS, LOG_CONFIG
 from fastms_core.redis import POOL, RedisDependency
 from fastms_core.models.salt import (
-    CreateJobRequest, CreateJobResponse, Job, JobResult
+    CreateJobRequest, CreateJobResponse, IntJid, Job, JobResult
 )
 from fastms_core.salt_http_client import SaltHttpClient, SaltHttpClientError
 from fastms_core.utilities.jid import jid_from_datetime
@@ -70,7 +70,7 @@ async def salt_auth_endpoint(username: FormStr, password: FormStr) -> JSONRespon
 async def get_jobs_endpoint(
         rdb: RedisDependency,
         start_datetime: pydantic.PastDatetime,
-        end_datetime: datetime.datetime = None
+        end_datetime: datetime.datetime | None = None
 ) -> list[Job]:
     if end_datetime is None:
         end_datetime = datetime.datetime.now() + datetime.timedelta(hours=1)
@@ -87,9 +87,9 @@ async def get_jobs_endpoint(
         raise http_errors.InternalServerError(detail=err.errors())
 
 
-@APP.get('/jobs/{tag}')
-async def get_job_endpoint(tag: str, rdb: RedisDependency) -> Job:
-    res_ = await rdb.zrange('jobs', start=int(tag), end=int(tag), byscore=True)
+@APP.get('/jobs/{jid}')
+async def get_job_endpoint(jid: IntJid, rdb: RedisDependency) -> Job:
+    res_ = await rdb.zrange('jobs', start=jid, end=jid, byscore=True)
 
     if not res_:
         raise http_errors.NotFound(detail='Job not found')
@@ -117,7 +117,7 @@ async def create_job_endpoint(item: CreateJobRequest) -> CreateJobResponse:
 
 
 @APP.get('/jobs/{jid}/rets')
-async def get_job_rets_endpoint(jid: str, rdb: RedisDependency) -> list[JobResult]:
+async def get_job_rets_endpoint(jid: IntJid, rdb: RedisDependency) -> list[JobResult]:
     res_ = await rdb.hgetall(name=f'job.rets:{jid}')
 
     res = []
@@ -163,7 +163,7 @@ async def websocket_jobs_rets_endpoint(websocket: WebSocket, rdb: RedisDependenc
 
 
 @APP.websocket('/ws_jobs/{jid}/rets')
-async def websocket_jobs_endpoint(websocket: WebSocket, jid: str, rdb: RedisDependency):
+async def websocket_jobs_endpoint(websocket: WebSocket, jid: IntJid, rdb: RedisDependency):
     # TODO Use https://github.com/encode/broadcaster if need broadcasts
     await websocket.accept()
 
