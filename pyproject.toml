@@ -29,14 +29,14 @@ url = 'https://gitlab.com/fastms'
 version = 'attr: package.__version__'
 
 [build-system]
-requires = ['setuptools>=57.4.0']
+requires = ['setuptools>=57.4.0', 'setuptools-scm']
 build-backend = 'setuptools.build_meta'
 
 [tool.setuptools]
 packages = ['fastms_core']
 
 [tool.setuptools.dynamic]
-dependencies = { file = ['backend/requirements.txt'] }
+dependencies = { file = ['requirements.txt'] }
 version = { attr = 'fastms_core.__version__' }
 
 [tool.flake8]
