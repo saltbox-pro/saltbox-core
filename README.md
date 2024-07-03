@@ -24,7 +24,7 @@ sudo docker build . --tag fastms-core
 ```
 
 Additional settings need to be passed as environment variables to start. Check
-[app/config.py](./app/config.py).
+[fastms\_core/config.py](./fastms_core/config.py).
 
 Use [FastMS Compose](https://gitlab.com/fastms/fastms-compose) repo to run
 whole system.

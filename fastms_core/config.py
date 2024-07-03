@@ -35,7 +35,7 @@ class LogConfig(BaseModel):
 
     }
     loggers: dict = {
-        'app': {'handlers': ['default'], 'level': LOG_LEVEL},
+        'fastms_core': {'handlers': ['default'], 'level': LOG_LEVEL},
     }
 
 

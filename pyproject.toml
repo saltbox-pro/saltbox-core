@@ -33,11 +33,11 @@ requires = ['setuptools>=57.4.0']
 build-backend = 'setuptools.build_meta'
 
 [tool.setuptools]
-packages = ['app']  # TODO Move app -> fastms_core
+packages = ['fastms_core']
 
 [tool.setuptools.dynamic]
 dependencies = { file = ['backend/requirements.txt'] }
-version = { attr = 'app.__version__' }
+version = { attr = 'fastms_core.__version__' }
 
 [tool.flake8]
 max-line-length = 120

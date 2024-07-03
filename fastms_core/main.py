@@ -18,14 +18,14 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi_offline import FastAPIOffline
 from pydantic import ValidationError
 
-from app import http_errors
-from app.config import APP_NAME, SETTINGS, LOG_CONFIG
-from app.redis import POOL, RedisDependency
-from app.models.salt import (
+from fastms_core import http_errors
+from fastms_core.config import APP_NAME, SETTINGS, LOG_CONFIG
+from fastms_core.redis import POOL, RedisDependency
+from fastms_core.models.salt import (
     CreateJobRequest, CreateJobResponse, Job, JobResult
 )
-from app.salt_http_client import SaltHttpClient, SaltHttpClientError
-from app.utilities.jid import jid_from_datetime
+from fastms_core.salt_http_client import SaltHttpClient, SaltHttpClientError
+from fastms_core.utilities.jid import jid_from_datetime
 
 FormStr = Annotated[str, Form()]
 
@@ -113,7 +113,6 @@ async def create_job_endpoint(item: CreateJobRequest) -> CreateJobResponse:
             tgt_type=item.tgt_type)
     except SaltHttpClientError as error:
         raise http_errors.BadGateway(detail=str(error))
-    # TODO Check jid tz
     return CreateJobResponse.model_validate(ret)
 
 

@@ -8,7 +8,7 @@ ENV SALT_USERNAME="salt_api_user"
 WORKDIR /srv/fastms-core/
 CMD [\
   "uvicorn",\
-  "app.main:APP",\
+  "fastms_core:APP",\
   "--host=0.0.0.0",\
   "--port=8000",\
   "--timeout-graceful-shutdown=5"\
@@ -18,4 +18,4 @@ EXPOSE 8000
 COPY requirements.txt ./
 RUN pip install --no-cache-dir --upgrade --requirement requirements.txt
 RUN echo "SALT_PASSWORD='$(tr -dc A-Za-z0-9 </dev/urandom | head -c 32)'" >> .env
-COPY app/ ./app/
+COPY fastms_core/ ./fastms_core/

@@ -5,7 +5,7 @@ from typing import Annotated, AsyncGenerator
 from fastapi import Depends
 from redis.asyncio import ConnectionPool, Redis
 
-from app.config import SETTINGS
+from fastms_core.config import SETTINGS
 
 
 LOGGER = logging.getLogger(__name__)

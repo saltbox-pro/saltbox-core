@@ -11,7 +11,7 @@ import httpx
 import pydantic
 import ssl
 
-from app.models.salt import AuthResponse
+from fastms_core.models.salt import AuthResponse
 
 LOGGER = logging.getLogger(__name__)
 DEBUG_INDENT = 2

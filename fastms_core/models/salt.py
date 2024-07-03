@@ -2,7 +2,7 @@ from typing import Any, Optional, Union
 
 from pydantic import BaseModel, Field, PastDatetime, computed_field, conlist
 
-from app.utilities.jid import jid_to_datetime
+from fastms_core.utilities.jid import jid_to_datetime
 
 
 class NullObj(BaseModel):
