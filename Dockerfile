@@ -11,6 +11,7 @@ RUN \
   pip install --upgrade --requirement /mnt/requirements.txt
 RUN \
   --mount=type=bind,target=/mnt/fastms_core/,readwrite \
+  --mount=type=cache,target=/root/.cache/pip/ \
   pip3 install --no-deps /mnt/fastms_core/
 RUN <<EOF
 set -e
