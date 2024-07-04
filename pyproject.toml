@@ -32,8 +32,9 @@ version = 'attr: package.__version__'
 requires = ['setuptools>=57.4.0', 'setuptools-scm']
 build-backend = 'setuptools.build_meta'
 
-[tool.setuptools]
-packages = ['fastms_core']
+[tool.setuptools.packages.find]
+# Explicit package dir for flat-layout
+include = ['fastms_core']
 
 [tool.setuptools.dynamic]
 dependencies = { file = ['requirements.txt'] }
