@@ -8,7 +8,7 @@ EXPOSE 8000
 RUN \
   --mount=type=bind,source=requirements.txt,target=/mnt/requirements.txt,readwrite \
   --mount=type=cache,target=/root/.cache/pip/ \
-  pip install --upgrade --requirement /mnt/requirements.txt
+  pip3 install --upgrade --requirement /mnt/requirements.txt
 RUN \
   --mount=type=bind,target=/mnt/fastms_core/,readwrite \
   --mount=type=cache,target=/root/.cache/pip/ \

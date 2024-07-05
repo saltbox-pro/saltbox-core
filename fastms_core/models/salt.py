@@ -1,8 +1,20 @@
-from typing import Any, Optional, Union
+from typing import cast, Annotated, Any, Optional, TypeVar, Union
 
-from pydantic import BaseModel, Field, PastDatetime, computed_field, conlist
+from pydantic import (
+    BaseModel,
+    Field,
+    PastDatetime,
+    computed_field,
+    model_validator,
+)
 
-from fastms_core.utilities.jid import jid_to_datetime
+from fastms_core.utilities.jid import jid_to_datetime, JID_REGEX
+from fastms_core.utilities.salt import fill_salt_kwarg_from_arg
+
+IntJid = Annotated[int, Field(gt=int(1970E+16), lt=int(1E+20))]
+StrJid = Annotated[str, Field(pattern=JID_REGEX)]
+
+T = TypeVar('T')
 
 
 class NullObj(BaseModel):
@@ -20,11 +32,11 @@ class AuthItem(BaseModel):
 
 
 class AuthResponse(BaseModel):
-    return_: conlist(AuthItem, min_length=1) = Field(alias='return')
+    return_: list[AuthItem] = Field(alias='return', min_length=1)
 
 
 class Job(BaseModel):
-    jid: str
+    jid: StrJid
     tgt: Union[str, list[str]]
     tgt_type: str
     user: str
@@ -38,6 +50,17 @@ class Job(BaseModel):
     def fms_jid_timestamp(self) -> PastDatetime:
         return jid_to_datetime(self.jid)
 
+    @model_validator(mode='before')
+    @classmethod
+    def _extract_kwargs(cls, data: T) -> T:
+        # data may be an instantiated Job or potentially any object
+        if not isinstance(data, dict):
+            return data
+
+        data['arg'], data['kwarg'] = fill_salt_kwarg_from_arg(data.get('arg'), data.get('kwarg'))
+
+        return cast(T, data)
+
 
 class JobResult(BaseModel):
     cmd: str
@@ -45,22 +68,34 @@ class JobResult(BaseModel):
     success: bool
     return_: Any = Field(alias='return')
     retcode: int
-    jid: str
+    jid: StrJid
     fun: str
     fun_args: Optional[list] = None
     fun_kwarg: Optional[dict] = None
     user: str
     stamp: str = Field(alias='_stamp')
 
+    @model_validator(mode='before')
+    @classmethod
+    def _extract_kwargs(cls, data: T) -> T:
+        # data may be an instantiated Job or potentially any object
+        if not isinstance(data, dict):
+            return data
+
+        data['fun_args'], data['fun_kwarg'] = fill_salt_kwarg_from_arg(
+            data.get('fun_args'), data.get('fun_kwarg'))
+
+        return cast(T, data)
+
 
 class PubData(BaseModel):
     """ Salt LocalClient.run_job response representation """
-    jid: str
-    minions: conlist(str, min_length=1)
+    jid: StrJid
+    minions: list[str] = Field(min_length=1)
 
 
 class CreateJobResponse(BaseModel):
-    return_: conlist(Union[PubData, NullObj], min_length=1) = Field(alias='return')
+    return_: list[Union[PubData, NullObj]] = Field(alias='return', min_length=1)
 
 
 class CreateJobRequest(BaseModel):

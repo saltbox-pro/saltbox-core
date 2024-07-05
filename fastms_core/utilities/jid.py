@@ -13,10 +13,11 @@ from typing import Union
 
 JID_FORMAT = '%Y%m%d%H%M%S%f'
 # Matches JID in expected format, but does not validate datetime
-JID_REGEX = re.compile(
+JID_REGEX = (
     r'^(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})(?P<hour>\d{2})'
     r'(?P<minute>\d{2})(?P<second>\d{2})(?P<microsecond>\d{6})$'
 )
+JID_PATTERN = re.compile(JID_REGEX)
 
 
 class JidError(RuntimeError):
@@ -44,7 +45,7 @@ def jid_to_datetime(jid: Union[int, str]) -> datetime:
     if isinstance(jid, int):
         jid = str(jid).zfill(20)
     # re is more efficient than datatime.strptime
-    if not (match := JID_REGEX.match(jid)):
+    if not (match := JID_PATTERN.match(jid)):
         msg = f'JID must be exclusively 20 digits value, but "{jid}" given'
         raise UnexpectedJidFormatError(msg)
 
