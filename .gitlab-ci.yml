@@ -1,0 +1,21 @@
+---
+
+default:
+  cache:
+    paths:
+      - .cache/pip/
+
+Test build:
+  image: docker:27
+  services:
+     - docker:27-dind
+  before_script:
+    - docker info
+  script:
+    - docker build --tag fastms_core .
+
+Flake8:
+  before_script:
+    - pip3 install -e .[dev]
+  script:
+    - flake8 fastms_core
