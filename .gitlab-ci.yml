@@ -15,6 +15,7 @@ Test build:
     - docker build --tag fastms_core .
 
 Flake8:
+  image: python:3.12-alpine
   before_script:
     - pip3 install -e .[dev]
   script:
