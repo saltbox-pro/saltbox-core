@@ -34,7 +34,7 @@ build-backend = 'setuptools.build_meta'
 
 [tool.setuptools.packages.find]
 # Explicit package dir for flat-layout
-include = ['fastms_core']
+include = ['fastms_core', 'fastms_core.*']
 
 [tool.setuptools.dynamic]
 dependencies = { file = ['requirements.txt'] }
