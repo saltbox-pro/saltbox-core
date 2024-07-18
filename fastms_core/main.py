@@ -11,7 +11,7 @@ from typing import Annotated
 import pydantic
 from redis.asyncio.client import PubSub
 
-from fastapi import FastAPI, Form
+from fastapi import FastAPI, Form, WebSocket
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -26,7 +26,7 @@ from fastms_core.models.salt import (
 )
 from fastms_core.salt_http_client import SaltHttpClient, SaltHttpClientError
 from fastms_core.utilities.jid import jid_from_datetime
-from fastms_core.websocket import WebSocketHandlerDependency
+from fastms_core.websocket import IsSocketDisconnected
 
 FormStr = Annotated[str, Form()]
 
@@ -133,11 +133,14 @@ async def get_job_rets_endpoint(jid: IntJid, rdb: RedisDependency) -> list[JobRe
     return res
 
 
+# TODO Use https://github.com/encode/broadcaster if need broadcasts
 @APP.websocket('/ws_jobs')
 async def websocket_jobs_rets_endpoint(
-    websocket: WebSocketHandlerDependency,
+    websocket: WebSocket,
     rdb: RedisDependency
 ) -> None:
+    await websocket.accept()
+
     async def reader(pubsub: PubSub) -> None:
         async for message in pubsub.listen():
             if message['type'] not in PubSub.PUBLISH_MESSAGE_TYPES:
@@ -146,20 +149,24 @@ async def websocket_jobs_rets_endpoint(
             decoded_data = message['data'].decode()
             data = json.loads(decoded_data)
             job = Job(**data)
-            await websocket.send_text(job.model_dump_json(by_alias=True))
+            with IsSocketDisconnected(websocket) as disconnect:
+                await websocket.send_text(job.model_dump_json(by_alias=True))
+            if disconnect:
+                return
 
     async with rdb.pubsub() as pubsub:
         await pubsub.psubscribe('job:*')
         await asyncio.create_task(reader(pubsub))
 
 
+# TODO Rename ret -> result
 @APP.websocket('/ws_jobs/{jid}/rets')
 async def websocket_jobs_endpoint(
     jid: IntJid,
-    websocket: WebSocketHandlerDependency,
+    websocket: WebSocket,
     rdb: RedisDependency,
 ) -> None:
-    # TODO Use https://github.com/encode/broadcaster if need broadcasts
+    await websocket.accept()
 
     async def reader(pubsub: PubSub):
         async for message in pubsub.listen():
@@ -169,7 +176,10 @@ async def websocket_jobs_endpoint(
             decoded_data = message['data'].decode()
             data = json.loads(decoded_data)
             result = JobResult(**data).model_dump_json(by_alias=True)
-            await websocket.send_text(result)
+            with IsSocketDisconnected(websocket) as disconnect:
+                await websocket.send_text(result)
+            if disconnect:
+                return
 
     async with rdb.pubsub() as pubsub:
         await pubsub.psubscribe(f'job.rets:{jid}')

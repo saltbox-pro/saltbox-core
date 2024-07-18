@@ -2,55 +2,37 @@ from __future__ import annotations
 
 import logging
 
-from collections.abc import Awaitable
-from typing import Annotated, Callable, TypeVar
+from contextlib import AbstractContextManager
+from typing import Type
 
-from fastapi import Depends, WebSocket, WebSocketDisconnect
+from fastapi import WebSocket, WebSocketDisconnect
 
 LOGGER = logging.getLogger(__name__)
 
-T = TypeVar('T')
 
-
-class WebSocketHandler:
-    """ Socket wrapper handles connection and disconnection """
-
+class IsSocketDisconnected(AbstractContextManager):
     def __init__(self, websocket: WebSocket) -> None:
         self.websocket = websocket
+        self.is_excepted = False
 
-    async def start(self) -> None:
-        await self.websocket.accept()
+    def __enter__(self) -> 'IsSocketDisconnected':
+        return self
 
-    @classmethod
-    async def create(cls, websocket: WebSocket) -> 'WebSocketHandler':
-        obj = cls(websocket)
-        await obj.start()
-        return obj
+    def __exit__(self, exttype: Type[BaseException] | None, extint: BaseException | None, exttb) -> bool:
+        if exttype is None:
+            return True
+        if issubclass(exttype, WebSocketDisconnect):
+            self.is_excepted = True
+            client = self.websocket.client
+            if not client:
+                LOGGER.info('/ws_jobs websocket has been disconnected')
+            else:
+                LOGGER.info(
+                    '/ws_jobs websocket for %s:%i has been disconnected',
+                    client.host,
+                    client.port)
+            return True
+        return False
 
-    @staticmethod
-    def swallow_disconnection(func: Callable[..., Awaitable[T]]) -> Callable[..., Awaitable[T | None]]:
-        async def wrapper(self: 'WebSocketHandler', *args, **kwargs) -> T | None:
-            try:
-                return await func(self, *args, **kwargs)
-            except WebSocketDisconnect:
-                client = self.websocket.client
-                if not client:
-                    LOGGER.info('/ws_jobs websocket has been disconnected')
-                else:
-                    LOGGER.info(
-                        '/ws_jobs websocket for %s:%i has been disconnected',
-                        client.host,
-                        client.port)
-                return None
-        return wrapper
-
-    @swallow_disconnection
-    async def send_text(self, data: str) -> None:
-        await self.websocket.send_text(data)
-
-
-async def get_websocket_handler(websocket: WebSocket) -> WebSocketHandler:
-    return await WebSocketHandler.create(websocket)
-
-
-WebSocketHandlerDependency = Annotated[WebSocketHandler, Depends(get_websocket_handler)]
+    def __bool__(self):
+        return self.is_excepted
