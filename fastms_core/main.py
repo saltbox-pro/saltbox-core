@@ -11,12 +11,13 @@ from typing import Annotated
 import pydantic
 from redis.asyncio.client import PubSub
 
-from fastapi import FastAPI, Form, WebSocket
+from fastapi import FastAPI, Form, WebSocket, WebSocketException
 from fastapi.encoders import jsonable_encoder
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi_offline import FastAPIOffline
 from pydantic import ValidationError
+from starlette.status import WS_1008_POLICY_VIOLATION
 
 from fastms_core import http_errors
 from fastms_core.config import APP_NAME, SETTINGS, LOG_CONFIG
@@ -152,7 +153,7 @@ async def websocket_jobs_rets_endpoint(
             with IsSocketDisconnected(websocket) as disconnect:
                 await websocket.send_text(job.model_dump_json(by_alias=True))
             if disconnect:
-                return
+                return  # TODO Raise HTTPError inside context manager
 
     async with rdb.pubsub() as pubsub:
         await pubsub.psubscribe('job:*')
@@ -166,6 +167,12 @@ async def websocket_jobs_endpoint(
     websocket: WebSocket,
     rdb: RedisDependency,
 ) -> None:
+    jid_in_jobs = bool(await rdb.zcount('jobs', min=jid, max=jid))
+    if not jid_in_jobs:
+        raise WebSocketException(
+            code=WS_1008_POLICY_VIOLATION,
+            reason=f'Job not found by JID={jid}')
+
     await websocket.accept()
 
     async def reader(pubsub: PubSub):
