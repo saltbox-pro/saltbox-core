@@ -4,6 +4,7 @@ import logging
 
 from contextlib import AbstractContextManager
 from typing import Type
+from types import TracebackType
 
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -11,6 +12,9 @@ LOGGER = logging.getLogger(__name__)
 
 
 class IsSocketDisconnected(AbstractContextManager):
+    """
+    Supress WebSocketDisconnect error
+    """
     def __init__(self, websocket: WebSocket) -> None:
         self.websocket = websocket
         self.is_excepted = False
@@ -18,7 +22,12 @@ class IsSocketDisconnected(AbstractContextManager):
     def __enter__(self) -> 'IsSocketDisconnected':
         return self
 
-    def __exit__(self, exttype: Type[BaseException] | None, extint: BaseException | None, exttb) -> bool:
+    def __exit__(
+        self,
+        exttype: Type[BaseException] | None,
+        extint: BaseException | None,
+        exttb: TracebackType | None,
+    ) -> bool:
         if exttype is None:
             return True
         if issubclass(exttype, WebSocketDisconnect):
