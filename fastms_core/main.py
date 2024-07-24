@@ -118,7 +118,7 @@ async def create_job_endpoint(item: CreateJobRequest) -> CreateJobResponse:
     return CreateJobResponse.model_validate(ret)
 
 
-@APP.get('/jobs/{jid}/rets')
+@APP.get('/jobs/{jid}/return')
 async def get_job_rets_endpoint(jid: IntJid, rdb: RedisDependency) -> list[JobResult]:
     res_ = await rdb.hgetall(name=f'job.rets:{jid}')
 
@@ -160,8 +160,7 @@ async def websocket_jobs_rets_endpoint(
         await asyncio.create_task(reader(pubsub))
 
 
-# TODO Rename ret -> result
-@APP.websocket('/ws_jobs/{jid}/rets')
+@APP.websocket('/ws_jobs/{jid}/return')
 async def websocket_jobs_endpoint(
     jid: IntJid,
     websocket: WebSocket,
