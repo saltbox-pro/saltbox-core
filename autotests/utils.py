@@ -24,3 +24,35 @@ def check_error_message(response_json, expected_message):
     exception_text = f'Expected message: "{expected_message}", but got: "{detail_message}"'
     with allure.step(text):
         assert detail_message == expected_message, exception_text
+
+
+def create_new_job(api):
+    """
+        This function for create test.ping job and get actual jid
+    """
+    payload = {
+        'tgt': '*',
+        'tgt_type': 'glob',
+        'fun': 'test.ping',
+        'arg': [],
+        'kwarg': {}
+    }
+    response_json = api.post('/jobs', json=payload).json()
+    jid = response_json['return'][0]['jid']
+    return jid
+
+
+def create_sleep_job(api):
+    """
+        This function for create test.sleep job and get actual jid
+    """
+    payload = {
+        'tgt': '*',
+        'tgt_type': 'glob',
+        'fun': 'test.sleep',
+        'arg': ['0.5'],
+        'kwarg': {}
+    }
+    response_json = api.post('/jobs', json=payload).json()
+    jid = response_json['return'][0]['jid']
+    return jid

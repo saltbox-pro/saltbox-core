@@ -1,7 +1,6 @@
 import pytest
 from datetime import datetime, timedelta
-import allure
-
+import allure # type: ignore
 from utils import attach_json_to_allure, check_error_message
 
 
@@ -10,7 +9,8 @@ from utils import attach_json_to_allure, check_error_message
 def test_get_specific_job(api, create_jid):
     response = api.get(f'/jobs/{create_jid}')
     with allure.step('Checking that the server has returned the status code == 200'):
-        assert response.status_code == 200, f'Error, the server has returned code {response.status_code}'
+        assert response.status_code == 200, f'Error, the server has returned code {
+            response.status_code}'
     response_json = response.json()
     with allure.step('Checking that the response contains all keys in JSON response'):
         required_keys = [
@@ -26,7 +26,8 @@ def test_get_specific_job(api, create_jid):
             'fms_jid_timestamp',
         ]
         for key in response_json:
-            assert key in required_keys, f'The response does not contain the key "{key}"'
+            assert key in required_keys, f'The response does not contain the key "{
+                key}"'
         attach_json_to_allure(response_json, 'Response JSON')
 
 
@@ -36,7 +37,8 @@ def test_get_specific_job_with_non_existent_jid(api):
     jid = 20240999999999999999
     response = api.get(f'/jobs/{jid}')
     with allure.step('Checking that the server has returned the status code == 404'):
-        assert response.status_code == 404, f'Error, the server has returned code {response.status_code}'
+        assert response.status_code == 404, f'Error, the server has returned code {
+            response.status_code}'
     response_json = response.json()
     assert response_json['detail'] == 'Job not found'
     attach_json_to_allure(response_json, 'Response JSON')
@@ -48,9 +50,11 @@ def test_get_specific_job_with_no_valid_int_jid(api):
     jid = 123
     response = api.get(f'/jobs/{jid}')
     with allure.step('Checking that the server has returned the status code == 422'):
-        assert response.status_code == 422, f'Error, the server has returned code {response.status_code}'
+        assert response.status_code == 422, f'Error, the server has returned code {
+            response.status_code}'
     error = response.json()
-    check_error_message(error, 'Input should be greater than 19700000000000000000')
+    check_error_message(
+        error, 'Input should be greater than 19700000000000000000')
     attach_json_to_allure(error, 'Response JSON')
 
 
@@ -60,9 +64,11 @@ def test_get_specific_job_with_str_type_jid(api):
     jid = 'hello world'
     response = api.get(f'/jobs/{jid}')
     with allure.step('Checking that the server has returned the status code == 422'):
-        assert response.status_code == 422, f'Error, the server has returned code {response.status_code}'
+        assert response.status_code == 422, f'Error, the server has returned code {
+            response.status_code}'
     error = response.json()
-    check_error_message(error, 'Input should be a valid integer, unable to parse string as an integer')
+    check_error_message(
+        error, 'Input should be a valid integer, unable to parse string as an integer')
     attach_json_to_allure(error, 'Response JSON')
 
 
@@ -81,7 +87,8 @@ def test_post_jobs_valid_request(api):
         attach_json_to_allure(payload, 'Request payload')
 
     with allure.step('Checking that the server has returned the status code == 200'):
-        assert response.status_code == 200, f'Error, the server has returned code {response.status_code}'
+        assert response.status_code == 200, f'Error, the server has returned code {
+            response.status_code}'
     response_json = response.json()
     with allure.step('Checking that the "jid" was returned in the response'):
         assert any('jid' in item for item in response_json.get('return', []))
@@ -98,7 +105,8 @@ def test_post_jobs_with_empty_json_body(api):
         attach_json_to_allure(payload, 'Request payload')
 
     with allure.step('Checking that the server has returned the status code == 200'):
-        assert response.status_code == 200, f'Error, the server has returned code {response.status_code}'
+        assert response.status_code == 200, f'Error, the server has returned code {
+            response.status_code}'
     response_json = response.json()
     with allure.step('Checking that the "jid" was returned in the response'):
         assert any('jid' in item for item in response_json.get('return', []))
@@ -118,7 +126,8 @@ def test_get_jobs(api):
     with allure.step(f'Required parameter start_datetime = {start_datetime}'):
         pass
     with allure.step('Checking that the server has returned the status code == 200'):
-        assert response.status_code == 200, f'Error, the server has returned code {response.status_code}'
+        assert response.status_code == 200, f'Error, the server has returned code {
+            response.status_code}'
     with allure.step('Checking that the all keys was returned in the response'):
         response_json = response.json()
         attach_json_to_allure(response_json, 'Response JSON')
@@ -137,7 +146,8 @@ def test_get_jobs(api):
         if response_json:
             for job in response_json:
                 for key in job:
-                    assert key in required_keys, f'The response does not contain the key "{key}"'
+                    assert key in required_keys, f'The response does not contain the key "{
+                        key}"'
         else:
             pytest.skip('The response came with an empty list/ no jobs')
 
@@ -157,7 +167,8 @@ def test_get_jobs_with_all_params(api):
     with allure.step(f'Parameters start_datetime = {start_datetime} and end_datetime = {end_datetime}'):
         pass
     with allure.step('Checking that the server has returned the status code == 200'):
-        assert response.status_code == 200, f'Error, the server has returned code {response.status_code}'
+        assert response.status_code == 200, f'Error, the server has returned code {
+            response.status_code}'
     with allure.step('Checking that all keys was returned in the response'):
         response_json = response.json()
         attach_json_to_allure(response_json, 'Response JSON')
@@ -176,7 +187,8 @@ def test_get_jobs_with_all_params(api):
         if response_json:
             for job in response_json:
                 for key in job:
-                    assert key in required_keys, f'The response does not contain the key "{key}"'
+                    assert key in required_keys, f'The response does not contain the key "{
+                        key}"'
         else:
             pytest.skip('The response came with an empty list/ no jobs')
 
@@ -226,12 +238,13 @@ def test_get_jobs_without_params(api):
     attach_json_to_allure(error, 'Response JSON')
 
 
-@allure.feature('Endpoint GET /jobs/{jid}/rets')
+@allure.feature('Endpoint GET /jobs/{jid}/return')
 @allure.title('Sending a GET request to retrieve information about the task results.')
-def test_get_info_about_valid_task_rets(api, create_jid):
-    response = api.get(f'/jobs/{create_jid}/rets')
+def test_get_info_about_valid_task_return(api, create_jid):
+    response = api.get(f'/jobs/{create_jid}/return')
     with allure.step('Checking that the server has returned the status code == 200'):
-        assert response.status_code == 200, f'Error, the server has returned code {response.status_code}'
+        assert response.status_code == 200, f'Error, the server has returned code {
+            response.status_code}'
     response_json = response.json()
     with allure.step('Checking that a response includes all required keys'):
         required_keys = [
@@ -248,41 +261,48 @@ def test_get_info_about_valid_task_rets(api, create_jid):
         ]
         for result in response_json:
             for key in required_keys:
-                assert key in result, f'The response does not contain the key "{key}"'
+                assert key in result, f'The response does not contain the key "{
+                    key}"'
         attach_json_to_allure(response_json, 'Response JSON')
 
 
-@allure.feature('Endpoint GET /jobs/{jid}/rets')
+@allure.feature('Endpoint GET /jobs/{jid}/return')
 @allure.title('Sending a GET request to retrieve information about a task with an invalid jid.')
-def test_get_info_about_task_rets_with_no_valid_jid(api):
+def test_get_info_about_task_return_with_no_valid_jid(api):
     jid = 2024071
-    response = api.get(f'/jobs/{jid}/rets')
+    response = api.get(f'/jobs/{jid}/return')
     with allure.step('Checking that the server has returned the status code == 422'):
-        assert response.status_code == 422, f'Error, the server has returned code {response.status_code}'
+        assert response.status_code == 422, f'Error, the server has returned code {
+            response.status_code}'
     error = response.json()
-    check_error_message(error, 'Input should be greater than 19700000000000000000')
+    check_error_message(
+        error, 'Input should be greater than 19700000000000000000')
     attach_json_to_allure(error, 'Response JSON')
 
 
-@allure.feature('Endpoint GET /jobs/{jid}/rets')
+@allure.feature('Endpoint GET /jobs/{jid}/return')
 @allure.title('Sending a GET request to retrieve information about a task with a big jid.')
-def test_get_info_about_task_rets_with_big_jid(api):
+def test_get_info_about_task_return_with_big_jid(api):
     jid = 4000240709134651062132
-    response = api.get(f'/jobs/{jid}/rets')
+    response = api.get(f'/jobs/{jid}/return')
     with allure.step('Checking that the server has returned the status code == 422'):
-        assert response.status_code == 422, f'Error, the server has returned code {response.status_code}'
+        assert response.status_code == 422, f'Error, the server has returned code {
+            response.status_code}'
     error = response.json()
-    check_error_message(error, 'Input should be less than 100000000000000000000')
+    check_error_message(
+        error, 'Input should be less than 100000000000000000000')
     attach_json_to_allure(error, 'Response JSON')
 
 
-@allure.feature('Endpoint GET /jobs/{jid}/rets')
+@allure.feature('Endpoint GET /jobs/{jid}/return')
 @allure.title('Sending a GET request to retrieve information about a task with a str jid.')
-def test_get_info_about_task_rets_with_str_jid(api):
+def test_get_info_about_task_return_with_str_jid(api):
     jid = 'Hello World'
-    response = api.get(f'/jobs/{jid}/rets')
+    response = api.get(f'/jobs/{jid}/return')
     with allure.step('Checking that the server has returned the status code == 422'):
-        assert response.status_code == 422, f'Error, the server has returned code {response.status_code}'
+        assert response.status_code == 422, f'Error, the server has returned code {
+            response.status_code}'
     error = response.json()
-    check_error_message(error, 'Input should be a valid integer, unable to parse string as an integer')
+    check_error_message(
+        error, 'Input should be a valid integer, unable to parse string as an integer')
     attach_json_to_allure(error, 'Response JSON')
