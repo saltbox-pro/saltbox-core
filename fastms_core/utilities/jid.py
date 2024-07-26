@@ -6,18 +6,12 @@ By default JIDs are monotonically increasing 20-digits values based on datetime.
 The module provides handful convertion functions for default datetime-based JID values.
 """
 
+from __future__ import annotations
+
 import re
+import functools
 
 from datetime import datetime, timezone
-from typing import Union
-
-JID_FORMAT = '%Y%m%d%H%M%S%f'
-# Matches JID in expected format, but does not validate datetime
-JID_REGEX = (
-    r'^(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})(?P<hour>\d{2})'
-    r'(?P<minute>\d{2})(?P<second>\d{2})(?P<microsecond>\d{6})$'
-)
-JID_PATTERN = re.compile(JID_REGEX)
 
 
 class JidError(RuntimeError):
@@ -28,30 +22,88 @@ class UnexpectedJidFormatError(JidError):
     ...
 
 
-def jid_from_datetime(value: datetime) -> int:
+class UnexpectedDataFormatError(JidError):
+    ...
+
+
+@functools.total_ordering
+class JID:
     """
-    Convert datetime object to JID str
+    Represents SaltStack 20-digit Job IDentifier
     """
-    strval = value.strftime(JID_FORMAT)
-    return int(strval)
+    LOWER_BOUND = int(1970E+16)
+    UPPER_BOUND = int(1E+20)
+    JID_FORMAT = '%Y%m%d%H%M%S%f'
+# Matches JID in expected format, but does not validate datetime
+    JID_REGEX = (
+        r'^(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})(?P<hour>\d{2})'
+        r'(?P<minute>\d{2})(?P<second>\d{2})(?P<microsecond>\d{6})$'
+    )
+    JID_PATTERN = re.compile(JID_REGEX)
 
+    def __init__(self, jid: int | str) -> None:
+        if isinstance(jid, str):
+            try:
+                jid = int(jid)
+            except ValueError as err:
+                raise UnexpectedDataFormatError(err)
+        if not jid > self.LOWER_BOUND or not jid < self.UPPER_BOUND:
+            raise UnexpectedJidFormatError(f'"{jid}" is unexpected JID value')
+        self.value: int = jid
 
-def jid_to_datetime(jid: Union[int, str]) -> datetime:
-    """
-    Convert JID to UTC aware datetime
+    def __str__(self) -> str:
+        return str(self.value).zfill(20)
 
-    :raises UnexpectedJidFormatError: on missformated JID
-    """
-    if isinstance(jid, int):
-        jid = str(jid).zfill(20)
-    # re is more efficient than datatime.strptime
-    if not (match := JID_PATTERN.match(jid)):
-        msg = f'JID must be exclusively 20 digits value, but "{jid}" given'
-        raise UnexpectedJidFormatError(msg)
+    def __int__(self) -> int:
+        return self.value
 
-    kwargs = {k: int(val) for k, val in match.groupdict().items()}
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, JID):
+            raise TypeError('Can compare JID only with JID')
+        return self.value == other.value
 
-    try:
-        return datetime(**kwargs, tzinfo=timezone.utc)
-    except ValueError as err:
-        raise UnexpectedJidFormatError(err)
+    def __gt__(self, other: 'JID') -> bool:
+        return self.value > other.value
+
+    @classmethod
+    def from_datetime(cls, value: datetime) -> JID:
+        """
+        Make JID from datetime object
+        """
+        strval = value.strftime(cls.JID_FORMAT)
+        return cls(strval)
+
+    @classmethod
+    def from_timestamp(cls, epoch: float | str) -> JID:
+        """
+        Make JID from μs-precision POSIX epoch timestamp
+        """
+        if isinstance(epoch, str):
+            try:
+                epoch = float(epoch)
+            except ValueError as err:
+                raise UnexpectedDataFormatError(err)
+        dt = datetime.fromtimestamp(epoch, tz=timezone.utc)
+        return cls.from_datetime(dt)
+
+    def to_datetime(self) -> datetime:
+        """
+        Convert JID to UTC aware datetime
+
+        :raises UnexpectedJidFormatError: on missformated JID
+        """
+        # re is more efficient than datatime.strptime
+        match = self.JID_PATTERN.match(str(self))
+        assert match
+        kwargs = {k: int(val) for k, val in match.groupdict().items()}
+        try:
+            return datetime(**kwargs, tzinfo=timezone.utc)
+        except ValueError as err:
+            raise UnexpectedJidFormatError(err)
+
+    def to_timestamp(self) -> float:
+        """
+        Get μs-precision POSIX epoch timestamp
+        """
+        dt = self.to_datetime()
+        return dt.timestamp()

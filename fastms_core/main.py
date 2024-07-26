@@ -9,15 +9,14 @@ from contextlib import asynccontextmanager
 from typing import Annotated
 
 import pydantic
-from redis.asyncio.client import PubSub
 
-from fastapi import FastAPI, Form, WebSocket, WebSocketException
+from fastapi import FastAPI, Form, WebSocket
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi_offline import FastAPIOffline
 from pydantic import ValidationError
-from starlette.status import WS_1008_POLICY_VIOLATION
+from redis.asyncio.client import PubSub
 
 from fastms_core import http_errors
 from fastms_core.config import APP_NAME, SETTINGS, LOG_CONFIG
@@ -26,7 +25,7 @@ from fastms_core.models.salt import (
     CreateJobRequest, CreateJobResponse, IntJid, Job, JobResult
 )
 from fastms_core.salt_http_client import SaltHttpClient, SaltHttpClientError
-from fastms_core.utilities.jid import jid_from_datetime
+from fastms_core.utilities.jid import JID
 from fastms_core.websocket import IsSocketDisconnected
 
 FormStr = Annotated[str, Form()]
@@ -77,8 +76,8 @@ async def get_jobs_endpoint(
     if end_datetime is None:
         end_datetime = datetime.datetime.now() + datetime.timedelta(hours=1)
 
-    start = jid_from_datetime(start_datetime)
-    end = jid_from_datetime(end_datetime)
+    start = JID.from_datetime(start_datetime).to_timestamp()
+    end = JID.from_datetime(end_datetime).to_timestamp()
 
     res_ = await rdb.zrange('jobs', start=end, end=start, desc=True, byscore=True)
     res = [json.loads(i) for i in res_]
@@ -91,10 +90,13 @@ async def get_jobs_endpoint(
 
 @APP.get('/jobs/{jid}')
 async def get_job_endpoint(jid: IntJid, rdb: RedisDependency) -> Job:
-    res_ = await rdb.zrange('jobs', start=jid, end=jid, byscore=True)
+    ts = JID(jid).to_timestamp()
+    res_ = await rdb.zrange('jobs', start=ts, end=ts, byscore=True)
 
     if not res_:
         raise http_errors.NotFound(detail='Job not found')
+    elif len(res_) > 1:
+        raise http_errors.InternalServerError(detail=f'Multiple jobs for JID {jid}')
 
     res = json.loads(res_[0])
 
@@ -153,7 +155,7 @@ async def websocket_jobs_rets_endpoint(
             with IsSocketDisconnected(websocket) as disconnect:
                 await websocket.send_text(job.model_dump_json(by_alias=True))
             if disconnect:
-                return  # TODO Raise HTTPError inside context manager
+                return
 
     async with rdb.pubsub() as pubsub:
         await pubsub.psubscribe('job:*')
@@ -166,11 +168,10 @@ async def websocket_jobs_endpoint(
     websocket: WebSocket,
     rdb: RedisDependency,
 ) -> None:
-    jid_in_jobs = bool(await rdb.zcount('jobs', min=jid, max=jid))
+    ts = JID(jid).to_timestamp()
+    jid_in_jobs = bool(await rdb.zcount('jobs', min=ts, max=ts))
     if not jid_in_jobs:
-        raise WebSocketException(
-            code=WS_1008_POLICY_VIOLATION,
-            reason=f'Job not found by JID={jid}')
+        raise http_errors.WebSocketPolicyViolation(f'Job not found by JID={jid}')
 
     await websocket.accept()
 

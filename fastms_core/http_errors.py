@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import abc
 
-from typing import Any, Optional
+from typing import Any
 
-from fastapi import HTTPException
+from fastapi import HTTPException, WebSocketException
+from starlette import status
 
 
 class BaseHttpError(abc.ABC, HTTPException):
@@ -10,33 +13,33 @@ class BaseHttpError(abc.ABC, HTTPException):
     @abc.abstractmethod
     def CODE(self) -> int: ...
 
-    def __init__(self, detail: Any, headers: Optional[dict[str, str]] = None):
+    def __init__(self, detail: Any, headers: dict[str, str] | None = None):
         super().__init__(status_code=self.CODE, detail=detail, headers=headers)
 
 
 class BadRequest(BaseHttpError):
     """ Bad client data, e.g. on POST data validation error """
-    CODE = 400
+    CODE = status.HTTP_400_BAD_REQUEST
 
 
 class Unauthorized(BaseHttpError):
     """ Failed to authorize """
-    CODE = 401
+    CODE = status.HTTP_401_UNAUTHORIZED
 
 
 class Forbidden(BaseHttpError):
     """ Access denied """
-    CODE = 403
+    CODE = status.HTTP_403_FORBIDDEN
 
 
 class NotFound(BaseHttpError):
     """ Resource is missing """
-    CODE = 404
+    CODE = status.HTTP_404_NOT_FOUND
 
 
 class MethodNotAllowed(BaseHttpError):
     """ Bad request type, e.g. POST on exclusively GET endpoint """
-    CODE = 405
+    CODE = status.HTTP_405_METHOD_NOT_ALLOWED
 
 
 class ImATeapot(BaseHttpError):
@@ -62,3 +65,22 @@ class BadGateway(BaseHttpError):
 class ServiceUnavalable(BaseHttpError):
     """ Server not able to handle the request now """
     CODE = 503
+
+
+class WebSocketError(abc.ABC, WebSocketException):
+    @property
+    @abc.abstractmethod
+    def CODE(self) -> int: ...
+
+    def __init__(self, reason: str | None = None) -> None:
+        super().__init__(code=self.CODE, reason=reason)
+
+
+class WebSocketPolicyViolation(WebSocketError):
+    """ Generic error means message violates policy of socket """
+    CODE = status.WS_1008_POLICY_VIOLATION
+
+
+class WebSocketServerError(WebSocketError):
+    """ Unexpected conditions prevents from fulfilling a request """
+    CODE = status.WS_1011_INTERNAL_ERROR
