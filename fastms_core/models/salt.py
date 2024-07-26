@@ -7,14 +7,25 @@ from pydantic import (
     computed_field,
     model_validator,
 )
+from pydantic.functional_validators import AfterValidator
 
-from fastms_core.utilities.jid import JID
+from fastms_core.utilities.jid import JID, JidError
 from fastms_core.utilities.salt import fill_salt_kwarg_from_arg
 
-IntJid = Annotated[int, Field(gt=JID.LOWER_BOUND, lt=JID.UPPER_BOUND)]
-StrJid = Annotated[str, Field(pattern=JID.JID_REGEX)]
-
 T = TypeVar('T')
+JID_T = TypeVar('JID_T', str, int)
+
+
+def jidable(value: JID_T) -> JID_T:
+    try:
+        JID.validate(value)
+    except JidError as err:
+        raise ValueError(err)
+    return value
+
+
+IntJid = Annotated[int, AfterValidator(jidable)]
+StrJid = Annotated[str, AfterValidator(jidable)]
 
 
 class NullObj(BaseModel):

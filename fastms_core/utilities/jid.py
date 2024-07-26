@@ -34,7 +34,7 @@ class JID:
     LOWER_BOUND = int(1970E+16)
     UPPER_BOUND = int(1E+20)
     JID_FORMAT = '%Y%m%d%H%M%S%f'
-# Matches JID in expected format, but does not validate datetime
+    # Matches JID in expected format, but does not validate datetime
     JID_REGEX = (
         r'^(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})(?P<hour>\d{2})'
         r'(?P<minute>\d{2})(?P<second>\d{2})(?P<microsecond>\d{6})$'
@@ -42,17 +42,13 @@ class JID:
     JID_PATTERN = re.compile(JID_REGEX)
 
     def __init__(self, jid: int | str) -> None:
-        if isinstance(jid, str):
-            try:
-                jid = int(jid)
-            except ValueError as err:
-                raise UnexpectedDataFormatError(err)
-        if not jid > self.LOWER_BOUND or not jid < self.UPPER_BOUND:
-            raise UnexpectedJidFormatError(f'"{jid}" is unexpected JID value')
-        self.value: int = jid
+        self.value: int = self.validate(jid)
 
     def __str__(self) -> str:
         return str(self.value).zfill(20)
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}({self.value})'
 
     def __int__(self) -> int:
         return self.value
@@ -64,6 +60,27 @@ class JID:
 
     def __gt__(self, other: 'JID') -> bool:
         return self.value > other.value
+
+    @classmethod
+    def validate(cls, jid: int | str) -> int:
+        if not (match := cls.JID_PATTERN.match(str(jid))):
+            raise UnexpectedJidFormatError(f'Jid "{jid}" is not a 20-digits value')
+        kwargs = {k: int(val) for k, val in match.groupdict().items()}
+        try:
+            datetime(**kwargs, tzinfo=None)
+        except ValueError as err:
+            raise UnexpectedJidFormatError(err)
+
+        if isinstance(jid, str):
+            try:
+                jid = int(jid)
+            except ValueError as err:
+                raise UnexpectedJidFormatError(err)
+
+        if not jid > cls.LOWER_BOUND or not jid < cls.UPPER_BOUND:
+            raise UnexpectedJidFormatError(f'"{jid}" is out of bounds')
+
+        return jid
 
     @classmethod
     def from_datetime(cls, value: datetime) -> JID:
