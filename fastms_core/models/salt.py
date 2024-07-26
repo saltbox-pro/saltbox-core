@@ -8,11 +8,11 @@ from pydantic import (
     model_validator,
 )
 
-from fastms_core.utilities.jid import JID, JID_REGEX
+from fastms_core.utilities.jid import JID
 from fastms_core.utilities.salt import fill_salt_kwarg_from_arg
 
-IntJid = Annotated[int, Field(gt=int(1970E+16), lt=int(1E+20))]
-StrJid = Annotated[str, Field(pattern=JID_REGEX)]
+IntJid = Annotated[int, Field(gt=JID.LOWER_BOUND, lt=JID.UPPER_BOUND)]
+StrJid = Annotated[str, Field(pattern=JID.JID_REGEX)]
 
 T = TypeVar('T')
 

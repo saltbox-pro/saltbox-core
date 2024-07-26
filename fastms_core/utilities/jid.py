@@ -13,14 +13,6 @@ import functools
 
 from datetime import datetime, timezone
 
-JID_FORMAT = '%Y%m%d%H%M%S%f'
-# Matches JID in expected format, but does not validate datetime
-JID_REGEX = (
-    r'^(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})(?P<hour>\d{2})'
-    r'(?P<minute>\d{2})(?P<second>\d{2})(?P<microsecond>\d{6})$'
-)
-JID_PATTERN = re.compile(JID_REGEX)
-
 
 class JidError(RuntimeError):
     ...
@@ -34,20 +26,28 @@ class UnexpectedDataFormatError(JidError):
     ...
 
 
-# TODO Field type
-
 @functools.total_ordering
 class JID:
     """
     Represents SaltStack 20-digit Job IDentifier
     """
+    LOWER_BOUND = int(1970E+16)
+    UPPER_BOUND = int(1E+20)
+    JID_FORMAT = '%Y%m%d%H%M%S%f'
+# Matches JID in expected format, but does not validate datetime
+    JID_REGEX = (
+        r'^(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})(?P<hour>\d{2})'
+        r'(?P<minute>\d{2})(?P<second>\d{2})(?P<microsecond>\d{6})$'
+    )
+    JID_PATTERN = re.compile(JID_REGEX)
+
     def __init__(self, jid: int | str) -> None:
         if isinstance(jid, str):
             try:
                 jid = int(jid)
             except ValueError as err:
                 raise UnexpectedDataFormatError(err)
-        if not jid > 1970E+16 or not jid < 1E+20:
+        if not jid > self.LOWER_BOUND or not jid < self.UPPER_BOUND:
             raise UnexpectedJidFormatError(f'"{jid}" is unexpected JID value')
         self.value: int = jid
 
@@ -70,7 +70,7 @@ class JID:
         """
         Make JID from datetime object
         """
-        strval = value.strftime(JID_FORMAT)
+        strval = value.strftime(cls.JID_FORMAT)
         return cls(strval)
 
     @classmethod
@@ -93,7 +93,7 @@ class JID:
         :raises UnexpectedJidFormatError: on missformated JID
         """
         # re is more efficient than datatime.strptime
-        match = JID_PATTERN.match(str(self))
+        match = self.JID_PATTERN.match(str(self))
         assert match
         kwargs = {k: int(val) for k, val in match.groupdict().items()}
         try:
