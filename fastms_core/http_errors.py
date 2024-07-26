@@ -4,6 +4,7 @@ from typing import Any, Optional
 
 from fastapi import HTTPException
 
+# TODO WS_ERRORS
 
 class BaseHttpError(abc.ABC, HTTPException):
     @property
