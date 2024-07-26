@@ -9,6 +9,7 @@ The module provides handful convertion functions for default datetime-based JID 
 from __future__ import annotations
 
 import re
+import functools
 
 from datetime import datetime, timezone
 
@@ -36,6 +37,7 @@ class UnexpectedDataFormatError(JidError):
 # TODO Field type
 # TODO Tests
 
+@functools.total_ordering
 class JID:
     """
     Represents SaltStack 20-digit Job IDentifier
@@ -56,6 +58,14 @@ class JID:
     def __int__(self) -> int:
         return self.value
 
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, JID):
+            raise TypeError('Can compare JID only with JID')
+        return self.value == other.value
+
+    def __gt__(self, other: 'JID') -> bool:
+        return self.value > other.value
+
     @classmethod
     def from_datetime(cls, value: datetime) -> JID:
         """
@@ -65,7 +75,7 @@ class JID:
         return cls(strval)
 
     @classmethod
-    def jid_from_timestamp(cls, epoch: float | str) -> JID:
+    def from_timestamp(cls, epoch: float | str) -> JID:
         """
         Make JID from μs-precision POSIX epoch timestamp
         """
