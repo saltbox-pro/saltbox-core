@@ -35,7 +35,6 @@ class UnexpectedDataFormatError(JidError):
 
 
 # TODO Field type
-# TODO Tests
 
 @functools.total_ordering
 class JID:

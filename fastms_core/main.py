@@ -10,14 +10,13 @@ from typing import Annotated
 
 import pydantic
 
-from fastapi import FastAPI, Form, WebSocket, WebSocketException
+from fastapi import FastAPI, Form, WebSocket
 from fastapi.encoders import jsonable_encoder
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi_offline import FastAPIOffline
 from pydantic import ValidationError
 from redis.asyncio.client import PubSub
-from starlette.status import WS_1008_POLICY_VIOLATION
 
 from fastms_core import http_errors
 from fastms_core.config import APP_NAME, SETTINGS, LOG_CONFIG
@@ -172,9 +171,7 @@ async def websocket_jobs_endpoint(
     ts = JID(jid).to_timestamp()
     jid_in_jobs = bool(await rdb.zcount('jobs', min=ts, max=ts))
     if not jid_in_jobs:
-        raise WebSocketException(
-            code=WS_1008_POLICY_VIOLATION,
-            reason=f'Job not found by JID={jid}')
+        raise http_errors.WebSocketPolicyViolation(f'Job not found by JID={jid}')
 
     await websocket.accept()
 
