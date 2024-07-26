@@ -18,7 +18,7 @@ JID_T = TypeVar('JID_T', str, int)
 
 def jidable(value: JID_T) -> JID_T:
     try:
-        JID.validate(value)
+        JID(value)
     except JidError as err:
         raise ValueError(err)
     return value

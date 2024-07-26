@@ -30,6 +30,8 @@ class UnexpectedDataFormatError(JidError):
 class JID:
     """
     Represents SaltStack 20-digit Job IDentifier
+
+    By default SaltStack JID contains μs-precision datetime info. Such format is expected.
     """
     LOWER_BOUND = int(1970E+16)
     UPPER_BOUND = int(1E+20)
@@ -42,32 +44,15 @@ class JID:
     JID_PATTERN = re.compile(JID_REGEX)
 
     def __init__(self, jid: int | str) -> None:
-        self.value: int = self.validate(jid)
-
-    def __str__(self) -> str:
-        return str(self.value).zfill(20)
-
-    def __repr__(self) -> str:
-        return f'{self.__class__.__name__}({self.value})'
-
-    def __int__(self) -> int:
-        return self.value
-
-    def __eq__(self, other: object) -> bool:
-        if not isinstance(other, JID):
-            raise TypeError('Can compare JID only with JID')
-        return self.value == other.value
-
-    def __gt__(self, other: 'JID') -> bool:
-        return self.value > other.value
-
-    @classmethod
-    def validate(cls, jid: int | str) -> int:
-        if not (match := cls.JID_PATTERN.match(str(jid))):
+        """
+        :raises UnexpectedJidFormatError: on invalid or missformated JID
+        """
+        # re is more efficient than datatime.strptime
+        if not (match := self.JID_PATTERN.match(str(jid))):
             raise UnexpectedJidFormatError(f'Jid "{jid}" is not a 20-digits value')
         kwargs = {k: int(val) for k, val in match.groupdict().items()}
         try:
-            datetime(**kwargs, tzinfo=None)
+            self._datetime = datetime(**kwargs, tzinfo=timezone.utc)
         except ValueError as err:
             raise UnexpectedJidFormatError(err)
 
@@ -76,11 +61,26 @@ class JID:
                 jid = int(jid)
             except ValueError as err:
                 raise UnexpectedJidFormatError(err)
-
-        if not jid > cls.LOWER_BOUND or not jid < cls.UPPER_BOUND:
+        self._value = jid
+        if not self._value > self.LOWER_BOUND or not self._value < self.UPPER_BOUND:
             raise UnexpectedJidFormatError(f'"{jid}" is out of bounds')
 
-        return jid
+    def __str__(self) -> str:
+        return str(self._value).zfill(20)
+
+    def __repr__(self) -> str:
+        return f'{self.__class__.__name__}({self._value})'
+
+    def __int__(self) -> int:
+        return self._value
+
+    def __eq__(self, other: object) -> bool:
+        if not isinstance(other, JID):
+            raise TypeError('Can compare JID only with JID')
+        return self._value == other._value
+
+    def __gt__(self, other: 'JID') -> bool:
+        return self._value > other._value
 
     @classmethod
     def from_datetime(cls, value: datetime) -> JID:
@@ -106,17 +106,8 @@ class JID:
     def to_datetime(self) -> datetime:
         """
         Convert JID to UTC aware datetime
-
-        :raises UnexpectedJidFormatError: on missformated JID
         """
-        # re is more efficient than datatime.strptime
-        match = self.JID_PATTERN.match(str(self))
-        assert match
-        kwargs = {k: int(val) for k, val in match.groupdict().items()}
-        try:
-            return datetime(**kwargs, tzinfo=timezone.utc)
-        except ValueError as err:
-            raise UnexpectedJidFormatError(err)
+        return self._datetime
 
     def to_timestamp(self) -> float:
         """
