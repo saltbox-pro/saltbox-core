@@ -34,55 +34,67 @@ class UnexpectedDataFormatError(JidError):
 
 
 # TODO Field type
-# TODO class Jid:
+# TODO Tests
 
-def jid_from_datetime(value: datetime) -> int:
+class JID:
     """
-    Convert datetime object to JID str
+    Represents SaltStack 20-digit Job IDentifier
     """
-    strval = value.strftime(JID_FORMAT)
-    return int(strval)
+    def __init__(self, jid: int | str) -> None:
+        if isinstance(jid, str):
+            try:
+                jid = int(jid)
+            except ValueError as err:
+                raise UnexpectedDataFormatError(err)
+        if not jid > 1970E+16 or not jid < 1E+20:
+            raise UnexpectedJidFormatError(f'"{jid}" is unexpected JID value')
+        self.value: int = jid
 
+    def __str__(self) -> str:
+        return str(self.value).zfill(20)
 
-def jid_to_datetime(jid: int | str) -> datetime:
-    """
-    Convert JID to UTC aware datetime
+    def __int__(self) -> int:
+        return self.value
 
-    :raises UnexpectedJidFormatError: on missformated JID
-    """
-    if isinstance(jid, int):
-        jid = str(jid).zfill(20)
-    # re is more efficient than datatime.strptime
-    if not (match := JID_PATTERN.match(jid)):
-        msg = f'JID must be exclusively 20 digits value, but "{jid}" given'
-        raise UnexpectedJidFormatError(msg)
+    @classmethod
+    def from_datetime(cls, value: datetime) -> JID:
+        """
+        Make JID from datetime object
+        """
+        strval = value.strftime(JID_FORMAT)
+        return cls(strval)
 
-    kwargs = {k: int(val) for k, val in match.groupdict().items()}
+    @classmethod
+    def jid_from_timestamp(cls, epoch: float | str) -> JID:
+        """
+        Make JID from μs-precision POSIX epoch timestamp
+        """
+        if isinstance(epoch, str):
+            try:
+                epoch = float(epoch)
+            except ValueError as err:
+                raise UnexpectedDataFormatError(err)
+        dt = datetime.fromtimestamp(epoch, tz=timezone.utc)
+        return cls.from_datetime(dt)
 
-    try:
-        return datetime(**kwargs, tzinfo=timezone.utc)
-    except ValueError as err:
-        raise UnexpectedJidFormatError(err)
+    def to_datetime(self) -> datetime:
+        """
+        Convert JID to UTC aware datetime
 
-
-# TODO Epoch -> timestamp
-def jid_to_epoch(jid: int | str) -> float:
-    """
-    Get μs-precision POSIX epoch timestamp
-    """
-    dt = jid_to_datetime(jid)
-    return dt.timestamp()
-
-
-def jid_from_epoch(epoch: float | str) -> int:
-    """
-    Make JID from μs-precision POSIX epoch timestamp
-    """
-    # TODO Check epoch precision
-    if isinstance(epoch, str):
+        :raises UnexpectedJidFormatError: on missformated JID
+        """
+        # re is more efficient than datatime.strptime
+        match = JID_PATTERN.match(str(self))
+        assert match
+        kwargs = {k: int(val) for k, val in match.groupdict().items()}
         try:
-            epoch = float(epoch)
+            return datetime(**kwargs, tzinfo=timezone.utc)
         except ValueError as err:
-            raise UnexpectedDataFormatError(err)
-    dt = datetime.fromtimestamp(epoch, tz=timezone.utc)
-    return jid_from_datetime(dt)
+            raise UnexpectedJidFormatError(err)
+
+    def to_timestamp(self) -> float:
+        """
+        Get μs-precision POSIX epoch timestamp
+        """
+        dt = self.to_datetime()
+        return dt.timestamp()

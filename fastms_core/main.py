@@ -26,7 +26,7 @@ from fastms_core.models.salt import (
     CreateJobRequest, CreateJobResponse, IntJid, Job, JobResult
 )
 from fastms_core.salt_http_client import SaltHttpClient, SaltHttpClientError
-from fastms_core.utilities import jid as JID
+from fastms_core.utilities.jid import JID
 from fastms_core.websocket import IsSocketDisconnected
 
 FormStr = Annotated[str, Form()]
@@ -77,8 +77,8 @@ async def get_jobs_endpoint(
     if end_datetime is None:
         end_datetime = datetime.datetime.now() + datetime.timedelta(hours=1)
 
-    start = JID.jid_to_epoch(JID.jid_from_datetime(start_datetime))
-    end = JID.jid_to_epoch(JID.jid_from_datetime(end_datetime))
+    start = JID.from_datetime(start_datetime).to_timestamp()
+    end = JID.from_datetime(end_datetime).to_timestamp()
 
     res_ = await rdb.zrange('jobs', start=end, end=start, desc=True, byscore=True)
     res = [json.loads(i) for i in res_]
@@ -91,7 +91,7 @@ async def get_jobs_endpoint(
 
 @APP.get('/jobs/{jid}')
 async def get_job_endpoint(jid: IntJid, rdb: RedisDependency) -> Job:
-    ts = JID.jid_to_epoch(jid)
+    ts = JID(jid).to_timestamp()
     res_ = await rdb.zrange('jobs', start=ts, end=ts, byscore=True)
 
     if not res_:
@@ -169,7 +169,7 @@ async def websocket_jobs_endpoint(
     websocket: WebSocket,
     rdb: RedisDependency,
 ) -> None:
-    ts = JID.jid_to_epoch(jid)
+    ts = JID(jid).to_timestamp()
     jid_in_jobs = bool(await rdb.zcount('jobs', min=ts, max=ts))
     if not jid_in_jobs:
         raise WebSocketException(

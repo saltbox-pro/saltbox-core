@@ -8,7 +8,7 @@ from pydantic import (
     model_validator,
 )
 
-from fastms_core.utilities.jid import jid_to_datetime, JID_REGEX
+from fastms_core.utilities.jid import JID, JID_REGEX
 from fastms_core.utilities.salt import fill_salt_kwarg_from_arg
 
 IntJid = Annotated[int, Field(gt=int(1970E+16), lt=int(1E+20))]
@@ -48,7 +48,7 @@ class Job(BaseModel):
 
     @computed_field(title='Timestamp decoded from JID')
     def fms_jid_timestamp(self) -> PastDatetime:
-        return jid_to_datetime(self.jid)
+        return JID(self.jid).to_datetime()
 
     @model_validator(mode='before')
     @classmethod
