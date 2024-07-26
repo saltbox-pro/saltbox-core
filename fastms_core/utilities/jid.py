@@ -6,10 +6,11 @@ By default JIDs are monotonically increasing 20-digits values based on datetime.
 The module provides handful convertion functions for default datetime-based JID values.
 """
 
+from __future__ import annotations
+
 import re
 
 from datetime import datetime, timezone
-from typing import Union
 
 JID_FORMAT = '%Y%m%d%H%M%S%f'
 # Matches JID in expected format, but does not validate datetime
@@ -28,6 +29,13 @@ class UnexpectedJidFormatError(JidError):
     ...
 
 
+class UnexpectedDataFormatError(JidError):
+    ...
+
+
+# TODO Field type
+# TODO class Jid:
+
 def jid_from_datetime(value: datetime) -> int:
     """
     Convert datetime object to JID str
@@ -36,7 +44,7 @@ def jid_from_datetime(value: datetime) -> int:
     return int(strval)
 
 
-def jid_to_datetime(jid: Union[int, str]) -> datetime:
+def jid_to_datetime(jid: int | str) -> datetime:
     """
     Convert JID to UTC aware datetime
 
@@ -55,3 +63,26 @@ def jid_to_datetime(jid: Union[int, str]) -> datetime:
         return datetime(**kwargs, tzinfo=timezone.utc)
     except ValueError as err:
         raise UnexpectedJidFormatError(err)
+
+
+# TODO Epoch -> timestamp
+def jid_to_epoch(jid: int | str) -> float:
+    """
+    Get μs-precision POSIX epoch timestamp
+    """
+    dt = jid_to_datetime(jid)
+    return dt.timestamp()
+
+
+def jid_from_epoch(epoch: float | str) -> int:
+    """
+    Make JID from μs-precision POSIX epoch timestamp
+    """
+    # TODO Check epoch precision
+    if isinstance(epoch, str):
+        try:
+            epoch = float(epoch)
+        except ValueError as err:
+            raise UnexpectedDataFormatError(err)
+    dt = datetime.fromtimestamp(epoch, tz=timezone.utc)
+    return jid_from_datetime(dt)
