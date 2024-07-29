@@ -1,8 +1,8 @@
-import allure
+import allure # type: ignore
 import pytest
 import requests
 import os
-import websockets
+import websockets # type: ignore
 import json
 
 

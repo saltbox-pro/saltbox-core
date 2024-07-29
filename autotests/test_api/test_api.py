@@ -7,6 +7,8 @@ from utils import attach_json_to_allure, check_error_message
 @allure.feature('Endpoint GET /jobs/{jid}')
 @allure.title('Sending a valid request to receive a specific job')
 def test_get_specific_job(api, create_jid):
+    with allure.step('Creating new job and get jid'):
+        pass
     response = api.get(f'/jobs/{create_jid}')
     with allure.step('Checking that the server has returned the status code == 200'):
         error_msg = f'Error, the server has returned code {response.status_code}'
@@ -33,13 +35,26 @@ def test_get_specific_job(api, create_jid):
 @allure.feature('Endpoint GET /jobs/{jid}')
 @allure.title('Sending a request with a non-existent jid')
 def test_get_specific_job_with_non_existent_jid(api):
-    jid = 20240999999999999999
+    jid = 19800803190000000000
     response = api.get(f'/jobs/{jid}')
     with allure.step('Checking that the server has returned the status code == 404'):
         msg = f'Error, the server has returned code {response.status_code}'
         assert response.status_code == 404, msg
     response_json = response.json()
     assert response_json['detail'] == 'Job not found'
+    attach_json_to_allure(response_json, 'Response JSON')
+
+
+@allure.feature('Endpoint GET /jobs/{jid}')
+@allure.title('Sending a request with a non-existent and no valid format jid')
+def test_get_specific_job_with_non_existent_and_no_valid_format_jid(api):
+    jid = 20240999999999999999
+    response = api.get(f'/jobs/{jid}')
+    with allure.step('Checking that the server has returned the status code == 404'):
+        msg = f'Error, the server has returned code {response.status_code}'
+        assert response.status_code == 422, msg
+    response_json = response.json()
+    assert response_json['detail'][0]['msg'] == 'Value error, day is out of range for month'
     attach_json_to_allure(response_json, 'Response JSON')
 
 
@@ -52,7 +67,7 @@ def test_get_specific_job_with_no_valid_int_jid(api):
         assert response.status_code == 422, f'Error, the server has returned code {response.status_code}'
     error = response.json()
     check_error_message(
-        error, 'Input should be greater than 19700000000000000000')
+        error, f'Value error, Jid "{jid}" is not a 20-digits value')
     attach_json_to_allure(error, 'Response JSON')
 
 
@@ -264,7 +279,7 @@ def test_get_info_about_task_return_with_no_valid_jid(api):
         assert response.status_code == 422, f'Error, the server has returned code {response.status_code}'
     error = response.json()
     check_error_message(
-        error, 'Input should be greater than 19700000000000000000')
+        error, f'Value error, Jid "{jid}" is not a 20-digits value')
     attach_json_to_allure(error, 'Response JSON')
 
 
@@ -277,7 +292,7 @@ def test_get_info_about_task_return_with_big_jid(api):
         assert response.status_code == 422, f'Error, the server has returned code {response.status_code}'
     error = response.json()
     check_error_message(
-        error, 'Input should be less than 100000000000000000000')
+        error, f'Value error, Jid "{jid}" is not a 20-digits value')
     attach_json_to_allure(error, 'Response JSON')
 
 
