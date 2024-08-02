@@ -43,7 +43,6 @@ version = { attr = 'fastms_core.__version__' }
 [tool.flake8]
 max-line-length = 120
 extend-ignore = [ ]
-builtins = [ '__opts__', '__salt__' ]
 
 [tool.mypy]
 check_untyped_defs = true
