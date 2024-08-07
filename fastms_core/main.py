@@ -218,3 +218,26 @@ async def get_minion_the_grain_endpoint(mid: str, grain: str, rdb: RedisDependen
     if value is None:
         raise http_errors.NotFound(f'No grain {grain} value for {mid}')
     return json.loads(value)
+
+
+@APP.websocket('/minion/{mid}/grains')
+async def minion_grains_websocket(
+    mid: str,
+    websocket: WebSocket,
+    rdb: RedisDependency,
+) -> None:
+    await websocket.accept()
+
+    async def reader(pubsub: PubSub) -> None:
+        async for message in pubsub.listen():
+            if message['type'] not in PubSub.PUBLISH_MESSAGE_TYPES:
+                LOGGER.debug('Skipping service message: %s', message)
+                continue
+            with IsSocketDisconnected(websocket) as disconnect:
+                await websocket.send_text(message['data'].decode())
+            if disconnect:
+                return
+
+    async with rdb.pubsub() as pubsub:
+        await pubsub.psubscribe(f'minion:{mid}:grains')
+        await asyncio.create_task(reader(pubsub))
