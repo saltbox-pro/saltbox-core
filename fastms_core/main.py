@@ -163,7 +163,7 @@ async def jobs_rets_websocket(
                 return
 
     async with rdb.pubsub() as pubsub:
-        await pubsub.psubscribe('job:*')
+        await pubsub.psubscribe('job:*:new')
         await asyncio.create_task(reader(pubsub))
 
 
