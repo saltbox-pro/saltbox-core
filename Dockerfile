@@ -1,7 +1,7 @@
 ARG PYTHON_VERSION='3.12'
 
 FROM python:${PYTHON_VERSION}-alpine
-LABEL name='fastms-core' version='0.3'
+LABEL name='fastms-core' version='0.4'
 ENV SALT_USERNAME="salt_api_user"
 EXPOSE 8000
 
@@ -20,11 +20,10 @@ mkdir -p /etc/fastms/
 echo "SALT_PASSWORD='${PASSWORD}'" >> /etc/fastms/core.env
 EOF
 
-CMD [\
-  "uvicorn",\
-  "fastms_core.main:APP",\
-  "--env-file=/etc/fastms/core.env",\
-  "--host=0.0.0.0",\
-  "--port=8000",\
-  "--timeout-graceful-shutdown=5"\
-]
+ENV TIMEOUT_GRACEFUL_SHUTDOWN=5
+CMD \
+  uvicorn fastms_core.main:APP \
+  --env-file=/etc/fastms/core.env \
+  --host=0.0.0.0\
+  --port=8000\
+  "--timeout-graceful-shutdown=${TIMEOUT_GRACEFUL_SHUTDOWN}"
