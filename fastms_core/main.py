@@ -141,8 +141,8 @@ async def get_job_rets_endpoint(jid: IntJid, rdb: RedisDependency) -> list[JobRe
 
 
 # TODO Use https://github.com/encode/broadcaster if need broadcasts
-@APP.websocket('/ws_jobs')
-async def websocket_jobs_rets_endpoint(
+@APP.websocket('/jobs')
+async def jobs_rets_websocket(
     websocket: WebSocket,
     rdb: RedisDependency
 ) -> None:
@@ -153,8 +153,9 @@ async def websocket_jobs_rets_endpoint(
             if message['type'] not in PubSub.PUBLISH_MESSAGE_TYPES:
                 LOGGER.debug('Skipping service message: %s', message)
                 continue
-            decoded_data = message['data'].decode()
-            data = json.loads(decoded_data)
+            data_str = message['data'].decode()
+            data = json.loads(data_str)
+            # FIXME LOGGER.error(f'>>> {data}')
             job = Job(**data)
             with IsSocketDisconnected(websocket) as disconnect:
                 await websocket.send_text(job.model_dump_json(by_alias=True))
@@ -166,8 +167,8 @@ async def websocket_jobs_rets_endpoint(
         await asyncio.create_task(reader(pubsub))
 
 
-@APP.websocket('/ws_jobs/{jid}/return')
-async def websocket_jobs_endpoint(
+@APP.websocket('/jobs/{jid}/return')
+async def jobs_endpoint_websocket(
     jid: IntJid,
     websocket: WebSocket,
     rdb: RedisDependency,
@@ -184,8 +185,7 @@ async def websocket_jobs_endpoint(
             if message['type'] not in PubSub.PUBLISH_MESSAGE_TYPES:
                 LOGGER.debug('Skipping service message: %s', message)
                 continue
-            decoded_data = message['data'].decode()
-            data = json.loads(decoded_data)
+            data = json.loads(message['data'].decode())
             result = JobResult(**data).model_dump_json(by_alias=True)
             with IsSocketDisconnected(websocket) as disconnect:
                 await websocket.send_text(result)
@@ -197,7 +197,6 @@ async def websocket_jobs_endpoint(
         await asyncio.create_task(reader(pubsub))
 
 # TODO List minions (with grains)
-# TODO Channel
 
 
 @APP.get('/minion/{mid}/grains')
