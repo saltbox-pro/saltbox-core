@@ -6,7 +6,7 @@ import json
 import logging
 
 from contextlib import asynccontextmanager
-from typing import Annotated
+from typing import Annotated, Any
 
 import pydantic
 
@@ -126,7 +126,7 @@ async def create_job_endpoint(item: CreateJobRequest) -> CreateJobResponse:
 
 @APP.get('/jobs/{jid}/return')
 async def get_job_rets_endpoint(jid: IntJid, rdb: RedisDependency) -> list[JobResult]:
-    res_ = await rdb.hgetall(name=f'job.rets:{jid}')
+    res_ = await rdb.hgetall(name=f'job:{jid}:return')
 
     res = []
     for _, ret in res_.items():
@@ -193,5 +193,29 @@ async def websocket_jobs_endpoint(
                 return
 
     async with rdb.pubsub() as pubsub:
-        await pubsub.psubscribe(f'job.rets:{jid}')
+        await pubsub.psubscribe(f'job:{jid}:return')
         await asyncio.create_task(reader(pubsub))
+
+# TODO List minions (with grains)
+# TODO Channel
+
+
+@APP.get('/minion/{mid}/grains')
+async def get_minion_grains_endpoint(mid: str, rdb: RedisDependency) -> dict[str, Any]:
+    data = await rdb.hgetall(name=f'minion:{mid}:grains')
+    if not data:
+        raise http_errors.NotFound(f'No grains kept for {mid}')
+    return {k: json.loads(val) for k, val in data.items()}
+
+
+@APP.get('/minion/{mid}/grain/{grain}')
+async def get_minion_the_grain_endpoint(mid: str, grain: str, rdb: RedisDependency) -> Any:
+    """
+    Get specific minion grain
+
+    There are 404 for null value
+    """
+    value = await rdb.hget(name=f'minion:{mid}:grains', key=grain)
+    if value is None:
+        raise http_errors.NotFound(f'No grain {grain} value for {mid}')
+    return json.loads(value)
