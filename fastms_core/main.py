@@ -196,7 +196,23 @@ async def jobs_endpoint_websocket(
         await pubsub.psubscribe(f'job:{jid}:return')
         await asyncio.create_task(reader(pubsub))
 
-# TODO List minions (with grains)
+
+@APP.get('/minion/have_grains')
+async def list_minions_with_grains(rdb: RedisDependency) -> list[str]:
+    """
+    Get list of minions for which grains are kept in DB
+    """
+    def get_mid(value: bytes) -> str:
+        return value.decode().lstrip('minion:').rstrip(':grains')
+
+    result: list[str] = []
+    cursor = 0
+    while True:
+        cursor, data = await rdb.scan(cursor=cursor, match='minion:*:grains')
+        result.extend(map(get_mid, data))
+        if not cursor:
+            break
+    return result
 
 
 @APP.get('/minion/{mid}/grains')
