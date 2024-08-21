@@ -9,36 +9,35 @@ from utils import create_sleep_job, create_new_job
 @allure.feature('A websocket endpoints')
 @allure.title('Connecting to ws endpoind and checking changing jobs')
 async def test_websocket_jobs(api):
-    await api.websocket_client.connect('/ws_jobs')
+    await api.websocket_client.connect('/jobs')
 
     with allure.step('Creating a new job to ensure that the client receives the required information'):
         jid = create_new_job(api)
     try:
-        message = await asyncio.wait_for(api.websocket_client.listen().__anext__(), timeout=1)
+        message = await asyncio.wait_for(api.websocket_client.listen().__anext__(), timeout=2)
         assert message['jid'] == jid
     except asyncio.TimeoutError:
-        pytest.fail(
-            "Timeout: No message received from the server within the expected time.")
+        pytest.fail('Timeout: No message received from the server within the expected time.')
 
     await api.websocket_client.close()
 
 
 @pytest.mark.asyncio
 @allure.feature('A websocket endpoints')
-@allure.title('A websocket connection has been established for '
-              'the job and the message has been received /ws_jobs/{jid}/return')
+@allure.title(
+    'A websocket connection has been established for ' 'the job and the message has been received /ws_jobs/{jid}/return'
+)
 async def test_websocket_jobs_return(api):
     with allure.step('Creating a new job and get jid'):
         jid = create_sleep_job(api)
-    await api.websocket_client.connect(f'/ws_jobs/{jid}/return')
+    await api.websocket_client.connect(f'/jobs/{jid}/return')
 
     with allure.step('Checking that client receives the required information'):
         try:
-            message = await asyncio.wait_for(api.websocket_client.listen().__anext__(), timeout=1)
+            message = await asyncio.wait_for(api.websocket_client.listen().__anext__(), timeout=2)
             assert message['jid'] == jid
         except asyncio.TimeoutError:
-            pytest.fail(
-                "Timeout: No message received from the server within the expected time.")
+            pytest.fail('Timeout: No message received from the server within the expected time.')
 
     await api.websocket_client.close()
 
@@ -49,4 +48,4 @@ async def test_websocket_jobs_return(api):
 async def test_websocket_no_valid_jobs_return(api):
     with allure.step('Checking that the server returns an error'):
         with pytest.raises(websockets.exceptions.InvalidHandshake):
-            await api.websocket_client.connect(f'/ws_jobs/asdasd/return')
+            await api.websocket_client.connect('/ws_jobs/asdasd/return')

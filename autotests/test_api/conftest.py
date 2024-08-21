@@ -1,8 +1,8 @@
-import allure # type: ignore
+import allure  # type: ignore
 import pytest
 import requests
 import os
-import websockets # type: ignore
+import websockets  # type: ignore
 import json
 
 
@@ -29,9 +29,11 @@ class WebSocketClient:
         with allure.step('Listening message'):
             async for message in self.websocket:
                 data = json.loads(message)
-                allure.attach(json.dumps(data, indent=2),
-                              name="WebSocket Message",
-                              attachment_type=allure.attachment_type.JSON)
+                allure.attach(
+                    json.dumps(data, indent=2),
+                    name='WebSocket Message',
+                    attachment_type=allure.attachment_type.JSON,
+                )
                 yield data
 
     async def close(self):
@@ -68,7 +70,7 @@ def create_jid(api):
         'tgt_type': 'glob',
         'fun': 'test.ping',
         'arg': [],
-        'kwarg': {}
+        'kwarg': {},
     }
     response_json = api.post('/jobs', json=payload).json()
     jid = response_json['return'][0]['jid']
