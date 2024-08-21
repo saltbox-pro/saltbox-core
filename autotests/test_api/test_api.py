@@ -66,8 +66,7 @@ def test_get_specific_job_with_no_valid_int_jid(api):
     with allure.step('Checking that the server has returned the status code == 422'):
         assert response.status_code == 422, f'Error, the server has returned code {response.status_code}'
     error = response.json()
-    check_error_message(
-        error, f'Value error, Jid "{jid}" is not a 20-digits value')
+    check_error_message(error, f'Value error, Jid "{jid}" is not a 20-digits value')
     attach_json_to_allure(error, 'Response JSON')
 
 
@@ -79,8 +78,7 @@ def test_get_specific_job_with_str_type_jid(api):
     with allure.step('Checking that the server has returned the status code == 422'):
         assert response.status_code == 422, f'Error, the server has returned code {response.status_code}'
     error = response.json()
-    check_error_message(
-        error, 'Input should be a valid integer, unable to parse string as an integer')
+    check_error_message(error, 'Input should be a valid integer, unable to parse string as an integer')
     attach_json_to_allure(error, 'Response JSON')
 
 
@@ -92,7 +90,7 @@ def test_post_jobs_valid_request(api):
         'tgt_type': 'glob',
         'fun': 'test_api.ring',
         'arg': [],
-        'kwarg': {}
+        'kwarg': {},
     }
     response = api.post('/jobs', json=payload)
     with allure.step('Request body'):
@@ -132,7 +130,8 @@ def test_get_jobs(api):
         '/jobs',
         params={
             'start_datetime': start_datetime,
-        })
+        },
+    )
     with allure.step(f'Required parameter start_datetime = {start_datetime}'):
         pass
     with allure.step('Checking that the server has returned the status code == 200'):
@@ -164,14 +163,17 @@ def test_get_jobs(api):
 @allure.title('Sending a valid request with all parameter')
 def test_get_jobs_with_all_params(api):
     start_datetime = (datetime.now() - timedelta(hours=6)).isoformat()
-    end_datetime = (datetime.now() - timedelta(hours=4)).isoformat()
+    end_datetime = (datetime.now()).isoformat()
 
     response = api.get(
         '/jobs',
         params={
             'start_datetime': start_datetime,
             'end_datetime': end_datetime,
-        })
+        },
+    )
+    print(response)
+
     with allure.step(f'Parameters start_datetime = {start_datetime} and end_datetime = {end_datetime}'):
         pass
     with allure.step('Checking that the server has returned the status code == 200'):
@@ -207,7 +209,8 @@ def test_get_jobs_with_only_no_required_param(api):
         '/jobs',
         params={
             'end_datetime': end_datetime,
-        })
+        },
+    )
     with allure.step('Checking that the server has returned the status code == 422'):
         assert response.status_code == 422
     error = response.json()
@@ -219,11 +222,7 @@ def test_get_jobs_with_only_no_required_param(api):
 @allure.title('Sending a request with a required date parameter set to a future date.')
 def test_get_jobs_with_future_date_in_params(api):
     start_datetime = (datetime.now() - timedelta(seconds=3)).isoformat()
-    response = api.get(
-        '/jobs',
-        params={
-            'start_datetime': start_datetime
-        })
+    response = api.get('/jobs', params={'start_datetime': start_datetime})
     with allure.step(f'Required parameter start_datetime = {start_datetime}'):
         pass
     with allure.step('Checking that the server has returned the status code == 422'):
@@ -262,7 +261,7 @@ def test_get_info_about_valid_task_return(api, create_jid):
             'fun',
             'fun_args',
             'user',
-            '_stamp'
+            '_stamp',
         ]
         for result in response_json:
             for key in required_keys:
@@ -278,8 +277,7 @@ def test_get_info_about_task_return_with_no_valid_jid(api):
     with allure.step('Checking that the server has returned the status code == 422'):
         assert response.status_code == 422, f'Error, the server has returned code {response.status_code}'
     error = response.json()
-    check_error_message(
-        error, f'Value error, Jid "{jid}" is not a 20-digits value')
+    check_error_message(error, f'Value error, Jid "{jid}" is not a 20-digits value')
     attach_json_to_allure(error, 'Response JSON')
 
 
@@ -291,8 +289,7 @@ def test_get_info_about_task_return_with_big_jid(api):
     with allure.step('Checking that the server has returned the status code == 422'):
         assert response.status_code == 422, f'Error, the server has returned code {response.status_code}'
     error = response.json()
-    check_error_message(
-        error, f'Value error, Jid "{jid}" is not a 20-digits value')
+    check_error_message(error, f'Value error, Jid "{jid}" is not a 20-digits value')
     attach_json_to_allure(error, 'Response JSON')
 
 
@@ -304,6 +301,5 @@ def test_get_info_about_task_return_with_str_jid(api):
     with allure.step('Checking that the server has returned the status code == 422'):
         assert response.status_code == 422, f'Error, the server has returned code {response.status_code}'
     error = response.json()
-    check_error_message(
-        error, 'Input should be a valid integer, unable to parse string as an integer')
+    check_error_message(error, 'Input should be a valid integer, unable to parse string as an integer')
     attach_json_to_allure(error, 'Response JSON')
