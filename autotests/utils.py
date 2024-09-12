@@ -1,7 +1,10 @@
 import json
 import time
 import pytest
+import redis
 import allure  # type: ignore
+
+redis_client = redis.Redis(host='localhost', port=6379, db=0)
 
 
 def attach_json_to_allure(data, name):
@@ -71,6 +74,7 @@ def get_available_minion(api):
     if not available_minion:
         pytest.fail('No available minions found.')
     else:
+        redis_client.delete(f'job:{jid}:return')
         return available_minion
 
 

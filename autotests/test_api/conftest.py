@@ -1,5 +1,6 @@
 import allure  # type: ignore
 import pytest
+import redis
 import requests
 import os
 import websockets  # type: ignore
@@ -57,13 +58,13 @@ class APIClient:
             return requests.post(url=url, params=params, headers=headers, json=json, data=data)
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope='session')
 def api():
-    base_url = os.environ.get('FASTMS_CORE_URL', 'http://localhost:8000')
+    base_url = os.environ.get('FASTMS_CORE_URL', 'http://localhost/api/core')
     return APIClient(base_url=base_url)
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope='session')
 def create_jid(api):
     payload = {
         'tgt': '*',
@@ -74,4 +75,33 @@ def create_jid(api):
     }
     response_json = api.post('/jobs', json=payload).json()
     jid = response_json['return'][0]['jid']
-    return jid
+    yield jid
+
+    redis_client = redis.Redis(host='localhost', port=6379, db=0)
+    redis_client.delete(f'job:{jid}:return')
+
+
+@pytest.fixture(scope='session')
+def create_data(api):
+    payload = {
+        'tgt': '*',
+        'tgt_type': 'glob',
+        'fun': 'grains.items',
+        'kwarg': {},
+    }
+    response_json = api.post('/jobs', json=payload).json()
+    if not response_json:
+        pytest.fail('Failed to create grains.items job or the answer came empty')
+    mid_list = response_json['return'][0]['minions']
+    if mid_list:
+        yield mid_list
+    else:
+        pytest.fail('No available minions found.')
+
+    # Delete created data
+    redis_client = redis.Redis(host='localhost', port=6379, db=0)
+    for i in mid_list:
+        redis_client.delete(f'minion:{i}:grains')
+    jids = [item['jid'] for item in response_json.get('return', [])]
+    for i in jids:
+        redis_client.delete(f'job:{i}:return')
