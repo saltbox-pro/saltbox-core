@@ -1,8 +1,8 @@
 ARG PYTHON_VERSION='3.12'
 
 FROM python:${PYTHON_VERSION}-alpine
-LABEL name='fastms-core' version='0.5'
-ENV SALT_USERNAME="salt_api_user"
+LABEL name='fastms-core' version='0.7'
+ENV SALT_USERNAME="fastms_core"
 EXPOSE 8000
 
 RUN \
@@ -13,18 +13,13 @@ RUN \
   --mount=type=bind,target=/mnt/fastms_core/,readwrite \
   --mount=type=cache,target=/root/.cache/pip/ \
   pip3 install --no-deps /mnt/fastms_core/
-RUN <<EOF
-set -e
-PASSWORD="$(tr -dc A-Za-z0-9 </dev/urandom | head -c 32)"
-mkdir -p /etc/fastms/
-echo "SALT_PASSWORD='${PASSWORD}'" >> /etc/fastms/core.env
-EOF
 
 ENV ROOT_PATH=/
 ENV TIMEOUT_GRACEFUL_SHUTDOWN=5
+ENV SALT_EAUTH=file
 CMD \
+  SALT_PASSWORD=$(cat /run/secrets/salt_api_password) \
   uvicorn fastms_core.main:APP \
-  --env-file=/etc/fastms/core.env \
   --host=0.0.0.0\
   "--root-path=${ROOT_PATH}"\
   --port=8000\

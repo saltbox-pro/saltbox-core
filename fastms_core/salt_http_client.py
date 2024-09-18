@@ -43,8 +43,8 @@ class SaltHttpClient:
         salt_instance: str,
         username: str,
         password: str,
+        eauth: str,
         strict_ssl=True,
-        eauth='rest'
     ) -> None:
         self._login_data = {
             'username': username,

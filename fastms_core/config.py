@@ -8,6 +8,7 @@ class Settings(BaseSettings):
     salt_url: str
     salt_username: str
     salt_password: str
+    salt_eauth: str = 'file'
     redis_url: str
     debug: bool = False
     origins: list[str] = Field(['*'], description='CORS allowed resources')

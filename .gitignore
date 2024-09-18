@@ -1,6 +1,12 @@
-__pycache__
-.venv
-venv
-*.pyc
+# Python
 *.egg-info
-.vscode
+*.pyc
+/build/
+__pycache__
+
+# Virtual environments
+/.venv
+/venv
+
+# Editors
+/.vscode

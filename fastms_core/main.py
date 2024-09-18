@@ -32,9 +32,10 @@ FormStr = Annotated[str, Form()]
 
 SALT_CLIENT = SaltHttpClient(
     SETTINGS.salt_url,
-    strict_ssl=False,
     username=SETTINGS.salt_username,
-    password=SETTINGS.salt_password)
+    password=SETTINGS.salt_password,
+    eauth=SETTINGS.salt_eauth,
+    strict_ssl=False,)
 LOGGER = logging.getLogger(__name__)
 
 logging.config.dictConfig(LOG_CONFIG.dict())
@@ -57,7 +58,8 @@ APP.add_middleware(
 )
 
 
-@APP.post('/salt_auth')
+# Deprecated due to salt.auth.file method
+@APP.post('/salt_auth', deprecated=True)
 async def salt_auth_endpoint(username: FormStr, password: FormStr) -> JSONResponse:
     """ For salt.auth.rest """
     if username == SETTINGS.salt_username and password == SETTINGS.salt_password:
@@ -155,7 +157,6 @@ async def jobs_rets_websocket(
                 continue
             data_str = message['data'].decode()
             data = json.loads(data_str)
-            # FIXME LOGGER.error(f'>>> {data}')
             job = Job(**data)
             with IsSocketDisconnected(websocket) as disconnect:
                 await websocket.send_text(job.model_dump_json(by_alias=True))
