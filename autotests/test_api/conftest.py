@@ -6,6 +6,10 @@ import os
 import websockets  # type: ignore
 import json
 
+from utils import delete_job_from_zset_on_redis
+
+REDIS_CLIENT = redis.Redis(host='localhost', port=6379, db=0)
+
 
 class WebSocketClient:
     def __init__(self, base_url):
@@ -77,8 +81,9 @@ def create_jid(api):
     jid = response_json['return'][0]['jid']
     yield jid
 
-    redis_client = redis.Redis(host='localhost', port=6379, db=0)
-    redis_client.delete(f'job:{jid}:return')
+    # Delete created jobs
+    REDIS_CLIENT.delete(f'job:{jid}:return')
+    delete_job_from_zset_on_redis(jid)
 
 
 @pytest.fixture(scope='session')
@@ -99,9 +104,8 @@ def create_data(api):
         pytest.fail('No available minions found.')
 
     # Delete created data
-    redis_client = redis.Redis(host='localhost', port=6379, db=0)
     for i in mid_list:
-        redis_client.delete(f'minion:{i}:grains')
-    jids = [item['jid'] for item in response_json.get('return', [])]
-    for i in jids:
-        redis_client.delete(f'job:{i}:return')
+        REDIS_CLIENT.delete(f'minion:{i}:grains')
+    jid = response_json['return'][0]['jid']
+    REDIS_CLIENT.delete(f'job:{jid}:return')
+    delete_job_from_zset_on_redis(jid)

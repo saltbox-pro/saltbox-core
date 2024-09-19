@@ -4,7 +4,7 @@ import pytest
 import redis
 import allure  # type: ignore
 
-redis_client = redis.Redis(host='localhost', port=6379, db=0)
+REDIS_CLIENT = redis.Redis(host='localhost', port=6379, db=0)
 
 
 def attach_json_to_allure(data, name):
@@ -74,7 +74,8 @@ def get_available_minion(api):
     if not available_minion:
         pytest.fail('No available minions found.')
     else:
-        redis_client.delete(f'job:{jid}:return')
+        REDIS_CLIENT.delete(f'job:{jid}:return')
+        delete_job_from_zset_on_redis(jid)
         return available_minion
 
 
@@ -97,3 +98,19 @@ def create_sleep_job(api):
     if not jid:
         pytest.fail('JID is not available')
     return jid
+
+
+def delete_job_from_zset_on_redis(jid):
+    jobs_list_from_redis = REDIS_CLIENT.zrange('jobs', 0, -1)
+
+    for e in jobs_list_from_redis:
+        element_str = e.decode('utf-8')
+        try:
+            element_dict = json.loads(element_str)
+        except json.JSONDecodeError:
+            print(f'Error to decode element to JSON: {element_str}')
+            continue
+
+        if element_dict.get('jid') == jid:
+            REDIS_CLIENT.zrem('jobs', element_str)
+            return

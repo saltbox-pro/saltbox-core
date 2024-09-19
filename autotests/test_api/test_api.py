@@ -5,7 +5,7 @@ import json
 import redis
 from datetime import datetime, timedelta
 import allure  # type: ignore
-from utils import attach_json_to_allure, check_error_message
+from utils import attach_json_to_allure, check_error_message, delete_job_from_zset_on_redis
 
 
 REDIS_CLIENT = redis.Redis(host='localhost', port=6379, db=0)
@@ -39,7 +39,6 @@ def test_get_specific_job(api, create_jid):
         for key in response_json:
             assert key in required_keys, f'The response does not contain the key "{key}"'
         attach_json_to_allure(response_json, 'Response JSON')
-    REDIS_CLIENT.delete(f'job:{create_jid}:/return')
 
 
 @allure.feature('Endpoint GET /jobs/{jid}')
@@ -117,12 +116,12 @@ def test_post_jobs_valid_request(api):
 
     with allure.step('Checking that the "jid" was returned in the response'):
         assert 'jid' in response_json.get('return', [])[0], 'Error, "jid" not found in the first element of response'
+        jid = response_json['return'][0]['jid']
     with allure.step('Response'):
         attach_json_to_allure(response_json, 'Response JSON')
-    jids = [item['jid'] for item in response_json.get('return', [])]
     time.sleep(0.1)
-    for i in jids:
-        REDIS_CLIENT.delete(f'job:{int(i)}:return')
+    REDIS_CLIENT.delete(f'job:{jid}:return')
+    delete_job_from_zset_on_redis(jid)
 
 
 @allure.feature('Endpoint POST /jobs')
@@ -144,10 +143,10 @@ def test_post_jobs_with_empty_json_body(api):
     with allure.step('Response'):
         attach_json_to_allure(response_json, 'Response JSON')
 
-    jids = [item['jid'] for item in response_json.get('return', [])]
+    jid = response_json['return'][0]['jid']
     time.sleep(0.1)
-    for i in jids:
-        REDIS_CLIENT.delete(f'job:{i}:return')
+    REDIS_CLIENT.delete(f'job:{jid}:return')
+    delete_job_from_zset_on_redis(jid)
 
 
 @allure.feature('Endpoint GET /jobs')
@@ -304,7 +303,6 @@ def test_get_info_about_valid_task_return(api, create_jid):
             for key in required_keys:
                 assert key in result, f'The response does not contain the key "{key}"'
         attach_json_to_allure(response_json, 'Response JSON')
-        REDIS_CLIENT.delete(f'job:{create_jid}:return')
 
 
 @allure.feature('Endpoint GET /jobs/{jid}/return')
@@ -350,7 +348,7 @@ def test_get_info_about_task_return_with_str_jid(api):
 @allure.title('Sending a GET request to retrieve list of minion id with grains')
 def test_get_list_minions_with_grains(api, create_data):
     time.sleep(1)
-    response = api.get(f'/minion/have_grains')
+    response = api.get('/minion/have_grains')
     with allure.step('Checking that the server has returned the status code == 200'):
         assert response.status_code == 200, f'Error, the server has returned code {response.status_code}'
 
@@ -406,19 +404,6 @@ def test_get_grains_list_no_valid_minion_id(api):
         attach_json_to_allure(response.json(), 'Response JSON')
 
 
-@allure.feature('Endpoint GET /minion/{mid}/grains')
-@allure.title('Sending a GET request to an invalid Redis hash results in a 422 status code')
-def test_get_no_valid_redis_hash(api, create_data):
-    mid = create_data[0]
-    redis_hash_key = f'minion:{mid}:grains'
-    REDIS_CLIENT.hset(redis_hash_key, 'os', 'КИРИЛЛИЦА')
-    response = api.get(f'/minion/{mid}/grains')
-    assert response.status_code == 422
-
-
-# TODO After fixed 500 error need assert 422 status code
-
-
 @allure.feature('Endpoint GET /minion/{mid}/grain/{grain}')
 @allure.title('Checking the received value from Redis with the value received from the API')
 def test_get_grain_os_from_minion(api, create_data):
@@ -441,6 +426,19 @@ def test_get_grain_os_from_minion(api, create_data):
         api_value = response.json()
         if not parsed_value_in_redis == api_value:
             pytest.fail('The value obtained from Redis does not correspond to the value returned by the API')
+
+
+@allure.feature('Endpoint GET /minion/{mid}/grains')
+@allure.title('Sending a GET request to an invalid Redis hash results in a 422 status code')
+def test_get_no_valid_redis_hash(api, create_data):
+    mid = create_data[0]
+    redis_hash_key = f'minion:{mid}:grains'
+    REDIS_CLIENT.hset(redis_hash_key, 'os', 'КИРИЛЛИЦА')
+    response = api.get(f'/minion/{mid}/grains')
+    assert response.status_code == 422
+
+
+# TODO After fixed 500 error need assert 422 status code
 
 
 @allure.feature('Endpoint GET /minion/{mid}/grain/{grain}')

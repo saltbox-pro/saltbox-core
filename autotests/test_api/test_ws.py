@@ -1,11 +1,10 @@
 import asyncio
-import time
 import json
 import pytest
 import redis
 import allure  # type: ignore
 import websockets  # type: ignore
-from utils import create_sleep_job, create_new_job
+from utils import create_sleep_job, create_new_job, delete_job_from_zset_on_redis
 
 REDIS_CLIENT = redis.Redis(host='localhost', port=6379, db=0)
 
@@ -26,7 +25,9 @@ async def test_websocket_jobs(api):
 
     await api.websocket_client.close()
     await asyncio.sleep(0.1)
+    # Delete created jobs
     REDIS_CLIENT.delete(f'job:{jid}:return')
+    delete_job_from_zset_on_redis(jid)
 
 
 @pytest.mark.asyncio
@@ -43,11 +44,12 @@ async def test_websocket_jobs_return(api):
         try:
             message = await asyncio.wait_for(api.websocket_client.listen().__anext__(), timeout=3)
             assert message['jid'] == jid
+            REDIS_CLIENT.delete(f'job:{jid}:return')
+            delete_job_from_zset_on_redis(jid)
         except asyncio.TimeoutError:
             pytest.fail('Timeout: No message received from the server within the expected time.')
         finally:
             await api.websocket_client.close()
-            REDIS_CLIENT.delete(f'job:{jid}:return')
 
 
 @pytest.mark.asyncio
