@@ -221,7 +221,10 @@ async def get_minion_grains_endpoint(mid: str, rdb: RedisDependency) -> dict[str
     data = await rdb.hgetall(name=f'minion:{mid}:grains')
     if not data:
         raise http_errors.NotFound(f'No grains kept for {mid}')
-    return {k: json.loads(val) for k, val in data.items()}
+    try:
+        return {k: json.loads(val) for k, val in data.items()}
+    except json.JSONDecodeError:
+        raise http_errors.InternalServerError('Failed to serialize value')
 
 
 @APP.get('/minion/{mid}/grain/{grain}')
@@ -234,7 +237,10 @@ async def get_minion_the_grain_endpoint(mid: str, grain: str, rdb: RedisDependen
     value = await rdb.hget(name=f'minion:{mid}:grains', key=grain)
     if value is None:
         raise http_errors.NotFound(f'No grain {grain} value for {mid}')
-    return json.loads(value)
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        raise http_errors.InternalServerError('Failed to serialize value')
 
 
 @APP.websocket('/minion/{mid}/grains')
