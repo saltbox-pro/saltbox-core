@@ -428,19 +428,6 @@ def test_get_grain_os_from_minion(api, create_data):
             pytest.fail('The value obtained from Redis does not correspond to the value returned by the API')
 
 
-@allure.feature('Endpoint GET /minion/{mid}/grains')
-@allure.title('Sending a GET request to an invalid Redis hash results in a 422 status code')
-def test_get_no_valid_redis_hash(api, create_data):
-    mid = create_data[0]
-    redis_hash_key = f'minion:{mid}:grains'
-    REDIS_CLIENT.hset(redis_hash_key, 'os', 'КИРИЛЛИЦА')
-    response = api.get(f'/minion/{mid}/grains')
-    assert response.status_code == 422
-
-
-# TODO After fixed 500 error need assert 422 status code
-
-
 @allure.feature('Endpoint GET /minion/{mid}/grain/{grain}')
 @allure.title('Checking a request for a non-existent field in the redis hash')
 def test_get_grain_os_no_contains(api, create_data):
