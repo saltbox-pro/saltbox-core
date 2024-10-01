@@ -1,5 +1,7 @@
+from functools import lru_cache
+
 from pydantic import BaseModel, Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 APP_NAME = 'FastMS core'
 
@@ -13,6 +15,8 @@ class Settings(BaseSettings):
     debug: bool = False
     origins: list[str] = Field(['*'], description='CORS allowed resources')
     max_count: int = Field(default=1000, description='Max array length to request')
+
+    model_config = SettingsConfigDict(env_file='.env')
 
 
 class LogConfig(BaseModel):
@@ -34,12 +38,16 @@ class LogConfig(BaseModel):
             'formatter': 'default',
             'stream': 'ext://sys.stderr',
         },
-
     }
     loggers: dict = {
         'fastms_core': {'handlers': ['default'], 'level': LOG_LEVEL},
     }
 
 
-SETTINGS = Settings(_env_file='.env')
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()
+
+
+SETTINGS = get_settings()
 LOG_CONFIG = LogConfig(LOG_LEVEL='DEBUG' if SETTINGS.debug else 'INFO')
