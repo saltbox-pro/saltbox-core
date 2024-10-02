@@ -28,6 +28,7 @@ from fastms_core.models.salt import (
 from fastms_core.salt_http_client import SaltHttpClient, SaltHttpClientError
 from fastms_core.utilities.jid import JID, JidError
 from fastms_core.websocket import IsSocketDisconnected
+from fastms_core.grains.router import router as minions_router
 
 FormStr = Annotated[str, Form()]
 
@@ -57,6 +58,8 @@ APP.add_middleware(
     allow_methods=['*'],
     allow_headers=['*'],
 )
+
+APP.include_router(minions_router)
 
 
 # Deprecated due to salt.auth.file method
