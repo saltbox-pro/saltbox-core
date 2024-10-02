@@ -7,7 +7,6 @@ from motor.core import AgnosticDatabase
 
 from fastms_core.config import LOG_CONFIG
 from fastms_core.db.mongo import get_db
-from fastms_core.minions.models import Minion
 from fastms_core.minions.crud import minion_crud
 from fastms_core.minions.schemas import MinionSchema, MinionSchemaCreate, MinionSchemaUpdate
 from fastms_core.redis import RedisDependency
