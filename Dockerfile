@@ -19,6 +19,7 @@ ENV TIMEOUT_GRACEFUL_SHUTDOWN=5
 ENV SALT_EAUTH=file
 CMD \
   SALT_PASSWORD=$(cat /run/secrets/salt_api_password) \
+  MONGO_PASSWORD=$(cat /run/secrets/mongo_admin_password) \
   uvicorn fastms_core.main:APP \
   --host=0.0.0.0\
   "--root-path=${ROOT_PATH}"\
