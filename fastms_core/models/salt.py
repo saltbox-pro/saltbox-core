@@ -2,6 +2,7 @@ from typing import cast, Annotated, Any, Optional, TypeVar, Union
 
 from pydantic import (
     BaseModel,
+    ConfigDict,
     Field,
     PastDatetime,
     computed_field,
@@ -74,7 +75,14 @@ class Job(BaseModel):
 
 
 class JobResult(BaseModel):
-    cmd: str
+    """
+    Describes return data for a job
+    """
+
+    # Officially obligatory fields are only [ id, jid, retcode, fun, return ]
+    # https://docs.saltproject.io/en/latest/topics/event/master_events.html#job-events
+    model_config = ConfigDict(extra='allow')
+
     id: str
     success: bool
     return_: Any = Field(alias='return')
