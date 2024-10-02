@@ -11,7 +11,7 @@ def datetime_now_sec() -> datetime:
 
 
 class Grains(EmbeddedModel):
-    cwd: Optional[str] = None
+    cwd: Optional[str] = Field(title='Current working directory', default=None)
     host: Optional[str] = None
     ip6_gw: Optional[bool] = None
     cpu_flags: Optional[list] = None  # Field(default_factory=list)

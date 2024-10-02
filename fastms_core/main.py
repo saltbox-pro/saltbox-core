@@ -28,7 +28,7 @@ from fastms_core.models.salt import (
 from fastms_core.salt_http_client import SaltHttpClient, SaltHttpClientError
 from fastms_core.utilities.jid import JID, JidError
 from fastms_core.websocket import IsSocketDisconnected
-from fastms_core.grains.router import router as minions_router
+from fastms_core.minions.router import router as minions_router
 
 FormStr = Annotated[str, Form()]
 

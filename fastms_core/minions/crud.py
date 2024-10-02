@@ -8,8 +8,8 @@ from odmantic import AIOEngine, Model
 from pydantic import BaseModel
 
 from fastms_core.db.mongo import get_engine
-from fastms_core.grains.models import Minion
-from fastms_core.grains.schemas import MinionSchemaCreate, MinionSchemaUpdate
+from fastms_core.minions.models import Minion
+from fastms_core.minions.schemas import MinionSchemaCreate, MinionSchemaUpdate
 
 ModelType = TypeVar('ModelType', bound=Model)
 CreateSchemaType = TypeVar('CreateSchemaType', bound=BaseModel)

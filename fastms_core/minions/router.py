@@ -7,8 +7,9 @@ from motor.core import AgnosticDatabase
 
 from fastms_core.config import LOG_CONFIG
 from fastms_core.db.mongo import get_db
-from fastms_core.grains.crud import minion_crud
-from fastms_core.grains.schemas import MinionSchema, MinionSchemaCreate, MinionSchemaUpdate
+from fastms_core.minions.models import Minion
+from fastms_core.minions.crud import minion_crud
+from fastms_core.minions.schemas import MinionSchema, MinionSchemaCreate, MinionSchemaUpdate
 from fastms_core.redis import RedisDependency
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
@@ -67,3 +68,23 @@ async def get_all_minions(
     minions = await minion_crud.get_multi(mdb, search, page=page, per_page=per_page, page_break=page_break)
 
     return [MinionSchema(**minion.model_dump()) for minion in minions]
+
+
+@router.get('/filter-schema')
+async def get_minion_schema() -> list[dict]:
+    # fields = Minion.model_json_schema()
+    fields = [
+        {
+            'name': 'minion_id',
+            'label': 'Minion ID',
+        },
+        {
+            'name': 'master',
+            'label': 'Master',
+        },
+        {
+            'name': 'grains.os_family',
+            'label': 'OS Family',
+        },
+    ]
+    return fields
