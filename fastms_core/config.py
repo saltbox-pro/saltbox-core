@@ -12,11 +12,19 @@ class Settings(BaseSettings):
     salt_password: str
     salt_eauth: str = 'file'
     redis_url: str
+    mongo_db: str
+    mongo_port: int = 27017
+    mongo_user: str
+    mongo_password: str
     debug: bool = False
     origins: list[str] = Field(['*'], description='CORS allowed resources')
     max_count: int = Field(default=1000, description='Max array length to request')
 
     model_config = SettingsConfigDict(env_file='.env')
+
+    @property
+    def mongo_url(self) -> str:
+        return f'mongodb://{self.mongo_user}:{self.mongo_password}@mongo:{self.mongo_port}/'
 
 
 class LogConfig(BaseModel):
