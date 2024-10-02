@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     redis_url: str
     debug: bool = False
     origins: list[str] = Field(['*'], description='CORS allowed resources')
+    max_count: int = Field(default=1000, description='Max array length to request')
 
 
 class LogConfig(BaseModel):

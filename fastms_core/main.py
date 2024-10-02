@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from typing import Annotated, Any
 
 import pydantic
+import redis.exceptions as redis_exceptions
 
 from fastapi import FastAPI, Form, WebSocket
 from fastapi.encoders import jsonable_encoder
@@ -22,7 +23,7 @@ from fastms_core import http_errors
 from fastms_core.config import APP_NAME, SETTINGS, LOG_CONFIG
 from fastms_core.redis import POOL, RedisDependency
 from fastms_core.models.salt import (
-    CreateJobRequest, CreateJobResponse, IntJid, Job, JobResult
+    CreateJobRequest, CreateJobResponse, GetJobReturnResponse, IntJid, Job, JobResult
 )
 from fastms_core.salt_http_client import SaltHttpClient, SaltHttpClientError
 from fastms_core.utilities.jid import JID, JidError
@@ -127,11 +128,24 @@ async def create_job_endpoint(item: CreateJobRequest) -> CreateJobResponse:
 
 
 @APP.get('/jobs/{jid}/return')
-async def get_job_rets_endpoint(jid: IntJid, rdb: RedisDependency) -> list[JobResult]:
-    res_ = await rdb.hgetall(name=f'job:{jid}:return')
+async def get_job_rets_endpoint(
+        jid: IntJid,
+        rdb: RedisDependency,
+        count: pydantic.conint(gt=0, lt=SETTINGS.max_count) = 10,
+        cursor: pydantic.NonNegativeInt = 0,
+) -> GetJobReturnResponse:
+    """
+    Get list of returned by minions data.
+
+    Amount is not guaranteed to be exactly count.
+    """
+    try:
+        next_cur, records = await rdb.hscan(name=f'job:{jid}:return', cursor=cursor, count=count)
+    except redis_exceptions.ResponseError as exc:
+        raise http_errors.BadGateway(detail=str(exc))
 
     res = []
-    for _, ret in res_.items():
+    for _, ret in records.items():
         data = json.loads(ret)
 
         try:
@@ -139,7 +153,7 @@ async def get_job_rets_endpoint(jid: IntJid, rdb: RedisDependency) -> list[JobRe
         except ValidationError as e:
             raise http_errors.InternalServerError(detail=e.errors())
 
-    return res
+    return GetJobReturnResponse(cursor=next_cur, result=res, length=len(res))
 
 
 # TODO Use https://github.com/encode/broadcaster if need broadcasts

@@ -30,8 +30,7 @@ StrJid = Annotated[str, AfterValidator(jidable)]
 
 
 class NullObj(BaseModel):
-    class Config:
-        extra = 'forbid'
+    model_config = ConfigDict(extra='forbid')
 
 
 class AuthItem(BaseModel):
@@ -123,3 +122,9 @@ class CreateJobRequest(BaseModel):
     fun: str = 'test.ping'
     arg: list = []
     kwarg: dict = {}
+
+
+class GetJobReturnResponse(BaseModel):
+    result: list[JobResult]
+    cursor: int = Field(description='Pointer to get next portion of data, 0 when no more data')
+    length: int
