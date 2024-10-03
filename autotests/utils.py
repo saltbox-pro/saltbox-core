@@ -59,8 +59,6 @@ def get_available_minion(api):
         'tgt': '*',
         'tgt_type': 'glob',
         'fun': 'test.ping',
-        'arg': [],
-        'kwarg': {},
     }
     response_json = api.post('/jobs', json=payload).json()
     if not response_json:
@@ -70,7 +68,7 @@ def get_available_minion(api):
     actual_response = api.get(f'/jobs/{jid}/return').json()
     if not actual_response:
         pytest.fail('Received an empty response')
-    available_minion = actual_response[0]['id']
+    available_minion = actual_response['result'][0]['id']
     if not available_minion:
         pytest.fail('No available minions found.')
     else:

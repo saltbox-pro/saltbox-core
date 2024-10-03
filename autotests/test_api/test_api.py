@@ -299,7 +299,7 @@ def test_get_info_about_valid_task_return(api, create_jid):
             'user',
             '_stamp',
         ]
-        for result in response_json:
+        for result in response_json['result']:
             for key in required_keys:
                 assert key in result, f'The response does not contain the key "{key}"'
         attach_json_to_allure(response_json, 'Response JSON')
