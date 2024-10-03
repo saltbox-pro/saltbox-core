@@ -127,6 +127,23 @@ async def create_job_endpoint(item: CreateJobRequest) -> CreateJobResponse:
     return CreateJobResponse.model_validate(ret)
 
 
+@APP.get(
+    '/jobs/{jid}/return-count',
+    responses={
+        404: {'description': 'When no data for JID'},
+    })
+async def get_job_rets_len_endpoint(jid: IntJid, rdb: RedisDependency) -> pydantic.conint(gt=0):
+    """
+    How many return data records for job at the moment.
+
+    To be used in pair with GET /jobs/{jid}/return cycle.
+    """
+    length = await rdb.hlen(name=f'job:{jid}:return')
+    if not length:
+        raise http_errors.NotFound(f'No return data for JID {jid}')
+    return length
+
+
 @APP.get('/jobs/{jid}/return')
 async def get_job_rets_endpoint(
         jid: IntJid,
