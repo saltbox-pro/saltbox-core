@@ -1,5 +1,3 @@
-from functools import lru_cache
-
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -52,10 +50,5 @@ class LogConfig(BaseModel):
     }
 
 
-@lru_cache
-def get_settings() -> Settings:
-    return Settings()
-
-
-SETTINGS = get_settings()
+SETTINGS = Settings()
 LOG_CONFIG = LogConfig(LOG_LEVEL='DEBUG' if SETTINGS.debug else 'INFO')
