@@ -439,3 +439,19 @@ def test_get_grain_os_no_contains(api, create_data):
     with allure.step('Checking that the server has returned the status code == 404'):
         assert response.status_code == 404, f'Error, the server has returned code {response.status_code}'
         attach_json_to_allure(response.json(), 'Response JSON')
+
+
+@allure.feature('Endpoint GET /jobs/{jid}/return-count')
+@allure.title('Checking that the integer value in the response corresponds to the actual number of responses for the job.')
+def test_get_comparing_int_with_resp(api, create_jid):
+    response = api.get(f'/jobs/{create_jid}/return-count')
+    with allure.step('Checking that the server has returned the status code == 200'):
+        assert response.status_code == 200, f'Error, the server has returned code {response.status_code}'
+    with allure.step('Counting the number of real answers'):
+        response_for_count = api.get(f'/jobs/{create_jid}/return').json()
+        result_count = len(response_for_count['result'])
+    with allure.step('We compare the calculated answers to the returned integer'):
+        assert result_count == response.json(), f'Error, the number of responses in the request ({result_count}) differs from the int returned by the API({response.json()})'
+
+
+
