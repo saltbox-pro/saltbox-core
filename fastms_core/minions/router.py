@@ -40,8 +40,7 @@ async def get_all_minions(
         for key in data:
             grains: dict[bytes, bytes] = await rdb.hgetall(name=key)
             minion_id = key.decode().split(':')[1]
-            prepared_grains = {k.decode(): json.loads(v) for k, v in grains.items() if k != b'id'}
-            prepared_grains['efi_secure_boot'] = prepared_grains.get('efi-secure-boot')
+            prepared_grains = {k.decode(): json.loads(v) for k, v in grains.items()}
             minion_obj = {
                 'minion_id': minion_id,
                 'master': prepared_grains.get('master', ''),
@@ -82,8 +81,12 @@ async def get_minion_schema() -> list[dict]:
             'label': 'Master',
         },
         {
-            'name': 'grains.os_family',
-            'label': 'OS Family',
+            'name': 'grains.host',
+            'label': 'Host',
+        },
+        {
+            'name': 'grains.fqdn',
+            'label': 'FQDN',
         },
     ]
     return fields

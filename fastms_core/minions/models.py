@@ -11,77 +11,58 @@ def datetime_now_sec() -> datetime:
 
 
 class Grains(EmbeddedModel):
-    cwd: Optional[str] = Field(title='Current working directory', default=None)
-    host: Optional[str] = None
-    ip6_gw: Optional[bool] = None
-    cpu_flags: Optional[list] = None  # Field(default_factory=list)
-    osfinger: Optional[str] = None
-    efi: Optional[bool] = None
-    swap_total: Optional[int] = None
-    zfs_support: Optional[bool] = None
-    disks: Optional[list] = None
-    localhost: Optional[str] = None
-    ps: Optional[str] = None
-    pythonexecutable: Optional[str] = None
-    kernel: Optional[str] = None
-    kernelrelease: Optional[str] = None
-    cpuarch: Optional[str] = None
-    gid: Optional[int] = None
-    ipv4: Optional[list] = None
-    uid: Optional[int] = None
-    kernelparams: Optional[list] = None
-    osmajorrelease: Optional[int] = None
-    groupname: Optional[str] = None
-    osfullname: Optional[str] = None
-    ip_interfaces: Optional[dict] = None
-    ssds: Optional[list] = None
-    path: Optional[str] = None
-    master: Optional[str] = None
-    gpus: Optional[list] = None
-    osrelease_info: Optional[list] = None
-    pythonpath: Optional[list] = None
-    oscodename: Optional[str] = None
-    hwaddr_interfaces: Optional[dict] = None
-    saltversioninfo: Optional[list] = None
-    shell: Optional[str] = None
-    ip6_interfaces: Optional[dict] = None
-    systempath: Optional[list] = None
-    num_gpus: Optional[int] = None
-    username: Optional[str] = None
-    pythonversion: Optional[list] = None
-    os_family: Optional[str] = None
-    locale_info: Optional[dict] = None
-    saltversion: Optional[str] = None
-    init: Optional[str] = None
-    lsb_distrib_codename: Optional[str] = None
-    ip4_interfaces: Optional[dict] = None
-    fqdn_ip4: Optional[list] = None
-    domain: Optional[str] = None
-    fqdn: Optional[str] = None
-    num_cpus: Optional[int] = None
-    os: Optional[str] = None
-    virtual: Optional[str] = None
-    nodename: Optional[str] = None
-    efi_secure_boot: Optional[bool] = None
-    cpu_model: Optional[str] = None
-    mem_total: Optional[int] = None
-    lsb_distrib_id: Optional[str] = None
-    zfs_feature_flags: Optional[bool] = None
-    osarch: Optional[str] = None
-    fqdns: Optional[list] = None
-    server_id: Optional[int] = None
-    zmqversion: Optional[str] = None
-    transactional: Optional[bool] = None
-    osrelease: Optional[str] = None
-    ip4_gw: Optional[str] = None
-    lsb_distrib_release: Optional[str] = None
-    kernelversion: Optional[str] = None
-    pid: Optional[int] = None
-    fqdn_ip6: Optional[list] = None
-    ip_gw: Optional[bool] = None
-    saltpath: Optional[str] = None
-    ipv6: Optional[list] = None
-    dns: Optional[dict] = None
+    # zmqversion
+    id: str = Field(title='ID')
+    host: str = Field(title='Host')
+    fqdn: str = Field(title='FQDN')
+    master: Optional[str] = Field(title='Master', default=None)
+    fqdns: Optional[list] = Field(title='FQDNs', default=None)
+    # CPU
+    cpu_model: Optional[str] = Field(title='CPU Model', default=None)
+    num_cpus: Optional[int] = Field(title='Number of CPUs', default=None)
+    cpu_flags: Optional[list] = Field(title='CPU Flags', default=None)
+    cpuarch: Optional[str] = Field(title='CPU Architecture', default=None)
+    # Memory
+    mem_total: Optional[int] = Field(title='Total memory', default=None)
+    swap_total: Optional[int] = Field(title='Total swap', default=None)
+    # GPU
+    gpus: Optional[list] = Field(title='GPUs', default=None)
+    num_gpus: Optional[int] = Field(title='Number of GPUs', default=None)
+    # OS
+    os: Optional[str] = Field(title='OS', default=None)
+    osfullname: Optional[str] = Field(title='OS Full Name', default=None)
+    osfinger: Optional[str] = Field(title='OS Finger', default=None)
+    osrelease: Optional[str] = Field(title='OS Release', default=None)
+    osrelease_info: Optional[list] = Field(title='OS Release Info', default=None)
+    oscodename: Optional[str] = Field(title='OS Codename', default=None)
+    os_family: Optional[str] = Field(title='OS Family', default=None)
+    osarch: Optional[str] = Field(title='OS Architecture', default=None)
+    disks: Optional[list] = Field(title='Disks', default=None)
+
+    # dns: Optional[dict] = None
+    # domain: Optional[str] = None
+    # hwaddr_interfaces: Optional[dict] = None
+    # ip_gw: Optional[bool] = None
+    # ip_interfaces: Optional[dict] = None
+    # ip4_gw: Optional[str] = None
+    # ip6_gw: Optional[str] = None
+    # kernelrelease: Optional[str] = None
+    # kernelversion: Optional[str] = None
+    # locale_info: Optional[dict] = None
+    # localhost: Optional[str] = None
+    # path: Optional[str] = None
+    # pythonexecutable: Optional[str] = None
+    # pythonpath: Optional[list] = None
+    # pythonversion: Optional[list] = None
+    # saltpath: Optional[str] = None
+    # saltversion: Optional[str] = None
+    # saltversioninfo: Optional[list] = None
+    # server_id: Optional[int] = None
+    # systempath: Optional[list] = None
+    # uid: Optional[int] = None
+    # zmqversion: Optional[str] = None
+
+    model_config = {'extra': 'allow'}
 
 
 class Minion(Model):
