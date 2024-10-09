@@ -23,7 +23,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator:
     await POOL.aclose()  # type: ignore[attr-defined]
 
 
-APP = FastAPIOffline(title=APP_NAME, lifespan=lifespan)
+APP = FastAPIOffline(
+    title=APP_NAME,
+    lifespan=lifespan,
+    swagger_ui_parameters={
+        'url': '/openapi.yaml',
+    },
+)
 
 APP.add_middleware(
     CORSMiddleware,
@@ -37,3 +43,12 @@ APP.include_router(minions_router)
 APP.include_router(jobs_router)
 APP.include_router(salt_router)
 
+
+# https://github.com/fastapi/fastapi/discussions/7673
+# TODO cache
+@APP.get('/openapi.yaml', include_in_schema=False)
+def read_openapi_yaml() -> Response:
+    openapi_json = APP.openapi()
+    yaml_s = io.StringIO()
+    yaml.dump(openapi_json, yaml_s)
+    return Response(yaml_s.getvalue(), media_type='text/yaml')
