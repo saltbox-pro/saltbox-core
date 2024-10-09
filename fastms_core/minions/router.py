@@ -1,15 +1,21 @@
+from __future__ import annotations
+
+import asyncio
 import json
 import logging
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, WebSocket
 from motor.core import AgnosticDatabase
+from redis.asyncio.client import PubSub
 
+from fastms_core import http_errors
 from fastms_core.config import LOG_CONFIG
 from fastms_core.db.mongo import get_db
+from fastms_core.db.redis import RedisDependency
 from fastms_core.minions.crud import minion_crud
 from fastms_core.minions.schemas import MinionSchema, MinionSchemaCreate, MinionSchemaUpdate
-from fastms_core.redis import RedisDependency
+from fastms_core.utilities.websocket import IsSocketDisconnected
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
@@ -19,7 +25,7 @@ mongo_db_dep = Annotated[AgnosticDatabase, Depends(get_db)]
 
 router = APIRouter(
     prefix='/minions',
-    tags=['mongo'],
+    tags=['Minions'],
     responses={404: {'description': 'Not found'}},
 )
 
@@ -90,3 +96,76 @@ async def get_minion_schema() -> list[dict]:
         },
     ]
     return fields
+
+
+@router.get('/have_grains')
+async def list_minions_with_grains(rdb: RedisDependency) -> list[str]:
+    """
+    Get list of minions for which grains are kept in DB
+    """
+
+    def get_mid(value: bytes) -> str:
+        return value.decode().removeprefix('minion:').removesuffix(':grains')
+
+    result: list[str] = []
+    cursor = 0
+    while True:
+        cursor, data = await rdb.scan(cursor=cursor, match='minion:*:grains')
+        result.extend(map(get_mid, data))
+        if not cursor:
+            break
+    return result
+
+
+@router.get('/{mid}/grains')
+async def get_minion_grains_endpoint(mid: str, rdb: RedisDependency) -> dict[str, Any]:
+    data = await rdb.hgetall(name=f'minion:{mid}:grains')
+    if not data:
+        msg = f'No grains kept for {mid}'
+        raise http_errors.NotFound(msg)
+    try:
+        return {k: json.loads(val) for k, val in data.items()}
+    except json.JSONDecodeError:
+        msg = 'Failed to serialize value'
+        raise http_errors.InternalServerError(msg) from None
+
+
+@router.get('/{mid}/grain/{grain}')
+async def get_minion_the_grain_endpoint(mid: str, grain: str, rdb: RedisDependency) -> Any:
+    """
+    Get specific minion grain
+
+    There are 404 for null value
+    """
+    value = await rdb.hget(name=f'minion:{mid}:grains', key=grain)
+    if value is None:
+        msg = f'No grain {grain} value for {mid}'
+        raise http_errors.NotFound(msg)
+    try:
+        return json.loads(value)
+    except json.JSONDecodeError:
+        msg = 'Failed to serialize value'
+        raise http_errors.InternalServerError(msg) from None
+
+
+@router.websocket('/{mid}/grains')
+async def minion_grains_websocket(
+    mid: str,
+    websocket: WebSocket,
+    rdb: RedisDependency,
+) -> None:
+    await websocket.accept()
+
+    async def reader(pubsub: PubSub) -> None:
+        async for message in pubsub.listen():
+            if message['type'] not in PubSub.PUBLISH_MESSAGE_TYPES:
+                logger.debug('Skipping service message: %s', message)
+                continue
+            with IsSocketDisconnected(websocket) as disconnect:
+                await websocket.send_text(message['data'].decode())
+            if disconnect:
+                return
+
+    async with rdb.pubsub() as pubsub:
+        await pubsub.psubscribe(f'minion:{mid}:grains')
+        await asyncio.create_task(reader(pubsub))

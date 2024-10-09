@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from collections.abc import Generator
 
@@ -18,7 +20,7 @@ class _MongoClientSingleton:
     mongo_client: motor_asyncio.AsyncIOMotorClient | None
     engine: AIOEngine
 
-    def __new__(cls) -> '_MongoClientSingleton':
+    def __new__(cls) -> _MongoClientSingleton:
         if not hasattr(cls, 'instance'):
             cls.instance = super().__new__(cls)
             cls.instance.mongo_client = AsyncIOMotorClient(SETTINGS.mongo_url, driver=DRIVER_INFO)
