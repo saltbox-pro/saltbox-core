@@ -1,41 +1,42 @@
+from __future__ import annotations
+
 import asyncio
 import contextlib
 import logging
-
+import ssl
+from collections.abc import Callable
 from datetime import datetime, timedelta
 from functools import wraps
 from pprint import pformat
-from typing import Awaitable, Optional
+from typing import Any
 
 import httpx
 import pydantic
-import ssl
 
-from fastms_core.models.salt import AuthResponse
+from fastms_core.config import SETTINGS
+from fastms_core.salt.schemas import AuthResponse
 
 LOGGER = logging.getLogger(__name__)
 DEBUG_INDENT = 2
 RETRIES_ON_AUTH_ERROR = 1
 
 
-class SaltHttpClientError(RuntimeError):
-    ...
+class SaltHttpClientError(RuntimeError): ...
 
 
-class SaltHttpClientConnectionError(SaltHttpClientError):
-    ...
+class SaltHttpClientConnectionError(SaltHttpClientError): ...
 
 
 class SaltHttpClientBadResponse(SaltHttpClientError):
-    """ Raises on bad HTTP response (4XX, 5XX codes) """
+    """Raises on bad HTTP response (4XX, 5XX codes)"""
 
 
-class SaltHttpClientUnauthorized(SaltHttpClientBadResponse):
-    ...
+class SaltHttpClientUnauthorized(SaltHttpClientBadResponse): ...
 
 
 class SaltHttpClient:
-    """ SaltStack CherryPy Rest API client """
+    """SaltStack CherryPy Rest API client"""
+
     TOKEN_BEST_BEFORE_SEC = 60
 
     def __init__(
@@ -44,7 +45,7 @@ class SaltHttpClient:
         username: str,
         password: str,
         eauth: str,
-        strict_ssl=True,
+        strict_ssl: bool = True,
     ) -> None:
         self._login_data = {
             'username': username,
@@ -53,14 +54,16 @@ class SaltHttpClient:
         }
         self._http = httpx.AsyncClient(
             base_url=salt_instance,
-            headers={'Accept': 'application/json', },
+            headers={
+                'Accept': 'application/json',
+            },
             verify=strict_ssl,
             proxies=None,
         )
         self._token_expire = datetime.fromtimestamp(0.0)
         self._loop = asyncio.get_event_loop()
 
-    def __del__(self):
+    def __del__(self) -> None:
         self._loop.run_until_complete(self._http.aclose())
         self._loop.close()
 
@@ -90,30 +93,28 @@ class SaltHttpClient:
         self._token_expire = datetime.fromtimestamp(ret.expire)
 
     @staticmethod
-    def _login_decorator(fn):
+    def _login_decorator(fn: Callable[..., Any]) -> Callable[..., Any]:
         @wraps(fn)
-        async def wrapper(self: 'SaltHttpClient', *args, **kwargs) -> Awaitable:
+        async def wrapper(self: SaltHttpClient, *args: tuple, **kwargs: dict) -> Any:
             if self.token_expires:
-                LOGGER.info(
-                    'Authenticate salt client due to token expiration time %s',
-                    self._token_expire.isoformat())
+                LOGGER.info('Authenticate salt client due to token expiration time %s', self._token_expire.isoformat())
                 await self._login()
             for try_n in range(1 + RETRIES_ON_AUTH_ERROR):
                 if try_n > 0:
-                    LOGGER.warning(
-                        'Try %i to reauthenticate salt client after authorization error',
-                        try_n)
+                    LOGGER.warning('Try %i to reauthenticate salt client after authorization error', try_n)
                     await self._login()
                 with contextlib.suppress(SaltHttpClientUnauthorized):
                     return await fn(self, *args, **kwargs)
-            raise SaltHttpClientUnauthorized('Failed to authenticate client')
+            msg = 'Failed to authenticate client'
+            raise SaltHttpClientUnauthorized(msg)
 
         return wrapper
 
     @staticmethod
     def _raise_for_status(response: httpx.Response) -> None:
         if response.status_code == 401:
-            raise SaltHttpClientError('Unexpectedly unauthorized')
+            msg = 'Unexpectedly unauthorized'
+            raise SaltHttpClientError(msg)
         try:
             response.raise_for_status()
         except httpx.HTTPStatusError as error:
@@ -121,9 +122,7 @@ class SaltHttpClient:
 
     @staticmethod
     def _log_response(response: httpx.Response) -> None:
-        LOGGER.debug(
-            'Response headers:\n%s',
-            pformat(dict(response.headers), indent=DEBUG_INDENT))
+        LOGGER.debug('Response headers:\n%s', pformat(dict(response.headers), indent=DEBUG_INDENT))
         LOGGER.debug('Response body:\n%s', response.content.decode())
 
     @_login_decorator
@@ -131,9 +130,9 @@ class SaltHttpClient:
         self,
         tgt: str,
         fun: str,
-        arg: Optional[list] = None,
-        kwarg: Optional[dict] = None,
-        tgt_type='glob',
+        arg: list | None = None,
+        kwarg: dict | None = None,
+        tgt_type: str = 'glob',
     ) -> dict[str, list]:
         if arg is None:
             arg = []
@@ -158,4 +157,18 @@ class SaltHttpClient:
 
         self._log_response(resp)
         self._raise_for_status(resp)
-        return resp.json()
+
+        result = resp.json()
+        if type(result) is not dict[str, list]:
+            msg = f'Unexpected response type: {result}'
+            raise SaltHttpClientBadResponse(msg)
+        return result
+
+
+SALT_CLIENT = SaltHttpClient(
+    SETTINGS.salt_url,
+    username=SETTINGS.salt_username,
+    password=SETTINGS.salt_password,
+    eauth=SETTINGS.salt_eauth,
+    strict_ssl=False,
+)

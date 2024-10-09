@@ -1,35 +1,20 @@
 from __future__ import annotations
 
-import asyncio
-import datetime
-import json
-import logging
-
+import io
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from typing import Annotated, Any
 
-import pydantic
-import redis.exceptions as redis_exceptions
-
-from fastapi import FastAPI, Form, WebSocket
-from fastapi.encoders import jsonable_encoder
+import yaml
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import Response
 from fastapi_offline import FastAPIOffline
+
+from fastms_core.config import APP_NAME, SETTINGS
+from fastms_core.db.redis import POOL
 from fastms_core.jobs.router import router as jobs_router
 from fastms_core.minions.router import router as minions_router
-
-FormStr = Annotated[str, Form()]
-
-SALT_CLIENT = SaltHttpClient(
-    SETTINGS.salt_url,
-    username=SETTINGS.salt_username,
-    password=SETTINGS.salt_password,
-    eauth=SETTINGS.salt_eauth,
-    strict_ssl=False,)
-LOGGER = logging.getLogger(__name__)
-
-logging.config.dictConfig(LOG_CONFIG.dict())
+from fastms_core.salt.router import router as salt_router
 
 
 @asynccontextmanager
@@ -50,3 +35,5 @@ APP.add_middleware(
 
 APP.include_router(minions_router)
 APP.include_router(jobs_router)
+APP.include_router(salt_router)
+
