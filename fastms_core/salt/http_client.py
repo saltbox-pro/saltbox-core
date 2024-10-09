@@ -21,17 +21,20 @@ DEBUG_INDENT = 2
 RETRIES_ON_AUTH_ERROR = 1
 
 
-class SaltHttpClientError(RuntimeError): ...
+class SaltHttpClientError(RuntimeError):
+    ...
 
 
-class SaltHttpClientConnectionError(SaltHttpClientError): ...
+class SaltHttpClientConnectionError(SaltHttpClientError):
+    ...
 
 
 class SaltHttpClientBadResponse(SaltHttpClientError):
     """Raises on bad HTTP response (4XX, 5XX codes)"""
 
 
-class SaltHttpClientUnauthorized(SaltHttpClientBadResponse): ...
+class SaltHttpClientUnauthorized(SaltHttpClientBadResponse):
+    ...
 
 
 class SaltHttpClient:
