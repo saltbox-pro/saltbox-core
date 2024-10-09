@@ -1,4 +1,3 @@
-from typing import Union
-from typing_extensions import TypeAlias
+from typing import TypeAlias
 
-Json: TypeAlias = Union[dict[str, 'Json'], list['Json'], str, int, float, bool, None]
+Json: TypeAlias = dict[str, 'Json'] | list['Json'] | str | int | float | bool | None

@@ -18,9 +18,9 @@ from fastms_core.salt.router import router as salt_router
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
+async def lifespan(app: FastAPI) -> AsyncIterator:
     yield
-    await POOL.aclose()
+    await POOL.aclose()  # type: ignore[attr-defined]
 
 
 APP = FastAPIOffline(title=APP_NAME, lifespan=lifespan)
