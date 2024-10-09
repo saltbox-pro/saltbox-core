@@ -1,0 +1,187 @@
+from __future__ import annotations
+
+import asyncio
+import datetime
+import json
+import logging
+from typing import Annotated
+
+import pydantic
+import redis.exceptions as redis_exceptions
+from fastapi import APIRouter, WebSocket
+from pydantic import Field, ValidationError
+from redis.asyncio.client import PubSub
+
+from fastms_core import http_errors
+from fastms_core.config import LOG_CONFIG, SETTINGS
+from fastms_core.db.redis import RedisDependency
+from fastms_core.jobs.schemas import CreateJobRequest, CreateJobResponse, GetJobReturnResponse, IntJid, Job, JobResult
+from fastms_core.salt.http_client import SALT_CLIENT, SaltHttpClientError
+from fastms_core.utilities.jid import JID, JidError
+from fastms_core.utilities.websocket import IsSocketDisconnected
+
+logging.config.dictConfig(LOG_CONFIG.model_dump())
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(
+    prefix='/jobs',
+    tags=['Jobs'],
+    responses={404: {'description': 'Not found'}},
+)
+
+
+@router.get('')
+async def get_jobs_endpoint(
+    rdb: RedisDependency, start_datetime: pydantic.PastDatetime, end_datetime: datetime.datetime | None = None
+) -> list[Job]:
+    if end_datetime is None:
+        end_datetime = datetime.datetime.now() + datetime.timedelta(hours=1)
+
+    try:
+        start = JID.from_datetime(start_datetime).to_timestamp()
+        end = JID.from_datetime(end_datetime).to_timestamp()
+    except JidError as err:
+        msg = f'Invalid range: {err}'
+        raise http_errors.BadRequest(msg) from err
+
+    res_ = await rdb.zrange('jobs', start=end, end=start, desc=True, byscore=True)  # type: ignore[call-overload]
+    res = [json.loads(i) for i in res_]
+
+    try:
+        return [Job(**i) for i in res]
+    except ValidationError as err:
+        raise http_errors.InternalServerError(detail=err.errors()) from err
+
+
+@router.get('/{jid}')
+async def get_job_endpoint(jid: IntJid, rdb: RedisDependency) -> Job:
+    ts = JID(jid).to_timestamp()
+    logger.info('ts=%s', ts)
+
+    res_ = await rdb.zrange('jobs', start=ts, end=ts, byscore=True)  # type: ignore[call-overload]
+
+    if not res_:
+        raise http_errors.NotFound(detail='Job not found')
+    elif len(res_) > 1:
+        raise http_errors.InternalServerError(detail=f'Multiple jobs for JID {jid}')
+
+    res = json.loads(res_[0])
+
+    try:
+        return Job(**res)
+    except ValidationError as e:
+        raise http_errors.InternalServerError(detail=e.errors()) from e
+
+
+@router.post('')
+async def create_job_endpoint(item: CreateJobRequest) -> CreateJobResponse:
+    try:
+        ret = await SALT_CLIENT.run_job(
+            tgt=item.tgt, fun=item.fun, arg=item.arg, kwarg=item.kwarg, tgt_type=item.tgt_type
+        )
+    except SaltHttpClientError as error:
+        raise http_errors.BadGateway(detail=str(error)) from error
+    return CreateJobResponse.model_validate(ret)
+
+
+@router.get(
+    '/{jid}/return-count',
+    responses={
+        404: {'description': 'When no data for JID'},
+    },
+)
+async def get_job_rets_len_endpoint(jid: IntJid, rdb: RedisDependency) -> Annotated[int, Field(gt=0)]:
+    """
+    How many return data records for job at the moment.
+
+    To be used in pair with GET /jobs/{jid}/return cycle.
+    """
+    length = await rdb.hlen(name=f'job:{jid}:return')
+    if not length:
+        msg = f'No return data for JID {jid}'
+        raise http_errors.NotFound(msg)
+    return length
+
+
+@router.get('/{jid}/return')
+async def get_job_rets_endpoint(
+    jid: IntJid,
+    rdb: RedisDependency,
+    count: Annotated[int, Field(gt=0, lt=SETTINGS.max_count)] = 10,
+    cursor: pydantic.NonNegativeInt = 0,
+) -> GetJobReturnResponse:
+    """
+    Get list of returned by minions data.
+
+    Amount is not guaranteed to be exactly count.
+    """
+    try:
+        next_cur, records = await rdb.hscan(name=f'job:{jid}:return', cursor=cursor, count=count)
+    except redis_exceptions.ResponseError as exc:
+        raise http_errors.BadGateway(detail=str(exc)) from exc
+
+    res = []
+    for _, ret in records.items():
+        data = json.loads(ret)
+
+        try:
+            res.append(JobResult(**data))
+        except ValidationError as e:
+            raise http_errors.InternalServerError(detail=e.errors()) from e
+
+    return GetJobReturnResponse(cursor=next_cur, result=res, length=len(res))
+
+
+# TODO Use https://github.com/encode/broadcaster if need broadcasts
+@router.websocket('')
+async def jobs_rets_websocket(websocket: WebSocket, rdb: RedisDependency) -> None:
+    await websocket.accept()
+
+    async def reader(pubsub: PubSub) -> None:
+        async for message in pubsub.listen():
+            if message['type'] not in PubSub.PUBLISH_MESSAGE_TYPES:
+                logger.debug('Skipping service message: %s', message)
+                continue
+            data_str = message['data'].decode()
+            data = json.loads(data_str)
+            job = Job(**data)
+            with IsSocketDisconnected(websocket) as disconnect:
+                await websocket.send_text(job.model_dump_json(by_alias=True))
+            if disconnect:
+                return
+
+    async with rdb.pubsub() as pubsub:
+        await pubsub.psubscribe('job:*:new')
+        await asyncio.create_task(reader(pubsub))
+
+
+@router.websocket('/{jid}/return')
+async def jobs_endpoint_websocket(
+    jid: IntJid,
+    websocket: WebSocket,
+    rdb: RedisDependency,
+) -> None:
+    ts = JID(jid).to_timestamp()
+    jid_in_jobs = bool(await rdb.zcount('jobs', min=ts, max=ts))
+    if not jid_in_jobs:
+        msg = f'Job not found by JID={jid}'
+        raise http_errors.WebSocketPolicyViolation(msg)
+
+    await websocket.accept()
+
+    async def reader(pubsub: PubSub) -> None:
+        async for message in pubsub.listen():
+            if message['type'] not in PubSub.PUBLISH_MESSAGE_TYPES:
+                logger.debug('Skipping service message: %s', message)
+                continue
+            data = json.loads(message['data'].decode())
+            result = JobResult(**data).model_dump_json(by_alias=True)
+            with IsSocketDisconnected(websocket) as disconnect:
+                await websocket.send_text(result)
+            if disconnect:
+                return
+
+    async with rdb.pubsub() as pubsub:
+        await pubsub.psubscribe(f'job:{jid}:return')
+        await asyncio.create_task(reader(pubsub))
