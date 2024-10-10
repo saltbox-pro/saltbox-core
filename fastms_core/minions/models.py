@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import ClassVar, Optional
 
 from odmantic import EmbeddedModel, Field, Model
+from odmantic.config import ODMConfigDict
 
 
 def datetime_now_sec() -> datetime:
@@ -62,7 +63,7 @@ class Grains(EmbeddedModel):
     # uid: Optional[int] = None
     # zmqversion: Optional[str] = None
 
-    model_config = {'extra': 'allow'}
+    model_config: ClassVar[ODMConfigDict] = {'extra': 'allow'}
 
 
 class Minion(Model):
