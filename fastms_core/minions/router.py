@@ -74,6 +74,14 @@ async def get_all_minions(
     return [MinionSchema(**minion.model_dump()) for minion in minions]
 
 
+@router.get('/{mid}')
+async def get_minion(mid: str, mdb: mongo_db_dep) -> MinionSchema:
+    minion = await minion_crud.get_by_id(mdb, minion_id=mid)
+    if not minion:
+        raise http_errors.NotFound(detail=f'Minion {mid} not found')
+    return MinionSchema(**minion.model_dump())
+
+
 @router.get('/filter-schema')
 async def get_minion_schema() -> list[dict]:
     # fields = Minion.model_json_schema()
@@ -117,7 +125,7 @@ async def list_minions_with_grains(rdb: RedisDependency) -> list[str]:
     return result
 
 
-@router.get('/{mid}/grains')
+@router.get('/{mid}/grains', deprecated=True)
 async def get_minion_grains_endpoint(mid: str, rdb: RedisDependency) -> dict[str, Any]:
     data = await rdb.hgetall(name=f'minion:{mid}:grains')
     if not data:
@@ -130,7 +138,7 @@ async def get_minion_grains_endpoint(mid: str, rdb: RedisDependency) -> dict[str
         raise http_errors.InternalServerError(msg) from None
 
 
-@router.get('/{mid}/grain/{grain}')
+@router.get('/{mid}/grain/{grain}', deprecated=True)
 async def get_minion_the_grain_endpoint(mid: str, grain: str, rdb: RedisDependency) -> Any:
     """
     Get specific minion grain
