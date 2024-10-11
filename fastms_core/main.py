@@ -26,9 +26,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator:
 APP = FastAPIOffline(
     title=APP_NAME,
     lifespan=lifespan,
-    swagger_ui_parameters={
-        'url': 'openapi.yaml',
-    },
+    # TODO: does not work with nginx api/core/ redirect
+    # swagger_ui_parameters={
+    #     'url': 'openapi.yaml',
+    # },
 )
 
 APP.add_middleware(
