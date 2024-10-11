@@ -161,11 +161,7 @@ class SaltHttpClient:
         self._log_response(resp)
         self._raise_for_status(resp)
 
-        result = resp.json()
-        if type(result) is not dict[str, list]:
-            msg = f'Unexpected response type: {result}'
-            raise SaltHttpClientBadResponse(msg)
-        return result
+        return resp.json()
 
 
 SALT_CLIENT = SaltHttpClient(
