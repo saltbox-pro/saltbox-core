@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, WebSocket
 from motor.core import AgnosticDatabase
@@ -30,8 +30,8 @@ router = APIRouter(
 )
 
 
-@router.get('')
-async def get_all_minions(
+@router.get('', operation_id='minions_list')
+async def minions_list(
     mdb: mongo_db_dep,
     rdb: RedisDependency,
     page: int = 0,
@@ -74,16 +74,16 @@ async def get_all_minions(
     return [MinionSchema(**minion.model_dump()) for minion in minions]
 
 
-@router.get('/{mid}')
-async def get_minion(mid: str, mdb: mongo_db_dep) -> MinionSchema:
+@router.get('/{mid}', operation_id='minion_retrieve')
+async def minion_retrieve(mid: str, mdb: mongo_db_dep) -> MinionSchema:
     minion = await minion_crud.get_by_id(mdb, minion_id=mid)
     if not minion:
         raise http_errors.NotFound(detail=f'Minion {mid} not found')
     return MinionSchema(**minion.model_dump())
 
 
-@router.get('/filter-schema')
-async def get_minion_schema() -> list[dict]:
+@router.get('/filter-schema', operation_id='filter_schema')
+async def filter_schema() -> list[dict]:
     # fields = Minion.model_json_schema()
     fields = [
         {
@@ -104,56 +104,6 @@ async def get_minion_schema() -> list[dict]:
         },
     ]
     return fields
-
-
-@router.get('/have_grains')
-async def list_minions_with_grains(rdb: RedisDependency) -> list[str]:
-    """
-    Get list of minions for which grains are kept in DB
-    """
-
-    def get_mid(value: bytes) -> str:
-        return value.decode().removeprefix('minion:').removesuffix(':grains')
-
-    result: list[str] = []
-    cursor = 0
-    while True:
-        cursor, data = await rdb.scan(cursor=cursor, match='minion:*:grains')
-        result.extend(map(get_mid, data))
-        if not cursor:
-            break
-    return result
-
-
-@router.get('/{mid}/grains', deprecated=True)
-async def get_minion_grains_endpoint(mid: str, rdb: RedisDependency) -> dict[str, Any]:
-    data = await rdb.hgetall(name=f'minion:{mid}:grains')
-    if not data:
-        msg = f'No grains kept for {mid}'
-        raise http_errors.NotFound(msg)
-    try:
-        return {k: json.loads(val) for k, val in data.items()}
-    except json.JSONDecodeError:
-        msg = 'Failed to serialize value'
-        raise http_errors.InternalServerError(msg) from None
-
-
-@router.get('/{mid}/grain/{grain}', deprecated=True)
-async def get_minion_the_grain_endpoint(mid: str, grain: str, rdb: RedisDependency) -> Any:
-    """
-    Get specific minion grain
-
-    There are 404 for null value
-    """
-    value = await rdb.hget(name=f'minion:{mid}:grains', key=grain)
-    if value is None:
-        msg = f'No grain {grain} value for {mid}'
-        raise http_errors.NotFound(msg)
-    try:
-        return json.loads(value)
-    except json.JSONDecodeError:
-        msg = 'Failed to serialize value'
-        raise http_errors.InternalServerError(msg) from None
 
 
 @router.websocket('/{mid}/grains')

@@ -31,8 +31,8 @@ router = APIRouter(
 )
 
 
-@router.get('')
-async def get_jobs_endpoint(
+@router.get('', operation_id='jobs_list')
+async def jobs_list(
     rdb: RedisDependency, start_datetime: pydantic.PastDatetime, end_datetime: datetime.datetime | None = None
 ) -> list[Job]:
     if end_datetime is None:
@@ -54,8 +54,8 @@ async def get_jobs_endpoint(
         raise http_errors.InternalServerError(detail=err.errors()) from err
 
 
-@router.get('/{jid}')
-async def get_job_endpoint(jid: IntJid, rdb: RedisDependency) -> Job:
+@router.get('/{jid}', operation_id='job_retrieve')
+async def job_retrieve(jid: IntJid, rdb: RedisDependency) -> Job:
     ts = JID(jid).to_timestamp()
     logger.info('ts=%s', ts)
 
@@ -74,8 +74,8 @@ async def get_job_endpoint(jid: IntJid, rdb: RedisDependency) -> Job:
         raise http_errors.InternalServerError(detail=e.errors()) from e
 
 
-@router.post('')
-async def create_job_endpoint(item: CreateJobRequest) -> CreateJobResponse:
+@router.post('', operation_id='job_create')
+async def job_create(item: CreateJobRequest) -> CreateJobResponse:
     try:
         ret = await SALT_CLIENT.run_job(
             tgt=item.tgt, fun=item.fun, arg=item.arg, kwarg=item.kwarg, tgt_type=item.tgt_type
@@ -86,12 +86,13 @@ async def create_job_endpoint(item: CreateJobRequest) -> CreateJobResponse:
 
 
 @router.get(
-    '/{jid}/return-count',
+    '/{jid}/returns-count',
+    operation_id='job_returns_count',
     responses={
         404: {'description': 'When no data for JID'},
     },
 )
-async def get_job_rets_len_endpoint(jid: IntJid, rdb: RedisDependency) -> Annotated[int, Field(gt=0)]:
+async def job_returns_count(jid: IntJid, rdb: RedisDependency) -> Annotated[int, Field(gt=0)]:
     """
     How many return data records for job at the moment.
 
@@ -104,8 +105,8 @@ async def get_job_rets_len_endpoint(jid: IntJid, rdb: RedisDependency) -> Annota
     return length
 
 
-@router.get('/{jid}/return')
-async def get_job_rets_endpoint(
+@router.get('/{jid}/return', operation_id='job_returns_list')
+async def job_returns_list(
     jid: IntJid,
     rdb: RedisDependency,
     count: Annotated[int, Field(gt=0, lt=SETTINGS.max_count)] = 10,
