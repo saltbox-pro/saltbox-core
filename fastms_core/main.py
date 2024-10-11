@@ -27,7 +27,7 @@ APP = FastAPIOffline(
     title=APP_NAME,
     lifespan=lifespan,
     swagger_ui_parameters={
-        'url': '/openapi.yaml',
+        'url': 'openapi.yaml',
     },
 )
 
