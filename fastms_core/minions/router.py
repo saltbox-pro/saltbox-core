@@ -74,17 +74,8 @@ async def minions_list(
     return [MinionSchema(**minion.model_dump()) for minion in minions]
 
 
-@router.get('/{mid}', operation_id='minion_retrieve')
-async def minion_retrieve(mid: str, mdb: mongo_db_dep) -> MinionSchema:
-    minion = await minion_crud.get_by_id(mdb, minion_id=mid)
-    if not minion:
-        raise http_errors.NotFound(detail=f'Minion {mid} not found')
-    return MinionSchema(**minion.model_dump())
-
-
 @router.get('/filter-schema', operation_id='filter_schema')
-async def filter_schema() -> list[dict]:
-    # fields = Minion.model_json_schema()
+async def filter_schema() -> list[dict[str, str]]:
     fields = [
         {
             'name': 'minion_id',
@@ -103,7 +94,16 @@ async def filter_schema() -> list[dict]:
             'label': 'FQDN',
         },
     ]
+
     return fields
+
+
+@router.get('/{mid}', operation_id='minion_retrieve')
+async def minion_retrieve(mid: str, mdb: mongo_db_dep) -> MinionSchema:
+    minion = await minion_crud.get_by_id(mdb, minion_id=mid)
+    if not minion:
+        raise http_errors.NotFound(detail=f'Minion {mid} not found')
+    return MinionSchema(**minion.model_dump())
 
 
 @router.websocket('/{mid}/grains')
