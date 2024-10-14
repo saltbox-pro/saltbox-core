@@ -14,7 +14,9 @@ from fastms_core.config import LOG_CONFIG
 from fastms_core.db.mongo import get_db
 from fastms_core.db.redis import RedisDependency
 from fastms_core.minions.crud import minion_crud
+from fastms_core.minions.models import Minion
 from fastms_core.minions.schemas import MinionSchema, MinionSchemaCreate, MinionSchemaUpdate
+from fastms_core.utilities.model_schema import get_model_schema
 from fastms_core.utilities.websocket import IsSocketDisconnected
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
@@ -76,26 +78,7 @@ async def minions_list(
 
 @router.get('/filter-schema', operation_id='filter_schema')
 async def filter_schema() -> list[dict[str, str]]:
-    fields = [
-        {
-            'name': 'minion_id',
-            'label': 'Minion ID',
-        },
-        {
-            'name': 'master',
-            'label': 'Master',
-        },
-        {
-            'name': 'grains.host',
-            'label': 'Host',
-        },
-        {
-            'name': 'grains.fqdn',
-            'label': 'FQDN',
-        },
-    ]
-
-    return fields
+    return get_model_schema(Minion)
 
 
 @router.get('/{mid}', operation_id='minion_retrieve')
