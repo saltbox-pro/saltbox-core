@@ -47,6 +47,10 @@ async def minions_list(
         cursor, data = await rdb.scan(cursor=cursor, match='minion:*:grains')
         for key in data:
             grains: dict[bytes, bytes] = await rdb.hgetall(name=key)
+
+            # FIXME: Temporary solution to delete data from redis
+            await rdb.delete(key)
+
             minion_id = key.decode().split(':')[1]
             prepared_grains = {k.decode(): json.loads(v) for k, v in grains.items()}
             minion_obj = {
@@ -55,16 +59,16 @@ async def minions_list(
                 'grains': prepared_grains,
             }
 
-            exist = await minion_crud.get_by_id(mdb, minion_id=minion_id)
+            if prepared_grains:
+                exist = await minion_crud.get_by_id(mdb, minion_id=minion_id)
+                if exist:
+                    await minion_crud.update(mdb, db_obj=exist, obj_in=MinionSchemaUpdate(**minion_obj))
+                else:
+                    await minion_crud.create(mdb, obj_in=MinionSchemaCreate(**minion_obj))
+                    # result.append(MinionSchema(**minion.model_dump()))
 
-            if exist:
-                await minion_crud.update(mdb, db_obj=exist, obj_in=MinionSchemaUpdate(**minion_obj))
-            else:
-                await minion_crud.create(mdb, obj_in=MinionSchemaCreate(**minion_obj))
-                # result.append(MinionSchema(**minion.model_dump()))
-
-        if data:
-            await rdb.delete(*data)
+        # if data:
+        #     await rdb.delete(*data)
 
         if not cursor:
             break

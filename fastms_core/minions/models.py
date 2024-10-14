@@ -67,7 +67,7 @@ class Grains(EmbeddedModel):
 
 
 class Minion(Model):
-    minion_id: str
+    minion_id: str = Field(unique=True)
     master: str
     created: datetime = Field(default_factory=datetime_now_sec)
     modified: datetime = Field(default_factory=datetime_now_sec)
