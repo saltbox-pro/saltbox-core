@@ -77,7 +77,9 @@ def create_jid(api):
         'arg': [],
         'kwarg': {},
     }
-    response_json = api.post('/jobs', json=payload).json()
+    response = api.post('/jobs', json=payload)
+    assert response.status_code == 200, f'Error, the server has returned code {response.status_code}, no created jid for test'
+    response_json = response.json()
     jid = response_json['return'][0]['jid']
     yield jid
 
@@ -94,7 +96,9 @@ def create_data(api):
         'fun': 'grains.items',
         'kwarg': {},
     }
-    response_json = api.post('/jobs', json=payload).json()
+    response = api.post('/jobs', json=payload)
+    assert response.status_code == 200, f'Error, the server has returned code {response.status_code}, no created data for test'
+    response_json = response.json()
     if not response_json:
         pytest.fail('Failed to create grains.items job or the answer came empty')
     mid_list = response_json['return'][0]['minions']
