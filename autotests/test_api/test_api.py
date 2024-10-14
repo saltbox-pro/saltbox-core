@@ -344,26 +344,26 @@ def test_get_info_about_task_return_with_str_jid(api):
     attach_json_to_allure(error, 'Response JSON')
 
 
-@allure.feature('Endpoint GET /minion/have_grains')
-@allure.title('Sending a GET request to retrieve list of minion id with grains')
+@allure.feature('Endpoint GET /minions')
+@allure.title('Sending a GET request to retrieve list of minions')
 def test_get_list_minions_with_grains(api, create_data):
-    time.sleep(1)
-    response = api.get('/minion/have_grains')
+    response = api.get('/minions')
     with allure.step('Checking that the server has returned the status code == 200'):
         assert response.status_code == 200, f'Error, the server has returned code {response.status_code}'
 
-    with allure.step('Checking that a response contains list of minion id'):
-        if response.json():
-            attach_json_to_allure(response.json(), 'Response JSON')
-        else:
-            pytest.fail('A response not contains minion id')
+    with allure.step('Checking that a response contains list of minions with their grains'):
+        minions = response.json()
+        for minion in minions:
+            assert 'minion_id' in minion, 'Minion missing "minion_id"'
+            assert 'grains' in minion, 'Minion missing "grains"'
+            assert isinstance(minion['grains'], dict), 'Grains should be a dictionary'
 
 
-@allure.feature('Endpoint GET /minion/{mid}/grains')
+@allure.feature('Endpoint GET /minions/{mid}')
 @allure.title('Sending a GET request to retrieve minion grains')
 def test_get_grains_list_minion(api, create_data):
     mid = create_data[0]
-    response = api.get(f'/minion/{mid}/grains')
+    response = api.get(f'/minions/{mid}')
 
     with allure.step('Checking that the server has returned the status code == 200'):
         assert response.status_code == 200, f'Error, the server has returned code {response.status_code}'
@@ -378,26 +378,26 @@ def test_get_grains_list_minion(api, create_data):
             'master',
         ]
         for key in required_keys:
-            assert key in response_json, f'The response does not contain the required key "{key}"'
+            assert key in response_json['grains'], f'The response does not contain the required key "{key}"'
         attach_json_to_allure(response_json, 'Response JSON')
 
 
-@allure.feature('Endpoint GET /minion/{mid}/grains')
+@allure.feature('Endpoint GET /minion/{mid}')
 @allure.title('Sending a GET request with a non-existent minion id')
 def test_get_grains_list_no_existent_minion_id(api):
     mid = '3512312555'
-    response = api.get(f'/minion/{mid}/grains')
+    response = api.get(f'/minion/{mid}')
 
     with allure.step('Checking that the server has returned the status code == 404'):
         assert response.status_code == 404, f'Error, the server has returned code {response.status_code}'
         attach_json_to_allure(response.json(), 'Response JSON')
 
 
-@allure.feature('Endpoint GET /minion/{mid}/grains')
+@allure.feature('Endpoint GET /minion/{mid}')
 @allure.title('Sending a GET request with a no valid minion id')
 def test_get_grains_list_no_valid_minion_id(api):
     mid = 'Hello world!'
-    response = api.get(f'/minion/{mid}/grains')
+    response = api.get(f'/minion/{mid}')
 
     with allure.step('Checking that the server has returned the status code == 404'):
         assert response.status_code == 404, f'Error, the server has returned code {response.status_code}'
@@ -411,20 +411,21 @@ def test_get_grain_os_from_minion(api, create_data):
 
     with allure.step('We retrieve the value of the Redis key and save the value of the OS field'):
         redis_hash_key = f'minion:{mid}:grains'
+        time.sleep(1)
         value_in_redis = REDIS_CLIENT.hget(redis_hash_key, 'os').decode('UTF-8')
         if not value_in_redis:
             pytest.fail('The value was not received from Redis')
         parsed_value_in_redis = json.loads(value_in_redis)
 
     with allure.step('Getting the value of the OS field using the API'):
-        response = api.get(f'/minion/{mid}/grain/os')
+        response = api.get(f'/minions/{mid}')
 
     with allure.step('Checking that the server has returned the status code == 200'):
         assert response.status_code == 200, f'Error, the server has returned code {response.status_code}'
 
     with allure.step('We compare the values obtained from Redis and via the API and find them to be the same'):
         api_value = response.json()
-        if not parsed_value_in_redis == api_value:
+        if not parsed_value_in_redis == api_value['grains']['os']:
             pytest.fail('The value obtained from Redis does not correspond to the value returned by the API')
 
 
@@ -444,7 +445,7 @@ def test_get_grain_os_no_contains(api, create_data):
 @allure.feature('Endpoint GET /jobs/{jid}/return-count')
 @allure.title('Checking that the count of response corresponds from the int returned by the API')
 def test_get_comparing_int_with_resp(api, create_jid):
-    response = api.get(f'/jobs/{create_jid}/return-count')
+    response = api.get(f'/jobs/{create_jid}/returns-count')
     with allure.step('Checking that the server has returned the status code == 200'):
         assert response.status_code == 200, f'Error, the server has returned code {response.status_code}'
 
