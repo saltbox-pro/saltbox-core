@@ -15,7 +15,7 @@ from fastms_core.db.mongo import get_db
 from fastms_core.db.redis import RedisDependency
 from fastms_core.minions.crud import minion_crud
 from fastms_core.minions.models import Minion
-from fastms_core.minions.schemas import MinionSchema, MinionSchemaCreate, MinionSchemaUpdate
+from fastms_core.minions.schemas import MinionListSchema, MinionSchema, MinionSchemaCreate, MinionSchemaUpdate
 from fastms_core.utilities.model_schema import get_model_schema
 from fastms_core.utilities.websocket import IsSocketDisconnected
 
@@ -40,7 +40,7 @@ async def minions_list(
     per_page: int = 20,
     page_break: bool = False,
     query: str | None = None,
-) -> list[MinionSchema]:
+) -> list[MinionListSchema]:
     # Update minions from redis before getting them
     cursor = 0
     while True:
@@ -75,9 +75,24 @@ async def minions_list(
 
     # from str to dict
     search = json.loads(query) if query else {}
-    minions = await minion_crud.get_multi(mdb, search, page=page, per_page=per_page, page_break=page_break)
 
-    return [MinionSchema(**minion.model_dump()) for minion in minions]
+    # NOTE: This is a temporary solution to get the list of minions
+    projection = {
+        'minion_id': 1,
+        'master': 1,
+        'grains.fqdn': 1,
+        'grains.osfullname': 1,
+        'grains.domain': 1,
+        'grains.efi': 1,
+        'grains.cpu_model': 1,
+        'grains.mem_total': 1,
+        'created': 1,
+    }
+    m = await mdb[Minion.__collection__].find(search, projection=projection).to_list(length=per_page)
+    return [MinionListSchema(**minion) for minion in m]
+
+    # minions = await minion_crud.get_multi(mdb, search, page=page, per_page=per_page, page_break=page_break)
+    # return [MinionListSchema(**minion.model_dump()) for minion in minions]
 
 
 @router.get('/filter-schema', operation_id='filter_schema')

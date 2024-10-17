@@ -60,10 +60,21 @@ class GrainsSchema(BaseModel):
     model_config = ConfigDict(extra='allow')
 
 
+class GrainsShortSchema(BaseModel):
+    id: str | None = None
+    fqdn: str | None = None
+    osfullname: str | None = None
+    domain: str | None = None
+    efi: bool | None = None
+    cpu_model: str | None = None
+    mem_total: int | None = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class MinionSchemaBase(BaseModel):
     minion_id: str
     master: str
-    grains: GrainsSchema | None = None
 
 
 class MinionSchemaInDBBase(MinionSchemaBase):
@@ -74,12 +85,20 @@ class MinionSchemaInDBBase(MinionSchemaBase):
 
 
 class MinionSchemaCreate(MinionSchemaBase):
-    pass
+    grains: GrainsSchema | None = None
 
 
 class MinionSchemaUpdate(MinionSchemaBase):
-    pass
+    grains: GrainsSchema | None = None
 
 
 class MinionSchema(MinionSchemaInDBBase):
+    grains: GrainsSchema | None = None
+
     model_config = ConfigDict(populate_by_name=True, extra='allow')
+
+
+class MinionListSchema(MinionSchemaInDBBase):
+    grains: GrainsShortSchema | None = None
+
+    model_config = ConfigDict(populate_by_name=True)
