@@ -1,29 +1,21 @@
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
-from typing import Annotated
+from datetime import datetime
 
-from fastapi import APIRouter, Depends, WebSocket
-from motor.core import AgnosticDatabase
-from redis.asyncio.client import PubSub
+from fastapi import APIRouter, HTTPException
 
-from fastms_core import http_errors
 from fastms_core.config import LOG_CONFIG
-from fastms_core.db.mongo import get_db
 from fastms_core.db.redis import RedisDependency
-from fastms_core.minions.crud import minion_crud
 from fastms_core.minions.models import Minion
-from fastms_core.minions.schemas import MinionListSchema, MinionSchema, MinionSchemaCreate, MinionSchemaUpdate
+from fastms_core.minions.schemas import MinionListSchema
 from fastms_core.utilities.model_schema import get_model_schema
-from fastms_core.utilities.websocket import IsSocketDisconnected
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
 logger = logging.getLogger(__name__)
 
-mongo_db_dep = Annotated[AgnosticDatabase, Depends(get_db)]
 
 router = APIRouter(
     prefix='/minions',
@@ -34,11 +26,9 @@ router = APIRouter(
 
 @router.get('', operation_id='minions_list')
 async def minions_list(
-    mdb: mongo_db_dep,
     rdb: RedisDependency,
     page: int = 0,
     per_page: int = 20,
-    page_break: bool = False,
     query: str | None = None,
 ) -> list[MinionListSchema]:
     # Update minions from redis before getting them
@@ -60,12 +50,13 @@ async def minions_list(
             }
 
             if prepared_grains:
-                exist = await minion_crud.get_by_id(mdb, minion_id=minion_id)
+                exist = await Minion.find_one({'minion_id': minion_id})
                 if exist:
-                    await minion_crud.update(mdb, db_obj=exist, obj_in=MinionSchemaUpdate(**minion_obj))
+                    minion_obj['modified'] = datetime.now().astimezone().replace(microsecond=0)
+                    await exist.update({'$set': minion_obj})
                 else:
-                    await minion_crud.create(mdb, obj_in=MinionSchemaCreate(**minion_obj))
-                    # result.append(MinionSchema(**minion.model_dump()))
+                    minion = Minion(**minion_obj)
+                    await minion.save()
 
         # if data:
         #     await rdb.delete(*data)
@@ -75,24 +66,9 @@ async def minions_list(
 
     # from str to dict
     search = json.loads(query) if query else {}
+    minions = await Minion.find(search).project(MinionListSchema).limit(per_page).skip(page * per_page).to_list()
 
-    # NOTE: This is a temporary solution to get the list of minions
-    projection = {
-        'minion_id': 1,
-        'master': 1,
-        'grains.fqdn': 1,
-        'grains.osfullname': 1,
-        'grains.domain': 1,
-        'grains.efi': 1,
-        'grains.cpu_model': 1,
-        'grains.mem_total': 1,
-        'created': 1,
-    }
-    m = await mdb[Minion.__collection__].find(search, projection=projection).to_list(length=per_page)
-    return [MinionListSchema(**minion) for minion in m]
-
-    # minions = await minion_crud.get_multi(mdb, search, page=page, per_page=per_page, page_break=page_break)
-    # return [MinionListSchema(**minion.model_dump()) for minion in minions]
+    return minions
 
 
 @router.get('/filter-schema', operation_id='filter_schema')
@@ -101,31 +77,9 @@ async def filter_schema() -> list[dict[str, str]]:
 
 
 @router.get('/{mid}', operation_id='minion_retrieve')
-async def minion_retrieve(mid: str, mdb: mongo_db_dep) -> MinionSchema:
-    minion = await minion_crud.get_by_id(mdb, minion_id=mid)
+async def minion_retrieve(mid: str) -> Minion:
+    minion = await Minion.find_one({'minion_id': mid})
+    logger.info(f'Minion: {minion}, {type(minion)}')
     if not minion:
-        raise http_errors.NotFound(detail=f'Minion {mid} not found')
-    return MinionSchema(**minion.model_dump())
-
-
-@router.websocket('/{mid}/grains')
-async def minion_grains_websocket(
-    mid: str,
-    websocket: WebSocket,
-    rdb: RedisDependency,
-) -> None:
-    await websocket.accept()
-
-    async def reader(pubsub: PubSub) -> None:
-        async for message in pubsub.listen():
-            if message['type'] not in PubSub.PUBLISH_MESSAGE_TYPES:
-                logger.debug('Skipping service message: %s', message)
-                continue
-            with IsSocketDisconnected(websocket) as disconnect:
-                await websocket.send_text(message['data'].decode())
-            if disconnect:
-                return
-
-    async with rdb.pubsub() as pubsub:
-        await pubsub.psubscribe(f'minion:{mid}:grains')
-        await asyncio.create_task(reader(pubsub))
+        raise HTTPException(status_code=404, detail='Minion not found')
+    return minion

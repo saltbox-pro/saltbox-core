@@ -1,38 +1,38 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import ClassVar
 
-from odmantic import ObjectId
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class GrainsSchema(BaseModel):
-    id: str
-    host: str
-    fqdn: str
-    master: str | None = None
-    fqdns: list | None = None
+    id: str | None = Field(title='ID', default=None)
+    host: str | None = Field(title='Host', default=None)
+    fqdn: str | None = Field(title='FQDN', default=None)
+    master: str | None = Field(title='Master', default=None)
+    fqdns: list | None = Field(title='FQDNs', default=None)
     # CPU
-    cpu_model: str | None = None
-    num_cpus: int | None = None
-    cpu_flags: list | None = None
-    cpuarch: str | None = None
+    cpu_model: str | None = Field(title='CPU Model', default=None)
+    num_cpus: int | None = Field(title='Number of CPUs', default=None)
+    cpu_flags: list | None = Field(title='CPU Flags', default=None)
+    cpuarch: str | None = Field(title='CPU Architecture', default=None)
     # Memory
-    mem_total: int | None = None
-    swap_total: int | None = None
+    mem_total: int | None = Field(title='Total memory', default=None)
+    swap_total: int | None = Field(title='Total swap', default=None)
     # GPU
-    gpus: list | None = None
-    num_gpus: int | None = None
+    gpus: list | None = Field(title='GPUs', default=None)
+    num_gpus: int | None = Field(title='Number of GPUs', default=None)
     # OS
-    os: str | None = None
-    osfullname: str | None = None
-    osfinger: str | None = None
-    osrelease: str | None = None
-    osrelease_info: list | None = None
-    oscodename: str | None = None
-    os_family: str | None = None
-    osarch: str | None = None
-    disks: list | None = None
+    os: str | None = Field(title='OS', default=None)
+    osfullname: str | None = Field(title='OS Full Name', default=None)
+    osfinger: str | None = Field(title='OS Finger', default=None)
+    osrelease: str | None = Field(title='OS Release', default=None)
+    osrelease_info: list | None = Field(title='OS Release Info', default=None)
+    oscodename: str | None = Field(title='OS Codename', default=None)
+    os_family: str | None = Field(title='OS Family', default=None)
+    osarch: str | None = Field(title='OS Architecture', default=None)
+    disks: list | None = Field(title='Disks', default=None)
 
     # dns: dict | None = None
     # domain: str | None = None
@@ -75,30 +75,38 @@ class GrainsShortSchema(BaseModel):
 class MinionSchemaBase(BaseModel):
     minion_id: str
     master: str
-
-
-class MinionSchemaInDBBase(MinionSchemaBase):
-    id: ObjectId | None = None
     created: datetime | None = None
     modified: datetime | None = None
-    model_config = ConfigDict(from_attributes=True)
+
+
+class MinionSchema(MinionSchemaBase):
+    grains: GrainsSchema | None = None
+
+    model_config = ConfigDict(extra='allow')
 
 
 class MinionSchemaCreate(MinionSchemaBase):
-    grains: GrainsSchema | None = None
+    pass
 
 
 class MinionSchemaUpdate(MinionSchemaBase):
-    grains: GrainsSchema | None = None
+    pass
 
 
-class MinionSchema(MinionSchemaInDBBase):
-    grains: GrainsSchema | None = None
-
-    model_config = ConfigDict(populate_by_name=True, extra='allow')
-
-
-class MinionListSchema(MinionSchemaInDBBase):
+class MinionListSchema(MinionSchemaBase):
     grains: GrainsShortSchema | None = None
 
-    model_config = ConfigDict(populate_by_name=True)
+    class Settings:
+        projection: ClassVar[dict] = {
+            'minion_id': 1,
+            'master': 1,
+            'grains.id': 1,
+            'grains.fqdn': 1,
+            'grains.osfullname': 1,
+            'grains.domain': 1,
+            'grains.efi': 1,
+            'grains.cpu_model': 1,
+            'grains.mem_total': 1,
+            'created': 1,
+            'modified': 1,
+        }
