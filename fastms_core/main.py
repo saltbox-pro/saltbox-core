@@ -11,7 +11,7 @@ from fastapi.responses import Response
 from fastapi_offline import FastAPIOffline
 
 from fastms_core.config import APP_NAME, SETTINGS
-from fastms_core.db.mongo import init_mongo
+from fastms_core.db.mongo.config import init_mongo
 from fastms_core.db.redis import POOL
 from fastms_core.jobs.router import router as jobs_router
 from fastms_core.minions.router import router as minions_router

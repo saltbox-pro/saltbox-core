@@ -3,7 +3,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import ClassVar
 
+from beanie import PydanticObjectId
 from pydantic import BaseModel, ConfigDict, Field
+
+
+def datetime_now_sec() -> datetime:
+    return datetime.now().astimezone().replace(microsecond=0)
 
 
 class GrainsSchema(BaseModel):
@@ -69,31 +74,28 @@ class GrainsShortSchema(BaseModel):
     cpu_model: str | None = None
     mem_total: int | None = None
 
-    model_config = ConfigDict(from_attributes=True)
-
 
 class MinionSchemaBase(BaseModel):
-    minion_id: str
-    master: str
-    created: datetime | None = None
-    modified: datetime | None = None
+    minion_id: str = Field(title='Minion ID')
+    master: str = Field(title='Master')
+    created: datetime = Field(default_factory=datetime_now_sec)
+    modified: datetime = Field(default_factory=datetime_now_sec)
 
 
 class MinionSchema(MinionSchemaBase):
     grains: GrainsSchema | None = None
 
-    model_config = ConfigDict(extra='allow')
 
-
-class MinionSchemaCreate(MinionSchemaBase):
+class MinionSchemaCreate(MinionSchema):
     pass
 
 
-class MinionSchemaUpdate(MinionSchemaBase):
+class MinionSchemaUpdate(MinionSchema):
     pass
 
 
 class MinionListSchema(MinionSchemaBase):
+    id: PydanticObjectId = Field(alias='_id', serialization_alias='_id')
     grains: GrainsShortSchema | None = None
 
     class Settings:
