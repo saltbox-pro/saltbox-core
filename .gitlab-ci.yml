@@ -11,6 +11,7 @@
     - docker pull $CI_REGISTRY_IMAGE:$IMAGE_TAG || true
     - >
       docker build
+      --target=main
       --build-arg BUILDKIT_INLINE_CACHE=1
       --cache-from $CI_REGISTRY_IMAGE:$IMAGE_TAG
       --tag $CI_REGISTRY_IMAGE:$CI_COMMIT_SHA

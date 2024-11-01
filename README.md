@@ -17,10 +17,10 @@ After deploying dev enivronment install pre-commit hooks with
 
 ### Run
 
-To build core image:
+To build the Core image:
 
 ```bash
-sudo docker build . --tag fastms-core
+sudo docker build --target=main --tag fastms-core .
 ```
 
 Additional settings need to be passed as environment variables to start. Check
