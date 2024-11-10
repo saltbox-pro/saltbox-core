@@ -42,10 +42,10 @@ class GrainsConsumer:
 
     async def consume(self) -> None:
         redis = await aioredis.from_url(self.redis_url)
-        logger.debug(f'Connected to redis: {self.redis_url}')
+        logger.debug('Connected to redis: %s', self.redis_url)
         async with redis.pubsub() as pubsub:
             await pubsub.subscribe(self.channel)
-            logger.debug(f'Subscribed to channel: {self.channel}')
+            logger.debug('Subscribed to channel: %s', self.channel)
 
             while True:
                 msg = await pubsub.get_message()
