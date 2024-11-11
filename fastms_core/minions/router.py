@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import json
 import logging
+from typing import Annotated
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from fastms_core.config import LOG_CONFIG
 from fastms_core.db.mongo.schemas_base import PaginatedResponse
-from fastms_core.db.redis import RedisDependency
+from fastms_core.http_errors import BadRequest
 from fastms_core.minions.crud import minion_crud
 from fastms_core.minions.models import Minion
 from fastms_core.minions.schemas import MinionListSchema
@@ -28,12 +29,25 @@ router = APIRouter(
 
 @router.get('', operation_id='minions_list')
 async def minions_list(
-    rdb: RedisDependency,
     page: int = 0,
     per_page: int = 20,
-    query: str | None = None,
+    query: Annotated[
+        str | None,
+        Query(
+            title='Mongo query string',
+            description='The string must be a valid JSON object. Example: '
+            '`{"minion_id": "minion1", "grains.os": "Ubuntu"}`',
+        ),
+    ] = None,
 ) -> PaginatedResponse[MinionListSchema]:
-    search = json.loads(query) if query else {}
+    if query:
+        try:
+            search = json.loads(query)
+        except json.JSONDecodeError:
+            msg = 'The string in the query must be a valid JSON object'
+            raise BadRequest(msg) from None
+    else:
+        search = {}
     response = await minion_crud.get_paginated(search, page=page, per_page=per_page, projection_model=MinionListSchema)
     return response
 
