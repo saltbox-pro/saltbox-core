@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 import logging
+from typing import get_args
 
 from pydantic import BaseModel
 
 from fastms_core.config import LOG_CONFIG
-from fastms_core.minions.schemas import GrainsSchema
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
@@ -18,8 +18,15 @@ def get_model_schema(model: type[BaseModel], pre_path: str | None = None) -> lis
     for field_name, field in model.model_fields.items():
         full_field_name = f'{pre_path}.{field_name}' if pre_path else field_name
 
-        if field_name == 'grains':
-            schema.extend(get_model_schema(GrainsSchema, full_field_name))
+        sub_model: type[BaseModel] | None = None
+
+        for field_class in get_args(field.annotation):
+            if issubclass(field_class, BaseModel):
+                sub_model = field_class
+                break
+
+        if sub_model:
+            schema.extend(get_model_schema(sub_model, full_field_name))
         else:
             schema.append(
                 {
