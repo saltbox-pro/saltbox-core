@@ -1,4 +1,4 @@
-import logging
+import logging.config
 from datetime import datetime
 from typing import Any, Generic, TypeVar
 

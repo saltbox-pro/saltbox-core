@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-import logging
+import logging.config
 from typing import Annotated
 
 from beanie import PydanticObjectId

@@ -1,5 +1,5 @@
 import json
-import logging
+import logging.config
 from typing import Any
 
 from redis import asyncio as aioredis

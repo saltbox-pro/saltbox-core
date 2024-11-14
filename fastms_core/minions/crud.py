@@ -1,4 +1,4 @@
-import logging
+import logging.config
 
 from fastms_core.config import LOG_CONFIG
 from fastms_core.db.mongo.crud_base import CRUDBase
