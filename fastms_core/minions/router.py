@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-import logging
+import logging.config
 from typing import Annotated
 
 from beanie import PydanticObjectId
@@ -9,10 +9,9 @@ from fastapi import APIRouter, HTTPException, Query
 
 from fastms_core.config import LOG_CONFIG
 from fastms_core.db.mongo.schemas_base import PaginatedResponse
-from fastms_core.http_errors import BadRequest
 from fastms_core.minions.crud import minion_crud
 from fastms_core.minions.models import Minion
-from fastms_core.minions.schemas import MinionListSchema
+from fastms_core.minions.schemas import MinionListSchema, MinionsListQueryParams
 from fastms_core.utilities.model_schema import get_model_schema
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
@@ -29,26 +28,12 @@ router = APIRouter(
 
 @router.get('', operation_id='minions_list')
 async def minions_list(
-    page: int = 0,
-    per_page: int = 20,
-    query: Annotated[
-        str | None,
-        Query(
-            title='Mongo query string',
-            description='The string must be a valid JSON object. Example: '
-            '`{"minion_id": "minion1", "grains.os": "Ubuntu"}`',
-        ),
-    ] = None,
+    params: Annotated[MinionsListQueryParams, Query()],
 ) -> PaginatedResponse[MinionListSchema]:
-    if query:
-        try:
-            search = json.loads(query)
-        except json.JSONDecodeError:
-            msg = 'The string in the query must be a valid JSON object'
-            raise BadRequest(msg) from None
-    else:
-        search = {}
-    response = await minion_crud.get_paginated(search, page=page, per_page=per_page, projection_model=MinionListSchema)
+    search = json.loads(params.query)
+    response = await minion_crud.get_paginated(
+        search, page=params.page, per_page=params.per_page, projection_model=MinionListSchema
+    )
     return response
 
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import logging
+import logging.config
 
 from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import logging
+import logging.config
 from typing import get_args
 
 from pydantic import BaseModel
