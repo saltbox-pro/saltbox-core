@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime
-from typing import ClassVar
+from typing import Annotated, ClassVar
 
 from beanie import PydanticObjectId
-from pydantic import BaseModel, ConfigDict, Field
+from fastapi.exceptions import RequestValidationError
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 def datetime_now_sec() -> datetime:
@@ -112,3 +114,37 @@ class MinionListSchema(MinionSchemaBase):
             'created': 1,
             'modified': 1,
         }
+
+
+class MinionsListQueryParams(BaseModel):
+    page: int = Field(default=0, description='Page number', ge=0)
+    per_page: int = Field(default=20, description='Items per page', ge=1)
+    query: Annotated[
+        str,
+        Field(
+            description='Query string must be a valid JSON object representing a dictionary',
+            example='{"grains.os": "Ubuntu"}',
+            default='{}',
+            validate_default=True,
+        ),
+    ]
+
+    @field_validator('query')
+    @classmethod
+    def validate_query(cls, value: str) -> str:
+        try:
+            search = json.loads(value)
+            if not isinstance(search, dict):
+                raise ValueError
+        except (json.JSONDecodeError, ValueError):
+            raise RequestValidationError(
+                errors=[
+                    {
+                        'loc': ['query', 'query'],
+                        'msg': 'The query string must be a valid JSON object representing a dictionary',
+                        'type': 'value_error',
+                        'input': value,
+                    }
+                ]
+            ) from None
+        return value
