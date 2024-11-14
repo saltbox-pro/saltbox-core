@@ -29,11 +29,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator:
     await POOL.aclose()  # type: ignore[attr-defined]
 
 
-APP = FastAPIOffline(
-    title=APP_NAME,
-    lifespan=lifespan,
-    # TODO: does not work with nginx api/core/ redirect
-)
+APP = FastAPIOffline(title=APP_NAME, lifespan=lifespan)
+
 
 APP.add_middleware(
     CORSMiddleware,
