@@ -6,7 +6,7 @@ ENV SALT_USERNAME="fastms_core"
 EXPOSE 8000
 
 RUN \
-  --mount=type=bind,source=requirements.txt,target=/mnt/requirements.txt,readwrite \
+  --mount=type=bind,source=requirements.txt,target=/mnt/requirements.txt\
   --mount=type=cache,target=/root/.cache/pip/ \
   pip3 install --upgrade --requirement /mnt/requirements.txt
 COPY docker/entrypoint.sh /usr/local/bin/
