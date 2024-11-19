@@ -1,3 +1,5 @@
+from typing import Any, Literal
+
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -10,6 +12,12 @@ class Settings(BaseSettings):
     salt_password: str
     salt_eauth: str = 'file'
     redis_url: str
+    redis_username: str | None = None
+    redis_password: str | None = None
+    redis_tls_verification: Literal['none', 'optional', 'required'] = 'required'
+    redis_ca_cert: str | None = Field(
+        None,
+        description='Path to file of concatenated PEM certs')
     mongo_db: str
     mongo_port: int = 27017
     mongo_user: str
@@ -23,6 +31,15 @@ class Settings(BaseSettings):
     @property
     def mongo_url(self) -> str:
         return f'mongodb://{self.mongo_user}:{self.mongo_password}@mongo:{self.mongo_port}/'
+
+    @property
+    def redis_connection_kwargs(self) -> dict[str, Any]:
+        return {
+            'username': self.redis_username,
+            'password': self.redis_password,
+            'ssl_cert_reqs': self.redis_tls_verification,
+            'ssl_ca_certs': self.redis_ca_cert,
+        }
 
 
 class LogConfig(BaseModel):

@@ -1,4 +1,4 @@
-from __future__ import annotations
+from __future__ import annotations  # FIXME Redundant since required Python >= 3.12
 
 import json
 from datetime import datetime

@@ -10,7 +10,7 @@ LOGGER = logging.getLogger(__name__)
 
 
 def _make_pool() -> ConnectionPool:
-    return ConnectionPool.from_url(SETTINGS.redis_url)
+    return ConnectionPool.from_url(SETTINGS.redis_url, **SETTINGS.redis_connection_kwargs)
 
 
 POOL = _make_pool()

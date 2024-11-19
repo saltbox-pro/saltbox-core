@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 class GrainsConsumer:
     def __init__(self, channel: str):
         self.redis_url: str = SETTINGS.redis_url
+        self.con_kwargs = SETTINGS.redis_connection_kwargs
         self.channel = channel
 
     async def handle_message(self, message: Any) -> None:
@@ -41,7 +42,7 @@ class GrainsConsumer:
                 await minion_crud.create(obj_in=MinionSchemaCreate(**minion_obj))
 
     async def consume(self) -> None:
-        redis = await aioredis.from_url(self.redis_url)
+        redis = await aioredis.from_url(self.redis_url, **self.con_kwargs)
         logger.debug('Connected to redis: %s', self.redis_url)
         async with redis.pubsub() as pubsub:
             await pubsub.subscribe(self.channel)
