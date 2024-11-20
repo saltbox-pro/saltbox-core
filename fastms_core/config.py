@@ -34,12 +34,19 @@ class Settings(BaseSettings):
 
     @property
     def redis_connection_kwargs(self) -> dict[str, Any]:
-        return {
+        """
+        Additional options for redis.*.from_url() group of methods
+        """
+        result = {
             'username': self.redis_username,
             'password': self.redis_password,
-            'ssl_cert_reqs': self.redis_tls_verification,
-            'ssl_ca_certs': self.redis_ca_cert,
         }
+        if self.redis_url.startswith('rediss:'):
+            result |= {
+                'ssl_cert_reqs': self.redis_tls_verification,
+                'ssl_ca_certs': self.redis_ca_cert,
+            }
+        return result
 
 
 class LogConfig(BaseModel):
