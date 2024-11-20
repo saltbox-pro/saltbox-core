@@ -2,7 +2,7 @@ from __future__ import annotations  # FIXME Redundant since required Python >= 3
 
 import json
 from datetime import datetime
-from typing import Annotated, ClassVar
+from typing import ClassVar
 
 from beanie import PydanticObjectId
 from fastapi.exceptions import RequestValidationError
@@ -116,18 +116,17 @@ class MinionListSchema(MinionSchemaBase):
         }
 
 
-class MinionsListQueryParams(BaseModel):
-    page: int = Field(default=0, description='Page number', ge=0)
-    per_page: int = Field(default=20, description='Items per page', ge=1)
-    query: Annotated[
-        str,
-        Field(
-            description='Query string must be a valid JSON object representing a dictionary',
-            example='{"grains.os": "Ubuntu"}',
-            default='{}',
-            validate_default=True,
-        ),
-    ]
+class MongoQueryString(BaseModel):
+    query: str = Field(
+        description='Query string must be a valid JSON object representing a dictionary',
+        examples=[
+            '{"grains.os": "Ubuntu"}',
+            '{"grains.cpu_model":{"$regex":"Intel"}}',
+        ],
+        default='{}',
+        validate_default=True,
+        json_schema_extra={'example': '{"grains.cpu_model":{"$not":{"$regex":"Intel"}}}'},
+    )
 
     @field_validator('query')
     @classmethod
@@ -147,4 +146,50 @@ class MinionsListQueryParams(BaseModel):
                     }
                 ]
             ) from None
+        return value
+
+
+class MinionsListQueryParams(MongoQueryString):
+    model_config = {'extra': 'forbid'}
+    page: int = Field(default=0, description='Page number', ge=0)
+    per_page: int = Field(default=20, description='Items per page', ge=1, examples=[20, 50, 100])
+
+
+class MinionFilterValuesQueryParams(MongoQueryString):
+    model_config = {'extra': 'forbid'}
+    field: str = Field(
+        description='Field name to get unique values',
+        examples=['grains.os', 'grains.cpu_model', 'grains.mem_total'],
+        json_schema_extra={'example': 'grains.os'},
+    )
+
+    @field_validator('field')
+    @classmethod
+    def validate_field(cls, value: str) -> str:
+        if '.' not in value and value not in MinionSchema.model_fields:
+            raise RequestValidationError(
+                errors=[
+                    {
+                        'loc': ['query', 'field'],
+                        'msg': f'Invalid field: {value}',
+                        'type': 'value_error',
+                        'input': value,
+                    }
+                ]
+            )
+
+        if '.' in value:
+            field_name_chain = value.split('.')
+
+            if field_name_chain[0] == 'grains' and field_name_chain[1] not in GrainsSchema.model_fields:
+                raise RequestValidationError(
+                    errors=[
+                        {
+                            'loc': ['field', 'field'],
+                            'msg': f'Invalid field: {value}',
+                            'type': 'value_error',
+                            'input': value,
+                        }
+                    ]
+                )
         return value
