@@ -85,14 +85,8 @@ async def job_create(item: CreateJobRequest) -> CreateJobResponse:
     return CreateJobResponse.model_validate(ret)
 
 
-@router.get(
-    '/{jid}/returns-count',
-    operation_id='job_returns_count',
-    responses={
-        404: {'description': 'When no data for JID'},
-    },
-)
-async def job_returns_count(jid: IntJid, rdb: RedisDependency) -> Annotated[int, Field(gt=0)]:
+@router.get('/{jid}/returns-count', operation_id='job_returns_count')
+async def job_returns_count(jid: IntJid, rdb: RedisDependency) -> Annotated[int, Field(gte=0)]:
     """
     How many return data records for job at the moment.
 
@@ -100,8 +94,7 @@ async def job_returns_count(jid: IntJid, rdb: RedisDependency) -> Annotated[int,
     """
     length = await rdb.hlen(name=f'job:{jid}:return')
     if not length:
-        msg = f'No return data for JID {jid}'
-        raise http_errors.NotFound(msg)
+        return 0
     return length
 
 
