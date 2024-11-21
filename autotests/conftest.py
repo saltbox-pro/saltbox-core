@@ -1,0 +1,85 @@
+import logging
+import os
+import time
+from http import HTTPStatus
+
+import pytest
+import redis
+from dotenv import load_dotenv
+
+
+from api.api_client import ApiClient
+from api.jobs_api import post_jobs
+from api.minions_api import get_minions
+from assertions.assertion_base import assert_status_code, assert_schema
+from models.jobs_models import ModelJobResponse
+from utilities.files_utils import read_json_common_request_data
+from utilities.logger_utils import logger
+from utilities.redis_utils import delete_job_from_zset_on_redis
+
+# redis settings
+redis_host = os.getenv('REDIS_HOST', 'localhost')
+redis_port = int(os.getenv('REDIS_PORT', 6379))
+redis_db = int(os.getenv('REDIS_DB', 0))
+
+# Connect to Redis
+redis_client = redis.Redis(host=redis_host, port=redis_port, db=redis_db)
+
+
+def pytest_configure():
+    # Set the current directory to the project root (this allows for relative file paths)
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
+    # Load environment variables from the /.env file
+    load_dotenv(dotenv_path=".env")
+
+    # Set up logger parameters
+    path = "logs/"
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    file_handler = logging.FileHandler(path + "/info.log", "w")
+    file_handler.setLevel(logging.INFO)
+    file_handler.setFormatter(logging.Formatter("%(lineno)d: %(asctime)s %(message)s"))
+
+    # Create custom logger
+    custom_logger = logging.getLogger("custom_logger")
+    custom_logger.setLevel(logging.INFO)
+    custom_logger.addHandler(file_handler)
+
+
+def pytest_runtest_setup(item):
+    logger.info(f"{item.name}:")
+
+
+@pytest.fixture(scope='class')
+def api():
+    return ApiClient()
+
+
+@pytest.fixture(scope='class')
+def create_jid(api):
+    post_obj = read_json_common_request_data('valid_post_jobs')
+    response = post_jobs(api, json=post_obj)
+    assert_status_code(response, HTTPStatus.OK)
+    jid = response.json()['return'][0]['jid']
+    assert_schema(response, ModelJobResponse)
+    yield jid
+    time.sleep(0.1)
+    redis_client.delete(f'job:{jid}:return')
+    delete_job_from_zset_on_redis(jid)
+
+
+@pytest.fixture(scope='class')
+def create_minions_data(api):
+    post_obj = read_json_common_request_data('grains_items_post')
+    response = post_jobs(api, json=post_obj)
+    jid = response.json()['return'][0]['jid']
+    assert_status_code(response, HTTPStatus.OK)
+    assert_schema(response, ModelJobResponse)
+    response_minions_list = get_minions(api)
+    id_list = [item["_id"] for item in response_minions_list.json()["data"]]
+    mid_list = response.json()['return'][0]['minions']
+    yield id_list
+    redis_client.delete(f'job:{jid}:return')
+    delete_job_from_zset_on_redis(jid)
+    for i in mid_list:
+        redis_client.delete(f'minion:{i}:grains')

@@ -1,0 +1,16 @@
+{
+    "detail": [
+        {
+            "type": "value_error",
+            "loc": [
+                "path",
+                "jid"
+            ],
+            "msg": "Value error, day is out of range for month",
+            "input": "20240999999999999999",
+            "ctx": {
+                "error": {}
+            }
+        }
+    ]
+}
