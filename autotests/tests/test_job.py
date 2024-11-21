@@ -79,7 +79,7 @@ class TestJobs:
         assert len(response.json()['result']) >= count_param
 
     @pytest.mark.parametrize('count, cursor, expected_status, type_of_error', INVALID_QUERY_PARAMS_FOR_JOB_RETURN)
-    def test_get_jobs_return_query_params(self, request, api, create_jid, count, cursor, expected_status, type_of_error):
+    def test_get_jobs_rtn_query_params(self, request, api, create_jid, count, cursor, expected_status, type_of_error):
         response = get_jobs_jid_return(api, create_jid, count, cursor)
         assert_status_code(response, expected_status)
         assert_unprocessable_entity(request, response, type_of_error)

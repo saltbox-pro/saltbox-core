@@ -11,6 +11,7 @@ redis_db = int(os.getenv('REDIS_DB', 0))
 # Connect to Redis
 redis_client = redis.Redis(host=redis_host, port=redis_port, db=redis_db)
 
+
 def decode_redis_hash(redis_data):
     decoded_data = {key.decode('utf-8'): json.loads(value.decode('utf-8')) for key, value in redis_data.items()}
     return decoded_data

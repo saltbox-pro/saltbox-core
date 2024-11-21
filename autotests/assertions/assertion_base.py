@@ -27,11 +27,11 @@ class LogMsg:
         if hasattr(self._response.request, 'params'):
             self._msg += f'\tquery params: {self._response.request.params}\n'
         else:
-            self._msg += f'\tquery params:\n'
+            self._msg += '\tquery params:\n'
         if hasattr(self._response.request, 'content') and self._response.request.read():
             self._msg += f'\tbody: {self._response.request.read()}\n'
         else:
-            self._msg += f'\tbody:\n'
+            self._msg += '\tbody:\n'
         return self
 
     def add_response_info(self):
@@ -45,7 +45,7 @@ class LogMsg:
         if text:
             self._msg += f'\n{text}\n'
         else:
-            self._msg += f'\n'
+            self._msg += '\n'
         return self
 
     def get_message(self):

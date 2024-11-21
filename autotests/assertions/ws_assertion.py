@@ -1,4 +1,5 @@
 import asyncio
+import pytest
 
 
 async def wait_for_job_message(api, jid, timeout=3):
