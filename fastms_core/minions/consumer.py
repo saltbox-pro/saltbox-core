@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging.config
 from typing import Any
@@ -52,4 +53,4 @@ class GrainsConsumer:
                 msg = await pubsub.get_message()
                 if msg:
                     await self.handle_message(msg['data'])
-                # await asyncio.sleep(0.01)
+                await asyncio.sleep(0.1)

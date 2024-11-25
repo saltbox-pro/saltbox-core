@@ -1,12 +1,11 @@
-from __future__ import annotations  # FIXME Redundant since required Python >= 3.12
-
-import json
 from datetime import datetime
 from typing import ClassVar
 
 from beanie import PydanticObjectId
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+from fastms_core.db.mongo.schemas_base import MongoQueryString, PaginatedListQueryParams
 
 
 def datetime_now_sec() -> datetime:
@@ -116,47 +115,12 @@ class MinionListSchema(MinionSchemaBase):
         }
 
 
-class MongoQueryString(BaseModel):
-    query: str = Field(
-        description='Query string must be a valid JSON object representing a dictionary',
-        examples=[
-            '{"grains.os": "Ubuntu"}',
-            '{"grains.cpu_model":{"$regex":"Intel"}}',
-        ],
-        default='{}',
-        validate_default=True,
-        json_schema_extra={'example': '{"grains.cpu_model":{"$not":{"$regex":"Intel"}}}'},
-    )
-
-    @field_validator('query')
-    @classmethod
-    def validate_query(cls, value: str) -> str:
-        try:
-            search = json.loads(value)
-            if not isinstance(search, dict):
-                raise ValueError
-        except (json.JSONDecodeError, ValueError):
-            raise RequestValidationError(
-                errors=[
-                    {
-                        'loc': ['query', 'query'],
-                        'msg': 'The query string must be a valid JSON object representing a dictionary',
-                        'type': 'value_error',
-                        'input': value,
-                    }
-                ]
-            ) from None
-        return value
-
-
-class MinionsListQueryParams(MongoQueryString):
-    model_config = {'extra': 'forbid'}
-    page: int = Field(default=0, description='Page number', ge=0)
-    per_page: int = Field(default=20, description='Items per page', ge=1, examples=[20, 50, 100])
+class MinionsListQueryParams(PaginatedListQueryParams, MongoQueryString):
+    model_config: ClassVar[ConfigDict] = {'extra': 'forbid'}
 
 
 class MinionFilterValuesQueryParams(MongoQueryString):
-    model_config = {'extra': 'forbid'}
+    model_config: ClassVar[ConfigDict] = {'extra': 'forbid'}
     field: str = Field(
         description='Field name to get unique values',
         examples=['grains.os', 'grains.cpu_model', 'grains.mem_total'],

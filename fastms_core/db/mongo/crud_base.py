@@ -41,12 +41,15 @@ class CRUDBase(Generic[ModelType, ListSchemaType, CreateSchemaType, UpdateSchema
 
     async def get_paginated(
         self,
-        search: dict,
+        search: dict | None = None,
         *,
         page: int = 0,
         per_page: int = 20,
         projection_model: type[FindQueryProjectionType] | None = None,
     ) -> PaginatedResponse[ListSchemaType]:
+        if not search:
+            search = {}
+
         data_query = self.model.find(search).project(projection_model).limit(per_page).skip(page * per_page)
         data = await data_query.to_list()
         total = await data_query.count()
@@ -75,7 +78,7 @@ class CRUDBase(Generic[ModelType, ListSchemaType, CreateSchemaType, UpdateSchema
         await db_obj.save()
         return db_obj
 
-    async def remove(self, *, id: str) -> ModelType | None:
+    async def remove(self, *, id: PydanticObjectId) -> ModelType | None:
         obj = await self.model.get(id)
         if obj:
             await obj.delete()

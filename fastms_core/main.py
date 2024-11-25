@@ -15,6 +15,7 @@ from fastms_core.jobs.router import router as jobs_router
 from fastms_core.minions.consumer import GrainsConsumer
 from fastms_core.minions.router import router as minions_router
 from fastms_core.salt.router import router as salt_router
+from fastms_core.tasks.router import router as tasks_router
 
 
 @asynccontextmanager
@@ -43,3 +44,4 @@ APP.add_middleware(
 APP.include_router(minions_router)
 APP.include_router(jobs_router)
 APP.include_router(salt_router)
+APP.include_router(tasks_router)

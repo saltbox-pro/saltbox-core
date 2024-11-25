@@ -7,6 +7,7 @@ from motor.motor_asyncio import AsyncIOMotorClient
 
 from fastms_core.config import LOG_CONFIG, SETTINGS
 from fastms_core.minions.models import Minion
+from fastms_core.tasks.models import TargetTemplate, TaskTemplate
 
 logger = logging.getLogger(__name__)
 logging.config.dictConfig(LOG_CONFIG.model_dump())
@@ -30,6 +31,6 @@ async def init_mongo() -> AsyncIOMotorClient:
         raise ValueError(msg)
 
     mongo_db = client[SETTINGS.mongo_db]
-    await init_beanie(mongo_db, document_models=[Minion])
+    await init_beanie(mongo_db, document_models=[Minion, TaskTemplate, TargetTemplate])
 
     return client
