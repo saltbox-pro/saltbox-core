@@ -11,7 +11,6 @@ from fastapi_offline import FastAPIOffline
 from fastms_core.config import APP_NAME, SETTINGS
 from fastms_core.db.mongo.config import init_mongo
 from fastms_core.db.redis import POOL
-from fastms_core.filters.router import router as filters_router
 from fastms_core.jobs.router import router as jobs_router
 from fastms_core.minions.consumer import GrainsConsumer
 from fastms_core.minions.router import router as minions_router
@@ -44,4 +43,3 @@ APP.add_middleware(
 APP.include_router(minions_router)
 APP.include_router(jobs_router)
 APP.include_router(salt_router)
-APP.include_router(filters_router)

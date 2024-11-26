@@ -2,8 +2,15 @@ import logging.config
 
 from fastms_core.config import LOG_CONFIG
 from fastms_core.db.mongo.crud_base import CRUDBase
-from fastms_core.minions.models import Minion
-from fastms_core.minions.schemas import MinionListSchema, MinionSchemaCreate, MinionSchemaUpdate
+from fastms_core.minions.models import Minion, MinionCollection
+from fastms_core.minions.schemas import (
+    MinionCollectionCreateSchema,
+    MinionCollectionListSchema,
+    MinionCollectionUpdateSchema,
+    MinionListSchema,
+    MinionSchemaCreate,
+    MinionSchemaUpdate,
+)
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
@@ -15,4 +22,11 @@ class CRUDMinion(CRUDBase[Minion, MinionListSchema, MinionSchemaCreate, MinionSc
         return await self.model.find_one({'minion_id': minion_id})
 
 
+class CRUDMinionCollection(
+    CRUDBase[MinionCollection, MinionCollectionListSchema, MinionCollectionCreateSchema, MinionCollectionUpdateSchema]
+):
+    pass
+
+
 minion_crud = CRUDMinion(Minion)
+minion_collection_crud = CRUDMinionCollection(MinionCollection)

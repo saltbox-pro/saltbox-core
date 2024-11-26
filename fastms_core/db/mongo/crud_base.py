@@ -78,7 +78,7 @@ class CRUDBase(Generic[ModelType, ListSchemaType, CreateSchemaType, UpdateSchema
         await db_obj.save()
         return db_obj
 
-    async def remove(self, *, id: str) -> ModelType | None:
+    async def remove(self, *, id: PydanticObjectId) -> ModelType | None:
         obj = await self.model.get(id)
         if obj:
             await obj.delete()
