@@ -76,9 +76,9 @@ async def collection_create(item: MinionCollectionCreateSchema) -> MinionCollect
     return MinionCollectionSchema.model_validate(obj)
 
 
-@router.get('/collection/{fid}', operation_id='collection_retrieve')
-async def collection_retrieve(fid: PydanticObjectId) -> MinionCollectionSchema:
-    obj = await minion_collection_crud.get(id=fid)
+@router.get('/collection/{cid}', operation_id='collection_retrieve')
+async def collection_retrieve(cid: PydanticObjectId) -> MinionCollectionSchema:
+    obj = await minion_collection_crud.get(id=cid)
 
     if not obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
@@ -86,9 +86,9 @@ async def collection_retrieve(fid: PydanticObjectId) -> MinionCollectionSchema:
     return MinionCollectionSchema.model_validate(obj)
 
 
-@router.put('/collection/{fid}', operation_id='collection_update')
-async def collection_update(fid: PydanticObjectId, item: MinionCollectionUpdateSchema) -> MinionCollectionSchema:
-    obj = await minion_collection_crud.get(id=fid)
+@router.put('/collection/{cid}', operation_id='collection_update')
+async def collection_update(cid: PydanticObjectId, item: MinionCollectionUpdateSchema) -> MinionCollectionSchema:
+    obj = await minion_collection_crud.get(id=cid)
 
     if not obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
@@ -98,9 +98,9 @@ async def collection_update(fid: PydanticObjectId, item: MinionCollectionUpdateS
     return MinionCollectionSchema.model_validate(obj_out)
 
 
-@router.delete('/collection/{fid}', operation_id='collection_delete', status_code=status.HTTP_204_NO_CONTENT)
-async def collection_delete(fid: PydanticObjectId) -> Response:
-    await minion_collection_crud.remove(id=fid)
+@router.delete('/collection/{cid}', operation_id='collection_delete', status_code=status.HTTP_204_NO_CONTENT)
+async def collection_delete(cid: PydanticObjectId) -> Response:
+    await minion_collection_crud.remove(id=cid)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
