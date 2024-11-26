@@ -8,6 +8,7 @@ include:
 Build image for tag:
   extends: .build-image
   variables:
+    TARGET: main
     IMAGE_TAG: '$CI_COMMIT_TAG'
   rules:
     - if: '$CI_COMMIT_TAG'
@@ -16,6 +17,7 @@ Build image for tag:
 Build image for branch:
   extends: .build-image
   variables:
+    TARGET: main
     IMAGE_TAG: '$CI_COMMIT_BRANCH'
   rules:
     - if: '$CI_COMMIT_BRANCH'
