@@ -1,14 +1,13 @@
-import json
 import logging.config
 from typing import Annotated, Any
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, Body, HTTPException, Query, Response, status
 
 from fastms_core.config import LOG_CONFIG
 from fastms_core.db.mongo.schemas_base import PaginatedResponse
 from fastms_core.minions.crud import minion_collection_crud, minion_crud
-from fastms_core.minions.models import Minion
+from fastms_core.minions.models import Minion, MinionCollection
 from fastms_core.minions.schemas import (
     MinionCollectionCreateSchema,
     MinionCollectionListQueryParams,
@@ -42,13 +41,12 @@ async def filter_schema() -> list[dict[str, str]]:
     return get_model_schema(Minion)
 
 
-@router.get('/filter-values', operation_id='filter_values')
-async def unique_field_values(params: Annotated[MinionFilterValuesQueryParams, Query()]) -> dict[str, Any]:
+@router.post('/filter-values', operation_id='filter_values')
+async def unique_field_values(params: Annotated[MinionFilterValuesQueryParams, Body()]) -> dict[str, Any]:
     """Get unique values for a field in the Minion model"""
-    search = json.loads(params.query)
     sequence = make_aggregate_sequence(params.field)
 
-    result = await Minion.find(search).aggregate(sequence).to_list()
+    result = await Minion.find(params.query).aggregate(sequence).to_list()
     response = {
         'total': len(result),
         'data': result,
@@ -108,20 +106,30 @@ async def collection_delete(cid: PydanticObjectId) -> Response:
 # Minions views
 
 
-@router.get('', operation_id='minions_list')
+@router.post('', operation_id='minions_list')
 async def minions_list(
-    params: Annotated[MinionsListQueryParams, Query()],
+    params: Annotated[MinionsListQueryParams, Body()],
 ) -> PaginatedResponse[MinionListSchema]:
-    search = json.loads(params.query)
+    search = params.query
+
+    if params.collection_id:
+        minions_collection = await minion_collection_crud.get(params.collection_id)
+
+        if isinstance(minions_collection, MinionCollection):
+            search = {'$and': [minions_collection.query, search]}
+
     response = await minion_crud.get_paginated(
         search, page=params.page, per_page=params.per_page, projection_model=MinionListSchema
     )
+
     return response
 
 
 @router.get('/{mid}', operation_id='minion_retrieve')
 async def minion_retrieve(mid: PydanticObjectId) -> Minion:
     minion = await minion_crud.get(mid)
+
     if not minion:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Minion not found')
+
     return minion

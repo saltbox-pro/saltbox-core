@@ -5,7 +5,7 @@ from beanie import PydanticObjectId
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from fastms_core.db.mongo.schemas_base import MongoQueryString, PaginatedListQueryParams
+from fastms_core.db.mongo.schemas_base import MongoQueryBaseSchema, PaginatedListQueryParams
 
 
 def datetime_now_sec() -> datetime:
@@ -115,11 +115,13 @@ class MinionListSchema(MinionSchemaBase):
         }
 
 
-class MinionsListQueryParams(PaginatedListQueryParams, MongoQueryString):
+class MinionsListQueryParams(PaginatedListQueryParams, MongoQueryBaseSchema):
+    collection_id: PydanticObjectId | None = None
+
     model_config: ClassVar[ConfigDict] = {'extra': 'forbid'}
 
 
-class MinionFilterValuesQueryParams(MongoQueryString):
+class MinionFilterValuesQueryParams(MongoQueryBaseSchema):
     model_configg: ClassVar[ConfigDict] = {'extra': 'forbid'}
     field: str = Field(
         description='Field name to get unique values',
@@ -159,9 +161,8 @@ class MinionFilterValuesQueryParams(MongoQueryString):
         return value
 
 
-class MinionCollectionBaseSchema(BaseModel):
+class MinionCollectionBaseSchema(MongoQueryBaseSchema):
     title: str = Field(title='Title')
-    query: dict[str, str | dict] = Field(title='Query')
 
 
 class MinionCollectionDBSchema(MinionCollectionBaseSchema):

@@ -1,4 +1,3 @@
-import json
 from typing import Generic, TypeVar
 
 from fastapi.exceptions import RequestValidationError
@@ -17,34 +16,37 @@ class PaginatedListQueryParams(BaseModel):
     per_page: int = Field(default=20, description='Items per page', ge=1, examples=[20, 50, 100])
 
 
-class MongoQueryString(BaseModel):
-    query: str = Field(
-        description='Query string must be a valid JSON object representing a dictionary',
+class MongoQueryBaseSchema(BaseModel):
+    query: dict = Field(
+        title='Mongo query',
+        description='Query dict must be a valid MongoDB query.',
         examples=[
-            '{"grains.os": "Ubuntu"}',
-            '{"grains.cpu_model":{"$regex":"Intel"}}',
+            {'grains.os': 'Ubuntu'},
+            {'grains.cpu_model': {'$regex': 'Intel'}},
         ],
-        default='{}',
+        default={},
         validate_default=True,
-        json_schema_extra={'example': '{"grains.cpu_model":{"$not":{"$regex":"Intel"}}}'},
+        json_schema_extra={'example': {'grains.cpu_model': {'$not': {'$regex': 'Intel'}}}},
     )
 
     @field_validator('query')
     @classmethod
-    def validate_query(cls, value: str) -> str:
+    def validate_query(cls, value: dict) -> dict:
         try:
-            search = json.loads(value)
-            if not isinstance(search, dict):
-                raise ValueError
-        except (json.JSONDecodeError, ValueError):
+            for k, v in value.items():
+                if k in ['$and', '$or'] and not isinstance(v, list):
+                    msg = 'Value of items with keys "$and" and "$or" must be a list'
+                    raise ValueError(msg)
+        except ValueError as e:
             raise RequestValidationError(
                 errors=[
                     {
                         'loc': ['query', 'query'],
-                        'msg': 'The query string must be a valid JSON object representing a dictionary',
+                        'msg': f'The query string must be a valid MongoDB query. Error:\n{e}',
                         'type': 'value_error',
                         'input': value,
                     }
                 ]
             ) from None
+
         return value
