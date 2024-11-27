@@ -1,9 +1,14 @@
 from typing import Generic, TypeVar
 
+from beanie import PydanticObjectId
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field, field_validator
 
 SchemaType = TypeVar('SchemaType', bound=BaseModel)
+
+
+class BaseDBSchema(BaseModel):
+    id: PydanticObjectId = Field(title='ID', alias='_id', serialization_alias='id')
 
 
 class PaginatedResponse(BaseModel, Generic[SchemaType]):
