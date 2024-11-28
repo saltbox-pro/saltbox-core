@@ -16,6 +16,7 @@ from fastms_core.tasks.schemas import (
     TaskTemplateListSchema,
     TaskTemplateSchema,
     TaskTemplateUpdateSchema,
+    TaskTgtType,
 )
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
@@ -57,7 +58,15 @@ async def template_retrieve(tid: PydanticObjectId) -> TaskTemplate:
     if not obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
-    print(obj.create_task({'test_arg': 'test_arg value 123'}))
+    task = obj.create_task(
+        variables_data={'test_arg': 'test_arg value 123'},
+        tgt_type=TaskTgtType.minions_collection,
+        tgt_value='6746c8d3a3629a02a653a31d',
+    )
+    task.status = Task.TaskStatus.running
+    await task.save()
+
+    await task.process()
 
     return TaskTemplate.model_validate(obj)
 

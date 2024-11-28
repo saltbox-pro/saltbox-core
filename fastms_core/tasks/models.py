@@ -6,15 +6,97 @@ from typing import Any, ClassVar
 import pymongo
 from beanie import Document
 
-from fastms_core.tasks.schemas import TaskSchema, TaskTemplateSchema, TaskTemplateVariable
+from fastms_core.minions.models import Minion, MinionCollection
+from fastms_core.salt.http_client import SALT_CLIENT, SaltHttpClientError
+from fastms_core.tasks.schemas import (
+    TaskJob,
+    TaskJobStatus,
+    TaskJobTarget,
+    TaskSchema,
+    TaskTemplateSchema,
+    TaskTemplateVariable,
+    TaskTgtType,
+)
 
 
 class Task(Document, TaskSchema):
-    def process(self) -> None:
-        if self.status != self.TaskStatus.running:
+    def __can_start_job(self) -> bool:
+        return True
+
+    async def __fill_jobs_queue(self) -> None:
+        if self.targets_queue is None:
+            self.targets_queue = []
+
+        minions: list[Minion] = []
+
+        if self.tgt_type == TaskTgtType.minions_list:
+            minions_ids = ','.split(self.tgt_value)
+            minions = await Minion.find({'_id': {'$in': minions_ids}}).to_list()
+        elif self.tgt_type == TaskTgtType.minions_collection:
+            collection: MinionCollection | None = await MinionCollection.get(self.tgt_value)
+
+            if collection:
+                minions = await Minion.find(collection.query).to_list()
+            else:
+                msg = f'Minion collection with id {self.tgt_type} not found'
+                raise ValueError(msg)
+
+        targets_lists: list[list[str]] = []
+        temp_targets_list: list[str] = []
+
+        while len(minions) > 0:
+            temp_targets_list.append(minions.pop(0).minion_id)
+
+            if self.batch_size and len(temp_targets_list) >= (self.batch_size - 1):
+                targets_lists.append(temp_targets_list[:])
+                temp_targets_list = []
+        else:
+            if len(temp_targets_list):
+                targets_lists.append(temp_targets_list[:])
+
+        for tgt_list in targets_lists:
+            self.targets_queue.append(TaskJobTarget(tgt=','.join(tgt_list), tgt_type='list'))
+
+        await self.save()
+
+    async def __check_running_jobs(self) -> None:
+        for job in self.jobs:
+            if job.status != TaskJobStatus.running:
+                continue
+
+        await self.save()
+
+    async def __rub_jobs(self) -> None:
+        if not self.targets_queue:
             return
 
-        ...
+        while self.targets_queue:
+            job_targeting = self.targets_queue.pop(0)
+
+            if not self.__can_start_job():
+                break
+            try:
+                ret = await SALT_CLIENT.run_job(
+                    tgt=job_targeting.tgt, fun=self.fun, arg=self.task_args, kwarg=self.task_kwargs, tgt_type='list'
+                )
+
+                self.jobs.append(TaskJob.model_validate({'jid': str(ret['return'][0]['jid']), 'target': job_targeting}))
+            except SaltHttpClientError:
+                break
+
+    async def process(self) -> None:
+        if self.status != self.TaskStatus.running:
+            return
+        if self.targets_queue is None:
+            await self.__fill_jobs_queue()
+
+        await self.__check_running_jobs()
+        await self.__rub_jobs()
+
+        if not self.targets_queue:
+            self.status = self.TaskStatus.finished
+
+        await self.save()
 
     class Settings:
         name = 'tasks'
@@ -101,17 +183,16 @@ class TaskTemplate(Document, TaskTemplateSchema):
 
         return task_kwargs
 
-    def create_task(
-        self, variables_data: dict, tgt: str = '*', tgt_type: Task.TaskTgtType | None = Task.TaskTgtType.glob
-    ) -> Task:
+    def create_task(self, variables_data: dict, tgt_type: TaskTgtType, tgt_value: str) -> Task:
         context: dict = self.get_context(variables_data)
 
         task_data = {
             'fun': self.fun,
             'task_args': self.get_task_args(variables_data, context),
             'task_kwargs': self.get_task_kwargs(variables_data, context),
-            'tgt': tgt,
             'tgt_type': tgt_type,
+            'tgt_value': tgt_value,
+            'batch_size': 100,
         }
 
         return Task.model_validate(task_data)
