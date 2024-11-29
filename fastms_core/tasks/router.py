@@ -66,8 +66,6 @@ async def template_retrieve(tid: PydanticObjectId) -> TaskTemplate:
     task.status = Task.TaskStatus.running
     await task.save()
 
-    await task.process()
-
     return TaskTemplate.model_validate(obj)
 
 

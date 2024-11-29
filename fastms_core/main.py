@@ -16,16 +16,24 @@ from fastms_core.minions.consumer import GrainsConsumer
 from fastms_core.minions.router import router as minions_router
 from fastms_core.salt.router import router as salt_router
 from fastms_core.tasks.router import router as task_router
+from fastms_core.tasks.tasks_watcher import TasksWatcher
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator:
     mongo_client = await init_mongo()
-    consumer = GrainsConsumer(channel='grains')
     loop = asyncio.get_event_loop()
-    task = loop.create_task(consumer.consume())
+
+    # Grains consumer
+    grains_consumer = GrainsConsumer(channel='grains')
+    grains_consumer_task = loop.create_task(grains_consumer.consume())
+    # Tasks watcher
+    tasks_watcher = TasksWatcher()
+    tasks_task_watcher = loop.create_task(tasks_watcher.process())
+
     yield
-    task.cancel()
+    grains_consumer_task.cancel()
+    tasks_task_watcher.cancel()
     mongo_client.close()
     await POOL.aclose()  # type: ignore[attr-defined]
 

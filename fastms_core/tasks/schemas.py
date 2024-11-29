@@ -102,6 +102,8 @@ class TaskBaseSchema(BaseModel):
 
     targets_queue: list[TaskJobTarget] | None = Field(title='Jobs queue', default=None)
     jobs: list[TaskJob] = Field(title='Jobs', default=[])
+    minions_retries_counts: dict[str, int] = Field(title='Minions retries cunts', default={})
+    failed_for_minions: list[str] = Field(title='Minions failed', default=[])
 
 
 class TaskDBSchema(BaseDBSchema, TaskBaseSchema):

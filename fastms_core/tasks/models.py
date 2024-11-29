@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import json
+import logging.config
 import re
 from typing import Any, ClassVar
 
 import pymongo
 from beanie import Document
+from redis import asyncio as aioredis
 
+from fastms_core.config import LOG_CONFIG, SETTINGS
 from fastms_core.minions.models import Minion, MinionCollection
 from fastms_core.salt.http_client import SALT_CLIENT, SaltHttpClientError
 from fastms_core.tasks.schemas import (
@@ -18,9 +22,21 @@ from fastms_core.tasks.schemas import (
     TaskTgtType,
 )
 
+logging.config.dictConfig(LOG_CONFIG.model_dump())
+
+logger = logging.getLogger(__name__)
+
 
 class Task(Document, TaskSchema):
+    @classmethod
+    async def __get_redis(cls) -> aioredis.Redis:
+        return await aioredis.from_url(SETTINGS.redis_url, **SETTINGS.redis_connection_kwargs)
+
     def __can_start_job(self) -> bool:
+        for job in self.jobs:
+            if job.status == TaskJobStatus.running:
+                return False
+
         return True
 
     async def __fill_jobs_queue(self) -> None:
@@ -59,10 +75,42 @@ class Task(Document, TaskSchema):
 
         await self.save()
 
-    async def __check_running_jobs(self) -> None:
+    async def __check_running_jobs(self, redis: aioredis.Redis) -> None:
+        minions_ids_with_failed_job: list[str] = []
+
         for job in self.jobs:
             if job.status != TaskJobStatus.running:
                 continue
+
+            job_returns_data = await redis.hgetall(name=f'job:{job.jid}:return')
+
+            for return_data_s in job_returns_data.values():
+                return_data = json.loads(return_data_s)
+                minion_id: str = return_data['id']
+
+                self.minions_retries_counts.setdefault(minion_id, 0)
+                self.minions_retries_counts[minion_id] += 1
+
+                if return_data['success'] is True:
+                    job.status = TaskJobStatus.succeeded
+                else:
+                    job.status = TaskJobStatus.failed
+                    minions_ids_with_failed_job.append(return_data['id'])
+
+        if minions_ids_with_failed_job:
+            minions_ids_for_retry: list[str] = []
+
+            for minion_id in minions_ids_with_failed_job:
+                if self.minions_retries_counts[minion_id] <= self.max_retries - 1:
+                    minions_ids_for_retry.append(minion_id)
+                else:
+                    self.failed_for_minions.append(minion_id)
+
+            if minions_ids_for_retry:
+                if not self.targets_queue:
+                    self.targets_queue = []
+
+                self.targets_queue.append(TaskJobTarget(tgt=','.join(minions_ids_for_retry), tgt_type='list'))
 
         await self.save()
 
@@ -70,11 +118,9 @@ class Task(Document, TaskSchema):
         if not self.targets_queue:
             return
 
-        while self.targets_queue:
+        if self.__can_start_job():
             job_targeting = self.targets_queue.pop(0)
 
-            if not self.__can_start_job():
-                break
             try:
                 ret = await SALT_CLIENT.run_job(
                     tgt=job_targeting.tgt, fun=self.fun, arg=self.task_args, kwarg=self.task_kwargs, tgt_type='list'
@@ -82,19 +128,28 @@ class Task(Document, TaskSchema):
 
                 self.jobs.append(TaskJob.model_validate({'jid': str(ret['return'][0]['jid']), 'target': job_targeting}))
             except SaltHttpClientError:
-                break
+                ...
 
-    async def process(self) -> None:
+        await self.save()
+
+    async def process(self, redis: aioredis.Redis | None = None) -> None:
         if self.status != self.TaskStatus.running:
             return
         if self.targets_queue is None:
             await self.__fill_jobs_queue()
 
-        await self.__check_running_jobs()
+        if not redis:
+            redis = await self.__get_redis()
+
+        await self.__check_running_jobs(redis=redis)
         await self.__rub_jobs()
 
         if not self.targets_queue:
-            self.status = self.TaskStatus.finished
+            for job in self.jobs:
+                if job.status == TaskJobStatus.running:
+                    break
+            else:
+                self.status = self.TaskStatus.finished
 
         await self.save()
 
