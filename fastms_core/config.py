@@ -8,6 +8,7 @@ APP_NAME = 'FastMS Core'
 
 class Settings(BaseSettings):
     celery_broker_url: str | None = None
+    celery_beat_schedule_filename: str = '/var/fastms-core/beat_schedule'
     debug: bool = False
     max_count: int = Field(default=1000, description='Max array length to request')
     mongo_db: str

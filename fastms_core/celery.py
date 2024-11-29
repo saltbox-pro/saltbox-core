@@ -10,6 +10,8 @@ from fastms_core.config import SETTINGS
 class CeleryConfig:
     accept_content = ['json']
     beat_schedule = {}
+    beat_schedule_filename = SETTINGS.celery_beat_schedule_filename
+    broker_connection_retry_on_startup = True
     broker_url = SETTINGS.celery_broker_url
     enable_utc = True
     result_expires = timedelta(minutes=60)
