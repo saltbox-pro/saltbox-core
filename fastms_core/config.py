@@ -3,28 +3,27 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-APP_NAME = 'FastMS core'
+APP_NAME = 'FastMS Core'
 
 
 class Settings(BaseSettings):
-    salt_url: str
-    salt_username: str
-    salt_password: str
-    salt_eauth: str = 'file'
-    redis_url: str
-    redis_username: str | None = None
-    redis_password: str | None = None
-    redis_tls_verification: Literal['none', 'optional', 'required'] = 'required'
-    redis_ca_cert: str | None = Field(
-        None,
-        description='Path to file of concatenated PEM certs')
+    celery_broker_url: str | None = None
+    debug: bool = False
+    max_count: int = Field(default=1000, description='Max array length to request')
     mongo_db: str
+    mongo_password: str
     mongo_port: int = 27017
     mongo_user: str
-    mongo_password: str
-    debug: bool = False
     origins: list[str] = Field(['*'], description='CORS allowed resources')
-    max_count: int = Field(default=1000, description='Max array length to request')
+    redis_ca_cert: str | None = Field(None, description='Path to file of concatenated PEM certs')
+    redis_password: str | None = None
+    redis_tls_verification: Literal['none', 'optional', 'required'] = 'required'
+    redis_url: str
+    redis_username: str | None = None
+    salt_eauth: str = 'file'
+    salt_password: str
+    salt_url: str
+    salt_username: str
 
     model_config = SettingsConfigDict(env_file='.env')
 
