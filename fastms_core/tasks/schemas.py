@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import Any, ClassVar
 
+from beanie import PydanticObjectId
 from pydantic import BaseModel, ConfigDict, Field
 
 from fastms_core.db.mongo.schemas_base import BaseDBSchema, PaginatedListQueryParams
@@ -91,12 +92,13 @@ class TaskBaseSchema(BaseModel):
 
     status: TaskStatus = Field(title='Status', default=TaskStatus.created)
 
+    task_template_id: PydanticObjectId | None = Field(title='Task template')
     fun: str = Field(title='Salt fun')
     task_args: list[str] = Field(title='Args')
     task_kwargs: dict[str, Any] = Field(title='Kwargs')
 
     tgt_type: TaskTgtType = Field(title='Targeting type')
-    tgt_value: str = Field(title='Targeting value', default='*')
+    tgt_value: str = Field(title='Targeting value')
     batch_size: int | None = Field(title='Batch size', default=None)
     max_retries: int = Field(title='Max retries', default=3)
 
@@ -114,8 +116,13 @@ class TaskSchema(TaskDBSchema):
     pass
 
 
-class TaskCreateSchema(TaskBaseSchema):
-    pass
+class TaskCreateSchema(BaseModel):
+    task_template_id: PydanticObjectId = Field(title='Task template id')
+    variables_data: dict[str, Any] = Field(title='Variables data')
+    tgt_type: TaskTgtType = Field(title='Targeting type')
+    tgt_value: str | PydanticObjectId = Field(title='Targeting value')
+    batch_size: int | None = Field(title='Batch size', default=None)
+    max_retries: int = Field(title='Max retries', default=3)
 
 
 class TaskUpdateSchema(TaskBaseSchema):

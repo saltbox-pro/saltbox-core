@@ -63,7 +63,7 @@ class Task(Document, TaskSchema):
         while len(minions) > 0:
             temp_targets_list.append(minions.pop(0).minion_id)
 
-            if self.batch_size and len(temp_targets_list) >= (self.batch_size - 1):
+            if self.batch_size and len(temp_targets_list) >= self.batch_size:
                 targets_lists.append(temp_targets_list[:])
                 temp_targets_list = []
         else:
@@ -128,7 +128,7 @@ class Task(Document, TaskSchema):
 
                 self.jobs.append(TaskJob.model_validate({'jid': str(ret['return'][0]['jid']), 'target': job_targeting}))
             except SaltHttpClientError:
-                ...
+                self.targets_queue.append(job_targeting)
 
         await self.save()
 
@@ -152,6 +152,17 @@ class Task(Document, TaskSchema):
                 self.status = self.TaskStatus.finished
 
         await self.save()
+
+    async def run(self) -> None:
+        if self.status in [self.TaskStatus.created, self.TaskStatus.stopped]:
+            self.status = self.TaskStatus.running
+            await self.save()
+
+    async def stop(self) -> None:
+        if self.status == self.TaskStatus.running:
+            # TODO: stop jobs
+            self.status = self.TaskStatus.stopped
+            await self.save()
 
     class Settings:
         name = 'tasks'
@@ -238,19 +249,31 @@ class TaskTemplate(Document, TaskTemplateSchema):
 
         return task_kwargs
 
-    def create_task(self, variables_data: dict, tgt_type: TaskTgtType, tgt_value: str) -> Task:
+    async def create_task(
+        self,
+        variables_data: dict,
+        tgt_type: TaskTgtType,
+        tgt_value: str,
+        batch_size: int | None = None,
+        max_retries: int = 3,
+    ) -> Task:
         context: dict = self.get_context(variables_data)
 
         task_data = {
+            'task_template_id': self.id,
             'fun': self.fun,
             'task_args': self.get_task_args(variables_data, context),
             'task_kwargs': self.get_task_kwargs(variables_data, context),
             'tgt_type': tgt_type,
             'tgt_value': tgt_value,
-            'batch_size': 100,
+            'batch_size': batch_size,
+            'max_retries': max_retries,
         }
 
-        return Task.model_validate(task_data)
+        task = Task.model_validate(task_data)
+        await task.save()
+
+        return task
 
     class Settings:
         name = 'task_templates'

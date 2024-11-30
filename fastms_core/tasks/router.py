@@ -2,21 +2,22 @@ import logging.config
 from typing import Annotated
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, Body, HTTPException, Query, Response, status
+from fastapi import APIRouter, HTTPException, Query, Response, status
 
 from fastms_core.config import LOG_CONFIG
 from fastms_core.db.mongo.schemas_base import PaginatedResponse
 from fastms_core.tasks.crud import task_crud, task_template_crud
 from fastms_core.tasks.models import Task, TaskTemplate
 from fastms_core.tasks.schemas import (
+    TaskCreateSchema,
     TaskListQueryParams,
     TaskListSchema,
+    TaskSchema,
     TaskTemplateCreateSchema,
     TaskTemplateListQueryParams,
     TaskTemplateListSchema,
     TaskTemplateSchema,
     TaskTemplateUpdateSchema,
-    TaskTgtType,
 )
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
@@ -58,14 +59,6 @@ async def template_retrieve(tid: PydanticObjectId) -> TaskTemplate:
     if not obj:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
 
-    task = obj.create_task(
-        variables_data={'test_arg': 'test_arg value 123'},
-        tgt_type=TaskTgtType.minions_collection,
-        tgt_value='6746c8d3a3629a02a653a31d',
-    )
-    task.status = Task.TaskStatus.running
-    await task.save()
-
     return TaskTemplate.model_validate(obj)
 
 
@@ -91,9 +84,9 @@ async def template_delete(tid: PydanticObjectId) -> Response:
 # Tasks views
 
 
-@router.post('', operation_id='tasks_list')
+@router.get('', operation_id='tasks_list')
 async def tasks_list(
-    params: Annotated[TaskListQueryParams, Body()],
+    params: Annotated[TaskListQueryParams, Query()],
 ) -> PaginatedResponse[TaskListSchema]:
     response = await task_crud.get_paginated(
         page=params.page, per_page=params.per_page, projection_model=TaskListSchema
@@ -102,11 +95,42 @@ async def tasks_list(
     return response
 
 
+@router.post('', operation_id='task_create')
+async def task_create(item: TaskCreateSchema) -> TaskSchema:
+    obj = await task_crud.create(obj_in=item)
+
+    return TaskSchema.model_validate(obj)
+
+
 @router.get('/{tid}', operation_id='task_retrieve')
 async def task_retrieve(tid: PydanticObjectId) -> Task:
     task = await task_crud.get(tid)
 
     if not task:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task not found')
+
+    return task
+
+
+@router.post('/{tid}/run', operation_id='task_run')
+async def task_run(tid: PydanticObjectId) -> Task:
+    task = await task_crud.get(tid)
+
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task not found')
+
+    await task.run()
+
+    return task
+
+
+@router.post('/{tid}/stop', operation_id='task_stop')
+async def task_stop(tid: PydanticObjectId) -> Task:
+    task = await task_crud.get(tid)
+
+    if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task not found')
+
+    await task.stop()
 
     return task
