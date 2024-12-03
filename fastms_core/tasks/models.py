@@ -186,10 +186,11 @@ class TaskTemplate(Document, TaskTemplateSchema):
 
             if variable.type == TaskTemplateVariable.TaskTemplateType.string:
                 context[variable.name] = str(variable_value)
-            elif variable.type == TaskTemplateVariable.TaskTemplateType.integer:
-                context[variable.name] = int(variable_value)
-            elif variable.type == TaskTemplateVariable.TaskTemplateType.float:
-                context[variable.name] = float(variable_value)
+            elif variable.type == TaskTemplateVariable.TaskTemplateType.number:
+                if str(variable_value).isdigit():
+                    context[variable.name] = int(variable_value)
+                else:
+                    context[variable.name] = float(variable_value)
             elif variable.type == TaskTemplateVariable.TaskTemplateType.bool:
                 context[variable.name] = bool(variable_value)
             elif variable.type == TaskTemplateVariable.TaskTemplateType.choices:
