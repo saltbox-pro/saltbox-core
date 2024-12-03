@@ -82,7 +82,7 @@ class Task(Document, TaskSchema):
             if job.status != TaskJobStatus.running:
                 continue
 
-            job_returns_data = await redis.hgetall(name=f'job:{job.jid}:return')
+            job_returns_data: dict = await redis.hgetall(name=f'job:{job.jid}:return')
 
             for return_data_s in job_returns_data.values():
                 return_data = json.loads(return_data_s)
