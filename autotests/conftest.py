@@ -15,15 +15,7 @@ from assertions.assertion_base import assert_status_code, assert_schema
 from models.jobs_models import ModelJobResponse
 from utilities.files_utils import read_json_common_request_data
 from utilities.logger_utils import logger
-from utilities.redis_utils import delete_job_from_zset_on_redis
-
-# redis settings
-redis_host = os.getenv('REDIS_HOST', 'localhost')
-redis_port = int(os.getenv('REDIS_PORT', 6379))
-redis_db = int(os.getenv('REDIS_DB', 0))
-
-# Connect to Redis
-redis_client = redis.Redis(host=redis_host, port=redis_port, db=redis_db)
+from utilities.redis_utils import redis_client, delete_job_from_zset_on_redis
 
 
 def pytest_configure():

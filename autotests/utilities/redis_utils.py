@@ -4,12 +4,31 @@ import redis
 from dotenv import load_dotenv
 
 load_dotenv()
+# redis settings
 redis_host = os.getenv('REDIS_HOST', 'localhost')
 redis_port = int(os.getenv('REDIS_PORT', 6379))
 redis_db = int(os.getenv('REDIS_DB', 0))
+username = os.getenv('REDIS_USERNAME', 'redis')
+password = os.getenv('REDIS_PASSWORD')
+ssl = True
+ssl_cert_reqs = None
 
 # Connect to Redis
-redis_client = redis.Redis(host=redis_host, port=redis_port, db=redis_db)
+redis_client = redis.Redis(
+    host=redis_host,
+    port=redis_port,
+    db=redis_db,
+    ssl=ssl,
+    ssl_cert_reqs=ssl_cert_reqs,
+    username=username,
+    password=password,
+)
+
+try:
+    redis_client.ping()
+    print("Connected to Redis successfully!")
+except redis.ConnectionError as e:
+    print(f"Failed to connect to Redis: {e}")
 
 
 def decode_redis_hash(redis_data):
