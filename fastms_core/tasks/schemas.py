@@ -1,3 +1,4 @@
+import logging.config
 import re
 from enum import Enum
 from typing import Any, ClassVar
@@ -5,7 +6,12 @@ from typing import Any, ClassVar
 from beanie import PydanticObjectId
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from fastms_core.config import LOG_CONFIG
 from fastms_core.db.mongo.schemas_base import BaseDBSchema, PaginatedListQueryParams
+
+logging.config.dictConfig(LOG_CONFIG.model_dump())
+
+logger = logging.getLogger(__name__)
 
 # Task template schemas
 
@@ -40,6 +46,24 @@ class TaskTemplateVariable(BaseModel):
             raise ValueError(msg)
 
         return self
+
+    def validate_value(self, value: str | int | float) -> str | int | float:
+        value_type = type(value)
+
+        if self.type == self.TaskTemplateType.string and value_type is not str:
+            msg = f'Variable "{self.name}" must be a string'
+            raise ValueError(msg)
+        elif self.type == TaskTemplateVariable.TaskTemplateType.number and value_type not in [int, float]:
+            msg = f'Variable "{self.name}" must be an integer or float'
+            raise ValueError(msg)
+        elif self.type == TaskTemplateVariable.TaskTemplateType.bool and value_type is not bool:
+            msg = f'Variable "{self.name}" must be a boolean'
+            raise ValueError(msg)
+        elif self.type == TaskTemplateVariable.TaskTemplateType.choices and self.choices and value not in self.choices:
+            msg = f'Variable "{self.name}" must be one of {self.choices}'
+            raise ValueError(msg)
+
+        return value
 
 
 class TaskTemplateBaseSchema(BaseModel):
@@ -173,6 +197,23 @@ class TaskCreateSchema(BaseModel):
     tgt_value: str | PydanticObjectId = Field(title='Targeting value')
     batch_size: int | None = Field(title='Batch size', default=None)
     max_retries: int = Field(title='Max retries', default=3)
+
+    @model_validator(mode='after')
+    def validation_targeting(self) -> 'TaskCreateSchema':
+        if self.tgt_type == TaskTgtType.minions_list:
+            if not isinstance(self.tgt_value, str):
+                msg: str = 'For task with type "minions_list" value of "tgt_value" must be a string'
+                raise ValueError(msg)
+
+            if not len(self.tgt_value):
+                msg = '"tgt_value" must not be empty'
+                raise ValueError(msg)
+
+            if '*' in self.tgt_value.split(','):
+                msg = '"tgt_value" must not contain "*"'
+                raise ValueError(msg)
+
+        return self
 
 
 class TaskUpdateSchema(TaskBaseSchema):

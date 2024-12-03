@@ -97,7 +97,10 @@ async def tasks_list(
 
 @router.post('', operation_id='task_create')
 async def task_create(item: TaskCreateSchema) -> TaskSchema:
-    obj = await task_crud.create(obj_in=item)
+    try:
+        obj = await task_crud.create(obj_in=item)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
     return TaskSchema.model_validate(obj)
 
