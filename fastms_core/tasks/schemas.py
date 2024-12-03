@@ -1,8 +1,9 @@
+import re
 from enum import Enum
 from typing import Any, ClassVar
 
 from beanie import PydanticObjectId
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from fastms_core.db.mongo.schemas_base import BaseDBSchema, PaginatedListQueryParams
 
@@ -12,26 +13,75 @@ from fastms_core.db.mongo.schemas_base import BaseDBSchema, PaginatedListQueryPa
 class TaskTemplateVariable(BaseModel):
     class TaskTemplateType(str, Enum):
         string = 'str'
-        integer = 'int'
-        float = 'float'
+        number = 'number'
         bool = 'bool'
         choices = 'choices'
 
     title: str = Field(title='Title')
-    name: str = Field(title='Name')
+    name: str = Field(title='Name', pattern=r'^[a-zA-Z0-9-_]+$')
     type: TaskTemplateType = Field(title='Type', default=TaskTemplateType.string)
     required: bool = Field(title='Required', default=True)
     choices: list[str | int | float] | None = Field(title='Choices', default=None)
     default_value: str | int | float | bool | None = Field(title='Default value', default=None)
 
+    @model_validator(mode='after')
+    def validate_default_value_and_choices(self) -> 'TaskTemplateVariable':
+        if self.type == self.TaskTemplateType.string and not isinstance(self.default_value, str | None):
+            msg: str = '"default_value" must by string for task template type "string"'
+            raise ValueError(msg)
+        elif self.type == self.TaskTemplateType.number and not isinstance(self.default_value, int | float | None):
+            msg = '"default_value" must by integer or float for task template type "number"'
+            raise ValueError(msg)
+        elif self.type == self.TaskTemplateType.bool and not isinstance(self.default_value, bool | None):
+            msg = '"default_value" must by boolean for task template type "bool"'
+            raise ValueError(msg)
+        elif self.type == self.TaskTemplateType.choices and not self.choices:
+            msg = '"choices" must have at least one value for task template type "choices"'
+            raise ValueError(msg)
+
+        return self
+
 
 class TaskTemplateBaseSchema(BaseModel):
     title: str = Field(title='Title')
-    fun: str = Field(title='Salt fun')
+    fun: str = Field(title='Salt fun', examples=['salt.ping'])
 
     variables: list[TaskTemplateVariable] = Field(title='Variables')
-    task_args: list[str] = Field(title='Args')
-    task_kwargs: dict[str, Any] = Field(title='Kwargs')
+    task_args: list[str] = Field(title='Args', examples=[['const_arg', '<<task_var.var_name>>']])
+    task_kwargs: dict[str, Any] = Field(
+        title='Kwargs', examples=[{'const_kwarg': 'const_kwarg_value', 'var_kwarg': '<<task_var.var_name>>'}]
+    )
+
+    @model_validator(mode='after')
+    def validate_variables(self) -> 'TaskTemplateBaseSchema':
+        str_values_of_args_and_kwargs: list[str] = [
+            val for val in self.task_args + list(self.task_kwargs.values()) if isinstance(val, str)
+        ]
+        var_names: list[str] = [var.name for var in self.variables]
+
+        # Check for unused variables
+        for var_name in var_names:
+            var_str = f'<<task_var.{var_name}>>'
+            var_found: bool = False
+
+            for arg in str_values_of_args_and_kwargs:
+                if var_str in arg:
+                    var_found = True
+                    break
+
+            if var_found is False:
+                msg: str = f'The variable "{var_name}" is defined, but not used'
+                raise ValueError(msg)
+
+        # Check for unknown variables
+        var_pattern = r'<<task_var\.(.+)>>'
+        for var in str_values_of_args_and_kwargs:
+            for match in re.finditer(var_pattern, var):
+                if match.group(1) not in var_names:
+                    msg = f'The variable "{match.group(1)}" is not defined'
+                    raise ValueError(msg)
+
+        return self
 
 
 class TaskTemplateDBSchema(BaseDBSchema, TaskTemplateBaseSchema):
