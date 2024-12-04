@@ -21,7 +21,7 @@ class LogMsg:
         Adds data about the request sent to the server.
         """
         self._msg += (
-            f'Request content (url, query params, тело):\n' \
+            f'Request content (url, query params, тело):\n'
             f'\tURL: {self._response.request.url}\n'
         )
         self._msg += f'\tmethod: {self._response.request.method}\n'

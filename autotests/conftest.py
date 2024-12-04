@@ -4,7 +4,6 @@ import time
 from http import HTTPStatus
 
 import pytest
-import redis
 from dotenv import load_dotenv
 
 
@@ -75,5 +74,3 @@ def create_minions_data(api):
     delete_job_from_zset_on_redis(jid)
     for i in mid_list:
         redis_client.delete(f'minion:{i}:grains')
-
-

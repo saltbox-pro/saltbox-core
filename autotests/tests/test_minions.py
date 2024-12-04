@@ -4,7 +4,7 @@ import pytest
 
 from api.minions_api import get_minions_filter_schema, get_minions_mid, post_minions
 from assertions.assertion_base import assert_status_code, assert_schema
-from models.minions_models import ModelItem, MinionModel
+from models.minions_models import ModelItem
 from test_data.valid_no_valid_params import PARAMETERS_FOR_MINIONS_ENDPOINT, INVALID_MID_VALUES
 
 
