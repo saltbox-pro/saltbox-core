@@ -1,0 +1,16 @@
+{
+    "detail": [
+        {
+            "type": "greater_than",
+            "loc": [
+                "query",
+                "count"
+            ],
+            "msg": "Input should be greater than 0",
+            "input": "-1",
+            "ctx": {
+                "gt": 0
+            }
+        }
+    ]
+}

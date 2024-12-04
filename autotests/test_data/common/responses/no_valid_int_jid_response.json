@@ -1,0 +1,16 @@
+{
+    "detail": [
+        {
+            "type": "value_error",
+            "loc": [
+                "path",
+                "jid"
+            ],
+            "msg": "Value error, Jid \"123\" is not a 20-digits value",
+            "input": "123",
+            "ctx": {
+                "error": {}
+            }
+        }
+    ]
+}
