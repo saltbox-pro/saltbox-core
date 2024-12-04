@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 from api.api_client import ApiClient
 from api.jobs_api import post_jobs
-from api.minions_api import get_minions
+from api.minions_api import post_minions
 from assertions.assertion_base import assert_status_code, assert_schema
 from models.jobs_models import ModelJobResponse
 from utilities.files_utils import read_json_common_request_data
@@ -67,7 +67,7 @@ def create_minions_data(api):
     jid = response.json()['return'][0]['jid']
     assert_status_code(response, HTTPStatus.OK)
     assert_schema(response, ModelJobResponse)
-    response_minions_list = get_minions(api)
+    response_minions_list = post_minions(api, json={})
     id_list = [item["_id"] for item in response_minions_list.json()["data"]]
     mid_list = response.json()['return'][0]['minions']
     yield id_list
@@ -75,3 +75,5 @@ def create_minions_data(api):
     delete_job_from_zset_on_redis(jid)
     for i in mid_list:
         redis_client.delete(f'minion:{i}:grains')
+
+

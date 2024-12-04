@@ -31,14 +31,14 @@ INVALID_QUERY_PARAMS_FOR_JOB_RETURN = [
 
 
 PARAMETERS_FOR_MINIONS_ENDPOINT = [
-    (None, None, None, HTTPStatus.OK, MinionsListModel),
-    (None, 1, None, HTTPStatus.OK, MinionsListModel),
-    (2, None, None, HTTPStatus.OK, MinionsListModel),
-    (2, 1, None, HTTPStatus.OK, MinionsListModel),
-    (2, 1, '{ "master": "salt-master"}', HTTPStatus.OK, MinionsListModel),
-    ('qwe', None, None, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
-    (None, 'qwe', None, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
-    (None, None, 'qwe', HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+    ({}, HTTPStatus.OK, MinionsListModel),
+    ({'page': 1}, HTTPStatus.OK, MinionsListModel),
+    ({'per_page': 2}, HTTPStatus.OK, MinionsListModel),
+    ({'query': {'qwe': 123}}, HTTPStatus.OK, MinionsListModel),
+    ({'page': 2, 'per_page': 1}, HTTPStatus.OK, MinionsListModel),
+    ({'page': 1, 'per_page': 2, 'query': {'$and': [{'$expr': 'true'}]}}, HTTPStatus.OK, MinionsListModel),
+    ({'page': 'qwe'}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+    ({'per_page': 'qwe'}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
 ]
 
 
