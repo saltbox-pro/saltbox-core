@@ -44,6 +44,7 @@ class Job(BaseModel):
     arg: list | None = None
     kwarg: dict | None = None
     minions: list[str]
+    missing: list[str] = []
     stamp: str = Field(alias='_stamp')
 
     @computed_field(title='Timestamp decoded from JID')
