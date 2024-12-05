@@ -9,3 +9,4 @@ pydantic~=2.9.2
 python-multipart~=0.0.17
 redis~=5.2.0
 uvicorn[standard]~=0.32.0
+pyjwt[crypto]~=2.10.1
