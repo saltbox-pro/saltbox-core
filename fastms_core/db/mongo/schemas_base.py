@@ -55,3 +55,17 @@ class MongoQueryBaseSchema(BaseModel):
             ) from None
 
         return value
+
+
+class AccessModel(BaseModel):
+    roles: list[str]
+
+
+class User(BaseModel):
+    sub: str = Field(serialization_alias='id')
+    realm_access: AccessModel
+    email_verified: bool
+    name: str
+    preferred_username: str
+    family_name: str
+    email: str

@@ -25,8 +25,16 @@ class Settings(BaseSettings):
     salt_password: str
     salt_url: str
     salt_username: str
+    kc_server_url: str
+    kc_realm_name: str
+    kc_audience: str = 'account'
+    kc_algorithm: str = 'RS256'
 
     model_config = SettingsConfigDict(env_file='.env')
+
+    @property
+    def kc_jwks_uri(self) -> str:
+        return f'{self.kc_server_url}/realms/{self.kc_realm_name}/protocol/openid-connect/certs'
 
     @property
     def mongo_url(self) -> str:

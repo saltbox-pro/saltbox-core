@@ -30,6 +30,8 @@ router = APIRouter(
     responses={404: {'description': 'Not found'}},
 )
 
+ws_router = APIRouter(prefix='/jobs')
+
 
 @router.get('', operation_id='jobs_list')
 async def jobs_list(
@@ -128,7 +130,7 @@ async def job_returns_list(
 
 
 # TODO Use https://github.com/encode/broadcaster if need broadcasts
-@router.websocket('')
+@ws_router.websocket('')
 async def jobs_rets_websocket(websocket: WebSocket, rdb: RedisDependency) -> None:
     await websocket.accept()
 
@@ -150,7 +152,7 @@ async def jobs_rets_websocket(websocket: WebSocket, rdb: RedisDependency) -> Non
         await asyncio.create_task(reader(pubsub))
 
 
-@router.websocket('/{jid}/return')
+@ws_router.websocket('/{jid}/return')
 async def jobs_endpoint_websocket(
     jid: IntJid,
     websocket: WebSocket,
