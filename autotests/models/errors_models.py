@@ -1,12 +1,13 @@
+from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
-from typing import List
 
 
 class DetailItem(BaseModel):
     type: str
     loc: List[str]
     msg: str
-    input: str
+    input: Any
+    ctx: Optional[Dict[str, Any]] = None  # The 'ctx` field may not be required
 
 
 class ErrorResponse(BaseModel):

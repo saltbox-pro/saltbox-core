@@ -8,7 +8,7 @@ from assertions.assertion_base import assert_status_code, assert_schema, \
 from assertions.jobs_assertion import assert_jid_in_response, assert_count
 from assertions.ws_assertion import wait_for_job_message
 from models.jobs_models import Jobs, ModelJobResponse, ModelJobReturn
-from test_data.valid_no_valid_params import VALID_AND_INVALID_PARAMS, INVALID_JID, INVALID_QUERY_PARAMS_FOR_JOB_RETURN
+from test_data.valid_no_valid_params import VALID_AND_INVALID_PARAMS_FOR_JOBS, INVALID_JID, INVALID_QUERY_PARAMS_FOR_JOB_RETURN
 from utilities.test_data_utils import create_new_job, delete_created_data, create_sleep_job
 
 
@@ -16,8 +16,8 @@ class TestJobs:
     """
     Tests /jobs
     """
-    # GET /jobs endpoint with params
-    @pytest.mark.parametrize('start_datetime, end_datetime, expected_status, schema', VALID_AND_INVALID_PARAMS)
+    # GET /jobs endpoint
+    @pytest.mark.parametrize('start_datetime, end_datetime, expected_status, schema', VALID_AND_INVALID_PARAMS_FOR_JOBS)
     def test_get_jobs(self, api, start_datetime, end_datetime, expected_status, schema):
         response = get_jobs(api, start_datetime, end_datetime)
         assert_status_code(response, expected_status)

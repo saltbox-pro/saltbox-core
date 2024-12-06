@@ -14,14 +14,18 @@ class ApiClient(Client):
         self.ws = WsClient(base_url=f'{os.getenv("RESOURCE_URL").replace("http" or "https", "ws")}')
 
     def request(self, method, url, **kwargs) -> Response:
-        username = os.getenv("BASIC_AUTH_LOGIN")
-        password = os.getenv("BASIC_AUTH_PASSWORD")
+        username = os.getenv('BASIC_AUTH_LOGIN')
+        password = os.getenv('BASIC_AUTH_PASSWORD')
         if eval(os.getenv('USE_BASIC_AUTH')):
             auth_header = f"Basic {b64encode(f'{username}:{password}'.encode()).decode()}"
             self.headers.update({"Authorization": auth_header})
         if eval(os.getenv('USE_LOGS')):
-            logger.info(f'{method} {url}')
-
+            log_message = f"{method} {url}"
+            if kwargs.get('params'):
+                log_message += f" | Params: {json.dumps(kwargs['params'])}"
+            if kwargs.get('json'):
+                log_message += f" | Body: {kwargs['json']}"
+            logger.info(log_message)
         return super().request(method, url, **kwargs)
 
 

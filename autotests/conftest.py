@@ -1,12 +1,10 @@
 import logging
 import os
 import time
-from http import HTTPStatus
-
 import pytest
+
+from http import HTTPStatus
 from dotenv import load_dotenv
-
-
 from api.api_client import ApiClient
 from api.jobs_api import post_jobs
 from api.minions_api import post_minions
@@ -17,28 +15,28 @@ from utilities.logger_utils import logger
 from utilities.redis_utils import redis_client, delete_job_from_zset_on_redis
 
 
-def pytest_configure():
+def pytest_configure(config):
     # Set the current directory to the project root (this allows for relative file paths)
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
     # Load environment variables from the /.env file
-    load_dotenv(dotenv_path=".env")
+    load_dotenv(dotenv_path='.env')
 
     # Set up logger parameters
-    path = "logs/"
+    path = 'logs/'
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    file_handler = logging.FileHandler(path + "/info.log", "w")
+    file_handler = logging.FileHandler(path + 'info.log', 'w')
     file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(logging.Formatter("%(lineno)d: %(asctime)s %(message)s"))
+    file_handler.setFormatter(logging.Formatter('%(lineno)d: %(asctime)s %(message)s'))
 
     # Create custom logger
-    custom_logger = logging.getLogger("custom_logger")
+    custom_logger = logging.getLogger('custom_logger')
     custom_logger.setLevel(logging.INFO)
     custom_logger.addHandler(file_handler)
 
 
 def pytest_runtest_setup(item):
-    logger.info(f"{item.name}:")
+    logger.info(f'{item.name}:')
 
 
 @pytest.fixture(scope='class')

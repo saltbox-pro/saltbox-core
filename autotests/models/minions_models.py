@@ -182,3 +182,8 @@ class MinionsListModel(BaseModel):
 class ModelItem(BaseModel):
     name: str
     label: str
+
+
+class CollectionsListModel(BaseModel):
+    total: int
+    data: List
