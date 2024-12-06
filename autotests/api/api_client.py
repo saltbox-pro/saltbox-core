@@ -11,7 +11,7 @@ class ApiClient(Client):
 
     def __init__(self):
         super().__init__(base_url=f'{os.getenv("RESOURCE_URL")}')
-        self.ws = WsClient(base_url=f'{os.getenv("RESOURCE_URL").replace("http" or "https", "ws")}')
+        self.ws = WsClient(base_url=f'{os.getenv("RESOURCE_WS_URL")}')
 
     def request(self, method, url, **kwargs) -> Response:
         username = os.getenv('BASIC_AUTH_LOGIN')
@@ -35,8 +35,13 @@ class WsClient:
         self.websocket = None
 
     async def connect(self, endpoint):
-        url = f'{self.base_url.replace("http" or "https", "ws")}{endpoint}'
-        self.websocket = await websockets.connect(url)
+        headers = {}
+        if eval(os.getenv('USE_BASIC_AUTH')):
+            username = os.getenv('BASIC_AUTH_LOGIN')
+            password = os.getenv('BASIC_AUTH_PASSWORD')
+            auth_header = f"Basic {b64encode(f'{username}:{password}'.encode()).decode()}"
+            headers["Authorization"] = auth_header
+        self.websocket = await websockets.connect(f'{self.base_url}{endpoint}', extra_headers=headers)
 
     async def send(self, message):
         await self.websocket.send(json.dumps(message))
