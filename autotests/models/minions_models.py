@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Dict
 
 from pydantic import BaseModel, Field
 
@@ -187,3 +187,9 @@ class ModelItem(BaseModel):
 class CollectionsListModel(BaseModel):
     total: int
     data: List
+
+
+class CreateCollectionModel(BaseModel):
+    query: Dict
+    title: str
+    id: str

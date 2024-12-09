@@ -1,140 +1,130 @@
-39: 2024-12-06 15:43:03,582 test_get_jobs[2024-12-06T11:43:03.575306-None-200-Jobs]:
-28: 2024-12-06 15:43:03,587 GET /jobs | Params: {"start_datetime": "2024-12-06T11:43:03.575306"}
-39: 2024-12-06 15:43:03,681 test_get_jobs[2024-12-06T11:43:03.575324-2024-12-06T15:43:03.575326-200-Jobs]:
-28: 2024-12-06 15:43:03,682 GET /jobs | Params: {"start_datetime": "2024-12-06T11:43:03.575324", "end_datetime": "2024-12-06T15:43:03.575326"}
-39: 2024-12-06 15:43:03,711 test_get_jobs[2024-12-06T15:43:03.575327-2024-12-06T15:43:03.575328-200-Jobs]:
-28: 2024-12-06 15:43:03,712 GET /jobs | Params: {"start_datetime": "2024-12-06T15:43:03.575327", "end_datetime": "2024-12-06T15:43:03.575328"}
-39: 2024-12-06 15:43:03,749 test_get_jobs[2024-12-06T15:42:03.575329-2024-12-06T15:41:03.575331-422-ErrorResponse]:
-28: 2024-12-06 15:43:03,750 GET /jobs | Params: {"start_datetime": "2024-12-06T15:42:03.575329", "end_datetime": "2024-12-06T15:41:03.575331"}
-39: 2024-12-06 15:43:03,777 test_get_jobs[invalid_date-None-422-ErrorResponse]:
-28: 2024-12-06 15:43:03,778 GET /jobs | Params: {"start_datetime": "invalid_date"}
-39: 2024-12-06 15:43:03,805 test_get_jobs[None-invalid_date-422-ErrorResponse]:
-28: 2024-12-06 15:43:03,806 GET /jobs | Params: {"start_datetime": null, "end_datetime": "invalid_date"}
-39: 2024-12-06 15:43:03,833 test_get_jobs[ -None-422-ErrorResponse]:
-28: 2024-12-06 15:43:03,833 GET /jobs | Params: {"start_datetime": " "}
-39: 2024-12-06 15:43:03,863 test_get_jobs[None- -422-ErrorResponse]:
-28: 2024-12-06 15:43:03,863 GET /jobs | Params: {"start_datetime": null, "end_datetime": " "}
-39: 2024-12-06 15:43:03,889 test_get_jobs[None-None-422-ErrorResponse]:
-28: 2024-12-06 15:43:03,890 GET /jobs | Params: {"start_datetime": null}
-39: 2024-12-06 15:43:03,917 test_get_jobs[None-2024-12-06T15:43:03.575334-422-ErrorResponse]:
-28: 2024-12-06 15:43:03,918 GET /jobs | Params: {"start_datetime": null, "end_datetime": "2024-12-06T15:43:03.575334"}
-39: 2024-12-06 15:43:03,945 test_get_jobs[2100-10-28T16:53:20.841870-None-422-ErrorResponse]:
-28: 2024-12-06 15:43:03,946 GET /jobs | Params: {"start_datetime": "2100-10-28T16:53:20.841870"}
-39: 2024-12-06 15:43:03,972 test_get_jobs[1970-01-01T00:00:00Z-None-200-Jobs]:
-28: 2024-12-06 15:43:03,972 GET /jobs | Params: {"start_datetime": "1970-01-01T00:00:00Z"}
-39: 2024-12-06 15:43:04,009 test_get_jobs[1970-01-01T00:00:00Z-1970-01-01T00:01:00Z-200-Jobs]:
-28: 2024-12-06 15:43:04,011 GET /jobs | Params: {"start_datetime": "1970-01-01T00:00:00Z", "end_datetime": "1970-01-01T00:01:00Z"}
-39: 2024-12-06 15:43:04,038 test_get_jobs_jid:
-28: 2024-12-06 15:43:04,039 POST /jobs | Body: {'tgt': '*', 'tgt_type': 'glob', 'fun': 'test.ping'}
-28: 2024-12-06 15:43:04,115 GET /jobs/20241206123723555383
-39: 2024-12-06 15:43:04,145 test_get_jobs_no_exist_jid:
-28: 2024-12-06 15:43:04,145 GET /jobs/19800803190000000000
-39: 2024-12-06 15:43:04,174 test_get_jobs_no_valid_jid[20240999999999999999-422-invalid_day_value]:
-28: 2024-12-06 15:43:04,175 GET /jobs/20240999999999999999
-39: 2024-12-06 15:43:04,204 test_get_jobs_no_valid_jid[123-422-invalid_int_value]:
-28: 2024-12-06 15:43:04,205 GET /jobs/123
-39: 2024-12-06 15:43:04,233 test_get_jobs_no_valid_jid[hello world-422-invalid_str_value]:
-28: 2024-12-06 15:43:04,234 GET /jobs/hello world
-39: 2024-12-06 15:43:04,261 test_ws_jobs:
-28: 2024-12-06 15:43:04,369 POST /jobs | Body: {'tgt': '*', 'tgt_type': 'glob', 'fun': 'test.ping'}
-39: 2024-12-06 15:43:04,768 test_ws_jobs_return:
-28: 2024-12-06 15:43:04,771 POST /jobs | Body: {'tgt': '*', 'tgt_type': 'glob', 'fun': 'test.sleep', 'arg': ['0.5']}
-39: 2024-12-06 15:43:05,252 test_get_jobs_return:
-28: 2024-12-06 15:43:05,253 GET /jobs/20241206123723555383/return
-39: 2024-12-06 15:43:05,285 test_get_jobs_return_no_valid_jid[20240999999999999999-422-invalid_day_value]:
-28: 2024-12-06 15:43:05,287 GET /jobs/20240999999999999999/return
-39: 2024-12-06 15:43:05,316 test_get_jobs_return_no_valid_jid[123-422-invalid_int_value]:
-28: 2024-12-06 15:43:05,316 GET /jobs/123/return
-39: 2024-12-06 15:43:05,343 test_get_jobs_return_no_valid_jid[hello world-422-invalid_str_value]:
-28: 2024-12-06 15:43:05,343 GET /jobs/hello world/return
-39: 2024-12-06 15:43:05,370 test_get_jobs_return_query_count:
-28: 2024-12-06 15:43:05,371 GET /jobs/20241206123723555383/return | Params: {"count": 2}
-39: 2024-12-06 15:43:05,461 test_get_jobs_rtn_query_params[-1-0-422-negative_num_value]:
-28: 2024-12-06 15:43:05,461 GET /jobs/20241206123723555383/return | Params: {"count": -1, "cursor": 0}
-39: 2024-12-06 15:43:05,488 test_get_jobs_rtn_query_params[hello world-0-422-invalid_str_count]:
-28: 2024-12-06 15:43:05,489 GET /jobs/20241206123723555383/return | Params: {"count": "hello world", "cursor": 0}
-39: 2024-12-06 15:43:05,546 test_get_jobs_rtn_query_params[None-None-200-None]:
-28: 2024-12-06 15:43:05,546 GET /jobs/20241206123723555383/return
-39: 2024-12-06 15:43:05,573 test_get_jobs_return_count:
-28: 2024-12-06 15:43:05,574 GET /jobs/20241206123723555383/returns-count
-28: 2024-12-06 15:43:05,599 GET /jobs/20241206123723555383/return
-39: 2024-12-06 15:43:05,630 test_post_jobs_empty_body:
-28: 2024-12-06 15:43:05,630 POST /jobs
-39: 2024-12-06 15:43:05,657 test_post_jobs_empty_json:
-28: 2024-12-06 15:43:05,657 POST /jobs
-39: 2024-12-06 15:43:06,221 test_get_minions_filter_schema:
-28: 2024-12-06 15:43:06,230 GET /minions/filter-schema
-39: 2024-12-06 15:43:06,318 test_get_minions_collections_list[None-None-200-CollectionsListModel0]:
-28: 2024-12-06 15:43:06,320 GET /minions/collection
-39: 2024-12-06 15:43:06,351 test_get_minions_collections_list[0-20-200-CollectionsListModel]:
-28: 2024-12-06 15:43:06,352 GET /minions/collection | Params: {"page": 0, "per_page": 20}
-39: 2024-12-06 15:43:06,383 test_get_minions_collections_list[1-50-200-CollectionsListModel]:
-28: 2024-12-06 15:43:06,384 GET /minions/collection | Params: {"page": 1, "per_page": 50}
-39: 2024-12-06 15:43:06,413 test_get_minions_collections_list[2-100-200-CollectionsListModel]:
-28: 2024-12-06 15:43:06,414 GET /minions/collection | Params: {"page": 2, "per_page": 100}
-39: 2024-12-06 15:43:06,447 test_get_minions_collections_list[0-1-200-CollectionsListModel]:
-28: 2024-12-06 15:43:06,448 GET /minions/collection | Params: {"page": 0, "per_page": 1}
-39: 2024-12-06 15:43:06,479 test_get_minions_collections_list[0-100-200-CollectionsListModel]:
-28: 2024-12-06 15:43:06,481 GET /minions/collection | Params: {"page": 0, "per_page": 100}
-39: 2024-12-06 15:43:06,511 test_get_minions_collections_list[-1-20-422-ErrorResponse]:
-28: 2024-12-06 15:43:06,513 GET /minions/collection | Params: {"page": -1, "per_page": 20}
-39: 2024-12-06 15:43:06,542 test_get_minions_collections_list[0-0-422-ErrorResponse]:
-28: 2024-12-06 15:43:06,544 GET /minions/collection | Params: {"page": 0, "per_page": 0}
-39: 2024-12-06 15:43:06,571 test_get_minions_collections_list[None--10-422-ErrorResponse]:
-28: 2024-12-06 15:43:06,573 GET /minions/collection | Params: {"per_page": -10}
-39: 2024-12-06 15:43:06,602 test_get_minions_collections_list[None-None-200-CollectionsListModel1]:
-28: 2024-12-06 15:43:06,604 GET /minions/collection
-39: 2024-12-06 15:43:06,639 test_get_minions_collections_list[-1-50-422-ErrorResponse]:
-28: 2024-12-06 15:43:06,640 GET /minions/collection | Params: {"page": -1, "per_page": 50}
-39: 2024-12-06 15:43:06,718 test_get_minions_collections_list[0-abc-422-ErrorResponse]:
-28: 2024-12-06 15:43:06,719 GET /minions/collection | Params: {"page": 0, "per_page": "abc"}
-39: 2024-12-06 15:43:06,749 test_get_minions_collections_list[abc-20-422-ErrorResponse]:
-28: 2024-12-06 15:43:06,751 GET /minions/collection | Params: {"page": "abc", "per_page": 20}
-39: 2024-12-06 15:43:06,778 test_get_minion_invalid_mid[123-422-ErrorResponse]:
-28: 2024-12-06 15:43:06,780 GET /minions/123
-39: 2024-12-06 15:43:06,808 test_get_minion_invalid_mid[qwe-422-ErrorResponse]:
-28: 2024-12-06 15:43:06,809 GET /minions/qwe
-39: 2024-12-06 15:43:06,836 test_get_minion_invalid_mid[63111a3f02fa4363a76d58a4-404-NotFoundModel]:
-28: 2024-12-06 15:43:06,837 GET /minions/63111a3f02fa4363a76d58a4
-39: 2024-12-06 15:43:06,866 test_get_minion_invalid_mid[None-422-ErrorResponse]:
-28: 2024-12-06 15:43:06,868 GET /minions/None
-39: 2024-12-06 15:43:06,896 test_get_minion_invalid_mid[   -422-ErrorResponse]:
-28: 2024-12-06 15:43:06,897 GET /minions/   
-39: 2024-12-06 15:43:06,925 test_get_minion_invalid_mid[@#$-422-ErrorResponse]:
-28: 2024-12-06 15:43:06,926 GET /minions/@#$
-39: 2024-12-06 15:43:06,953 test_get_minion_invalid_mid[1-422-ErrorResponse]:
-28: 2024-12-06 15:43:06,954 GET /minions/1
-39: 2024-12-06 15:43:06,979 test_get_minion_invalid_mid[True-422-ErrorResponse]:
-28: 2024-12-06 15:43:06,979 GET /minions/True
-39: 2024-12-06 15:43:07,007 test_get_minion_invalid_mid[False-422-ErrorResponse]:
-28: 2024-12-06 15:43:07,008 GET /minions/False
-39: 2024-12-06 15:43:07,037 test_post_minions[body0-200-MinionsListModel]:
-28: 2024-12-06 15:43:07,037 POST /jobs | Body: {'tgt': '*', 'tgt_type': 'glob', 'fun': 'grains.items'}
-28: 2024-12-06 15:43:07,111 POST /minions
-28: 2024-12-06 15:43:07,146 POST /minions
-39: 2024-12-06 15:43:07,181 test_post_minions[body1-200-MinionsListModel]:
-28: 2024-12-06 15:43:07,182 POST /minions | Body: {'page': 1}
-39: 2024-12-06 15:43:07,212 test_post_minions[body2-200-MinionsListModel]:
-28: 2024-12-06 15:43:07,212 POST /minions | Body: {'per_page': 2}
-39: 2024-12-06 15:43:07,245 test_post_minions[body3-200-MinionsListModel]:
-28: 2024-12-06 15:43:07,246 POST /minions | Body: {'query': {'grains.os': 'Ubuntu'}}
-39: 2024-12-06 15:43:07,276 test_post_minions[body4-200-MinionsListModel]:
-28: 2024-12-06 15:43:07,278 POST /minions | Body: {'collection_id': '5eb7cf5a86d9755df3a6c593'}
-39: 2024-12-06 15:43:07,312 test_post_minions[body5-200-MinionsListModel]:
-28: 2024-12-06 15:43:07,314 POST /minions | Body: {'page': 1, 'per_page': 2, 'collection_id': '5eb7cf5a86d9755df3a6c593'}
-39: 2024-12-06 15:43:07,352 test_post_minions[body6-200-MinionsListModel]:
-28: 2024-12-06 15:43:07,353 POST /minions | Body: {'query': {'$and': [{'grains.os': 'Ubuntu'}, {'grains.mem_total': {'$gte': 8192}}]}}
-39: 2024-12-06 15:43:07,385 test_post_minions[body7-422-ErrorResponse]:
-28: 2024-12-06 15:43:07,386 POST /minions | Body: {'page': 'qwe'}
-39: 2024-12-06 15:43:07,413 test_post_minions[body8-422-ErrorResponse]:
-28: 2024-12-06 15:43:07,415 POST /minions | Body: {'per_page': 'qwe'}
-39: 2024-12-06 15:43:07,442 test_post_minions[body9-422-ErrorResponse]:
-28: 2024-12-06 15:43:07,444 POST /minions | Body: {'collection_id': 'invalid_collection_id'}
-39: 2024-12-06 15:43:07,508 test_post_minions[body10-422-ErrorResponse]:
-28: 2024-12-06 15:43:07,510 POST /minions | Body: {'page': -1}
-39: 2024-12-06 15:43:07,536 test_post_minions[body11-422-ErrorResponse]:
-28: 2024-12-06 15:43:07,537 POST /minions | Body: {'per_page': 0}
-39: 2024-12-06 15:43:07,562 test_post_minions[body12-422-ErrorResponse]:
-28: 2024-12-06 15:43:07,563 POST /minions | Body: {'page': 1, 'per_page': 2, 'collection_id': ''}
-39: 2024-12-06 15:43:07,590 test_post_minions[body13-422-ErrorResponse]:
-28: 2024-12-06 15:43:07,591 POST /minions | Body: {'query': {'$invalid': 'value'}}
+39: 2024-12-09 16:30:42,008 test_get_jobs[2024-12-09T12:30:41.995461-None-200-Jobs]:
+28: 2024-12-09 16:30:42,017 GET /jobs | Params: {"start_datetime": "2024-12-09T12:30:41.995461"}
+39: 2024-12-09 16:30:44,511 test_get_jobs[2024-12-09T12:30:41.995484-2024-12-09T16:30:41.995488-200-Jobs]:
+28: 2024-12-09 16:30:44,512 GET /jobs | Params: {"start_datetime": "2024-12-09T12:30:41.995484", "end_datetime": "2024-12-09T16:30:41.995488"}
+39: 2024-12-09 16:30:44,554 test_get_jobs[2024-12-09T12:30:41.995490-2024-12-09T12:30:41.995493-200-Jobs]:
+28: 2024-12-09 16:30:44,555 GET /jobs | Params: {"start_datetime": "2024-12-09T12:30:41.995490", "end_datetime": "2024-12-09T12:30:41.995493"}
+39: 2024-12-09 16:30:44,612 test_get_jobs[2024-12-09T16:29:41.995496-2024-12-09T16:28:41.995499-422-ErrorResponse]:
+28: 2024-12-09 16:30:44,613 GET /jobs | Params: {"start_datetime": "2024-12-09T16:29:41.995496", "end_datetime": "2024-12-09T16:28:41.995499"}
+39: 2024-12-09 16:30:44,678 test_get_jobs[invalid_date-None-422-ErrorResponse]:
+28: 2024-12-09 16:30:44,679 GET /jobs | Params: {"start_datetime": "invalid_date"}
+39: 2024-12-09 16:30:44,721 test_get_jobs[None-invalid_date-422-ErrorResponse]:
+28: 2024-12-09 16:30:44,722 GET /jobs | Params: {"start_datetime": null, "end_datetime": "invalid_date"}
+39: 2024-12-09 16:30:44,771 test_get_jobs[ -None-422-ErrorResponse]:
+28: 2024-12-09 16:30:44,771 GET /jobs | Params: {"start_datetime": " "}
+39: 2024-12-09 16:30:44,819 test_get_jobs[None- -422-ErrorResponse]:
+28: 2024-12-09 16:30:44,820 GET /jobs | Params: {"start_datetime": null, "end_datetime": " "}
+39: 2024-12-09 16:30:44,863 test_get_jobs[None-None-422-ErrorResponse]:
+28: 2024-12-09 16:30:44,864 GET /jobs | Params: {"start_datetime": null}
+39: 2024-12-09 16:30:44,909 test_get_jobs[None-2024-12-09T16:30:41.995504-422-ErrorResponse]:
+28: 2024-12-09 16:30:44,910 GET /jobs | Params: {"start_datetime": null, "end_datetime": "2024-12-09T16:30:41.995504"}
+39: 2024-12-09 16:30:44,951 test_get_jobs[2100-10-28T16:53:20.841870-None-422-ErrorResponse]:
+28: 2024-12-09 16:30:44,951 GET /jobs | Params: {"start_datetime": "2100-10-28T16:53:20.841870"}
+39: 2024-12-09 16:30:45,022 test_get_jobs[1970-01-01T00:00:00Z-None-200-Jobs]:
+28: 2024-12-09 16:30:45,022 GET /jobs | Params: {"start_datetime": "1970-01-01T00:00:00Z"}
+39: 2024-12-09 16:30:45,069 test_get_jobs[1970-01-01T00:00:00Z-1970-01-01T00:01:00Z-200-Jobs]:
+28: 2024-12-09 16:30:45,070 GET /jobs | Params: {"start_datetime": "1970-01-01T00:00:00Z", "end_datetime": "1970-01-01T00:01:00Z"}
+39: 2024-12-09 16:30:45,114 test_get_jobs_jid:
+28: 2024-12-09 16:30:45,115 POST /jobs | Body: {'tgt': '*', 'tgt_type': 'glob', 'fun': 'test.ping'}
+39: 2024-12-09 16:30:45,201 test_get_jobs_no_exist_jid:
+28: 2024-12-09 16:30:45,201 GET /jobs/19800803190000000000
+39: 2024-12-09 16:30:45,268 test_get_jobs_no_valid_jid[20240999999999999999-422-invalid_day_value]:
+28: 2024-12-09 16:30:45,268 GET /jobs/20240999999999999999
+39: 2024-12-09 16:30:45,317 test_get_jobs_no_valid_jid[123-422-invalid_int_value]:
+28: 2024-12-09 16:30:45,318 GET /jobs/123
+39: 2024-12-09 16:30:45,364 test_get_jobs_no_valid_jid[hello world-422-invalid_str_value]:
+28: 2024-12-09 16:30:45,365 GET /jobs/hello world
+39: 2024-12-09 16:30:45,414 test_ws_jobs:
+39: 2024-12-09 16:30:45,666 test_ws_jobs_return:
+28: 2024-12-09 16:30:45,667 POST /jobs | Body: {'tgt': '*', 'tgt_type': 'glob', 'fun': 'test.sleep', 'arg': ['0.5']}
+39: 2024-12-09 16:30:46,859 test_get_jobs_return:
+39: 2024-12-09 16:30:46,868 test_get_jobs_return_no_valid_jid[20240999999999999999-422-invalid_day_value]:
+28: 2024-12-09 16:30:46,869 GET /jobs/20240999999999999999/return
+39: 2024-12-09 16:30:46,920 test_get_jobs_return_no_valid_jid[123-422-invalid_int_value]:
+28: 2024-12-09 16:30:46,921 GET /jobs/123/return
+39: 2024-12-09 16:30:46,967 test_get_jobs_return_no_valid_jid[hello world-422-invalid_str_value]:
+28: 2024-12-09 16:30:46,968 GET /jobs/hello world/return
+39: 2024-12-09 16:30:47,011 test_get_jobs_return_query_count:
+39: 2024-12-09 16:30:47,020 test_get_jobs_rtn_query_params[-1-0-422-negative_num_value]:
+39: 2024-12-09 16:30:47,028 test_get_jobs_rtn_query_params[hello world-0-422-invalid_str_count]:
+39: 2024-12-09 16:30:47,037 test_get_jobs_rtn_query_params[None-None-200-None]:
+39: 2024-12-09 16:30:47,045 test_get_jobs_return_count:
+39: 2024-12-09 16:30:47,053 test_post_jobs_empty_body:
+28: 2024-12-09 16:30:47,053 POST /jobs
+39: 2024-12-09 16:30:47,117 test_post_jobs_empty_json:
+28: 2024-12-09 16:30:47,117 POST /jobs
+39: 2024-12-09 16:30:47,248 test_get_minions_filter_schema:
+28: 2024-12-09 16:30:47,257 GET /minions/filter-schema
+39: 2024-12-09 16:30:47,358 test_get_minions_collections_list[None-None-200-CollectionsListModel0]:
+28: 2024-12-09 16:30:47,359 GET /minions/collection
+39: 2024-12-09 16:30:47,400 test_get_minions_collections_list[0-20-200-CollectionsListModel]:
+28: 2024-12-09 16:30:47,401 GET /minions/collection | Params: {"page": 0, "per_page": 20}
+39: 2024-12-09 16:30:47,441 test_get_minions_collections_list[1-50-200-CollectionsListModel]:
+28: 2024-12-09 16:30:47,442 GET /minions/collection | Params: {"page": 1, "per_page": 50}
+39: 2024-12-09 16:30:47,481 test_get_minions_collections_list[2-100-200-CollectionsListModel]:
+28: 2024-12-09 16:30:47,481 GET /minions/collection | Params: {"page": 2, "per_page": 100}
+39: 2024-12-09 16:30:47,517 test_get_minions_collections_list[0-1-200-CollectionsListModel]:
+28: 2024-12-09 16:30:47,518 GET /minions/collection | Params: {"page": 0, "per_page": 1}
+39: 2024-12-09 16:30:47,560 test_get_minions_collections_list[0-100-200-CollectionsListModel]:
+28: 2024-12-09 16:30:47,561 GET /minions/collection | Params: {"page": 0, "per_page": 100}
+39: 2024-12-09 16:30:52,862 test_get_minions_collections_list[-1-20-422-ErrorResponse]:
+28: 2024-12-09 16:30:52,863 GET /minions/collection | Params: {"page": -1, "per_page": 20}
+39: 2024-12-09 16:30:54,098 test_get_minions_collections_list[0-0-422-ErrorResponse]:
+28: 2024-12-09 16:30:54,100 GET /minions/collection | Params: {"page": 0, "per_page": 0}
+39: 2024-12-09 16:30:54,141 test_get_minions_collections_list[None--10-422-ErrorResponse]:
+28: 2024-12-09 16:30:54,142 GET /minions/collection | Params: {"per_page": -10}
+39: 2024-12-09 16:30:54,177 test_get_minions_collections_list[None-None-200-CollectionsListModel1]:
+28: 2024-12-09 16:30:54,177 GET /minions/collection
+39: 2024-12-09 16:30:54,217 test_get_minions_collections_list[-1-50-422-ErrorResponse]:
+28: 2024-12-09 16:30:54,218 GET /minions/collection | Params: {"page": -1, "per_page": 50}
+39: 2024-12-09 16:30:54,267 test_get_minions_collections_list[0-abc-422-ErrorResponse]:
+28: 2024-12-09 16:30:54,268 GET /minions/collection | Params: {"page": 0, "per_page": "abc"}
+39: 2024-12-09 16:30:54,331 test_get_minions_collections_list[abc-20-422-ErrorResponse]:
+28: 2024-12-09 16:30:54,332 GET /minions/collection | Params: {"page": "abc", "per_page": 20}
+39: 2024-12-09 16:30:54,444 test_post_minions_create_collection[body0-200-CreateCollectionModel]:
+28: 2024-12-09 16:30:54,445 POST /minions/collection | Body: {'query': {'grains.os': 'Ubuntu'}, 'title': 'Ubuntu Minions'}
+39: 2024-12-09 16:30:54,502 test_post_minions_create_collection[body1-200-CreateCollectionModel]:
+28: 2024-12-09 16:30:54,503 POST /minions/collection | Body: {'query': {}, 'title': 'All Minions'}
+39: 2024-12-09 16:30:54,586 test_post_minions_create_collection[body2-200-CreateCollectionModel]:
+28: 2024-12-09 16:30:54,587 POST /minions/collection | Body: {'title': 'Missing Query'}
+39: 2024-12-09 16:30:54,624 test_post_minions_create_collection[body3-422-ErrorResponse]:
+28: 2024-12-09 16:30:54,625 POST /minions/collection | Body: {'query': {'grains.os': 'Ubuntu'}}
+39: 2024-12-09 16:30:54,688 test_post_minions_create_collection[body4-422-ErrorResponse]:
+28: 2024-12-09 16:30:54,689 POST /minions/collection
+39: 2024-12-09 16:30:54,726 test_post_minions_create_collection[body5-422-ErrorResponse]:
+28: 2024-12-09 16:30:54,727 POST /minions/collection | Body: {'query': 'grains.os=Ubuntu', 'title': 'Invalid Query Type'}
+39: 2024-12-09 16:30:54,771 test_post_minions_create_collection[body6-422-ErrorResponse]:
+28: 2024-12-09 16:30:54,772 POST /minions/collection | Body: {'query': {'grains.os': 'Ubuntu'}, 'title': 123}
+39: 2024-12-09 16:30:54,810 test_get_minion_invalid_mid[123-422-ErrorResponse]:
+28: 2024-12-09 16:30:54,811 GET /minions/123
+39: 2024-12-09 16:30:54,850 test_get_minion_invalid_mid[qwe-422-ErrorResponse]:
+28: 2024-12-09 16:30:54,851 GET /minions/qwe
+39: 2024-12-09 16:30:54,887 test_get_minion_invalid_mid[63111a3f02fa4363a76d58a4-404-NotFoundModel]:
+28: 2024-12-09 16:30:54,888 GET /minions/63111a3f02fa4363a76d58a4
+39: 2024-12-09 16:30:54,936 test_get_minion_invalid_mid[None-422-ErrorResponse]:
+28: 2024-12-09 16:30:54,937 GET /minions/None
+39: 2024-12-09 16:31:00,080 test_get_minion_invalid_mid[   -422-ErrorResponse]:
+28: 2024-12-09 16:31:00,080 GET /minions/   
+39: 2024-12-09 16:31:00,170 test_get_minion_invalid_mid[@#$-422-ErrorResponse]:
+28: 2024-12-09 16:31:00,170 GET /minions/@#$
+39: 2024-12-09 16:31:00,204 test_get_minion_invalid_mid[1-422-ErrorResponse]:
+28: 2024-12-09 16:31:00,205 GET /minions/1
+39: 2024-12-09 16:31:00,240 test_get_minion_invalid_mid[True-422-ErrorResponse]:
+28: 2024-12-09 16:31:00,240 GET /minions/True
+39: 2024-12-09 16:31:00,276 test_get_minion_invalid_mid[False-422-ErrorResponse]:
+28: 2024-12-09 16:31:00,276 GET /minions/False
+39: 2024-12-09 16:31:00,313 test_post_minions[body0-200-MinionsListModel]:
+28: 2024-12-09 16:31:00,313 POST /jobs | Body: {'tgt': '*', 'tgt_type': 'glob', 'fun': 'grains.items'}
+39: 2024-12-09 16:31:00,380 test_post_minions[body1-200-MinionsListModel]:
+39: 2024-12-09 16:31:00,409 test_post_minions[body2-200-MinionsListModel]:
+39: 2024-12-09 16:31:00,460 test_post_minions[body3-200-MinionsListModel]:
+39: 2024-12-09 16:31:00,487 test_post_minions[body4-200-MinionsListModel]:
+39: 2024-12-09 16:31:00,513 test_post_minions[body5-200-MinionsListModel]:
+39: 2024-12-09 16:31:00,540 test_post_minions[body6-200-MinionsListModel]:
+39: 2024-12-09 16:31:00,566 test_post_minions[body7-422-ErrorResponse]:
+39: 2024-12-09 16:31:00,592 test_post_minions[body8-422-ErrorResponse]:
+39: 2024-12-09 16:31:00,619 test_post_minions[body9-422-ErrorResponse]:
+39: 2024-12-09 16:31:00,645 test_post_minions[body10-422-ErrorResponse]:
+39: 2024-12-09 16:31:00,671 test_post_minions[body11-422-ErrorResponse]:
+39: 2024-12-09 16:31:00,698 test_post_minions[body12-422-ErrorResponse]:
+39: 2024-12-09 16:31:00,724 test_post_minions[body13-422-ErrorResponse]:

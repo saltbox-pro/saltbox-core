@@ -2,7 +2,8 @@ from http import HTTPStatus
 
 import pytest
 
-from api.minions_api import get_minions_filter_schema, get_minions_mid, post_minions, get_minions_collection
+from api.minions_api import get_minions_filter_schema, get_minions_mid, post_minions, get_minions_collection, \
+    post_minions_collection
 from assertions.assertion_base import assert_status_code, assert_schema
 from models.minions_models import ModelItem
 from test_data.valid_no_valid_params import BODY_FOR_POST_MINIONS_ENDPOINT, INVALID_MID_VALUES, \
@@ -27,9 +28,11 @@ class TestMinions:
         assert_status_code(response, expected_status)
         assert_schema(response, schema)
 
-    # @pytest.mark.parametrize('body, expected_status, schema', BODY_FOR_POST_MINIONS_COLLECTION_ENDPOINT)
-    # def test_post_minions_create_collection(self, api, body, expected_status, schema):
-
+    @pytest.mark.parametrize('body, expected_status, schema', BODY_FOR_POST_MINIONS_COLLECTION_ENDPOINT)
+    def test_post_minions_create_collection(self, api, body, expected_status, schema):
+        response = post_minions_collection(api, json=body)
+        assert_status_code(response, expected_status)
+        assert_schema(response, schema)
 
     # GET minions/{mid} endpoint
     # def test_get_minion_mid(self, api, create_minions_data):
