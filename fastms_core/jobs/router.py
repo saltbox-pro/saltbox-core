@@ -1,6 +1,3 @@
-from __future__ import annotations
-
-import asyncio
 import datetime
 import json
 import logging.config
@@ -10,7 +7,6 @@ import pydantic
 import redis.exceptions as redis_exceptions
 from fastapi import APIRouter, WebSocket
 from pydantic import Field, ValidationError
-from redis.asyncio.client import PubSub
 
 from fastms_core import http_errors
 from fastms_core.config import LOG_CONFIG, SETTINGS
@@ -18,7 +14,7 @@ from fastms_core.db.redis import RedisDependency
 from fastms_core.jobs.schemas import CreateJobRequest, CreateJobResponse, GetJobReturnResponse, IntJid, Job, JobResult
 from fastms_core.salt.http_client import SALT_CLIENT, SaltHttpClientError
 from fastms_core.utilities.jid import JID, JidError
-from fastms_core.utilities.websocket import IsSocketDisconnected
+from fastms_core.utilities.websocket import PubSubAuthenticatedWebSocket
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
@@ -38,7 +34,7 @@ async def jobs_list(
     rdb: RedisDependency, start_datetime: pydantic.PastDatetime, end_datetime: datetime.datetime | None = None
 ) -> list[Job]:
     if end_datetime is None:
-        end_datetime = datetime.datetime.now() + datetime.timedelta(hours=1)
+        end_datetime = datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=1)
 
     try:
         start = JID.from_datetime(start_datetime).to_timestamp()
@@ -132,24 +128,10 @@ async def job_returns_list(
 # TODO Use https://github.com/encode/broadcaster if need broadcasts
 @ws_router.websocket('')
 async def jobs_rets_websocket(websocket: WebSocket, rdb: RedisDependency) -> None:
-    await websocket.accept()
+    secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
+    await secure_websocket.accept()
 
-    async def reader(pubsub: PubSub) -> None:
-        async for message in pubsub.listen():
-            if message['type'] not in PubSub.PUBLISH_MESSAGE_TYPES:
-                logger.debug('Skipping service message: %s', message)
-                continue
-            data_str = message['data'].decode()
-            data = json.loads(data_str)
-            job = Job(**data)
-            with IsSocketDisconnected(websocket) as disconnect:
-                await websocket.send_text(job.model_dump_json(by_alias=True))
-            if disconnect:
-                return
-
-    async with rdb.pubsub() as pubsub:
-        await pubsub.psubscribe('job:*:new')
-        await asyncio.create_task(reader(pubsub))
+    await secure_websocket.handle_pubsub(channel='job:*:new', schema=Job)
 
 
 @ws_router.websocket('/{jid}/return')
@@ -164,20 +146,9 @@ async def jobs_endpoint_websocket(
         msg = f'Job not found by JID={jid}'
         raise http_errors.WebSocketPolicyViolation(msg)
 
-    await websocket.accept()
-
-    async def reader(pubsub: PubSub) -> None:
-        async for message in pubsub.listen():
-            if message['type'] not in PubSub.PUBLISH_MESSAGE_TYPES:
-                logger.debug('Skipping service message: %s', message)
-                continue
-            data = json.loads(message['data'].decode())
-            result = JobResult(**data).model_dump_json(by_alias=True)
-            with IsSocketDisconnected(websocket) as disconnect:
-                await websocket.send_text(result)
-            if disconnect:
-                return
+    secure_websocket = PubSubAuthenticatedWebSocket(websocket)
+    await secure_websocket.accept()
 
     async with rdb.pubsub() as pubsub:
         await pubsub.psubscribe(f'job:{jid}:return')
-        await asyncio.create_task(reader(pubsub))
+        await secure_websocket.pubsub_forwarder(pubsub, schema=JobResult)
