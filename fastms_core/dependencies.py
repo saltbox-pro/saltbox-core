@@ -21,7 +21,7 @@ keycloak_scheme = HTTPBearer(
 
 # Использование PyJWKClient обеспечивает автоматическое кэширование публичных ключей,
 # что позволяет минимизировать количество запросов к JWKS URI.
-jwks_client = jwt.PyJWKClient(uri=SETTINGS.kc_jwks_uri)
+jwks_client = jwt.PyJWKClient(uri=SETTINGS.keycloak_jwks_uri)
 
 
 async def get_current_user(token: Annotated[HTTPAuthorizationCredentials, Depends(keycloak_scheme)]) -> User:
@@ -34,7 +34,8 @@ async def get_current_user(token: Annotated[HTTPAuthorizationCredentials, Depend
         access_token = token.credentials
         signing_key = jwks_client.get_signing_key_from_jwt(access_token)
         payload = jwt.decode(
-            access_token, signing_key.key, algorithms=[SETTINGS.kc_algorithm], audience=SETTINGS.kc_audience
+            access_token, signing_key.key, algorithms=[SETTINGS.keycloak_algorithm],
+            audience=SETTINGS.keycloak_audience
         )
         user_id: str = payload.get('sub')
         if user_id is None:
