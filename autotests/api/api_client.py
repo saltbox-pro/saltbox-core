@@ -10,23 +10,63 @@ from utilities.logger_utils import logger
 class ApiClient(Client):
 
     def __init__(self):
-        super().__init__(base_url=f'{os.getenv("RESOURCE_URL")}')
-        self.ws = WsClient(base_url=f'{os.getenv("RESOURCE_WS_URL")}')
+        super().__init__(base_url=os.getenv("RESOURCE_URL"))
+        self.ws = WsClient(base_url=os.getenv("RESOURCE_WS_URL"))
+        self.token = None
 
-    def request(self, method, url, **kwargs) -> Response:
+    @staticmethod
+    def basic_auth_header(self):
+        """Return header for для Basic Auth."""
         username = os.getenv('BASIC_AUTH_LOGIN')
         password = os.getenv('BASIC_AUTH_PASSWORD')
-        if eval(os.getenv('USE_BASIC_AUTH')):
-            auth_header = f"Basic {b64encode(f'{username}:{password}'.encode()).decode()}"
-            self.headers.update({"Authorization": auth_header})
+        return f"Basic {b64encode(f'{username}:{password}'.encode()).decode()}"
+
+    def get_token(self):
+        """Get Bearer Token."""
+        url = os.getenv('GET_TOKEN_ENDPOINT')
+        payload = {
+            'username': os.getenv('USER_NAME'),
+            'password': os.getenv('USER_PASSWORD'),
+            'grant_type': 'password',
+            'client_id': 'fastms_core',
+            'client_secret': os.getenv('CLIENT_SECRET'),
+            'scope': 'openid',
+        }
+        headers = {
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': self.basic_auth_header(self),
+        }
+        response = super().request('POST', url, data=payload, headers=headers)
+        response.raise_for_status()
+        self.token = response.json().get('access_token')
+        logger.info('Token successfully retrieve')
+
+    def request(self, method, url, **kwargs) -> Response:
+        """Requests with auth token"""
+        if not self.token:
+            self.get_token()
+
+        # Update request headers
+        headers = kwargs.pop("headers", {}) or {}
+        headers.update({
+            'Authorization': f'Bearer {self.token}'
+        })
+        kwargs['headers'] = headers
+
+        # Logger
+        self.log_request(method, url, **kwargs)
+
+        return super().request(method, url, **kwargs)
+
+    def log_request(self, method, url, **kwargs):
+        """Логирует информацию о запросе."""
         if eval(os.getenv('USE_LOGS')):
             log_message = f"{method} {url}"
             if kwargs.get('params'):
                 log_message += f" | Params: {json.dumps(kwargs['params'])}"
             if kwargs.get('json'):
-                log_message += f" | Body: {kwargs['json']}"
+                log_message += f" | Body: {json.dumps(kwargs['json'])}"
             logger.info(log_message)
-        return super().request(method, url, **kwargs)
 
 
 class WsClient:
