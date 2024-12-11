@@ -1,4 +1,3 @@
-import asyncio
 import pytest
 
 from http import HTTPStatus
