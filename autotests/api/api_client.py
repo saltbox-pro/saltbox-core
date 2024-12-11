@@ -5,21 +5,22 @@ import websockets
 from base64 import b64encode
 from httpx import Client, Response
 from utilities.logger_utils import logger
+from httpx import BasicAuth
 
 
 class ApiClient(Client):
 
     def __init__(self):
         super().__init__(base_url=os.getenv("RESOURCE_URL"))
-        self.ws = WsClient(base_url=os.getenv("RESOURCE_WS_URL"))
+        self.ws = WsClient(base_url=os.getenv("RESOURCE_WS_URL"), api_client=self)
         self.token = None
 
-    @staticmethod
-    def basic_auth_header(self):
-        """Return header for для Basic Auth."""
-        username = os.getenv('BASIC_AUTH_LOGIN')
-        password = os.getenv('BASIC_AUTH_PASSWORD')
-        return f"Basic {b64encode(f'{username}:{password}'.encode()).decode()}"
+    # @staticmethod
+    # def basic_auth_header(self):
+    #     """Return header for для Basic Auth."""
+    #     username = os.getenv('BASIC_AUTH_LOGIN')
+    #     password = os.getenv('BASIC_AUTH_PASSWORD')
+    #     return f"Basic {b64encode(f'{username}:{password}'.encode()).decode()}"
 
     def get_token(self):
         """Get Bearer Token."""
@@ -34,9 +35,10 @@ class ApiClient(Client):
         }
         headers = {
             'Content-Type': 'application/x-www-form-urlencoded',
-            'Authorization': self.basic_auth_header(self),
         }
-        response = super().request('POST', url, data=payload, headers=headers)
+
+        response = super().request('POST', url, data=payload, headers=headers,
+                                   auth=BasicAuth(os.getenv('BASIC_AUTH_LOGIN'), os.getenv('BASIC_AUTH_PASSWORD')))
         response.raise_for_status()
         self.token = response.json().get('access_token')
         logger.info('Token successfully retrieve')
@@ -58,7 +60,8 @@ class ApiClient(Client):
 
         return super().request(method, url, **kwargs)
 
-    def log_request(self, method, url, **kwargs):
+    @staticmethod
+    def log_request(method, url, **kwargs):
         """Logging request info."""
         if eval(os.getenv('USE_LOGS')):
             log_message = f"{method} {url}"
@@ -70,12 +73,15 @@ class ApiClient(Client):
 
 
 class WsClient:
-    def __init__(self, base_url):
+    def __init__(self, base_url, api_client):
         self.base_url = base_url
+        self.api_client = api_client
         self.websocket = None
 
     async def connect(self, endpoint):
-        headers = {}
+        headers = {
+            'Authorization': f'Bearer {self.api_client.token}'  # Используем токен ApiClient
+        }
         if eval(os.getenv('USE_BASIC_AUTH')):
             username = os.getenv('BASIC_AUTH_LOGIN')
             password = os.getenv('BASIC_AUTH_PASSWORD')
