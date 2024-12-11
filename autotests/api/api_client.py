@@ -59,7 +59,7 @@ class ApiClient(Client):
         return super().request(method, url, **kwargs)
 
     def log_request(self, method, url, **kwargs):
-        """Логирует информацию о запросе."""
+        """Logging request info."""
         if eval(os.getenv('USE_LOGS')):
             log_message = f"{method} {url}"
             if kwargs.get('params'):
