@@ -5,8 +5,8 @@ def get_minions_filter_schema(client):
     return client.get(routes.Routes.MINIONS_FILTER_SCHEMA)
 
 
-def get_minions_filter_values(client):
-    return client.get(routes.Routes.MINIONS_FILTER_VALUES)
+def post_minions_filter_values(client, **kwargs):
+    return client.post(routes.Routes.MINIONS_FILTER_VALUES, **kwargs)
 
 
 def get_minions_collection(client, page=0, per_page=20):
