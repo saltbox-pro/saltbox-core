@@ -40,13 +40,13 @@ class ApiClient(Client):
         response = super().request('POST', url, data=payload, headers=headers,
                                    auth=BasicAuth(os.getenv('BASIC_AUTH_LOGIN'), os.getenv('BASIC_AUTH_PASSWORD')))
         response.raise_for_status()
-        self.token = response.json().get('access_token')
         logger.info('Token successfully retrieve')
+        return response.json().get('access_token')
 
     def request(self, method, url, **kwargs) -> Response:
         """Requests with auth token"""
         if not self.token:
-            self.get_token()
+            self.token = self.get_token()
 
         # Update request headers
         headers = kwargs.pop("headers", {}) or {}
