@@ -8,10 +8,10 @@ from utilities.logger_utils import logger
 from httpx import BasicAuth
 
 
-class ApiClient(Client):
+class ApiClient:
 
     def __init__(self):
-        super().__init__(base_url=os.getenv("RESOURCE_URL"))
+        self.client = Client(base_url=os.getenv("RESOURCE_URL"))
         self.ws = WsClient(base_url=os.getenv("RESOURCE_WS_URL"), api_client=self)
         self.token = None
 
@@ -37,8 +37,9 @@ class ApiClient(Client):
             'Content-Type': 'application/x-www-form-urlencoded',
         }
 
-        response = super().request('POST', url, data=payload, headers=headers,
-                                   auth=BasicAuth(os.getenv('BASIC_AUTH_LOGIN'), os.getenv('BASIC_AUTH_PASSWORD')))
+        response = self.client.request('POST', url, data=payload, headers=headers,
+                                       auth=BasicAuth(os.getenv('BASIC_AUTH_LOGIN'), os.getenv('BASIC_AUTH_PASSWORD')))
+
         response.raise_for_status()
         logger.info('Token successfully retrieve')
         return response.json().get('access_token')
@@ -58,7 +59,7 @@ class ApiClient(Client):
         # Logger
         self.log_request(method, url, **kwargs)
 
-        return super().request(method, url, **kwargs)
+        return self.client.request(method, url, **kwargs)
 
     @staticmethod
     def log_request(method, url, **kwargs):
@@ -80,7 +81,7 @@ class WsClient:
 
     async def connect(self, endpoint):
         headers = {
-            'Authorization': f'Bearer {self.api_client.token}'  # Используем токен ApiClient
+            'Authorization': f'Bearer {self.api_client.token}'  # Use ApiClient token
         }
         if eval(os.getenv('USE_BASIC_AUTH')):
             username = os.getenv('BASIC_AUTH_LOGIN')
