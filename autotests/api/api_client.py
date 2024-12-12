@@ -63,7 +63,7 @@ class ApiClient(Client):
     @staticmethod
     def log_request(method, url, **kwargs):
         """Logging request info."""
-        if eval(os.getenv('USE_LOGS')):
+        if eval(os.getenv('LOGGING')):
             log_message = f"{method} {url}"
             if kwargs.get('params'):
                 log_message += f" | Params: {json.dumps(kwargs['params'])}"
