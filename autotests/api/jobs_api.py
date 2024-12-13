@@ -12,7 +12,7 @@ def get_jobs_jid(client, jid):
     return client.request('GET', routes.Routes.JOB_JID.format(jid))
 
 
-def get_jobs_jid_return(client, jid, count=None, cursor=None):
+def get_jobs_jid_return(client, jid, count=10, cursor=None):
     params = {
         'count': count,
         'cursor': cursor,

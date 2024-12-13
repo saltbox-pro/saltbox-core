@@ -30,7 +30,7 @@ def assert_jid_in_response(jid, response, text=None):
 
 def assert_count(api, response, jid):
     assert isinstance(response.json(), int)
-    response_for_count = get_jobs_jid_return(api, jid).json()
+    response_for_count = get_jobs_jid_return(api, jid, count=999).json()
     assert 'result' in response_for_count, 'Response does not contain "result" key'
     result_count = len(response_for_count['result'])
     assert result_count == response.json(), 'The count of responses differs from the int returned by the API'
