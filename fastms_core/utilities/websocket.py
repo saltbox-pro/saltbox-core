@@ -145,11 +145,7 @@ class AuthenticatedWebSocket:
         if self._token_refresher_task:
             self._token_refresher_task.cancel()
             LOGGER.debug('Cancel token refresher task')
-            # try:
-            #     await self._token_refresher_task
-            # except asyncio.CancelledError:
-            #     LOGGER.debug('Token refresher task has been cancelled')
-            #     pass
+
         await self._close_websocket(msg)
 
 
