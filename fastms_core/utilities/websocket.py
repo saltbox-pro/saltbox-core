@@ -2,8 +2,11 @@ import asyncio
 import datetime
 import json
 import logging.config
+from collections.abc import Callable
 from contextlib import AbstractContextManager
+from functools import wraps
 from types import TracebackType
+from typing import Any
 
 from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.websockets import WebSocketState
@@ -58,6 +61,24 @@ class IsSocketDisconnected(AbstractContextManager):
         return self.is_excepted
 
 
+def _check_ws_connection(fn: Callable[..., Any]) -> Callable[..., Any]:
+    @wraps(fn)
+    async def wrapper(self: 'AuthenticatedWebSocket', *args: tuple, **kwargs: dict) -> Any:
+        if (
+            self.websocket.application_state == WebSocketState.DISCONNECTED
+            or self.websocket.client_state == WebSocketState.DISCONNECTED
+        ):
+            LOGGER.debug('Catch WebSocketDisconnect in _check_ws_connection decorator')
+            raise WebSocketDisconnect
+        if self.token_expiration and datetime.datetime.now(datetime.UTC) >= self.token_expiration:
+            LOGGER.debug('Token expired: %s', self.token_expiration)
+            await self.close('Token expired')
+            raise WebSocketDisconnect
+        return await fn(self, *args, **kwargs)
+
+    return wrapper
+
+
 class AuthenticatedWebSocket:
     """Base class for authenticated WebSocket connections
 
@@ -81,20 +102,8 @@ class AuthenticatedWebSocket:
         self.token_expiration: datetime.datetime | None = None
         self._token_refresher_task: asyncio.Task | None = None
 
-    async def _check_connection(self) -> None:
-        if (
-            self.websocket.application_state == WebSocketState.DISCONNECTED
-            or self.websocket.client_state == WebSocketState.DISCONNECTED
-        ):
-            LOGGER.debug('WebSocket disconnected')
-            raise WebSocketDisconnect
-        if self.token_expiration and datetime.datetime.now(datetime.UTC) >= self.token_expiration:
-            LOGGER.debug('Token expired: %s', self.token_expiration)
-            await self.close('Token expired')
-            raise WebSocketDisconnect
-
+    @_check_ws_connection
     async def _obtain_token_msg(self) -> None:
-        await self._check_connection()
         message = await self.websocket.receive_text()
         await self._process_token_message(message)
 
@@ -106,6 +115,7 @@ class AuthenticatedWebSocket:
             LOGGER.error('Error processing token message %s', e)
             await self.close(f'Invalid token message: {e!s}')
 
+    @_check_ws_connection
     async def _close_websocket(self, reason: str) -> None:
         await self.websocket.close(code=1008, reason=reason)
 
@@ -115,11 +125,12 @@ class AuthenticatedWebSocket:
 
         self._token_refresher_task = asyncio.create_task(self._token_refresher())
 
+    @_check_ws_connection
     async def send(self, message: str) -> None:
-        await self._check_connection()
         await self.websocket.send_text(message)
 
     async def _token_refresher(self) -> None:
+        LOGGER.debug('Start token refresher task')
         while True:
             try:
                 await self._obtain_token_msg()
@@ -129,10 +140,12 @@ class AuthenticatedWebSocket:
     async def close(self, msg: str) -> None:
         if self._token_refresher_task:
             self._token_refresher_task.cancel()
-            try:
-                await self._token_refresher_task
-            except asyncio.CancelledError:
-                pass
+            LOGGER.debug('Cancel token refresher task')
+            # try:
+            #     await self._token_refresher_task
+            # except asyncio.CancelledError:
+            #     LOGGER.debug('Token refresher task has been cancelled')
+            #     pass
         await self._close_websocket(msg)
 
 
