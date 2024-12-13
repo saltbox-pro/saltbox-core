@@ -62,6 +62,10 @@ class IsSocketDisconnected(AbstractContextManager):
 
 
 def _check_ws_connection(fn: Callable[..., Any]) -> Callable[..., Any]:
+    """Decorator to check secure WebSocket connection state
+    Raises WebSocketDisconnect if token expired or WebSocket disconnected
+    """
+
     @wraps(fn)
     async def wrapper(self: 'AuthenticatedWebSocket', *args: tuple, **kwargs: dict) -> Any:
         if (
