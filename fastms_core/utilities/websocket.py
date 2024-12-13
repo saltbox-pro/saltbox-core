@@ -179,13 +179,27 @@ class PubSubAuthenticatedWebSocket(AuthenticatedWebSocket):
             LOGGER.error('Error processing pubsub message %s', e)
 
     async def pubsub_forwarder(self, pubsub: PubSub, schema: type[BaseModel]) -> None:
-        async for message in pubsub.listen():
-            if message['type'] not in PubSub.PUBLISH_MESSAGE_TYPES:
-                continue
-            try:
-                await self._process_pubsub_message(message, schema)
-            except WebSocketDisconnect:
-                break
+        async def forwarder(pubsub: PubSub, schema: type[BaseModel]) -> None:
+            async for message in pubsub.listen():
+                if message['type'] not in PubSub.PUBLISH_MESSAGE_TYPES:
+                    continue
+                try:
+                    await self._process_pubsub_message(message, schema)
+                except WebSocketDisconnect:
+                    LOGGER.debug('Catch WebSocketDisconnect in pubsub_forwarder')
+                    break
+
+        pubsub_forward_task = asyncio.create_task(forwarder(pubsub, schema))
+        try:
+            await pubsub_forward_task
+        except asyncio.CancelledError:
+            LOGGER.debug('Catch CancelledError in handle_pubsub')
+            pass
+        finally:
+            pubsub_forward_task.cancel()
+            if self._token_refresher_task:
+                self._token_refresher_task.cancel()
+            LOGGER.debug('Task `pubsub_forward_task` and `token_refresher_task` has been cancelled')
 
     async def handle_pubsub(self, channel: str, schema: type[BaseModel]) -> None:
         if self.rdb is None:
