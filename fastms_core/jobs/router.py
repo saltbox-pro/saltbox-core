@@ -55,7 +55,7 @@ async def jobs_list(
 @router.get('/{jid}', operation_id='job_retrieve')
 async def job_retrieve(jid: IntJid, rdb: RedisDependency) -> Job:
     ts = JID(jid).to_timestamp()
-    logger.info('ts=%s', ts)
+    logger.debug('ts=%s', ts)
 
     res_ = await rdb.zrange('jobs', start=ts, end=ts, byscore=True)  # type: ignore[call-overload]
 
@@ -129,8 +129,6 @@ async def job_returns_list(
 @ws_router.websocket('')
 async def jobs_rets_websocket(websocket: WebSocket, rdb: RedisDependency) -> None:
     secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
-    await secure_websocket.accept()
-
     await secure_websocket.handle_pubsub(channel='job:*:new', schema=Job)
 
 
@@ -146,9 +144,5 @@ async def jobs_endpoint_websocket(
         msg = f'Job not found by JID={jid}'
         raise http_errors.WebSocketPolicyViolation(msg)
 
-    secure_websocket = PubSubAuthenticatedWebSocket(websocket)
-    await secure_websocket.accept()
-
-    async with rdb.pubsub() as pubsub:
-        await pubsub.psubscribe(f'job:{jid}:return')
-        await secure_websocket.pubsub_forwarder(pubsub, schema=JobResult)
+    secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
+    await secure_websocket.handle_pubsub(channel=f'job:{jid}:return', schema=JobResult)
