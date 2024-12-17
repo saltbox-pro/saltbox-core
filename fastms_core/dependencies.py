@@ -14,7 +14,7 @@ logging.config.dictConfig(LOG_CONFIG.model_dump())
 logger = logging.getLogger(__name__)
 
 keycloak_scheme = HTTPBearer(
-    scheme_name='Keycloak JWT',
+    scheme_name='KeycloakJWT',
     description='Validate JWT token from Keycloak server with JWKS URI and extract user data',
 )
 
