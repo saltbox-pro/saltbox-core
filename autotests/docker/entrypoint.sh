@@ -1,0 +1,11 @@
+#! /bin/sh
+
+set -o errexit -o verbose
+
+CLIENT_SECRET="$(cat "$CLIENT_SECRET_FILE")"
+REDIS_PASSWORD="$(cat "$REDIS_PASSWORD_FILE")"
+USER_PASSWORD="$(cat "$USER_PASSWORD_FILE")"
+
+export CLIENT_SECRET REDIS_PASSWORD USER_PASSWORD
+
+"$@"
