@@ -9,8 +9,9 @@ import pymongo
 from beanie import Document
 from redis import asyncio as aioredis
 
+from fastms_core.collections.models import MinionCollection
 from fastms_core.config import LOG_CONFIG, SETTINGS
-from fastms_core.minions.models import Minion, MinionCollection
+from fastms_core.minions.models import Minion
 from fastms_core.salt.http_client import SALT_CLIENT, SaltHttpClientError
 from fastms_core.tasks.schemas import (
     TaskJob,
