@@ -1,0 +1,6 @@
+*.egg-info
+.dockerignore
+Dockerfile
+/build
+__pycache__
+/.requirements
