@@ -6,7 +6,7 @@ from typing import Any
 from redis import asyncio as aioredis
 
 from fastms_core.config import LOG_CONFIG, SETTINGS
-from fastms_core.minions.crud import minion_crud
+from fastms_core.minions.crud import minions_crud
 from fastms_core.minions.models import Minion
 from fastms_core.minions.schemas import MinionSchemaCreate
 
@@ -38,9 +38,9 @@ class GrainsConsumer:
         if data:
             exist = await Minion.find_one({'minion_id': minion_id})
             if exist:
-                await minion_crud.update(db_obj=exist, obj_in=minion_obj)
+                await minions_crud.update(db_obj=exist, obj_in=minion_obj)
             else:
-                await minion_crud.create(obj_in=MinionSchemaCreate(**minion_obj))
+                await minions_crud.create(obj_in=MinionSchemaCreate(**minion_obj))
 
     async def consume(self) -> None:
         redis = await aioredis.from_url(self.redis_url, **self.con_kwargs)

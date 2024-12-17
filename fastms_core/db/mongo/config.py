@@ -5,8 +5,9 @@ import logging.config
 from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient
 
+from fastms_core.collections.models import MinionCollection
 from fastms_core.config import LOG_CONFIG, SETTINGS
-from fastms_core.minions.models import Minion, MinionCollection
+from fastms_core.minions.models import Minion
 from fastms_core.tasks.models import Task, TaskTemplate
 
 logger = logging.getLogger(__name__)
