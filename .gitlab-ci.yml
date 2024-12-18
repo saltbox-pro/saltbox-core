@@ -1,7 +1,7 @@
 ---
 
 include:
-  - project: 'fastms/ci-lib'
+  - project: 'salt.box/ci-lib'
     file: 'build-image.yml'
 
 
