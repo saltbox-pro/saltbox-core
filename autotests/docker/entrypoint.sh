@@ -1,6 +1,7 @@
-#! /bin/sh
+#! /bin/bash
 
-set -o errexit -o verbose
+set -o errexit
+trap 'echo Last command: ${BASH_COMMAND}' ERR
 
 CLIENT_SECRET="$(cat "$CLIENT_SECRET_FILE")"
 REDIS_PASSWORD="$(cat "$REDIS_PASSWORD_FILE")"
