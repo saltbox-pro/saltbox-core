@@ -6,8 +6,9 @@ import pytest
 from http import HTTPStatus
 from dotenv import load_dotenv
 from api.api_client import ApiClient
+from api.collections_api import post_collection, del_collection_cid
 from api.jobs_api import post_jobs
-from api.minions_api import post_minions, post_minions_collection, del_minion_collection_cid
+from api.minions_api import post_minions
 from assertions.assertion_base import assert_status_code, assert_schema
 from models.jobs_models import ModelJobResponse
 from utilities.files_utils import read_json_common_request_data
@@ -77,8 +78,8 @@ def create_minions_data(api):
 @pytest.fixture(scope='class')
 def create_cid(api):
     post_obj = read_json_common_request_data('create_collection_for_fixture')
-    response = post_minions_collection(api, json=post_obj)
+    response = post_collection(api, json=post_obj)
     assert_status_code(response, HTTPStatus.OK)
     cid = response.json().get('id')
     yield cid
-    del_minion_collection_cid(api, cid)
+    del_collection_cid(api, cid)
