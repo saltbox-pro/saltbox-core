@@ -80,18 +80,31 @@ class WsClient:
         self.websocket = None
 
     async def connect(self, endpoint):
-        headers = {
-            'Authorization': f'Bearer {self.api_client.token}'  # Use ApiClient token
-        }
+        headers = {}
+        token = self.api_client.token
         if eval(os.getenv('USE_BASIC_AUTH')):
             username = os.getenv('BASIC_AUTH_LOGIN')
             password = os.getenv('BASIC_AUTH_PASSWORD')
             auth_header = f"Basic {b64encode(f'{username}:{password}'.encode()).decode()}"
-            headers["Authorization"] = auth_header
-        self.websocket = await websockets.connect(f'{self.base_url}{endpoint}', extra_headers=headers)
+            headers['Authorization'] = auth_header
+        try:
+            self.websocket = await websockets.connect(f'{self.base_url}{endpoint}', extra_headers=headers)
+            logger.info(f'Successfully connected to WebSocket with Base Auth: {self.base_url}{endpoint}')
+        except Exception as e:
+            logger.error(f'Failed to connect to WebSocket: {self.base_url}{endpoint}. Error: {str(e)}')
+            raise
+        try:
+            await self.send(token)
+            logger.info('The token has been sent in the first message')
+        except Exception as e:
+            logger.error(f'Token was not sent. Error: {str(e)}')
+            raise
 
     async def send(self, message):
-        await self.websocket.send(json.dumps(message))
+        if isinstance(message, str):
+            await self.websocket.send(message)
+        else:
+            await self.websocket.send(json.dumps(message))
 
     async def receive(self):
         message = await self.websocket.recv()
@@ -99,6 +112,7 @@ class WsClient:
 
     async def listen(self):
         async for message in self.websocket:
+            logger.info("Listening for messages...")
             data = json.loads(message)
             yield data
 

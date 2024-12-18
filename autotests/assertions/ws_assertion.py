@@ -2,7 +2,7 @@ import asyncio
 import pytest
 
 
-async def wait_for_job_message(api, jid, timeout=50):
+async def wait_for_job_message(api, jid, timeout=59):
     """
     Waits for a job-related message to arrive via WebSocket.
     """

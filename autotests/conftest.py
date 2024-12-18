@@ -7,7 +7,7 @@ from http import HTTPStatus
 from dotenv import load_dotenv
 from api.api_client import ApiClient
 from api.jobs_api import post_jobs
-from api.minions_api import post_minions
+from api.minions_api import post_minions, post_minions_collection, del_minion_collection_cid
 from assertions.assertion_base import assert_status_code, assert_schema
 from models.jobs_models import ModelJobResponse
 from utilities.files_utils import read_json_common_request_data
@@ -72,3 +72,13 @@ def create_minions_data(api):
     delete_job_from_zset_on_redis(jid)
     for i in mid_list:
         redis_client.delete(f'minion:{i}:grains')
+
+
+@pytest.fixture(scope='class')
+def create_cid(api):
+    post_obj = read_json_common_request_data('create_collection_for_fixture')
+    response = post_minions_collection(api, json=post_obj)
+    assert_status_code(response, HTTPStatus.OK)
+    cid = response.json().get('id')
+    yield cid
+    del_minion_collection_cid(api, cid)
