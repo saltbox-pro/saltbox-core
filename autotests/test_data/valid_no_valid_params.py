@@ -3,7 +3,7 @@ from http import HTTPStatus
 
 from models.errors_models import ErrorResponse, NotFoundModel
 from models.jobs_models import Jobs
-from models.minions_models import MinionsListModel, CollectionsListModel, CreateCollectionModel
+from models.minions_models import MinionsListModel, CollectionsListModel, CreateCollectionModel, UniqueFilterValue
 
 VALID_AND_INVALID_PARAMS_FOR_JOBS = [
     # Valid params
@@ -82,34 +82,34 @@ INVALID_QUERY_PARAMS_FOR_JOB_RETURN = [
 
 BODY_FOR_POST_MINIONS_FILTER = [
     # Positive cases
-    # Valid query and field, expecting unique values for "grains.os" matching the filter
-    # ({"query": {"grains.os": "Ubuntu"}, "field": "grains.os"}, HTTPStatus.OK, Schema),
-    #
-    # # Valid field without a query, expecting all unique values for "grains.os"
-    # ({"field": "grains.os"}, HTTPStatus.OK, Schema),
-    #
-    # # Query with a non-existent field, should return an empty list of unique values
-    # ({"query": {"nonexistent_field": "value"}, "field": "grains.os"}, HTTPStatus.OK, Schema),
-    #
-    # # Query with an empty string as a filter value, expecting valid response
-    # ({"query": {"grains.os": ""}, "field": "grains.os"}, HTTPStatus.OK, Schema),
-    #
-    # # Valid field for a different grain, expecting unique values for "grains.cpu_model"
-    # ({"field": "grains.cpu_model"}, HTTPStatus.OK, Schema),
+    # Valid query and field, expecting unique values for 'grains.os' matching the filter
+    ({'query': {'grains.os': 'Alpine'}, 'field': 'grains.os'}, HTTPStatus.OK, UniqueFilterValue),
+
+    # Valid field without a query, expecting all unique values for 'grains.os'
+    ({'field': 'minion_id'}, HTTPStatus.OK, UniqueFilterValue),
+
+    # Query with a non-existent field, should return an empty list of unique values
+    ({'query': {'nonexistent_field': 'value'}, 'field': 'grains.os'}, HTTPStatus.OK, UniqueFilterValue),
+
+    # Query with an empty string as a filter value, expecting valid response
+    ({'query': {'grains.os': ''}, 'field': 'grains.os'}, HTTPStatus.OK, UniqueFilterValue),
+
+    # Valid field for a different grain, expecting unique values for 'grains.cpu_model'
+    ({'field': 'grains.cpu_model'}, HTTPStatus.OK, UniqueFilterValue),
 
     # Negative cases
-    # Missing "field" parameter, expecting an error response
+    # Missing 'field' parameter, expecting an error response
     ({}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
 
-    # Invalid type for "field", expecting an error response
-    ({"field": 12345}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+    # Invalid type for 'field', expecting an error response
+    ({'field': 12345}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
 
     # Query contains unsupported operator, expecting an error response
-    ({"query": {"grains.os": {"$invalid_operator": "value"}}, "field": "grains.os"}, HTTPStatus.UNPROCESSABLE_ENTITY,
+    ({'query': {'grains.os': {'$invalid_operator': 'value'}}, 'field': 'grains.os'}, HTTPStatus.UNPROCESSABLE_ENTITY,
      ErrorResponse),
 
-    # Excessively long value for "field", expecting an error response
-    ({"field": "a" * 1000}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+    # Excessively long value for 'field', expecting an error response
+    ({'field': 'a' * 1000}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
 ]
 
 BODY_FOR_POST_MINIONS_ENDPOINT = [
@@ -223,10 +223,10 @@ PARAMETERS_FOR_GET_MINIONS_COLLECTION_ENDPOINT = [
     (-1, 50, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
 
     # Invalid type for per_page
-    (0, "abc", HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+    (0, 'abc', HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
 
     # Invalid type for page
-    ("abc", 20, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+    ('abc', 20, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
 ]
 
 BODY_FOR_POST_MINIONS_COLLECTION_ENDPOINT = [
@@ -252,4 +252,67 @@ BODY_FOR_POST_MINIONS_COLLECTION_ENDPOINT = [
 
     # Invalid title type
     ({'query': {'grains.os': 'Ubuntu'}, 'title': 123}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+]
+
+INVALID_CID_VALUES_FOR_MINIONS_COLLECTION = [
+    # Nonexistent cid
+    ('5eb7cf5a86d9755df3a6c999', HTTPStatus.NOT_FOUND, NotFoundModel),
+
+    # Empty cid
+    (' ', HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+
+    # Incorrect format mid
+    ('12345', HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+
+    # Incorrect format with special symbols
+    ('5eb7cf5a86d9755!invalid', HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+
+    # Incorrect format: long cid
+    ('5eb7cf5a86d9755df3a6c5931234567890', HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+]
+
+INVALID_BODY_FOR_PUT_MINIONS_COLLECTION = [
+    # Empty request body
+    ({}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+
+    # # Body without 'query'
+    # ({'title': 'Valid Title'}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+    #
+    # # Body without 'title'
+    # ({'query': {'grains.os': 'Ubuntu'}}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+    #
+    # # Empty 'query' field
+    # ({'query': {}, 'title': 'Valid Title'}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+    #
+    # # Incorrect structure 'query' field
+    # ({'query': 'Invalid Query', 'title': 'Valid Title'}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+    #
+    # # Invalid 'query' field
+    # ({'query': {'$invalid': 'value'}, 'title': 'Valid Title'}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+    #
+    # # Empty 'title' field
+    # ({'query': {'grains.os': 'Ubuntu'}, 'title': ''}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+    #
+    # # Поле 'title' содержит слишком длинное значение
+    # ({'query': {'grains.os': 'Ubuntu'}, 'title': 'a' * 256}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+    #
+    # # Поле 'query' и 'title' пустые
+    # ({'query': {}, 'title': ''}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+]
+
+INVALID_CID_VALUES_FOR_DEL_MINIONS_COLLECTION = [
+    # Nonexistent cid
+    ('5eb7cf5a86d9755df3a6c999', HTTPStatus.NO_CONTENT),
+
+    # Empty cid
+    (' ', HTTPStatus.UNPROCESSABLE_ENTITY),
+
+    # Incorrect format mid
+    ('12345', HTTPStatus.UNPROCESSABLE_ENTITY),
+
+    # Incorrect format with special symbols
+    ('5eb7cf5a86d9755!invalid', HTTPStatus.UNPROCESSABLE_ENTITY),
+
+    # Incorrect format: long cid
+    ('5eb7cf5a86d9755df3a6c5931234567890', HTTPStatus.UNPROCESSABLE_ENTITY),
 ]

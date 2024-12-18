@@ -33,15 +33,6 @@ def put_minion_collection_cid(client, cid, **kwargs):
 def del_minion_collection_cid(client, cid):
     return client.request('DELETE', routes.Routes.MINIONS_COLLECTION_ID.format(cid))
 
-# def get_minions(client, page=0, per_page=20, query=None):
-#     params = {
-#         'page': page,
-#         'per_page': per_page,
-#         'query': query,
-#     }
-#     params = {k: v for k, v in params.items() if v is not None}
-#     return client.get(routes.Routes.MINIONS, params=params)
-
 
 def post_minions(client, **kwargs):
     return client.request('POST', routes.Routes.MINIONS, **kwargs)
