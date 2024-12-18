@@ -5,6 +5,7 @@ from models.errors_models import ErrorResponse, NotFoundModel
 from models.jobs_models import Jobs
 from models.minions_models import MinionsListModel, CollectionsListModel, CreateCollectionModel, UniqueFilterValue
 
+# DATA DOR /jobs ENDPOINTS
 VALID_AND_INVALID_PARAMS_FOR_JOBS = [
     # Valid params
     # Only start_datetime
@@ -80,7 +81,8 @@ INVALID_QUERY_PARAMS_FOR_JOB_RETURN = [
     (None, None, HTTPStatus.OK, None),
 ]
 
-BODY_FOR_POST_MINIONS_FILTER = [
+# DATA FOR /filters ENDPOINTS
+BODY_FOR_POST_FILTER = [
     # Positive cases
     # Valid query and field, expecting unique values for 'grains.os' matching the filter
     ({'query': {'grains.os': 'Alpine'}, 'field': 'grains.os'}, HTTPStatus.OK, UniqueFilterValue),
@@ -112,6 +114,7 @@ BODY_FOR_POST_MINIONS_FILTER = [
     ({'field': 'a' * 1000}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
 ]
 
+# DATA FOR /minions ENDPOINTS
 BODY_FOR_POST_MINIONS_ENDPOINT = [
     # Positive scenarios
     # Empty body
@@ -188,7 +191,8 @@ INVALID_MID_VALUES = [
     (False, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
 ]
 
-PARAMETERS_FOR_GET_MINIONS_COLLECTION_ENDPOINT = [
+# DATA FOR /collections ENDPOINTS
+PARAMETERS_FOR_GET_COLLECTION_ENDPOINT = [
     # Default values
     (None, None, HTTPStatus.OK, CollectionsListModel),
 
@@ -229,7 +233,7 @@ PARAMETERS_FOR_GET_MINIONS_COLLECTION_ENDPOINT = [
     ('abc', 20, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
 ]
 
-BODY_FOR_POST_MINIONS_COLLECTION_ENDPOINT = [
+BODY_FOR_POST_COLLECTION_ENDPOINT = [
     # Positive scenarios
     # Valid query and title
     ({'query': {'grains.os': 'Ubuntu'}, 'title': 'Ubuntu Minions'}, HTTPStatus.OK, CreateCollectionModel),
@@ -254,7 +258,7 @@ BODY_FOR_POST_MINIONS_COLLECTION_ENDPOINT = [
     ({'query': {'grains.os': 'Ubuntu'}, 'title': 123}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
 ]
 
-INVALID_CID_VALUES_FOR_MINIONS_COLLECTION = [
+INVALID_CID_VALUES_FOR_COLLECTION = [
     # Nonexistent cid
     ('5eb7cf5a86d9755df3a6c999', HTTPStatus.NOT_FOUND, NotFoundModel),
 
@@ -271,7 +275,7 @@ INVALID_CID_VALUES_FOR_MINIONS_COLLECTION = [
     ('5eb7cf5a86d9755df3a6c5931234567890', HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
 ]
 
-INVALID_BODY_FOR_PUT_MINIONS_COLLECTION = [
+INVALID_BODY_FOR_PUT_COLLECTION = [
     # Empty request body
     ({}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
 
@@ -300,7 +304,7 @@ INVALID_BODY_FOR_PUT_MINIONS_COLLECTION = [
     # ({'query': {}, 'title': ''}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
 ]
 
-INVALID_CID_VALUES_FOR_DEL_MINIONS_COLLECTION = [
+INVALID_CID_VALUES_FOR_DEL_COLLECTION = [
     # Nonexistent cid
     ('5eb7cf5a86d9755df3a6c999', HTTPStatus.NO_CONTENT),
 
