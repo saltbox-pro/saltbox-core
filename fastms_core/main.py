@@ -52,23 +52,23 @@ APP.add_middleware(
 
 APP.include_router(
     minions_router,
-    dependencies=[Depends(RolesRequiredDependency(['default-roles-fastms']))],
+    dependencies=[Depends(RolesRequiredDependency(['default-roles-salt.box']))],
 )
 APP.include_router(
     collections_router,
-    dependencies=[Depends(RolesRequiredDependency(['default-roles-fastms']))],
+    dependencies=[Depends(RolesRequiredDependency(['default-roles-salt.box']))],
 )
 APP.include_router(
     filters_router,
-    dependencies=[Depends(RolesRequiredDependency(['default-roles-fastms']))],
+    dependencies=[Depends(RolesRequiredDependency(['default-roles-salt.box']))],
 )
 APP.include_router(
     jobs_router,
-    dependencies=[Depends(RolesRequiredDependency(['default-roles-fastms']))],
+    dependencies=[Depends(RolesRequiredDependency(['default-roles-salt.box']))],
 )
 APP.include_router(jobs_ws_router)
 APP.include_router(salt_router)
 APP.include_router(
     task_router,
-    dependencies=[Depends(RolesRequiredDependency(['default-roles-fastms']))],
+    dependencies=[Depends(RolesRequiredDependency(['default-roles-salt.box']))],
 )
