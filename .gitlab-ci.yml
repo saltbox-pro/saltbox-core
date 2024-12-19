@@ -5,7 +5,7 @@ include:
     file: 'build-image.yml'
 
 
-Build image for tag:
+Build core image for tag:
   extends: .build-image
   variables:
     TARGET: main
@@ -14,10 +14,30 @@ Build image for tag:
     - if: '$CI_COMMIT_TAG'
 
 
-Build image for branch:
+Build core image for branch:
   extends: .build-image
   variables:
     TARGET: main
+    IMAGE_TAG: '$CI_COMMIT_BRANCH'
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+
+
+Build autotests image for tag:
+  extends: .build-image
+  variables:
+    CONTEXT_PATH: autotests/
+    ADDITIONAL_PATH: autotests
+    IMAGE_TAG: '$CI_COMMIT_TAG'
+  rules:
+    - if: '$CI_COMMIT_TAG'
+
+
+Build autotests image for branch:
+  extends: .build-image
+  variables:
+    CONTEXT_PATH: autotests/
+    ADDITIONAL_PATH: autotests
     IMAGE_TAG: '$CI_COMMIT_BRANCH'
   rules:
     - if: '$CI_COMMIT_BRANCH'
