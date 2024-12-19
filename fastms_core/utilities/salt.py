@@ -44,7 +44,8 @@ def fill_salt_kwarg_from_arg(
     return new_arg, new_kwarg
 
 
-class SaltJobCreateError(Exception): ...
+class SaltJobCreateError(Exception):
+    ...
 
 
 async def create_job(

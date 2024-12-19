@@ -13,13 +13,16 @@ import re
 from datetime import UTC, datetime
 
 
-class JidError(RuntimeError): ...
+class JidError(RuntimeError):
+    ...
 
 
-class UnexpectedJidFormatError(JidError): ...
+class UnexpectedJidFormatError(JidError):
+    ...
 
 
-class UnexpectedDataFormatError(JidError): ...
+class UnexpectedDataFormatError(JidError):
+    ...
 
 
 @functools.total_ordering
