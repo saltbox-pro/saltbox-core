@@ -12,8 +12,8 @@ from fastms_core import http_errors
 from fastms_core.config import LOG_CONFIG, SETTINGS
 from fastms_core.db.redis import RedisDependency
 from fastms_core.jobs.schemas import CreateJobRequest, CreateJobResponse, GetJobReturnResponse, IntJid, Job, JobResult
-from fastms_core.salt.http_client import SALT_CLIENT, SaltHttpClientError
 from fastms_core.utilities.jid import JID, JidError
+from fastms_core.utilities.salt import SaltJobCreateError, create_job
 from fastms_core.utilities.websocket import PubSubAuthenticatedWebSocket
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
@@ -73,14 +73,21 @@ async def job_retrieve(jid: IntJid, rdb: RedisDependency) -> Job:
 
 
 @router.post('', operation_id='job_create')
-async def job_create(item: CreateJobRequest) -> CreateJobResponse:
+async def job_create(item: CreateJobRequest, rdb: RedisDependency) -> CreateJobResponse:
     try:
-        ret = await SALT_CLIENT.run_job(
-            tgt=item.tgt, fun=item.fun, arg=item.arg, kwarg=item.kwarg, tgt_type=item.tgt_type
+        jid: str = await create_job(
+            tgt=item.tgt,
+            tgt_type=item.tgt_type,
+            fun=item.fun,
+            arg=item.arg,
+            kwarg=item.kwarg,
+            salt_master='salt-master',  # TODO: get salt master from request
+            rdb=rdb,
         )
-    except SaltHttpClientError as error:
+
+        return CreateJobResponse.model_validate({"jid": jid})
+    except SaltJobCreateError as error:
         raise http_errors.BadGateway(detail=str(error)) from error
-    return CreateJobResponse.model_validate(ret)
 
 
 @router.get('/{jid}/returns-count', operation_id='job_returns_count')
