@@ -10,7 +10,6 @@ from api.collections_api import post_collection, del_collection_cid
 from api.jobs_api import post_jobs
 from api.minions_api import post_minions
 from assertions.assertion_base import assert_status_code, assert_schema
-from models.jobs_models import ModelJobResponse
 from utilities.files_utils import read_json_common_request_data
 from utilities.logger_utils import logger
 from utilities.redis_utils import redis_client, delete_job_from_zset_on_redis
@@ -50,8 +49,7 @@ def create_jid(api):
     post_obj = read_json_common_request_data('valid_post_jobs')
     response = post_jobs(api, json=post_obj)
     assert_status_code(response, HTTPStatus.OK)
-    jid = response.json()['return'][0]['jid']
-    assert_schema(response, ModelJobResponse)
+    jid = response.json().get('jid')
     yield jid
     time.sleep(0.1)
     redis_client.delete(f'job:{jid}:return')
@@ -62,12 +60,11 @@ def create_jid(api):
 def create_minions_data(api):
     post_obj = read_json_common_request_data('grains_items_post')
     response = post_jobs(api, json=post_obj)
-    jid = response.json()['return'][0]['jid']
+    jid = response.json().get('jid')
     assert_status_code(response, HTTPStatus.OK)
-    assert_schema(response, ModelJobResponse)
     response_minions_list = post_minions(api, json={})
-    id_list = [item["_id"] for item in response_minions_list.json()["data"]]
-    mid_list = response.json()['return'][0]['minions']
+    id_list = [item['_id'] for item in response_minions_list.json()['data']]
+    mid_list = [item['minion_id'] for item in response_minions_list.json()['data']]
     yield id_list
     redis_client.delete(f'job:{jid}:return')
     delete_job_from_zset_on_redis(jid)
