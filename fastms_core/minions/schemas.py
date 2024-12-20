@@ -220,3 +220,15 @@ class GrainValue(TypedDict):
 class UniqueGrainValuesResponse(BaseModel):
     total: int
     data: list[GrainValue]
+
+
+class MinionFilterOperatorsSchema(BaseModel):
+    name: str
+    value: str
+    label: str
+
+class MinionFilterSchema(BaseModel):
+    name: str
+    label: str
+    operators: list[MinionFilterOperatorsSchema]
+    input_type: str = Field(serialization_alias='inputType')

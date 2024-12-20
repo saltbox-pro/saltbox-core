@@ -11,6 +11,7 @@ from fastms_core.db.mongo.schemas_base import PaginatedResponse
 from fastms_core.minions.crud import minions_crud
 from fastms_core.minions.models import Minion
 from fastms_core.minions.schemas import (
+    MinionFilterSchema,
     MinionFilterValuesQueryParams,
     MinionListSchema,
     MinionsListQueryParams,
@@ -66,8 +67,8 @@ async def minion_retrieve(mid: PydanticObjectId) -> Minion:
 
 
 @filters_router.get('/schema', operation_id='filter_schema')
-async def filter_schema() -> list[dict[str, str]]:
-    return get_model_schema(Minion)
+async def filter_schema() -> list[MinionFilterSchema]:
+    return [MinionFilterSchema.model_validate(field) for field in get_model_schema(Minion)]
 
 
 @filters_router.post('/unique-grain-values', operation_id='filter_values')
