@@ -53,7 +53,7 @@ async def minions_list(
             search, page=params.page, per_page=params.per_page, projection_model=MinionListSchema
         )
     except PyMongoError as error:
-        raise http_errors.BadRequest(str(error)) from error
+        raise http_errors.UnprocessableEntity(str(error)) from error
 
 
 @minions_router.get('/{mid}', operation_id='minion_retrieve')
