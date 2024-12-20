@@ -103,7 +103,7 @@ class PubData(BaseModel):
 
 
 class CreateJobResponse(BaseModel):
-    return_: list[PubData | NullObj] = Field(alias='return', min_length=1)
+    jid: StrJid
 
 
 class CreateJobRequest(BaseModel):

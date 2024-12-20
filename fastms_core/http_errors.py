@@ -52,6 +52,12 @@ class ImATeapot(BaseHttpError):
     CODE = 418
 
 
+class UnprocessableEntity(BaseHttpError):
+    """Server cannot process the request due to invalid data"""
+
+    CODE = status.HTTP_422_UNPROCESSABLE_ENTITY
+
+
 class InternalServerError(BaseHttpError):
     """Generic server-side error"""
 

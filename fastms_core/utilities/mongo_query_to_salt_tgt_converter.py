@@ -1,7 +1,7 @@
 import json
 from typing import Any, ClassVar
 
-from fastms_core.minions.models import MinionCollection
+from fastms_core.collections.models import MinionCollection
 
 
 class MongoQueryToSaltTgtConverterUnknownKey(Exception):

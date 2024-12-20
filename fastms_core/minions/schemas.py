@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Any, ClassVar
+from typing import Any, ClassVar, TypedDict
 
 from beanie import PydanticObjectId
 from fastapi.exceptions import RequestValidationError
@@ -212,29 +212,24 @@ class MinionFilterValuesQueryParams(MongoQueryBaseSchema):
         return value
 
 
-class MinionCollectionBaseSchema(MongoQueryBaseSchema):
-    title: str = Field(title='Title')
+class GrainValue(TypedDict):
+    value: str | None
+    count: int
 
 
-class MinionCollectionDBSchema(MinionCollectionBaseSchema):
-    id: PydanticObjectId = Field(title='ID', alias='_id', serialization_alias='id')
+class UniqueGrainValuesResponse(BaseModel):
+    total: int
+    data: list[GrainValue]
 
 
-class MinionCollectionSchema(MinionCollectionDBSchema):
-    pass
+class MinionFilterOperatorsSchema(BaseModel):
+    name: str
+    value: str
+    label: str
 
 
-class MinionCollectionCreateSchema(MinionCollectionBaseSchema):
-    pass
-
-
-class MinionCollectionUpdateSchema(MinionCollectionBaseSchema):
-    pass
-
-
-class MinionCollectionListSchema(MinionCollectionDBSchema):
-    pass
-
-
-class MinionCollectionListQueryParams(PaginatedListQueryParams):
-    model_config: ClassVar[ConfigDict] = {'extra': 'forbid'}
+class MinionFilterSchema(BaseModel):
+    name: str
+    label: str
+    operators: list[MinionFilterOperatorsSchema]
+    input_type: str = Field(serialization_alias='inputType')

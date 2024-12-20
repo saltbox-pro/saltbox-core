@@ -1,0 +1,12 @@
+#! /bin/bash
+
+set -o errexit
+trap 'echo Last command: ${BASH_COMMAND}' ERR
+
+CLIENT_SECRET="$(cat "$CLIENT_SECRET_FILE")"
+REDIS_PASSWORD="$(cat "$REDIS_PASSWORD_FILE")"
+USER_PASSWORD="$(cat "$USER_PASSWORD_FILE")"
+
+export CLIENT_SECRET REDIS_PASSWORD USER_PASSWORD
+
+"$@"

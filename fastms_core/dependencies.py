@@ -1,5 +1,5 @@
 import logging.config
-from typing import Annotated
+from typing import Annotated, Any
 
 import jwt
 from fastapi import Depends, HTTPException, status
@@ -14,7 +14,7 @@ logging.config.dictConfig(LOG_CONFIG.model_dump())
 logger = logging.getLogger(__name__)
 
 keycloak_scheme = HTTPBearer(
-    scheme_name='Keycloak JWT',
+    scheme_name='KeycloakJWT',
     description='Validate JWT token from Keycloak server with JWKS URI and extract user data',
 )
 
@@ -24,6 +24,14 @@ keycloak_scheme = HTTPBearer(
 jwks_client = jwt.PyJWKClient(uri=SETTINGS.keycloak_jwks_uri)
 
 
+async def decode_jwt(token: str) -> Any:
+    signing_key = jwks_client.get_signing_key_from_jwt(token)
+    payload = jwt.decode(
+        token, signing_key.key, algorithms=[SETTINGS.keycloak_algorithm], audience=SETTINGS.keycloak_audience
+    )
+    return payload
+
+
 async def get_current_user(token: Annotated[HTTPAuthorizationCredentials, Depends(keycloak_scheme)]) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -31,12 +39,7 @@ async def get_current_user(token: Annotated[HTTPAuthorizationCredentials, Depend
         headers={'WWW-Authenticate': 'Bearer'},
     )
     try:
-        access_token = token.credentials
-        signing_key = jwks_client.get_signing_key_from_jwt(access_token)
-        payload = jwt.decode(
-            access_token, signing_key.key, algorithms=[SETTINGS.keycloak_algorithm],
-            audience=SETTINGS.keycloak_audience
-        )
+        payload = await decode_jwt(token.credentials)
         user_id: str = payload.get('sub')
         if user_id is None:
             raise credentials_exception from None
