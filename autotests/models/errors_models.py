@@ -14,9 +14,5 @@ class ErrorResponse(BaseModel):
     detail: List[DetailItem]
 
 
-class NotFoundModel(BaseModel):
-    detail: str
-
-
 class ErrorTextModel(BaseModel):
     detail: str

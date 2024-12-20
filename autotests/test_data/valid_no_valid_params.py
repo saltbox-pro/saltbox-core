@@ -1,7 +1,7 @@
 from datetime import timedelta, datetime
 from http import HTTPStatus
 
-from models.errors_models import ErrorResponse, NotFoundModel, ErrorTextModel
+from models.errors_models import ErrorResponse, ErrorTextModel
 from models.jobs_models import Jobs
 from models.minions_models import MinionsListModel, CollectionsListModel, CreateCollectionModel, UniqueFilterValue
 
@@ -170,7 +170,7 @@ INVALID_MID_VALUES = [
     ('qwe', HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
 
     # Nonexistent MID
-    ('63111a3f02fa4363a76d58a4', HTTPStatus.NOT_FOUND, NotFoundModel),
+    ('63111a3f02fa4363a76d58a4', HTTPStatus.NOT_FOUND, ErrorTextModel),
 
     # None as MID
     (None, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
@@ -260,7 +260,7 @@ BODY_FOR_POST_COLLECTION_ENDPOINT = [
 
 INVALID_CID_VALUES_FOR_COLLECTION = [
     # Nonexistent cid
-    ('5eb7cf5a86d9755df3a6c999', HTTPStatus.NOT_FOUND, NotFoundModel),
+    ('5eb7cf5a86d9755df3a6c999', HTTPStatus.NOT_FOUND, ErrorTextModel),
 
     # Empty cid
     (' ', HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
