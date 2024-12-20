@@ -20,7 +20,6 @@ class UnsupportedSchemaType(Exception):
     pass
 
 
-
 schema_lookups_js_values = {
     '=': {'name': '=', 'value': '=', 'label': '='},
     '!=': {'name': '!=', 'value': '!=', 'label': '!='},

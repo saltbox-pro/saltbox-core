@@ -227,6 +227,7 @@ class MinionFilterOperatorsSchema(BaseModel):
     value: str
     label: str
 
+
 class MinionFilterSchema(BaseModel):
     name: str
     label: str
