@@ -9,7 +9,7 @@ from api.api_client import ApiClient
 from api.collections_api import post_collection, del_collection_cid
 from api.jobs_api import post_jobs
 from api.minions_api import post_minions
-from assertions.assertion_base import assert_status_code, assert_schema
+from assertions.assertion_base import assert_status_code
 from utilities.files_utils import read_json_common_request_data
 from utilities.logger_utils import logger
 from utilities.redis_utils import redis_client, delete_job_from_zset_on_redis

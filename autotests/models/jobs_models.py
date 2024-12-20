@@ -23,6 +23,7 @@ class JobResponse(BaseModel):
 class ModelJobResponse(BaseModel):
     jid: str
 
+
 class JobReturn(BaseModel):
     id: str
     success: bool
