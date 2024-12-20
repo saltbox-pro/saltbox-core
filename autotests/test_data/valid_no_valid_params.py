@@ -1,7 +1,7 @@
 from datetime import timedelta, datetime
 from http import HTTPStatus
 
-from models.errors_models import ErrorResponse, NotFoundModel
+from models.errors_models import ErrorResponse, NotFoundModel, ErrorTextModel
 from models.jobs_models import Jobs
 from models.minions_models import MinionsListModel, CollectionsListModel, CreateCollectionModel, UniqueFilterValue
 
@@ -159,7 +159,7 @@ BODY_FOR_POST_MINIONS_ENDPOINT = [
     ({'page': 1, 'per_page': 2, 'collection_id': ''}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
 
     # Incorrect query parameter
-    ({'query': {'$invalid': 'value'}}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+    ({'query': {'$invalid': 'value'}}, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorTextModel),
 ]
 
 INVALID_MID_VALUES = [

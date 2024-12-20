@@ -16,3 +16,7 @@ class ErrorResponse(BaseModel):
 
 class NotFoundModel(BaseModel):
     detail: str
+
+
+class ErrorTextModel(BaseModel):
+    detail: str
