@@ -1,4 +1,4 @@
-# Autotests for FastMS Core
+# Autotests for salt.box core
 
 ## Environment
 
@@ -10,8 +10,7 @@ pip install -r requirements.txt
 
 ## Run tests
 
-Start the FastMS system and optionally set `FASTMS_CORE_URL` environment
-variable. Then run:
+Start the salt.box system and tune the `.env` file. Then run:
 
 ```bash
 pytest -sv
@@ -25,8 +24,8 @@ In order to solve the following issue:
 ModuleNotFoundError: No module named 'fastms_core'
 ```
 
-install the FastMS Core as adviced in `README.md` or extend the `PYTHONPATH`:
+install the salt.box core as adviced in `README.md` or extend the `PYTHONPATH`:
 
 ```bash
-export PYTHONPATH="$PYTHONPATH:/path/to/fastms-core/"
+export PYTHONPATH="$PYTHONPATH:/path/to/salt-box-core/"
 ```

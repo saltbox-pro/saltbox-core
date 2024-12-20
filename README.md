@@ -1,4 +1,4 @@
-# FastMS Core
+# salt.box core
 
 ## Developement
 
@@ -26,5 +26,5 @@ sudo docker build --target=main --tag fastms-core .
 Additional settings need to be passed as environment variables to start. Check
 [fastms\_core/config.py](./fastms_core/config.py).
 
-Use [FastMS Compose](https://gitlab.com/fastms/fastms-compose) repo to run
+Use [salt.box compose](https://gitlab.com/salt.box/salt-box-compose) repo to run
 whole system.
