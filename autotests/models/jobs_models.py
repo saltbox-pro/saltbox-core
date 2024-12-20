@@ -21,8 +21,7 @@ class JobResponse(BaseModel):
 
 
 class ModelJobResponse(BaseModel):
-    return_: List[JobResponse] = Field(..., alias='return')
-
+    jid: str
 
 class JobReturn(BaseModel):
     id: str

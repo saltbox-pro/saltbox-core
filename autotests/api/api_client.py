@@ -29,7 +29,7 @@ class ApiClient:
             'username': os.getenv('USER_NAME'),
             'password': os.getenv('USER_PASSWORD'),
             'grant_type': 'password',
-            'client_id': 'fastms_core',
+            'client_id': 'salt_box_core',
             'client_secret': os.getenv('CLIENT_SECRET'),
             'scope': 'openid',
         }

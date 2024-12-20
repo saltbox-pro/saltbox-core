@@ -12,7 +12,7 @@ def create_new_job(api):
     post_obj = read_json_common_request_data('valid_post_jobs')
     response = post_jobs(api, json=post_obj)
     assert_status_code(response, HTTPStatus.OK)
-    jid = response.json()['return'][0]['jid']
+    jid = response.json().get('jid')
     return jid
 
 
@@ -20,7 +20,7 @@ def create_sleep_job(api):
     post_obj = read_json_common_request_data('valid_post_sleep_jobs')
     response = post_jobs(api, json=post_obj)
     assert_status_code(response, HTTPStatus.OK)
-    jid = response.json()['return'][0]['jid']
+    jid = response.json().get('jid')
     return jid
 
 

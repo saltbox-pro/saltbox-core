@@ -112,7 +112,7 @@ class TestJobs:
     @pytest.mark.ci
     def test_post_jobs_empty_json(self, api):
         response = post_jobs(api, json={})
-        jid = response.json()['return'][0]['jid']
+        jid = response.json().get('jid')
         assert_status_code(response, HTTPStatus.OK)
         assert_schema(response, ModelJobResponse)
         delete_created_data(jid)
