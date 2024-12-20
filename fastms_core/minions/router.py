@@ -3,7 +3,9 @@ from typing import Annotated
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, Body, HTTPException, status
+from pymongo.errors import PyMongoError
 
+from fastms_core import http_errors
 from fastms_core.collections.crud import collections_crud
 from fastms_core.collections.models import MinionCollection
 from fastms_core.config import LOG_CONFIG
@@ -46,11 +48,12 @@ async def minions_list(
         if isinstance(minions_collection, MinionCollection):
             search = {'$and': [minions_collection.query, search]}
 
-    response = await minions_crud.get_paginated(
-        search, page=params.page, per_page=params.per_page, projection_model=MinionListSchema
-    )
-
-    return response
+    try:
+        return await minions_crud.get_paginated(
+            search, page=params.page, per_page=params.per_page, projection_model=MinionListSchema
+        )
+    except PyMongoError as error:
+        raise http_errors.BadRequest(str(error)) from error
 
 
 @minions_router.get('/{mid}', operation_id='minion_retrieve')
