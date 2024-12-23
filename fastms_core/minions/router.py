@@ -19,7 +19,7 @@ from fastms_core.minions.schemas import (
     MinionsListQueryParams,
     UniqueGrainValuesResponse,
 )
-from fastms_core.minions.utils import make_aggregate_sequence
+from fastms_core.minions.utils import MongoPiplineBuilder
 from fastms_core.utilities.model_schema import get_model_schema
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
@@ -77,11 +77,19 @@ async def filter_schema() -> list[MinionFilterSchema]:
 @filters_router.post('/unique-grain-values', operation_id='filter_values')
 async def unique_field_values(params: Annotated[MinionFilterValuesQueryParams, Body()]) -> UniqueGrainValuesResponse:
     """Get unique values for a field in the Minion model"""
-    sequence = make_aggregate_sequence(params.field)
+    pipline_builder = MongoPiplineBuilder(params.field)
+    pipline = pipline_builder.build()
 
-    result = await Minion.find(params.query).aggregate(sequence).to_list()
+    try:
+        result = await minions_crud.get_pipeline(params.query, pipeline=pipline)
+    except Exception as e:
+        msg = f'Error on aggregation pipeline: {e!r}'
+        logger.error(msg)
+        raise HTTPException(status_code=400, detail=msg) from None
+
     response = UniqueGrainValuesResponse(
         total=len(result),
         data=result,
     )
+
     return response

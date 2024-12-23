@@ -39,6 +39,9 @@ class CRUDBase(Generic[ModelType, ListSchemaType, CreateSchemaType, UpdateSchema
 
         return data
 
+    async def get_pipeline(self, search: dict, *, pipeline: list[dict]) -> list[dict[str, Any]]:
+        return await self.model.find(search).aggregate(pipeline).to_list()
+
     async def get_paginated(
         self,
         search: dict | None = None,
