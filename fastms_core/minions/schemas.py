@@ -95,6 +95,7 @@ class GrainsSchema(BaseModel):
     pythonexecutable: str | None = Field(title='Python executable', default=None)
     pythonpath: list[str] | None = Field(title='Python paths list', default=None)
     pythonversion: list[Any] | None = Field(title='Python version', default=None)
+    pythonversionstring: str | None = Field(title='Python version string', default=None)
     saltpath: str | None = Field(title='Salt path', default=None)
     saltversion: str | None = Field(title='Salt version', default=None)
     saltversioninfo: list[int] | None = Field(title='Salt version info', default=None)
@@ -173,12 +174,13 @@ class MinionsListQueryParams(PaginatedListQueryParams, MongoQueryBaseSchema):
 
 
 class MinionFilterValuesQueryParams(MongoQueryBaseSchema):
-    model_configg: ClassVar[ConfigDict] = {'extra': 'forbid'}
     field: str = Field(
         description='Field name to get unique values',
         examples=['grains.os', 'grains.cpu_model', 'grains.mem_total'],
         json_schema_extra={'example': 'grains.os'},
     )
+
+    model_config: ClassVar[ConfigDict] = {'extra': 'forbid'}
 
     @field_validator('field')
     @classmethod
