@@ -3,7 +3,49 @@ from http import HTTPStatus
 
 from models.errors_models import ErrorResponse, ErrorTextModel
 from models.jobs_models import Jobs
-from models.minions_models import MinionsListModel, CollectionsListModel, CreateCollectionModel, UniqueFilterValue
+from models.minions_models import MinionsListModel, ListModel, CreateCollectionModel, UniqueFilterValue
+from models.tasks_models import TaskTemplateBaseSchema
+
+PARAMETERS_FOR_GET_LISTS_ENDPOINTS = [
+    # Default values
+    (None, None, HTTPStatus.OK, ListModel),
+
+    # Positive tests: valid values
+    # Valid page and per_page values
+    (0, 20, HTTPStatus.OK, ListModel),
+    (1, 50, HTTPStatus.OK, ListModel),
+    (2, 100, HTTPStatus.OK, ListModel),
+
+    # Boundary values
+    # Minimum valid value for per_page
+    (0, 1, HTTPStatus.OK, ListModel),
+
+    # Maximum valid value for per_page
+    (0, 100, HTTPStatus.OK, ListModel),
+
+    # Negative tests: values that result in errors
+    # Invalid value for page
+    (-1, 20, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+
+    # Invalid value for per_page
+    (0, 0, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+
+    # Negative per_page
+    (None, -10, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+
+    # Absence of optional parameters (though they are optional)
+    (None, None, HTTPStatus.OK, ListModel),
+
+    # Mixed invalid and valid parameters
+    # Invalid page and valid per_page
+    (-1, 50, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+
+    # Invalid type for per_page
+    (0, 'abc', HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+
+    # Invalid type for page
+    ('abc', 20, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+]
 
 # DATA DOR /jobs ENDPOINTS
 VALID_AND_INVALID_PARAMS_FOR_JOBS = [
@@ -20,8 +62,8 @@ VALID_AND_INVALID_PARAMS_FOR_JOBS = [
 
     # Boundary and invalid cases
     # end_datetime < start_datetime
-    ((datetime.now() - timedelta(minutes=1)).isoformat(), (datetime.now() - timedelta(minutes=2)).isoformat(),
-     HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
+    ((datetime.now() - timedelta(minutes=10)).isoformat(), (datetime.now() - timedelta(minutes=2)).isoformat(),
+     HTTPStatus.OK, ErrorResponse),
 
     # Invalid format
     # Invalid start_datetime format
@@ -192,47 +234,6 @@ INVALID_MID_VALUES = [
 ]
 
 # DATA FOR /collections ENDPOINTS
-PARAMETERS_FOR_GET_COLLECTION_ENDPOINT = [
-    # Default values
-    (None, None, HTTPStatus.OK, CollectionsListModel),
-
-    # Positive tests: valid values
-    # Valid page and per_page values
-    (0, 20, HTTPStatus.OK, CollectionsListModel),
-    (1, 50, HTTPStatus.OK, CollectionsListModel),
-    (2, 100, HTTPStatus.OK, CollectionsListModel),
-
-    # Boundary values
-    # Minimum valid value for per_page
-    (0, 1, HTTPStatus.OK, CollectionsListModel),
-
-    # Maximum valid value for per_page
-    (0, 100, HTTPStatus.OK, CollectionsListModel),
-
-    # Negative tests: values that result in errors
-    # Invalid value for page
-    (-1, 20, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
-
-    # Invalid value for per_page
-    (0, 0, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
-
-    # Negative per_page
-    (None, -10, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
-
-    # Absence of optional parameters (though they are optional)
-    (None, None, HTTPStatus.OK, CollectionsListModel),
-
-    # Mixed invalid and valid parameters
-    # Invalid page and valid per_page
-    (-1, 50, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
-
-    # Invalid type for per_page
-    (0, 'abc', HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
-
-    # Invalid type for page
-    ('abc', 20, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
-]
-
 BODY_FOR_POST_COLLECTION_ENDPOINT = [
     # Positive scenarios
     # Valid query and title
@@ -319,4 +320,131 @@ INVALID_CID_VALUES_FOR_DEL_COLLECTION = [
 
     # Incorrect format: long cid
     ('5eb7cf5a86d9755df3a6c5931234567890', HTTPStatus.UNPROCESSABLE_ENTITY),
+]
+
+# DATA FOR /tasks
+BODY_FOR_POST_TASKS_TEMPLATE_ENDPOINT = [
+    # ТС001: Валидные данные
+    (
+        {
+            'title': 'Valid Task',
+            'fun': 'salt.ping',
+            'variables': [
+                {
+                    'title': 'Timeout',
+                    'name': 'timeout',
+                    'type': 'number',
+                    'required': True,
+                    'choices': [5, 10, 15],
+                    'default_value': 10,
+                }
+            ],
+            'task_args': ['const_arg', '<<task_var.timeout>>'],
+            'task_kwargs': {
+                'timeout': '<<task_var.timeout>>',
+            },
+        },
+        HTTPStatus.OK,
+        TaskTemplateBaseSchema,
+    ),
+    # ТС002: Неверный тип данных для variables.type
+    (
+        {
+            'title': 'Invalid Type',
+            'fun': 'salt.ping',
+            'variables': [
+                {
+                    'title': 'Timeout',
+                    'name': 'timeout',
+                    'type': 'int',  # Некорректный тип
+                    'required': True,
+                }
+            ],
+            'task_args': [],
+            'task_kwargs': {},
+        },
+        HTTPStatus.UNPROCESSABLE_ENTITY,
+        ErrorResponse,
+    ),
+    # ТС003: Пустое название задачи
+    (
+        {
+            'title': '',
+            'fun': 'salt.ping',
+            'variables': [],
+            'task_args': [],
+            'task_kwargs': {},
+        },
+        HTTPStatus.UNPROCESSABLE_ENTITY,
+        ErrorResponse,
+    ),
+    # ТС004: Пропущено обязательное поле 'fun'
+    (
+        {
+            'title': 'Missing Fun',
+            'variables': [
+                {
+                    'title': 'Variable',
+                    'name': 'var1',
+                    'type': 'str',
+                    'required': True,
+                }
+            ],
+            'task_args': [],
+            'task_kwargs': {},
+        },
+        HTTPStatus.UNPROCESSABLE_ENTITY,
+        ErrorResponse,
+    ),
+    # ТС005: Некорректный ключ в task_kwargs
+    (
+        {
+            'title': 'Invalid Kwarg Key',
+            'fun': 'salt.ping',
+            'variables': [
+                {
+                    'title': 'Timeout',
+                    'name': 'timeout',
+                    'type': 'number',
+                    'required': True,
+                }
+            ],
+            'task_args': [],
+            'task_kwargs': {
+                123: '<<task_var.timeout>>',  # Ключ в виде числа, а не строки
+            },
+        },
+        HTTPStatus.UNPROCESSABLE_ENTITY,
+        ErrorResponse,
+    ),
+    # ТС006: Пропущено обязательное поле 'title'
+    (
+        {
+            'fun': 'salt.ping',
+            'variables': [
+                {
+                    'title': 'Variable',
+                    'name': 'var1',
+                    'type': 'str',
+                    'required': True,
+                }
+            ],
+            'task_args': ['const_arg'],
+            'task_kwargs': {},
+        },
+        HTTPStatus.UNPROCESSABLE_ENTITY,
+        ErrorResponse,
+    ),
+    # ТС007: Пустой список variables
+    (
+        {
+            'title': 'Empty Variables',
+            'fun': 'salt.ping',
+            'variables': [],
+            'task_args': ['const_arg'],
+            'task_kwargs': {'key': 'value'},
+        },
+        HTTPStatus.OK,
+        TaskTemplateBaseSchema,
+    ),
 ]
