@@ -194,7 +194,7 @@ class MinionsListModel(BaseModel):
     data: List[Datum]
 
 
-class CollectionsListModel(BaseModel):
+class ListModel(BaseModel):
     total: int
     data: List
 

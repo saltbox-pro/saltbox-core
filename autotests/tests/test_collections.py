@@ -7,7 +7,7 @@ from api.collections_api import get_collection, post_collection, get_collection_
 from assertions.assertion_base import assert_status_code, assert_schema
 from assertions.minions_assertions import assertion_collection_title
 from models.minions_models import CreateCollectionModel
-from test_data.valid_no_valid_params import PARAMETERS_FOR_GET_COLLECTION_ENDPOINT, BODY_FOR_POST_COLLECTION_ENDPOINT, \
+from test_data.valid_no_valid_params import PARAMETERS_FOR_GET_LISTS_ENDPOINTS, BODY_FOR_POST_COLLECTION_ENDPOINT, \
     INVALID_CID_VALUES_FOR_COLLECTION, INVALID_BODY_FOR_PUT_COLLECTION, INVALID_CID_VALUES_FOR_DEL_COLLECTION
 from utilities.files_utils import read_json_common_request_data
 
@@ -19,7 +19,7 @@ class TestCollections:
 
     # GET /collection
     @pytest.mark.ci
-    @pytest.mark.parametrize('page, per_page, expected_status, schema', PARAMETERS_FOR_GET_COLLECTION_ENDPOINT)
+    @pytest.mark.parametrize('page, per_page, expected_status, schema', PARAMETERS_FOR_GET_LISTS_ENDPOINTS)
     def test_get_collections_list(self, api, page, per_page, expected_status, schema):
         response = get_collection(api, page, per_page)
         assert_status_code(response, expected_status)
