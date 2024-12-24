@@ -7,7 +7,7 @@ from beanie import PydanticObjectId
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from fastms_core.config import LOG_CONFIG
-from fastms_core.db.mongo.schemas_base import BaseDBSchema, PaginatedListQueryParams
+from fastms_core.db.mongo.schemas_base import BaseDBSchema, PaginatedListParams
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
@@ -128,7 +128,7 @@ class TaskTemplateListSchema(TaskTemplateDBSchema):
     pass
 
 
-class TaskTemplateListQueryParams(PaginatedListQueryParams):
+class TaskTemplateListQueryParams(PaginatedListParams):
     model_config: ClassVar[ConfigDict] = {'extra': 'forbid'}
 
 
@@ -224,5 +224,5 @@ class TaskListSchema(TaskDBSchema):
     pass
 
 
-class TaskListQueryParams(PaginatedListQueryParams):
+class TaskListQueryParams(PaginatedListParams):
     model_config: ClassVar[ConfigDict] = {'extra': 'forbid'}
