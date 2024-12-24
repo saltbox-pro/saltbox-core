@@ -16,7 +16,7 @@ class PaginatedResponse(BaseModel, Generic[SchemaType]):
     data: list[SchemaType]
 
 
-class PaginatedListQueryParams(BaseModel):
+class PaginatedListParams(BaseModel):
     page: int = Field(default=0, description='Page number', ge=0)
     per_page: int = Field(default=20, description='Items per page', ge=1, examples=[20, 50, 100])
 

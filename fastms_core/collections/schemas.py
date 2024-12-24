@@ -3,7 +3,7 @@ from typing import ClassVar
 from beanie import PydanticObjectId
 from pydantic import ConfigDict, Field
 
-from fastms_core.db.mongo.schemas_base import MongoQueryBaseSchema, PaginatedListQueryParams
+from fastms_core.db.mongo.schemas_base import MongoQueryBaseSchema, PaginatedListParams
 
 
 class MinionCollectionBaseSchema(MongoQueryBaseSchema):
@@ -30,5 +30,5 @@ class MinionCollectionListSchema(MinionCollectionDBSchema):
     pass
 
 
-class MinionCollectionListQueryParams(PaginatedListQueryParams):
+class MinionCollectionListQueryParams(PaginatedListParams):
     model_config: ClassVar[ConfigDict] = {'extra': 'forbid'}

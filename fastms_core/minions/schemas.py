@@ -5,7 +5,7 @@ from beanie import PydanticObjectId
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from fastms_core.db.mongo.schemas_base import MongoQueryBaseSchema, PaginatedListQueryParams
+from fastms_core.db.mongo.schemas_base import MongoQueryBaseSchema, PaginatedListParams
 
 
 def datetime_now_sec() -> datetime:
@@ -167,13 +167,13 @@ class MinionListSchema(MinionSchemaBase):
         }
 
 
-class MinionsListQueryParams(PaginatedListQueryParams, MongoQueryBaseSchema):
+class MinionsListBody(PaginatedListParams, MongoQueryBaseSchema):
     collection_id: PydanticObjectId | None = None
 
     model_config: ClassVar[ConfigDict] = {'extra': 'forbid'}
 
 
-class MinionFilterValuesQueryParams(MongoQueryBaseSchema):
+class MinionFilterValuesBody(MongoQueryBaseSchema):
     field: str = Field(
         description='Field name to get unique values',
         examples=['grains.os', 'grains.cpu_model', 'grains.mem_total'],
@@ -189,7 +189,7 @@ class MinionFilterValuesQueryParams(MongoQueryBaseSchema):
             raise RequestValidationError(
                 errors=[
                     {
-                        'loc': ['query', 'field'],
+                        'loc': ['body', 'field'],
                         'msg': f'Invalid field: {value}',
                         'type': 'value_error',
                         'input': value,
@@ -204,7 +204,7 @@ class MinionFilterValuesQueryParams(MongoQueryBaseSchema):
                 raise RequestValidationError(
                     errors=[
                         {
-                            'loc': ['field', 'field'],
+                            'loc': ['body', 'field'],
                             'msg': f'Invalid field: {value}',
                             'type': 'value_error',
                             'input': value,
