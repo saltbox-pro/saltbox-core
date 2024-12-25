@@ -14,13 +14,7 @@ class ApiClient:
         self.client = Client(base_url=os.getenv("RESOURCE_URL"))
         self.ws = WsClient(base_url=os.getenv("RESOURCE_WS_URL"), api_client=self)
         self.token = None
-
-    # @staticmethod
-    # def basic_auth_header(self):
-    #     """Return header for для Basic Auth."""
-    #     username = os.getenv('BASIC_AUTH_LOGIN')
-    #     password = os.getenv('BASIC_AUTH_PASSWORD')
-    #     return f"Basic {b64encode(f'{username}:{password}'.encode()).decode()}"
+        self.logging_enabled = os.getenv('LOGGING', 'False').lower() == 'true'
 
     def get_token(self):
         """Get Bearer Token."""
@@ -64,11 +58,9 @@ class ApiClient:
 
         return self.client.request(method, url, **kwargs)
 
-    @staticmethod
-    def log_request(method, url, **kwargs):
+    def log_request(self, method, url, **kwargs):
         """Logging request info."""
-
-        if os.getenv('LOGGING', 'False').lower() == 'true':
+        if self.logging_enabled:
             log_message = f"{method} {url}"
             if kwargs.get('params'):
                 log_message += f" | Params: {json.dumps(kwargs['params'])}"
