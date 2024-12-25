@@ -36,9 +36,12 @@ class ApiClient:
         headers = {
             'Content-Type': 'application/x-www-form-urlencoded',
         }
+        if os.getenv('USE_BASIC_AUTH', 'False').lower() == 'true':
+            auth = BasicAuth(os.getenv('BASIC_AUTH_LOGIN'), os.getenv('BASIC_AUTH_PASSWORD'))
+        else:
+            auth = None
 
-        response = self.client.request('POST', url, data=payload, headers=headers,
-                                       auth=BasicAuth(os.getenv('BASIC_AUTH_LOGIN'), os.getenv('BASIC_AUTH_PASSWORD')))
+        response = self.client.request('POST', url, data=payload, headers=headers, auth=auth)
 
         response.raise_for_status()
         logger.info('Token successfully retrieve')
@@ -64,7 +67,8 @@ class ApiClient:
     @staticmethod
     def log_request(method, url, **kwargs):
         """Logging request info."""
-        if os.getenv('LOGGING', 'False').lower() in 'true':
+
+        if os.getenv('LOGGING', 'False').lower() == 'true':
             log_message = f"{method} {url}"
             if kwargs.get('params'):
                 log_message += f" | Params: {json.dumps(kwargs['params'])}"
@@ -82,7 +86,7 @@ class WsClient:
     async def connect(self, endpoint):
         headers = {}
         token = self.api_client.token
-        if os.getenv('USE_BASIC_AUTH', 'False').lower() in 'true':
+        if os.getenv('USE_BASIC_AUTH', 'False').lower() == 'true':
             username = os.getenv('BASIC_AUTH_LOGIN')
             password = os.getenv('BASIC_AUTH_PASSWORD')
             auth_header = f"Basic {b64encode(f'{username}:{password}'.encode()).decode()}"
