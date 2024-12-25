@@ -64,7 +64,7 @@ class ApiClient:
     @staticmethod
     def log_request(method, url, **kwargs):
         """Logging request info."""
-        if eval(os.getenv('LOGGING')):
+        if os.getenv('LOGGING', 'False').lower() in 'true':
             log_message = f"{method} {url}"
             if kwargs.get('params'):
                 log_message += f" | Params: {json.dumps(kwargs['params'])}"
@@ -82,7 +82,7 @@ class WsClient:
     async def connect(self, endpoint):
         headers = {}
         token = self.api_client.token
-        if eval(os.getenv('USE_BASIC_AUTH')):
+        if os.getenv('USE_BASIC_AUTH', 'False').lower() in 'true':
             username = os.getenv('BASIC_AUTH_LOGIN')
             password = os.getenv('BASIC_AUTH_PASSWORD')
             auth_header = f"Basic {b64encode(f'{username}:{password}'.encode()).decode()}"
