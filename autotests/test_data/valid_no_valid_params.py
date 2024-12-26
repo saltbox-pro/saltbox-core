@@ -63,7 +63,7 @@ VALID_AND_INVALID_PARAMS_FOR_JOBS = [
     # Boundary and invalid cases
     # end_datetime < start_datetime
     ((datetime.now() - timedelta(minutes=10)).isoformat(), (datetime.now() - timedelta(minutes=2)).isoformat(),
-     HTTPStatus.OK, ErrorResponse),
+     HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
 
     # Invalid format
     # Invalid start_datetime format
