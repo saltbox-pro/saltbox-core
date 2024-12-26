@@ -1,8 +1,7 @@
 import logging.config
-from typing import Annotated
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, Body, HTTPException, status
+from fastapi import APIRouter, HTTPException, status
 from pymongo.errors import PyMongoError
 
 from fastms_core import http_errors
@@ -14,12 +13,12 @@ from fastms_core.minions.crud import minions_crud
 from fastms_core.minions.models import Minion
 from fastms_core.minions.schemas import (
     MinionFilterSchema,
-    MinionFilterValuesQueryParams,
+    MinionFilterValuesBody,
     MinionListSchema,
-    MinionsListQueryParams,
+    MinionsListBody,
     UniqueGrainValuesResponse,
 )
-from fastms_core.minions.utils import make_aggregate_sequence
+from fastms_core.minions.utils import MongoPiplineBuilder
 from fastms_core.utilities.model_schema import get_model_schema
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
@@ -38,19 +37,19 @@ filters_router = APIRouter(prefix='/filters', tags=['Filters'])
 
 @minions_router.post('', operation_id='minions_list')
 async def minions_list(
-    params: Annotated[MinionsListQueryParams, Body()],
+    body: MinionsListBody,
 ) -> PaginatedResponse[MinionListSchema]:
-    search = params.query
+    search = body.query
 
-    if params.collection_id:
-        minions_collection = await collections_crud.get(params.collection_id)
+    if body.collection_id:
+        minions_collection = await collections_crud.get(body.collection_id)
 
         if isinstance(minions_collection, MinionCollection):
             search = {'$and': [minions_collection.query, search]}
 
     try:
         return await minions_crud.get_paginated(
-            search, page=params.page, per_page=params.per_page, projection_model=MinionListSchema
+            search, page=body.page, per_page=body.per_page, projection_model=MinionListSchema
         )
     except PyMongoError as error:
         raise http_errors.UnprocessableEntity(str(error)) from error
@@ -75,13 +74,19 @@ async def filter_schema() -> list[MinionFilterSchema]:
 
 
 @filters_router.post('/unique-grain-values', operation_id='filter_values')
-async def unique_field_values(params: Annotated[MinionFilterValuesQueryParams, Body()]) -> UniqueGrainValuesResponse:
+async def unique_field_values(body: MinionFilterValuesBody) -> UniqueGrainValuesResponse:
     """Get unique values for a field in the Minion model"""
-    sequence = make_aggregate_sequence(params.field)
+    pipline_builder = MongoPiplineBuilder(body.field)
+    pipline = pipline_builder.build()
 
-    result = await Minion.find(params.query).aggregate(sequence).to_list()
+    try:
+        result = await minions_crud.get_pipeline(body.query, pipeline=pipline)
+    except PyMongoError as error:
+        raise http_errors.UnprocessableEntity(str(error)) from error
+
     response = UniqueGrainValuesResponse(
         total=len(result),
         data=result,
     )
+
     return response

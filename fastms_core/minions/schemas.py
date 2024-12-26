@@ -5,7 +5,7 @@ from beanie import PydanticObjectId
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from fastms_core.db.mongo.schemas_base import MongoQueryBaseSchema, PaginatedListQueryParams
+from fastms_core.db.mongo.schemas_base import MongoQueryBaseSchema, PaginatedListParams
 
 
 def datetime_now_sec() -> datetime:
@@ -95,6 +95,7 @@ class GrainsSchema(BaseModel):
     pythonexecutable: str | None = Field(title='Python executable', default=None)
     pythonpath: list[str] | None = Field(title='Python paths list', default=None)
     pythonversion: list[Any] | None = Field(title='Python version', default=None)
+    pythonversionstring: str | None = Field(title='Python version string', default=None)
     saltpath: str | None = Field(title='Salt path', default=None)
     saltversion: str | None = Field(title='Salt version', default=None)
     saltversioninfo: list[int] | None = Field(title='Salt version info', default=None)
@@ -166,19 +167,20 @@ class MinionListSchema(MinionSchemaBase):
         }
 
 
-class MinionsListQueryParams(PaginatedListQueryParams, MongoQueryBaseSchema):
+class MinionsListBody(PaginatedListParams, MongoQueryBaseSchema):
     collection_id: PydanticObjectId | None = None
 
     model_config: ClassVar[ConfigDict] = {'extra': 'forbid'}
 
 
-class MinionFilterValuesQueryParams(MongoQueryBaseSchema):
-    model_configg: ClassVar[ConfigDict] = {'extra': 'forbid'}
+class MinionFilterValuesBody(MongoQueryBaseSchema):
     field: str = Field(
         description='Field name to get unique values',
         examples=['grains.os', 'grains.cpu_model', 'grains.mem_total'],
         json_schema_extra={'example': 'grains.os'},
     )
+
+    model_config: ClassVar[ConfigDict] = {'extra': 'forbid'}
 
     @field_validator('field')
     @classmethod
@@ -187,7 +189,7 @@ class MinionFilterValuesQueryParams(MongoQueryBaseSchema):
             raise RequestValidationError(
                 errors=[
                     {
-                        'loc': ['query', 'field'],
+                        'loc': ['body', 'field'],
                         'msg': f'Invalid field: {value}',
                         'type': 'value_error',
                         'input': value,
@@ -202,7 +204,7 @@ class MinionFilterValuesQueryParams(MongoQueryBaseSchema):
                 raise RequestValidationError(
                     errors=[
                         {
-                            'loc': ['field', 'field'],
+                            'loc': ['body', 'field'],
                             'msg': f'Invalid field: {value}',
                             'type': 'value_error',
                             'input': value,
