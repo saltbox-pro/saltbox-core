@@ -33,14 +33,19 @@ class TasksWatcher:
             await asyncio.sleep(1)
 
 
-async def main():
+async def async_main():
     mongo_client = await init_mongo()
     watcher = TasksWatcher()
 
+    logger.info('Starting watcher')
     await watcher.process()
 
     mongo_client.close()
 
 
+def main() -> None:
+    asyncio.run(async_main())
+
+
 if __name__ == '__main__':
-    asyncio.run(main())
+    main()

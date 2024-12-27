@@ -13,8 +13,7 @@ COPY --chmod=644 docker/shell_init.sh /etc/
 COPY --chmod=755 \
   docker/celery-beat.sh \
   docker/celery-worker.sh \
-  docker/minions-consumer.sh \
-  docker/tasks-watcher.sh \
+  docker/entrypoint.sh \
   docker/uvicorn.sh \
   /usr/local/bin/
 

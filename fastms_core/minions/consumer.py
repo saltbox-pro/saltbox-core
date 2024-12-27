@@ -57,14 +57,19 @@ class GrainsConsumer:
                 await asyncio.sleep(0.01)
 
 
-async def main():
+async def async_main():
     mongo_client = await init_mongo()
     grains_consumer = GrainsConsumer(channel='grains')
 
+    logger.info('Starting grains consumer')
     await grains_consumer.consume()
 
     mongo_client.close()
 
 
+def main() -> None:
+    asyncio.run(async_main())
+
+
 if __name__ == '__main__':
-    asyncio.run(main())
+    main()

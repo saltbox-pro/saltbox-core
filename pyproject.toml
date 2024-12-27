@@ -26,6 +26,8 @@ dev = [
 ]
 
 [project.scripts]
+salt-box-minions-consumer = 'fastms_core.minions.consumer:main'
+salt-box-tasks-watcher = 'fastms_core.tasks.tasks_watcher:main'
 
 [metadata]
 url = 'https://gitlab.com/fastms'
