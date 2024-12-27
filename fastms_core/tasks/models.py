@@ -135,6 +135,7 @@ class Task(Document, TaskSchema):
 
                 self.jobs.append(TaskJob.model_validate({'jid': jid, 'target': job_targeting}))
             except SaltJobCreateError as error:
+                logger.warning(error)
                 self.targets_queue.append(job_targeting)
 
         await self.save()
