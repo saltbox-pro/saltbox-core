@@ -1,7 +1,7 @@
 ARG PYTHON_VERSION='3.12'
 
 FROM python:${PYTHON_VERSION}-alpine AS base
-LABEL version='0.12'
+LABEL version='0.13'
 ENV SALT_USERNAME="salt_box_core"
 EXPOSE 8000
 
@@ -9,10 +9,10 @@ RUN \
   --mount=type=bind,source=requirements.txt,target=/mnt/requirements.txt\
   --mount=type=cache,target=/root/.cache/pip/ \
   pip3 install --upgrade --requirement /mnt/requirements.txt
+COPY --chmod=644 docker/shell_init.sh /etc/
 COPY --chmod=755 \
   docker/celery-beat.sh \
   docker/celery-worker.sh \
-  docker/export-secrets.sh \
   docker/minions-consumer.sh \
   docker/tasks-watcher.sh \
   docker/uvicorn.sh \

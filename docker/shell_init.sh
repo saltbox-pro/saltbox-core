@@ -1,8 +1,16 @@
-#! /bin/sh
+# This file is a part of salt.box core Docker image.
+#
+# This file supposed to be sourced with a shell.
+#
+
 set -e
 
 warn() {
   1>&2 echo "$@"
+}
+
+err() {
+  warn "$@" && exit 1
 }
 
 SALT_PASSWORD="$(cat /run/secrets/salt_api_password)"

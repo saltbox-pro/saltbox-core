@@ -1,9 +1,6 @@
 #! /bin/sh
-set -e
-
-err() {
-  2>&1 echo "$1" && exit 1
-}
+# shellcheck source=./shell_init.sh
+. /etc/shell_init.sh
 
 application=fastms_core.celery
 concurrency=4
@@ -15,8 +12,6 @@ case $1 in
 esac
 
 if [ -z "$queue" ]; then err 'Missing QUEUE arg' && exit 1; fi
-
-. export-secrets.sh
 
 cmd="celery --app='${application}' worker"
 cmd="${cmd} --concurrency=${concurrency} --pool=gevent --queues=${queue}"
