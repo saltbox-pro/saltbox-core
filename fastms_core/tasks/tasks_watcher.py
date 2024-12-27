@@ -4,6 +4,7 @@ import logging.config
 from redis import asyncio as aioredis
 
 from fastms_core.config import LOG_CONFIG, SETTINGS
+from fastms_core.db.mongo.config import init_mongo
 from fastms_core.tasks.models import Task
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
@@ -30,3 +31,16 @@ class TasksWatcher:
                 await task.process(redis=redis)  # TODO: move to celery task
 
             await asyncio.sleep(1)
+
+
+async def main():
+    mongo_client = await init_mongo()
+    watcher = TasksWatcher()
+
+    await watcher.process()
+
+    mongo_client.close()
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

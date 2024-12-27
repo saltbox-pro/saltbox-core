@@ -13,6 +13,8 @@ COPY --chmod=755 \
   docker/celery-beat.sh \
   docker/celery-worker.sh \
   docker/export-secrets.sh \
+  docker/minions-consumer.sh \
+  docker/tasks-watcher.sh \
   docker/uvicorn.sh \
   /usr/local/bin/
 

@@ -6,6 +6,7 @@ from typing import Any
 from redis import asyncio as aioredis
 
 from fastms_core.config import LOG_CONFIG, SETTINGS
+from fastms_core.db.mongo.config import init_mongo
 from fastms_core.minions.crud import minions_crud
 from fastms_core.minions.models import Minion
 from fastms_core.minions.schemas import MinionSchemaCreate
@@ -54,3 +55,16 @@ class GrainsConsumer:
                 if msg:
                     await self.handle_message(msg['data'])
                 await asyncio.sleep(0.01)
+
+
+async def main():
+    mongo_client = await init_mongo()
+    grains_consumer = GrainsConsumer(channel='grains')
+
+    await grains_consumer.consume()
+
+    mongo_client.close()
+
+
+if __name__ == '__main__':
+    asyncio.run(main())
