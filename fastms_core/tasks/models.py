@@ -12,7 +12,6 @@ from redis import asyncio as aioredis
 from fastms_core.collections.models import MinionCollection
 from fastms_core.config import LOG_CONFIG, SETTINGS
 from fastms_core.minions.models import Minion
-from fastms_core.salt.http_client import SALT_CLIENT, SaltHttpClientError
 from fastms_core.tasks.schemas import (
     TaskJob,
     TaskJobStatus,
@@ -22,6 +21,7 @@ from fastms_core.tasks.schemas import (
     TaskTemplateVariable,
     TaskTgtType,
 )
+from fastms_core.utilities.salt import SaltJobCreateError, create_job
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
@@ -115,7 +115,7 @@ class Task(Document, TaskSchema):
 
         await self.save()
 
-    async def __rub_jobs(self) -> None:
+    async def __rub_jobs(self, redis) -> None:
         if not self.targets_queue:
             return
 
@@ -123,12 +123,18 @@ class Task(Document, TaskSchema):
             job_targeting = self.targets_queue.pop(0)
 
             try:
-                ret = await SALT_CLIENT.run_job(
-                    tgt=job_targeting.tgt, fun=self.fun, arg=self.task_args, kwarg=self.task_kwargs, tgt_type='list'
+                jid: str = await create_job(
+                    tgt=job_targeting.tgt,
+                    tgt_type='list',
+                    fun=self.fun,
+                    arg=self.task_args,
+                    kwarg=self.task_kwargs,
+                    salt_master='salt-master',  # TODO: get salt master from request
+                    rdb=redis,
                 )
 
-                self.jobs.append(TaskJob.model_validate({'jid': str(ret['return'][0]['jid']), 'target': job_targeting}))
-            except SaltHttpClientError:
+                self.jobs.append(TaskJob.model_validate({'jid': jid, 'target': job_targeting}))
+            except SaltJobCreateError as error:
                 self.targets_queue.append(job_targeting)
 
         await self.save()
@@ -143,7 +149,7 @@ class Task(Document, TaskSchema):
             redis = await self.__get_redis()
 
         await self.__check_running_jobs(redis=redis)
-        await self.__rub_jobs()
+        await self.__rub_jobs(redis=redis)
 
         if not self.targets_queue:
             for job in self.jobs:
