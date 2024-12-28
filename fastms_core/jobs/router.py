@@ -85,7 +85,7 @@ async def job_create(item: CreateJobRequest, rdb: RedisDependency) -> CreateJobR
             rdb=rdb,
         )
 
-        return CreateJobResponse.model_validate({"jid": jid})
+        return CreateJobResponse.model_validate({'jid': jid})
     except SaltJobCreateError as error:
         raise http_errors.BadGateway(detail=str(error)) from error
 
@@ -136,7 +136,7 @@ async def job_returns_list(
 @ws_router.websocket('')
 async def jobs_rets_websocket(websocket: WebSocket, rdb: RedisDependency) -> None:
     secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
-    await secure_websocket.handle_pubsub(channel='job:*:new', schema=Job)
+    await secure_websocket.handle_pubsub({'job:*:new': Job})
 
 
 @ws_router.websocket('/{jid}/return')
@@ -152,4 +152,4 @@ async def jobs_endpoint_websocket(
         raise http_errors.WebSocketPolicyViolation(msg)
 
     secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
-    await secure_websocket.handle_pubsub(channel=f'job:{jid}:return', schema=JobResult)
+    await secure_websocket.handle_pubsub({'job:*:return': JobResult})
