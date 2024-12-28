@@ -10,7 +10,7 @@ from typing import Any, TypedDict
 
 from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.websockets import WebSocketState
-from jwt import InvalidTokenError
+from jwt import InvalidTokenError, PyJWKClientError
 from pydantic import BaseModel, ValidationError
 from redis.asyncio import Redis
 from redis.asyncio.client import PubSub
@@ -75,13 +75,7 @@ def _check_ws_connection(fn: Callable[..., Any]) -> Callable[..., Any]:
 
     @functools.wraps(fn)
     async def wrapper(self: 'AuthenticatedWebSocket', *args: tuple, **kwargs: dict) -> Any:
-        if (
-            self.websocket.application_state == WebSocketState.DISCONNECTED
-            or self.websocket.client_state == WebSocketState.DISCONNECTED
-        ):
-            LOGGER.debug('Server state: %s', self.websocket.application_state)
-            LOGGER.debug('Client state: %s', self.websocket.client_state)
-            self._closed = True
+        if self._already_closed:
             raise WebSocketDisconnect
         if self.token_expiration and datetime.datetime.now(datetime.UTC) >= self.token_expiration:
             LOGGER.debug('Token expired: %s', self.token_expiration)
@@ -114,7 +108,15 @@ class AuthenticatedWebSocket:
         self.websocket = websocket
         self.token_expiration: datetime.datetime | None = None
         self._subtasks: set[asyncio.Task] = set()
-        self._closed = False
+
+    @property
+    def _already_closed(self) -> bool:
+        LOGGER.debug('Server state: %s', self.websocket.application_state)
+        LOGGER.debug('Client state: %s', self.websocket.client_state)
+        return (
+            self.websocket.application_state == WebSocketState.DISCONNECTED
+            or self.websocket.client_state == WebSocketState.DISCONNECTED
+        )
 
     @_check_ws_connection
     async def _obtain_token_msg(self) -> None:
@@ -127,7 +129,7 @@ class AuthenticatedWebSocket:
         try:
             payload = await decode_jwt(token)
             self.token_expiration = datetime.datetime.fromtimestamp(payload['exp'], datetime.UTC)
-        except (InvalidTokenError, ValidationError, IndexError) as e:
+        except (InvalidTokenError, ValidationError, IndexError, PyJWKClientError) as e:
             LOGGER.error('Error processing token message %s', e)
             await self.close(f'Invalid token message: {e!s}')
 
@@ -141,7 +143,7 @@ class AuthenticatedWebSocket:
         self._subtasks.add(asyncio.create_task(self._token_refresher_task_manager()))
 
     async def _token_refresher_task_manager(self) -> None:
-        while not self._closed:
+        while not self._already_closed:
             LOGGER.debug('Start token refresher task')
             token_refresher_task = asyncio.create_task(self._token_refresher())
             self._subtasks.add(token_refresher_task)
@@ -163,16 +165,16 @@ class AuthenticatedWebSocket:
         await self.websocket.send_text(message)
 
     async def _token_refresher(self) -> None:
-        while not self._closed:
+        while not self._already_closed:
             await self._obtain_token_msg()
 
     async def close(self, msg: str) -> None:
-        self._closed = True
         LOGGER.debug('Cancel all subtasks: %s', self._subtasks)
         for task in self._subtasks:
             task.cancel()
 
-        await self.websocket.close(code=1008, reason=msg)
+        if not self._already_closed:
+            await self.websocket.close(code=1008, reason=msg)
 
 
 class PubSubAuthenticatedWebSocket(AuthenticatedWebSocket):
@@ -183,7 +185,7 @@ class PubSubAuthenticatedWebSocket(AuthenticatedWebSocket):
     async def channel_forwarder(websocket: WebSocket, rdb: RedisDependency) -> None:
         secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
 
-        await secure_websocket.handle_pubsub(channel='job:*:return', schema=JobResult)
+        await secure_websocket.handle_pubsub({'job:*:new': Job, 'channel2': AnotherModel})
     """
 
     def __init__(self, websocket: WebSocket, rdb: Redis) -> None:
@@ -203,7 +205,7 @@ class PubSubAuthenticatedWebSocket(AuthenticatedWebSocket):
         async with self._rdb.pubsub() as pubsub:
             await pubsub.psubscribe(channel)
             async for message in pubsub.listen():
-                if self._closed:
+                if self._already_closed:
                     LOGGER.debug('Cant forward msg - Websocket already closed')
                     break
                 if message['type'] not in PubSub.PUBLISH_MESSAGE_TYPES:
@@ -213,13 +215,16 @@ class PubSubAuthenticatedWebSocket(AuthenticatedWebSocket):
         LOGGER.debug('Exit from _message_forwarder')
 
     # TODO: Add multiple channels support
-    async def handle_pubsub(self, channel: str, schema: type[BaseModel]) -> None:
+    async def handle_pubsub(self, channel_schema_map: dict[str, type[BaseModel]]) -> None:
         await self.accept()
-        forwarder_task = asyncio.create_task(self._message_forwarder(channel, schema))
-        self._subtasks.add(forwarder_task)
+        channel_tasks = []
+        for channel, schema in channel_schema_map.items():
+            task = asyncio.create_task(self._message_forwarder(channel, schema))
+            channel_tasks.append(task)
+            self._subtasks.add(task)
 
         try:
-            await forwarder_task
+            await asyncio.gather(*channel_tasks)
         except WebSocketDisconnect:
             LOGGER.debug('Close in handle_pubsub')
             await self.close('WebSocket disconnected')
