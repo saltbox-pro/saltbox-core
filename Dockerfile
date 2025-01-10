@@ -1,14 +1,51 @@
-ARG PYTHON_VERSION='3.12'
+ARG PYTHON_VERSION='3.12'  # FIXME
 
-FROM python:${PYTHON_VERSION}-alpine AS base
-LABEL version='0.13'
+FROM registry.altlinux.org/alt/alt:p11 AS base
+LABEL version='1.0'
 ENV SALT_USERNAME="salt_box_core"
 EXPOSE 8000
 
+  #python3-module-gevent \  # TODO Install explicitly?
 RUN \
-  --mount=type=bind,source=requirements.txt,target=/mnt/requirements.txt\
-  --mount=type=cache,target=/root/.cache/pip/ \
-  pip3 install --upgrade --requirement /mnt/requirements.txt
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+<<EOF
+set -e
+mkdir --parents /var/cache/apt/archives/partial/ /var/lib/apt/lists/partial/
+apt-get update
+apt-get install -y \
+  python3-module-celery \
+  python3-module-fastapi \
+  python3-module-httpx \
+  python3-module-motor \
+  python3-module-pydantic \
+  python3-module-pydantic-settings \
+  python3-module-pyjwt \
+  python3-module-python-multipart \
+  python3-module-redis \
+  python3-module-uvicorn \
+  python3-module-websockets \
+;
+EOF
+
+RUN \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+<<EOF
+set -e
+mkdir --parents /var/cache/apt/archives/partial/ /var/lib/apt/lists/partial/
+apt-get update
+apt-get install -y \
+  python3-module-pip \
+;
+EOF
+
+# FIXME Check outer deps
+#RUN \
+#  --mount=type=bind,source=requirements.txt,target=/mnt/requirements.txt\
+#  --mount=type=cache,target=/root/.cache/pip/ \
+#  pip3 install --requirement /mnt/requirements.txt
+
 COPY --chmod=644 docker/shell_init.sh /etc/
 COPY --chmod=755 \
   docker/celery-beat.sh \
@@ -38,7 +75,7 @@ ENTRYPOINT ["/usr/local/bin/uvicorn.sh"]
 ## Mount Core repository dir to /mnt/salt_box_core to serve with the container.
 
 FROM base AS dev
-LABEL name='salt-box-core-dev' version='0.12'
+LABEL name='salt-box-core-dev' version='1.0'
 # Install Core as editable package
 WORKDIR /mnt/salt_box_core/
 VOLUME /mnt/salt_box_core/
@@ -53,7 +90,7 @@ CMD ["dev"]
 ################
 
 FROM base AS main
-LABEL name='salt-box-core' version='0.11'
+LABEL name='salt-box-core' version='1.0'
 # Install Core as usual package
 RUN \
   --mount=type=bind,target=/mnt/salt_box_core/,readwrite \
