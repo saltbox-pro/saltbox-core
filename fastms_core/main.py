@@ -1,9 +1,10 @@
+import logging
+
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi_offline import FastAPIOffline
 
 from fastms_core.collections.router import collections_router
 from fastms_core.config import APP_NAME, SETTINGS
@@ -16,6 +17,8 @@ from fastms_core.minions.router import filters_router, minions_router
 from fastms_core.salt.router import router as salt_router
 from fastms_core.tasks.router import router as task_router
 
+LOGGER = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator:
@@ -26,7 +29,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator:
     await POOL.aclose()  # type: ignore[attr-defined]
 
 
-APP = FastAPIOffline(title=APP_NAME, lifespan=lifespan)
+def _get_app() -> ...:
+    try:
+        from fastapi_offline import FastAPIOffline
+        LOGGER.info('Using fastapi_offline to provide extra static')
+    except ModuleNotFoundError:
+        from fastapi import FastAPI
+        app_t = FastAPI
+        LOGGER.warning('fastapi_offline not found')
+    else:
+        app_t = FastAPIOffline
+    finally:
+        return app_t(title=APP_NAME, lifespan=lifespan)
+
+
+APP = _get_app()
 
 
 APP.add_middleware(

@@ -2,7 +2,9 @@
 
 beanie~=1.27.0  # FIXME Missing in ALT P11
 celery[gevent]>=5.3.6
-fastapi_offline~=1.7.2  # FIXME Missing in ALT P11
+# TODO Optional
+# FIXME Missing in ALT P11
+fastapi_offline~=1.7.2
 fastapi>=0.115.4
 httpx>=0.27.2  # FIXME Deprecated with SaltClient?
 motor>=3.4.0
