@@ -1,50 +1,51 @@
-ARG PYTHON_VERSION='3.12'  # FIXME
-
 FROM registry.altlinux.org/alt/alt:p11 AS base
 LABEL version='1.0'
-ENV SALT_USERNAME="salt_box_core"
+ENV SALT_USERNAME='salt_box_core'
 EXPOSE 8000
 
-  #python3-module-gevent \  # TODO Install explicitly?
-RUN \
-  --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
-<<EOF
-set -e
-mkdir --parents /var/cache/apt/archives/partial/ /var/lib/apt/lists/partial/
-apt-get update
-apt-get install -y \
-  python3-module-celery \
-  python3-module-fastapi \
-  python3-module-httpx \
-  python3-module-motor \
-  python3-module-pydantic \
-  python3-module-pydantic-settings \
-  python3-module-pyjwt \
-  python3-module-python-multipart \
-  python3-module-redis \
-  python3-module-uvicorn \
-  python3-module-websockets \
-;
-EOF
-
-RUN \
-  --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
-<<EOF
-set -e
-mkdir --parents /var/cache/apt/archives/partial/ /var/lib/apt/lists/partial/
-apt-get update
-apt-get install -y \
-  python3-module-pip \
-;
-EOF
-
-# FIXME Check outer deps
+## TODO
+## Requirements related packages
 #RUN \
-#  --mount=type=bind,source=requirements.txt,target=/mnt/requirements.txt\
-#  --mount=type=cache,target=/root/.cache/pip/ \
-#  pip3 install --requirement /mnt/requirements.txt
+#  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+#  --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+#<<EOF
+#set -e
+#mkdir --parents /var/cache/apt/archives/partial/ /var/lib/apt/lists/partial/
+#apt-get update
+#apt-get install -y \
+#  python3-module-celery \
+#  python3-module-fastapi \
+#  python3-module-httpx \
+#  python3-module-motor \
+#  python3-module-pydantic \
+#  python3-module-pydantic-settings \
+#  python3-module-pyjwt \
+#  python3-module-python-multipart \
+#  python3-module-redis \
+#  python3-module-uvicorn \
+#  python3-module-websockets \
+#;
+#EOF
+
+RUN \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+<<EOF
+set -e
+apt-get update
+apt-get install -y glibc-pthread python3-module-pip
+EOF
+
+## Outer dependencies
+## Install modules which are missing or have incompatible version in the dist repo
+RUN \
+  --mount=type=bind,source=requirements.txt,target=/mnt/requirements.txt\
+  --mount=type=cache,target=/root/.cache/pip/ \
+  pip3 install --requirement /mnt/requirements.txt
+
+## Uncomment to debug Python dependencies with pipdeptree
+# FIXME
+RUN --mount=type=cache,target=/root/.cache/pip/ pip3 install pipdeptree==2.23.1
 
 COPY --chmod=644 docker/shell_init.sh /etc/
 COPY --chmod=755 \
