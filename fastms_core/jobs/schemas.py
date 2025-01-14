@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from enum import Enum
 from typing import Annotated, Any, TypeVar, cast
 
 from pydantic import (
@@ -36,16 +37,21 @@ class NullObj(BaseModel):
 
 
 class Job(BaseModel):
+    class JobStatus(str, Enum):
+        in_queue = 'in_queue'
+        started = 'started'
+
     jid: StrJid
     tgt: str | list[str]
     tgt_type: str
-    user: str
+    user: str | None = None
     fun: str
     arg: list | None = None
     kwarg: dict | None = None
-    minions: list[str]
+    minions: list[str] = []
     missing: list[str] = []
-    stamp: str = Field(alias='_stamp')
+    stamp: str | None = Field(alias='_stamp', default=None)
+    status: JobStatus
 
     @computed_field(title='Timestamp decoded from JID')
     def fms_jid_timestamp(self) -> PastDatetime:
@@ -61,6 +67,17 @@ class Job(BaseModel):
         data['arg'], data['kwarg'] = fill_salt_kwarg_from_arg(data.get('arg'), data.get('kwarg'))
 
         return cast(T, data)
+
+
+class JobCreate(BaseModel):
+    tgt: str
+    tgt_type: str
+    fun: str
+    arg: list | None = None
+    kwarg: dict | None = None
+    jid: str | None = None
+    jid_postfix: str | None = None
+    salt_master: str | None = None
 
 
 class JobResult(BaseModel):

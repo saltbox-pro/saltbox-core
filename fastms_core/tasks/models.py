@@ -11,6 +11,9 @@ from redis import asyncio as aioredis
 
 from fastms_core.collections.models import MinionCollection
 from fastms_core.config import LOG_CONFIG, SETTINGS
+from fastms_core.jobs.exceptions import JobCreateException
+from fastms_core.jobs.schemas import JobCreate
+from fastms_core.jobs.services import JobService
 from fastms_core.minions.models import Minion
 from fastms_core.tasks.schemas import (
     TaskJob,
@@ -21,7 +24,7 @@ from fastms_core.tasks.schemas import (
     TaskTemplateVariable,
     TaskTgtType,
 )
-from fastms_core.utilities.salt import SaltJobCreateError, create_job
+from fastms_core.utilities.jid import JID
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
@@ -121,20 +124,20 @@ class Task(Document, TaskSchema):
 
         if self.__can_start_job():
             job_targeting = self.targets_queue.pop(0)
+            job_service = JobService(rdb=redis)
 
             try:
-                jid: str = await create_job(
-                    tgt=job_targeting.tgt,
-                    tgt_type='list',
-                    fun=self.fun,
-                    arg=self.task_args,
-                    kwarg=self.task_kwargs,
-                    salt_master='salt-master',  # TODO: get salt master from request
-                    rdb=redis,
-                )
+                jid: JID = await job_service.create_job(JobCreate.model_validate({
+                    'tgt': job_targeting.tgt,
+                    'tgt_type': 'list',
+                    'fun': self.fun,
+                    'arg': self.task_args,
+                    'kwarg': self.task_kwargs,
+                    'salt_master': 'salt-master',  # TODO: get salt master from minion
+                }))
 
-                self.jobs.append(TaskJob.model_validate({'jid': jid, 'target': job_targeting}))
-            except SaltJobCreateError as error:
+                self.jobs.append(TaskJob.model_validate({'jid': str(jid), 'target': job_targeting}))
+            except JobCreateException as error:
                 logger.warning(error)
                 self.targets_queue.append(job_targeting)
 

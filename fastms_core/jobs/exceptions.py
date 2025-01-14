@@ -1,0 +1,22 @@
+class JobException(Exception):
+    ...
+
+
+class JobDoesNotExistsException(JobException):
+    ...
+
+
+class JobMultipleReturnsException(JobException):
+    ...
+
+
+class JobCreateException(JobException):
+    ...
+
+
+class JobServiceInvalidArgsException(JobException):
+    ...
+
+
+class JobServiceException(JobException):
+    ...

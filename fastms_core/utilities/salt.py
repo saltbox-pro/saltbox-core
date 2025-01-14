@@ -1,13 +1,6 @@
 from __future__ import annotations
 
-import json
 from typing import Any
-
-from redis import exceptions as redis_exceptions
-from redis.asyncio import Redis
-
-from fastms_core.db.redis import POOL
-from fastms_core.utilities.jid import JID
 
 
 def fill_salt_kwarg_from_arg(
@@ -42,58 +35,3 @@ def fill_salt_kwarg_from_arg(
         new_kwarg.update(kwarg_dict)
 
     return new_arg, new_kwarg
-
-
-class SaltJobCreateError(Exception):
-    ...
-
-
-async def create_job(
-    tgt: str,
-    tgt_type: str,
-    fun: str,
-    arg: list | None = None,
-    kwarg: dict | None = None,
-    jid: str | None = None,
-    jid_postfix: str | None = None,
-    salt_master: str | None = None,
-    rdb: Redis | None = None,
-) -> str:
-    if not rdb:
-        rdb = Redis(connection_pool=POOL)
-
-    if not jid:
-        jid = str(JID.generate())
-
-    create_job_hash_name: str = f'job_create:{jid}'
-
-    try:
-        await rdb.hmset(
-            name=create_job_hash_name,
-            mapping={
-                'jid': f'{jid}-{jid_postfix}' if jid_postfix else jid,
-                'fun': fun,
-                'tgt': tgt,
-                'tgt_type': tgt_type,
-                'arg': json.dumps(arg),
-                'kwarg': json.dumps(kwarg),
-            },
-        )
-
-        await rdb.publish(
-            channel='salt-service',
-            message=json.dumps(
-                {
-                    'command': f'job/run/{salt_master}' if salt_master else 'job/run',
-                    'payload': {
-                        'hash_name': create_job_hash_name,
-                    },
-                }
-            ),
-        )
-    except redis_exceptions.RedisError as error:
-        raise SaltJobCreateError(error) from error
-
-    await rdb.aclose()  # type: ignore
-
-    return jid
