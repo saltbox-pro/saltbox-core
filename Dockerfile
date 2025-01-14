@@ -32,6 +32,7 @@ RUN \
   --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
 <<EOF
 set -e
+mkdir --parents /var/cache/apt/archives/partial/ /var/lib/apt/lists/partial/
 apt-get update
 apt-get install -y glibc-pthread python3-module-pip
 EOF
