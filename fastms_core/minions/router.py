@@ -78,14 +78,16 @@ async def unique_field_values(body: MinionFilterValuesBody) -> UniqueGrainValues
     """Get unique values for a field in the Minion model"""
     pipline_builder = MongoPiplineBuilder(body.field)
     pipline = pipline_builder.build()
+    query = body.query
 
-    collection = await collections_crud.get(body.collection_id)
-    if not collection:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Collection not found')
+    if body.collection_id:
+        collection = await collections_crud.get(body.collection_id)
+        if not collection:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Collection not found')
 
-    # TODO: check user access to the collection
+        # TODO: check user access to the collection
 
-    query = {'$and': [collection.query, body.query]}
+        query = {'$and': [collection.query, body.query]}
 
     try:
         result = await minions_crud.get_pipeline(query, pipeline=pipline)
