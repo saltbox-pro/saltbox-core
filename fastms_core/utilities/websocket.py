@@ -201,7 +201,21 @@ class PubSubAuthenticatedWebSocket(AuthenticatedWebSocket):
         except (ValidationError, TypeError, json.JSONDecodeError) as e:
             LOGGER.error('Error processing pubsub message %s', e)
 
-    async def _message_forwarder(self, channel: str, schema: type[BaseModel]) -> None:
+    async def _process_channel_message_by_callback(self, message: RedisPubSubMessage, callback: type[Callable]) -> None:
+        data_str = message['data'].decode()
+        try:
+            data = json.loads(data_str)
+            result = callback(data=data)
+
+            if result is not None:
+                if isinstance(result, str):
+                    await self.send_text(result)
+                else:
+                    await self.send_text(json.dumps(result))
+        except (ValidationError, TypeError, json.JSONDecodeError) as e:
+            LOGGER.error('Error processing pubsub message %s', e)
+
+    async def _message_forwarder(self, channel: str, handler: type[BaseModel, Callable]) -> None:
         async with self._rdb.pubsub() as pubsub:
             await pubsub.psubscribe(channel)
             async for message in pubsub.listen():
@@ -210,16 +224,23 @@ class PubSubAuthenticatedWebSocket(AuthenticatedWebSocket):
                     break
                 if message['type'] not in PubSub.PUBLISH_MESSAGE_TYPES:
                     continue
-                await self._process_channel_message(message, schema)
+
+                if callable(handler):
+                    await self._process_channel_message_by_callback(message, handler)
+                elif issubclass(handler, BaseModel):
+                    await self._process_channel_message(message, handler)
+                else:
+                    msg = 'Unsupported handler type'
+                    raise Exception(msg)
 
         LOGGER.debug('Exit from _message_forwarder')
 
     # TODO: Add multiple channels support
-    async def handle_pubsub(self, channel_schema_map: dict[str, type[BaseModel]]) -> None:
+    async def handle_pubsub(self, channel_schema_map: dict[str, type[BaseModel, Callable]]) -> None:
         await self.accept()
         channel_tasks = []
-        for channel, schema in channel_schema_map.items():
-            task = asyncio.create_task(self._message_forwarder(channel, schema))
+        for channel, handler in channel_schema_map.items():
+            task = asyncio.create_task(self._message_forwarder(channel, handler))
             channel_tasks.append(task)
             self._subtasks.add(task)
 

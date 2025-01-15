@@ -116,8 +116,14 @@ async def job_returns_list(
 # TODO Use https://github.com/encode/broadcaster if need broadcasts
 @ws_router.websocket('')
 async def jobs_rets_websocket(websocket: WebSocket, rdb: RedisDependency) -> None:
+    def job_new_handler(data):
+        return Job(**{
+            'status': Job.JobStatus.started,
+            **data
+        }).model_dump_json(by_alias=True)
+
     secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
-    await secure_websocket.handle_pubsub({'job:*:new': Job})
+    await secure_websocket.handle_pubsub({'job:*:new': job_new_handler})
 
 
 @ws_router.websocket('/{jid}/return')
