@@ -174,6 +174,11 @@ class MinionsListBody(PaginatedListParams, MongoQueryBaseSchema):
 
 
 class MinionFilterValuesBody(MongoQueryBaseSchema):
+    collection_id: PydanticObjectId = Field(
+        description='Collection ID',
+        examples=['5f9d1a0e4c0d0e3f2b1a0e4c'],
+        json_schema_extra={'example': '5f9d1a0e4c0d0e3f2b1a0e4c'},
+    )
     field: str = Field(
         description='Field name to get unique values',
         examples=['grains.os', 'grains.cpu_model', 'grains.mem_total'],
