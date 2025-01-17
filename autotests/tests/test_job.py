@@ -85,6 +85,7 @@ class TestJobs:
     def test_get_jobs_return_query_count(self, api, create_jid):
         count_param = 2
         response = get_jobs_jid_return(api, create_jid, count_param)
+        assert_status_code(response, HTTPStatus.OK)
         assert len(response.json()['result']) >= count_param
 
     @pytest.mark.ci

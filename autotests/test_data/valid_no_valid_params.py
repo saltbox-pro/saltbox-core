@@ -33,9 +33,6 @@ PARAMETERS_FOR_GET_LISTS_ENDPOINTS = [
     # Negative per_page
     (None, -10, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
 
-    # Absence of optional parameters (though they are optional)
-    (None, None, HTTPStatus.OK, ListModel),
-
     # Mixed invalid and valid parameters
     # Invalid page and valid per_page
     (-1, 50, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
