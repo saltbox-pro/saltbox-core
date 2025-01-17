@@ -6,12 +6,12 @@ class Jobs(BaseModel):
     jid: str
     tgt: str
     tgt_type: str
-    user: str
+    user: str | None
     fun: str
     arg: List
     kwarg: Optional[dict]
     minions: List[str]
-    _stamp: str
+    _stamp: str | None
     fms_jid_timestamp: str
 
 
