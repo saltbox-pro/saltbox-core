@@ -5,7 +5,9 @@ from redis import asyncio as aioredis
 
 from fastms_core.config import LOG_CONFIG, SETTINGS
 from fastms_core.db.mongo.config import init_mongo
+from fastms_core.jobs.services import JobService
 from fastms_core.tasks.models import Task
+from fastms_core.tasks.services import TaskLifespanService, TaskService
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
@@ -27,8 +29,17 @@ class TasksWatcher:
             redis = await self.get_redis()
             tasks = await Task.find({'status': Task.TaskStatus.running}).to_list()
 
+            job_service = JobService(rdb=redis)
+            task_service = TaskService()
+
             for task in tasks:
-                await task.process(redis=redis)  # TODO: move to celery task
+                task_lifespan_service = TaskLifespanService(
+                    rdb=redis,
+                    task_service=task_service,
+                    job_service=job_service,
+                    task=task
+                )
+                await task_lifespan_service.process()  # TODO: move to celery task
 
             await asyncio.sleep(1)
 

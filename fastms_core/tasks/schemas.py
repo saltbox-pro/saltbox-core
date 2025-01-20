@@ -149,6 +149,7 @@ class TaskJobStatus(str, Enum):
 class TaskJobTarget(BaseModel):
     tgt_type: str = Field(title='Salt tgt type')
     tgt: str = Field(title='Salt tgt')
+    master: str = Field(title='Master')
 
 
 class TaskJob(BaseModel):

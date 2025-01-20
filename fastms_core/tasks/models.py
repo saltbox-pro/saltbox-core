@@ -1,30 +1,19 @@
 from __future__ import annotations
 
-import json
 import logging.config
 import re
 from typing import Any, ClassVar
 
 import pymongo
 from beanie import Document
-from redis import asyncio as aioredis
 
-from fastms_core.collections.models import MinionCollection
-from fastms_core.config import LOG_CONFIG, SETTINGS
-from fastms_core.jobs.exceptions import JobCreateException
-from fastms_core.jobs.schemas import JobCreate
-from fastms_core.jobs.services import JobService
-from fastms_core.minions.models import Minion
+from fastms_core.config import LOG_CONFIG
 from fastms_core.tasks.schemas import (
-    TaskJob,
-    TaskJobStatus,
-    TaskJobTarget,
     TaskSchema,
     TaskTemplateSchema,
     TaskTemplateVariable,
     TaskTgtType,
 )
-from fastms_core.utilities.jid import JID
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
@@ -32,149 +21,6 @@ logger = logging.getLogger(__name__)
 
 
 class Task(Document, TaskSchema):
-    @classmethod
-    async def __get_redis(cls) -> aioredis.Redis:
-        return await aioredis.from_url(SETTINGS.redis_url, **SETTINGS.redis_connection_kwargs)
-
-    def __can_start_job(self) -> bool:
-        for job in self.jobs:
-            if job.status == TaskJobStatus.running:
-                return False
-
-        return True
-
-    async def __fill_jobs_queue(self) -> None:
-        if self.targets_queue is None:
-            self.targets_queue = []
-
-        minions: list[Minion] = []
-
-        if self.tgt_type == TaskTgtType.minions_list:
-            minions_ids = ','.split(self.tgt_value)
-            minions = await Minion.find({'_id': {'$in': minions_ids}}).to_list()
-        elif self.tgt_type == TaskTgtType.minions_collection:
-            collection: MinionCollection | None = await MinionCollection.get(self.tgt_value)
-
-            if collection:
-                minions = await Minion.find(collection.query).to_list()
-            else:
-                msg = f'Minion collection with id {self.tgt_type} not found'
-                raise ValueError(msg)
-
-        targets_lists: list[list[str]] = []
-        temp_targets_list: list[str] = []
-
-        while len(minions) > 0:
-            temp_targets_list.append(minions.pop(0).minion_id)
-
-            if self.batch_size and len(temp_targets_list) >= self.batch_size:
-                targets_lists.append(temp_targets_list[:])
-                temp_targets_list = []
-        else:
-            if len(temp_targets_list):
-                targets_lists.append(temp_targets_list[:])
-
-        for tgt_list in targets_lists:
-            self.targets_queue.append(TaskJobTarget(tgt=','.join(tgt_list), tgt_type='list'))
-
-        await self.save()
-
-    async def __check_running_jobs(self, redis: aioredis.Redis) -> None:
-        minions_ids_with_failed_job: list[str] = []
-
-        for job in self.jobs:
-            if job.status != TaskJobStatus.running:
-                continue
-
-            job_returns_data: dict = await redis.hgetall(name=f'job:{job.jid}:return')
-
-            for return_data_s in job_returns_data.values():
-                return_data = json.loads(return_data_s)
-                minion_id: str = return_data['id']
-
-                self.minions_retries_counts.setdefault(minion_id, 0)
-                self.minions_retries_counts[minion_id] += 1
-
-                if return_data['success'] is True:
-                    job.status = TaskJobStatus.succeeded
-                else:
-                    job.status = TaskJobStatus.failed
-                    minions_ids_with_failed_job.append(return_data['id'])
-
-        if minions_ids_with_failed_job:
-            minions_ids_for_retry: list[str] = []
-
-            for minion_id in minions_ids_with_failed_job:
-                if self.minions_retries_counts[minion_id] <= self.max_retries - 1:
-                    minions_ids_for_retry.append(minion_id)
-                else:
-                    self.failed_for_minions.append(minion_id)
-
-            if minions_ids_for_retry:
-                if not self.targets_queue:
-                    self.targets_queue = []
-
-                self.targets_queue.append(TaskJobTarget(tgt=','.join(minions_ids_for_retry), tgt_type='list'))
-
-        await self.save()
-
-    async def __rub_jobs(self, redis) -> None:
-        if not self.targets_queue:
-            return
-
-        if self.__can_start_job():
-            job_targeting = self.targets_queue.pop(0)
-            job_service = JobService(rdb=redis)
-
-            try:
-                jid: JID = await job_service.create_job(JobCreate.model_validate({
-                    'tgt': job_targeting.tgt,
-                    'tgt_type': 'list',
-                    'fun': self.fun,
-                    'arg': self.task_args,
-                    'kwarg': self.task_kwargs,
-                    'salt_master': 'salt-master',  # TODO: get salt master from minion
-                }))
-
-                self.jobs.append(TaskJob.model_validate({'jid': str(jid), 'target': job_targeting}))
-            except JobCreateException as error:
-                logger.warning(error)
-                self.targets_queue.append(job_targeting)
-
-        await self.save()
-
-    async def process(self, redis: aioredis.Redis | None = None) -> None:
-        if self.status != self.TaskStatus.running:
-            return
-        if self.targets_queue is None:
-            await self.__fill_jobs_queue()
-
-        if not redis:
-            redis = await self.__get_redis()
-
-        await self.__check_running_jobs(redis=redis)
-        await self.__rub_jobs(redis=redis)
-
-        if not self.targets_queue:
-            for job in self.jobs:
-                if job.status == TaskJobStatus.running:
-                    break
-            else:
-                self.status = self.TaskStatus.finished
-
-        await self.save()
-
-    async def run(self) -> None:
-        if self.status in [self.TaskStatus.created, self.TaskStatus.stopped]:
-            self.status = self.TaskStatus.running
-            await self.save()
-
-    async def stop(self) -> None:
-        if self.status == self.TaskStatus.running:
-            # TODO: stop jobs
-            self.status = self.TaskStatus.stopped
-            await self.save()
-
     class Settings:
         name = 'tasks'
         indexes: ClassVar[list] = [

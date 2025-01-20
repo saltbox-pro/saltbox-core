@@ -6,8 +6,8 @@ from fastapi import APIRouter, HTTPException, Query, Response, status
 
 from fastms_core.config import LOG_CONFIG
 from fastms_core.db.mongo.schemas_base import PaginatedResponse
-from fastms_core.tasks.crud import task_crud, task_template_crud
-from fastms_core.tasks.models import Task, TaskTemplate
+from fastms_core.tasks.exceptions import TaskDoesNotExistException, TaskTemplateDoesNotExistException
+from fastms_core.tasks.models import TaskTemplate
 from fastms_core.tasks.schemas import (
     TaskCreateSchema,
     TaskListQueryParams,
@@ -18,6 +18,11 @@ from fastms_core.tasks.schemas import (
     TaskTemplateListSchema,
     TaskTemplateSchema,
     TaskTemplateUpdateSchema,
+)
+from fastms_core.tasks.services import (
+    TaskServiceDependency,
+    TaskServiceLifespanDependency,
+    TaskTemplateServiceDependency,
 )
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
@@ -37,46 +42,51 @@ router = APIRouter(
 
 @router.get('/template', operation_id='templates_list')
 async def templates_list(
-    params: Annotated[TaskTemplateListQueryParams, Query()],
+    params: Annotated[TaskTemplateListQueryParams, Query()], task_templates_service: TaskTemplateServiceDependency
 ) -> PaginatedResponse[TaskTemplateListSchema]:
-    response = await task_template_crud.get_paginated(
+    task_templates: PaginatedResponse[TaskTemplateListSchema] = await task_templates_service.get_list_paginated(
         page=params.page, per_page=params.per_page, projection_model=TaskTemplateListSchema
     )
-    return response
+
+    return task_templates
 
 
 @router.post('/template', operation_id='template_create')
-async def template_create(item: TaskTemplateCreateSchema) -> TaskTemplateSchema:
-    obj = await task_template_crud.create(obj_in=item)
+async def template_create(
+        item: TaskTemplateCreateSchema, task_templates_service: TaskTemplateServiceDependency
+) -> TaskTemplateSchema:
+    obj: TaskTemplate = await task_templates_service.create_obj(obj_data=item)
 
     return TaskTemplateSchema.model_validate(obj)
 
 
 @router.get('/template/{tid}', operation_id='template_retrieve')
-async def template_retrieve(tid: PydanticObjectId) -> TaskTemplate:
-    obj = await task_template_crud.get(id=tid)
+async def template_retrieve(
+        tid: PydanticObjectId, task_templates_service: TaskTemplateServiceDependency
+) -> TaskTemplateSchema:
+    try:
+        obj: TaskTemplate = await task_templates_service.get_obj(obj_id=tid)
+    except TaskTemplateDoesNotExistException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task template does not found') from e
 
-    if not obj:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-
-    return TaskTemplate.model_validate(obj)
+    return TaskTemplateSchema.model_validate(obj)
 
 
 @router.put('/template/{tid}', operation_id='template_update')
-async def template_update(tid: PydanticObjectId, item: TaskTemplateUpdateSchema) -> TaskTemplateSchema:
-    obj = await task_template_crud.get(id=tid)
+async def template_update(
+        tid: PydanticObjectId, item: TaskTemplateUpdateSchema, task_templates_service: TaskTemplateServiceDependency
+) -> TaskTemplateSchema:
+    try:
+        updated_obj: TaskTemplate = task_templates_service.update_obj(obj_id=tid, obj_data=item)
+    except TaskTemplateDoesNotExistException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task template does not found') from e
 
-    if not obj:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND)
-
-    obj_out = await task_template_crud.update(db_obj=obj, obj_in=item)
-
-    return TaskTemplateSchema.model_validate(obj_out)
+    return TaskTemplateSchema.model_validate(updated_obj)
 
 
 @router.delete('/template/{tid}', operation_id='template_delete', status_code=status.HTTP_204_NO_CONTENT)
-async def template_delete(tid: PydanticObjectId) -> Response:
-    await task_template_crud.remove(id=tid)
+async def template_delete(tid: PydanticObjectId, task_templates_service: TaskTemplateServiceDependency) -> Response:
+    await task_templates_service.delete_obj(id=tid)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -86,54 +96,54 @@ async def template_delete(tid: PydanticObjectId) -> Response:
 
 @router.get('', operation_id='tasks_list')
 async def tasks_list(
-    params: Annotated[TaskListQueryParams, Query()],
+        params: Annotated[TaskListQueryParams, Query()], task_service: TaskServiceDependency
 ) -> PaginatedResponse[TaskListSchema]:
-    response = await task_crud.get_paginated(
+    task_list = await task_service.get_list_paginated(
         page=params.page, per_page=params.per_page, projection_model=TaskListSchema
     )
 
-    return response
+    return task_list
 
 
 @router.post('', operation_id='task_create')
-async def task_create(item: TaskCreateSchema) -> TaskSchema:
+async def task_create(item: TaskCreateSchema, task_service: TaskServiceDependency) -> TaskSchema:
     try:
-        obj = await task_crud.create(obj_in=item)
+        task = await task_service.create_obj(obj_data=item)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
-    return TaskSchema.model_validate(obj)
+    return TaskSchema.model_validate(task)
 
 
 @router.get('/{tid}', operation_id='task_retrieve')
-async def task_retrieve(tid: PydanticObjectId) -> Task:
-    task = await task_crud.get(tid)
+async def task_retrieve(tid: PydanticObjectId, task_service: TaskServiceDependency) -> TaskSchema:
+    try:
+        task = await task_service.get_obj(tid)
+    except TaskDoesNotExistException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task does not found') from e
 
-    if not task:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task not found')
-
-    return task
+    return TaskSchema.model_validate(task)
 
 
 @router.post('/{tid}/run', operation_id='task_run')
-async def task_run(tid: PydanticObjectId) -> Task:
-    task = await task_crud.get(tid)
+async def task_run(task_lifespan_service: TaskServiceLifespanDependency) -> TaskSchema:
+    try:
+        task = await task_lifespan_service.get_task()
+    except TaskDoesNotExistException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task not found') from e
 
-    if not task:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task not found')
+    await task_lifespan_service.run()
 
-    await task.run()
-
-    return task
+    return TaskSchema.model_validate(task)
 
 
 @router.post('/{tid}/stop', operation_id='task_stop')
-async def task_stop(tid: PydanticObjectId) -> Task:
-    task = await task_crud.get(tid)
+async def task_stop(task_lifespan_service: TaskServiceLifespanDependency) -> TaskSchema:
+    try:
+        task = await task_lifespan_service.get_task()
+    except TaskDoesNotExistException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task not found') from e
 
-    if not task:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task not found')
+    await task_lifespan_service.stop()
 
-    await task.stop()
-
-    return task
+    return TaskSchema.model_validate(task)
