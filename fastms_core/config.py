@@ -3,7 +3,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-APP_NAME = 'FastMS Core'
+APP_NAME = 'Salt.box Core'
 
 
 class Settings(BaseSettings):
