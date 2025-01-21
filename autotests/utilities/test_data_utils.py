@@ -1,6 +1,7 @@
 import time
 from http import HTTPStatus
 
+from api.collections_api import del_collection_cid
 from api.jobs_api import post_jobs
 from assertions.assertion_base import assert_status_code
 from conftest import redis_client
@@ -28,3 +29,9 @@ def delete_created_data(jid):
     time.sleep(0.2)
     redis_client.delete(f'job:{jid}:return')
     delete_job_from_zset_on_redis(jid)
+
+
+def delete_created_collection(api, response):
+    collection_id = response.json().get('id')
+    del_collection_cid(api, collection_id)
+

@@ -10,6 +10,7 @@ from models.minions_models import CreateCollectionModel
 from test_data.valid_no_valid_params import PARAMETERS_FOR_GET_LISTS_ENDPOINTS, BODY_FOR_POST_COLLECTION_ENDPOINT, \
     INVALID_CID_VALUES_FOR_COLLECTION, INVALID_BODY_FOR_PUT_COLLECTION, INVALID_CID_VALUES_FOR_DEL_COLLECTION
 from utilities.files_utils import read_json_common_request_data
+from utilities.test_data_utils import delete_created_collection
 
 
 class TestCollections:
@@ -32,6 +33,8 @@ class TestCollections:
         response = post_collection(api, json=body)
         assert_status_code(response, expected_status)
         assert_schema(response, schema)
+        delete_created_collection(api, response)
+
 
     # GET /collection/{cid}
     def test_get_collection_valid_cid(self, api, create_cid):

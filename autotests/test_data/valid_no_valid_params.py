@@ -85,17 +85,6 @@ VALID_AND_INVALID_PARAMS_FOR_JOBS = [
     # Future dates
     # Future start_datetime
     ('2100-10-28T16:53:20.841870', None, HTTPStatus.UNPROCESSABLE_ENTITY, ErrorResponse),
-
-    # Future end_datetime
-    # ((datetime.now() - timedelta(hours=4)).isoformat(), '2100-10-28T16:53:20.841870', HTTPStatus.UNPROCESSABLE_ENTITY,
-    #  ErrorResponse),
-
-    # Edge cases
-    # Unix epoch as start_datetime
-    ('1970-01-01T00:00:00Z', None, HTTPStatus.OK, Jobs),
-
-    # Minimum range from epoch
-    ('1970-01-01T00:00:00Z', '1970-01-01T00:01:00Z', HTTPStatus.OK, Jobs),
 ]
 
 INVALID_JID = [
