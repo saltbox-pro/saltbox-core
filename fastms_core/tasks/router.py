@@ -8,7 +8,9 @@ from fastms_core import http_errors
 from fastms_core.config import LOG_CONFIG
 from fastms_core.db.mongo.schemas_base import PaginatedResponse
 from fastms_core.db.redis import RedisDependency
+from fastms_core.jobs.exceptions import JobDoesNotExistsException
 from fastms_core.jobs.schemas import Job, JobResult
+from fastms_core.jobs.services import JobServiceDependency
 from fastms_core.tasks.exceptions import TaskDoesNotExistException, TaskTemplateDoesNotExistException
 from fastms_core.tasks.models import TaskTemplate
 from fastms_core.tasks.schemas import (
@@ -27,6 +29,7 @@ from fastms_core.tasks.services import (
     TaskServiceLifespanDependency,
     TaskTemplateServiceDependency,
 )
+from fastms_core.utilities.jid import JID
 from fastms_core.utilities.websocket import PubSubAuthenticatedWebSocket
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
@@ -129,6 +132,52 @@ async def task_retrieve(tid: PydanticObjectId, task_service: TaskServiceDependen
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task does not found') from e
 
     return TaskSchema.model_validate(task)
+
+
+@router.get('/{tid}/jobs', operation_id='task_jobs')
+async def task_jobs(
+        tid: PydanticObjectId,
+        task_service: TaskServiceDependency,
+        job_service: JobServiceDependency
+) -> list[Job]:
+    result: list[Job] = []
+
+    try:
+        task: TaskSchema = await task_service.get_obj(tid)
+
+        for task_job in task.jobs:
+            try:
+                job = await job_service.get_job(JID(task_job.jid))
+                result.append(job)
+            except JobDoesNotExistsException:
+                continue
+    except TaskDoesNotExistException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task does not found') from e
+
+    return result
+
+
+@router.get('/{tid}/returns', operation_id='task_returns')
+async def task_returns(
+        tid: PydanticObjectId,
+        task_service: TaskServiceDependency,
+        job_service: JobServiceDependency
+) -> list[JobResult]:
+    result: list[JobResult] = []
+
+    try:
+        task: TaskSchema = await task_service.get_obj(tid)
+
+        for task_job in task.jobs:
+            try:
+                job_returns: list[JobResult] = await job_service.get_job_all_returns(JID(task_job.jid))
+                result.extend(job_returns)
+            except JobDoesNotExistsException:
+                continue
+    except TaskDoesNotExistException as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task does not found') from e
+
+    return result
 
 
 @router.post('/{tid}/run', operation_id='task_run')
