@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Annotated
 
 from beanie import PydanticObjectId
@@ -56,6 +57,16 @@ class TaskService:
         if not obj:
             msg = 'Task does not found'
             raise TaskDoesNotExistException(msg)
+
+        if obj.status != obj_data.status:
+            stamp_field_name = {
+                Task.TaskStatus.running: 'run_stamp',
+                Task.TaskStatus.stopped: 'stopped_stamp',
+                Task.TaskStatus.finished: 'finished_stamp',
+            }.get(obj_data.status)
+
+            if stamp_field_name:
+                obj_data.__setattr__(stamp_field_name, str(datetime.now(UTC).timestamp()))
 
         updated_obj = await task_crud.update(db_obj=obj, obj_in=obj_data)
 

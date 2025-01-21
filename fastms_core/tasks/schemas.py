@@ -166,6 +166,10 @@ class TaskBaseSchema(BaseModel):
         stopped = 'stopped'
 
     status: TaskStatus = Field(title='Status', default=TaskStatus.created)
+    created_stamp: str | None = Field(title='Created timestamp', default=None)
+    run_stamp: str | None = Field(title='Run timestamp', default=None)
+    stopped_stamp: str | None = Field(title='Stopped timestamp', default=None)
+    finished_stamp: str | None = Field(title='Finished timestamp', default=None)
 
     task_template_id: PydanticObjectId | None = Field(title='Task template')
     fun: str = Field(title='Salt fun')

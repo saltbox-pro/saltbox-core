@@ -59,11 +59,13 @@ class TaskLifespanService:
         for attr, value in kwargs.items():
             task.__setattr__(attr, value)
 
-        return await self.task_service.update_obj(
+        self.__task = await self.task_service.update_obj(
             obj_id=task.id,
             obj_data=TaskUpdateSchema(**task.model_dump()),
             notify=notify
         )
+
+        return self.__task
 
     async def run(self):
         task = await self.get_task()
