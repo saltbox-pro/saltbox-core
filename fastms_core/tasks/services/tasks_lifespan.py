@@ -15,7 +15,7 @@ from fastms_core.jobs.services import JobService, JobServiceDependency
 from fastms_core.minions.models import Minion
 from fastms_core.tasks.exceptions import TaskServieException
 from fastms_core.tasks.models import Task
-from fastms_core.tasks.schemas import TaskJob, TaskJobStatus, TaskJobTarget, TaskTgtType
+from fastms_core.tasks.schemas import TaskJob, TaskJobStatus, TaskJobTarget, TaskTgtType, TaskUpdateSchema
 from fastms_core.tasks.services.tasks import TaskService, TaskServiceDependency
 from fastms_core.utilities.jid import JID
 
@@ -54,14 +54,17 @@ class TaskLifespanService:
         msg = 'Task does not set'
         raise TaskServieException(msg)
 
-    async def update_task(self, save=True, **kwargs):
+    async def update_task(self, notify=True, **kwargs) -> Task:
         task = await self.get_task()
 
         for attr, value in kwargs.items():
             task.__setattr__(attr, value)
 
-        if save:
-            await task.save()  # type: ignore
+        return await self.task_service.update_obj(
+            obj_id=task.id,
+            obj_data=TaskUpdateSchema(**task.model_dump()),
+            notify=notify
+        )
 
     async def run(self):
         task = await self.get_task()
@@ -128,8 +131,6 @@ class TaskLifespanService:
             for tgt_list in targets_list:
                 task.targets_queue.append(TaskJobTarget(tgt=','.join(tgt_list), tgt_type='list', master=master))
 
-        await task.save()
-
     async def __check_running_jobs(self) -> None:
         task = await self.get_task()
         minions_ids_with_failed_job: list[str] = []
@@ -168,8 +169,6 @@ class TaskLifespanService:
 
                 task.targets_queue.append(TaskJobTarget(tgt=','.join(minions_ids_for_retry), tgt_type='list'))
 
-        await task.save()
-
     async def __rub_jobs(self) -> None:
         task = await self.get_task()
 
@@ -189,15 +188,13 @@ class TaskLifespanService:
                     'fun': task.fun,
                     'arg': task.task_args,
                     'kwarg': task.task_kwargs,
-                    'salt_master': 'salt-master',  # TODO: get salt master from minion
+                    'salt_master': job_targeting.master,
                 }))
 
                 task.jobs.append(TaskJob.model_validate({'jid': str(jid), 'target': job_targeting}))
             except JobCreateException as error:
                 logger.warning(error)
                 task.targets_queue.append(job_targeting)
-
-        await task.save()
 
     async def process(self) -> None:
         task = await self.get_task()
@@ -217,7 +214,7 @@ class TaskLifespanService:
             else:
                 task.status = task.TaskStatus.finished
 
-        await task.save()
+        await self.update_task(notify=True)
 
 
 async def get_task_lifespan_service(

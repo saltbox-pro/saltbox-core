@@ -30,7 +30,7 @@ class TasksWatcher:
             tasks = await Task.find({'status': Task.TaskStatus.running}).to_list()
 
             job_service = JobService(rdb=redis)
-            task_service = TaskService()
+            task_service = TaskService(rdb=redis)
 
             for task in tasks:
                 task_lifespan_service = TaskLifespanService(

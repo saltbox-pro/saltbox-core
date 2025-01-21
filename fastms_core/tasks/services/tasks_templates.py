@@ -9,7 +9,7 @@ from fastms_core.db.redis import RedisDependency
 from fastms_core.tasks.crud import task_template_crud
 from fastms_core.tasks.exceptions import TaskTemplateDoesNotExistException
 from fastms_core.tasks.models import TaskTemplate
-from fastms_core.tasks.schemas import TaskCreateSchema
+from fastms_core.tasks.schemas import TaskCreateSchema, TaskTemplateUpdateSchema
 
 
 class TaskTemplateService:
@@ -46,7 +46,7 @@ class TaskTemplateService:
 
         return task_templates
 
-    async def update_obj(self, obj_id: PydanticObjectId, obj_data: TaskCreateSchema) -> TaskTemplate:
+    async def update_obj(self, obj_id: PydanticObjectId, obj_data: TaskTemplateUpdateSchema) -> TaskTemplate:
         obj = await task_template_crud.get(id=obj_id)
 
         if not obj:

@@ -2,10 +2,13 @@ import logging.config
 from typing import Annotated
 
 from beanie import PydanticObjectId
-from fastapi import APIRouter, HTTPException, Query, Response, status
+from fastapi import APIRouter, HTTPException, Query, Response, WebSocket, status
 
+from fastms_core import http_errors
 from fastms_core.config import LOG_CONFIG
 from fastms_core.db.mongo.schemas_base import PaginatedResponse
+from fastms_core.db.redis import RedisDependency
+from fastms_core.jobs.schemas import Job, JobResult
 from fastms_core.tasks.exceptions import TaskDoesNotExistException, TaskTemplateDoesNotExistException
 from fastms_core.tasks.models import TaskTemplate
 from fastms_core.tasks.schemas import (
@@ -24,6 +27,7 @@ from fastms_core.tasks.services import (
     TaskServiceLifespanDependency,
     TaskTemplateServiceDependency,
 )
+from fastms_core.utilities.websocket import PubSubAuthenticatedWebSocket
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
@@ -35,6 +39,8 @@ router = APIRouter(
     tags=['Tasks'],
     responses={status.HTTP_404_NOT_FOUND: {'description': 'Not found'}},
 )
+
+ws_router = APIRouter(prefix='/tasks')
 
 
 # Task templates views
@@ -147,3 +153,39 @@ async def task_stop(task_lifespan_service: TaskServiceLifespanDependency) -> Tas
     await task_lifespan_service.stop()
 
     return TaskSchema.model_validate(task)
+
+
+@ws_router.websocket('')
+async def tasks_websocket(websocket: WebSocket, rdb: RedisDependency) -> None:
+    secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
+    await secure_websocket.handle_pubsub({
+        'task:*:create': TaskSchema,
+        'task:*:update': TaskSchema,
+    })
+
+
+@ws_router.websocket('/{tid}')
+async def task_websocket(
+    tid: PydanticObjectId,
+    websocket: WebSocket,
+    rdb: RedisDependency,
+    task_service: TaskServiceDependency
+) -> None:
+    task = await task_service.get_obj(tid)
+
+    if not task:
+        msg = f'Task not found by ID={tid}'
+        raise http_errors.WebSocketPolicyViolation(msg)
+
+    def job_new_handler(data) -> str:
+        return Job(**{
+            'status': Job.JobStatus.started,
+            **data
+        }).model_dump_json(by_alias=True)
+
+    secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
+    await secure_websocket.handle_pubsub({
+        f'task:{tid}:job:*:return': JobResult,
+        f'task:{tid}:job:*:new': job_new_handler,
+        f'task:{tid}:update': TaskSchema,
+    })

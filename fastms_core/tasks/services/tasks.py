@@ -3,17 +3,25 @@ from typing import Annotated
 from beanie import PydanticObjectId
 from fastapi import Depends
 from pydantic import BaseModel
+from redis.asyncio import Redis
 
 from fastms_core.db.mongo.schemas_base import PaginatedResponse
+from fastms_core.db.redis import RedisDependency
 from fastms_core.tasks.crud import task_crud
 from fastms_core.tasks.exceptions import TaskDoesNotExistException
 from fastms_core.tasks.models import Task
-from fastms_core.tasks.schemas import TaskCreateSchema
+from fastms_core.tasks.schemas import TaskCreateSchema, TaskUpdateSchema
 
 
 class TaskService:
-    async def create_obj(self, obj_data: TaskCreateSchema) -> Task:
+    def __init__(self, rdb: Redis):
+        self.rdb = rdb
+
+    async def create_obj(self, obj_data: TaskCreateSchema, notify: bool = True) -> Task:
         task = await task_crud.create(obj_in=obj_data)
+
+        if notify:
+            await self.rdb.publish(channel=f'task:{task.id}:create', message=task.model_dump_json(by_alias=True))
 
         return task
 
@@ -42,9 +50,41 @@ class TaskService:
 
         return tasks
 
+    async def update_obj(self, obj_id: PydanticObjectId, obj_data: TaskUpdateSchema, notify: bool = True) -> Task:
+        obj = await task_crud.get(id=obj_id)
 
-async def get_task_service():
-    task_service = TaskService()
+        if not obj:
+            msg = 'Task does not found'
+            raise TaskDoesNotExistException(msg)
+
+        updated_obj = await task_crud.update(db_obj=obj, obj_in=obj_data)
+
+        if notify:
+            await self.rdb.publish(
+                channel=f'task:{updated_obj.id}:update',
+                message=updated_obj.model_dump_json(by_alias=True)
+            )
+
+        return updated_obj
+
+    async def delete_obj(self, obj_id: PydanticObjectId, notify: bool = True):
+        obj = await task_crud.get(id=obj_id)
+
+        if not obj:
+            msg = 'Task template does not found'
+            raise TaskDoesNotExistException(msg)
+
+        await task_crud.remove(id=obj_id)
+
+        if notify:
+            await self.rdb.publish(
+                channel=f'task:{obj.id}:delete',
+                message=obj.model_dump_json(by_alias=True)
+            )
+
+
+async def get_task_service(rdb: RedisDependency):
+    task_service = TaskService(rdb=rdb)
     yield task_service
 
 

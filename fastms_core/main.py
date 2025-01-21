@@ -14,6 +14,7 @@ from fastms_core.jobs.router import router as jobs_router
 from fastms_core.jobs.router import ws_router as jobs_ws_router
 from fastms_core.minions.router import filters_router, minions_router
 from fastms_core.tasks.router import router as task_router
+from fastms_core.tasks.router import ws_router as task_ws_router
 
 LOGGER = logging.getLogger(__name__)
 
@@ -73,3 +74,4 @@ APP.include_router(
     task_router,
     dependencies=[Depends(RolesRequiredDependency(['default-roles-salt.box']))],
 )
+APP.include_router(task_ws_router)
