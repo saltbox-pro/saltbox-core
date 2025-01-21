@@ -148,6 +148,26 @@ class JobService:
 
         return res, next_cur
 
+    async def get_job_all_returns(
+            self,
+            jid: JID
+    ) -> list[JobResult]:
+        try:
+            records = await self.rdb.hgetall(name=f'job:{jid}:return')
+        except redis_exceptions.ResponseError as exc:
+            raise JobServiceException(str(exc)) from exc
+
+        res: list[JobResult] = []
+        for _, ret in records.items():
+            data = json.loads(ret)
+
+            try:
+                res.append(JobResult(**data))
+            except pydantic.ValidationError as e:
+                raise JobServiceException(e.errors()) from e
+
+        return res
+
     async def get_job_returns_count(self, jid: JID) -> int:
         returns_count = await self.rdb.hlen(name=f'job:{jid}:return')
 
