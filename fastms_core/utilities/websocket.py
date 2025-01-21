@@ -5,6 +5,7 @@ import json
 import logging.config
 from collections.abc import Callable
 from contextlib import AbstractContextManager
+from inspect import isclass
 from types import TracebackType
 from typing import Any, TypedDict
 
@@ -225,10 +226,10 @@ class PubSubAuthenticatedWebSocket(AuthenticatedWebSocket):
                 if message['type'] not in PubSub.PUBLISH_MESSAGE_TYPES:
                     continue
 
-                if callable(handler):
-                    await self._process_channel_message_by_callback(message, handler)
-                elif issubclass(handler, BaseModel):
+                if isclass(handler) and issubclass(handler, BaseModel):
                     await self._process_channel_message(message, handler)
+                elif callable(handler):
+                    await self._process_channel_message_by_callback(message, handler)
                 else:
                     msg = 'Unsupported handler type'
                     raise Exception(msg)
