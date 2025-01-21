@@ -1,4 +1,3 @@
-from datetime import UTC, datetime
 from typing import Annotated
 
 from beanie import PydanticObjectId
@@ -12,6 +11,7 @@ from fastms_core.tasks.crud import task_crud
 from fastms_core.tasks.exceptions import TaskDoesNotExistException
 from fastms_core.tasks.models import Task
 from fastms_core.tasks.schemas import TaskCreateSchema, TaskUpdateSchema
+from fastms_core.utilities.helpers import get_now_stamp_str
 
 
 class TaskService:
@@ -66,7 +66,7 @@ class TaskService:
             }.get(obj_data.status)
 
             if stamp_field_name:
-                obj_data.__setattr__(stamp_field_name, str(datetime.now(UTC).timestamp()))
+                obj_data.__setattr__(stamp_field_name, get_now_stamp_str())
 
         updated_obj = await task_crud.update(db_obj=obj, obj_in=obj_data)
 

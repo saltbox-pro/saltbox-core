@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging.config
 import re
-from datetime import UTC, datetime
 from typing import Any, ClassVar
 
 import pymongo
@@ -127,7 +126,6 @@ class TaskTemplate(Document, TaskTemplateSchema):
             'tgt_value': tgt_value,
             'batch_size': batch_size,
             'max_retries': max_retries,
-            'created_stamp': str(datetime.now(UTC).timestamp()),
         }
 
         task = Task.model_validate(task_data)

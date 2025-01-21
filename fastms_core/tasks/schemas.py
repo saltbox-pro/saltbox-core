@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from fastms_core.config import LOG_CONFIG
 from fastms_core.db.mongo.schemas_base import BaseDBSchema, PaginatedListParams
+from fastms_core.utilities.helpers import get_now_stamp_str
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
@@ -146,16 +147,26 @@ class TaskJobStatus(str, Enum):
     failed = 'failed'
 
 
+class TaskJobReturnStatus(str, Enum):
+    succeeded = 'succeeded'
+    failed = 'failed'
+    waiting = 'waiting'
+    timeout = 'timeout'
+
+
 class TaskJobTarget(BaseModel):
-    tgt_type: str = Field(title='Salt tgt type')
     tgt: str = Field(title='Salt tgt')
     master: str = Field(title='Master')
 
 
 class TaskJob(BaseModel):
     jid: str = Field(title='JID')
-    status: TaskJobStatus = Field(title='Job status', default=TaskJobStatus.running)
     target: TaskJobTarget = Field(title='Job salt target')
+    status: TaskJobStatus = Field(title='Job status', default=TaskJobStatus.running)
+    returns_statuses: dict[str, TaskJobReturnStatus] = Field(title='Job returns statuses by minions', default={})
+
+    created_stamp: str = Field(title='Created stamp', default_factory=get_now_stamp_str)
+    finished_stamp: str | None = Field(title='Finished stamp', default=None)
 
 
 class TaskBaseSchema(BaseModel):
@@ -166,7 +177,7 @@ class TaskBaseSchema(BaseModel):
         stopped = 'stopped'
 
     status: TaskStatus = Field(title='Status', default=TaskStatus.created)
-    created_stamp: str | None = Field(title='Created timestamp', default=None)
+    created_stamp: str = Field(title='Created timestamp', default_factory=get_now_stamp_str)
     run_stamp: str | None = Field(title='Run timestamp', default=None)
     stopped_stamp: str | None = Field(title='Stopped timestamp', default=None)
     finished_stamp: str | None = Field(title='Finished timestamp', default=None)
