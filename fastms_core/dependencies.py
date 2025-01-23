@@ -1,9 +1,12 @@
+import json
 import logging.config
 from typing import Annotated, Any
 
+import httpx
 import jwt
+from aiocache import Cache  # type: ignore[import-untyped]
 from fastapi import Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.security import OpenIdConnect
 from pydantic import ValidationError
 
 from fastms_core.config import LOG_CONFIG, SETTINGS
@@ -13,9 +16,14 @@ logging.config.dictConfig(LOG_CONFIG.model_dump())
 
 logger = logging.getLogger(__name__)
 
-keycloak_scheme = HTTPBearer(
-    scheme_name='KeycloakJWT',
-    description='Validate JWT token from Keycloak server with JWKS URI and extract user data',
+
+# user_cache = Cache.from_url(f'{SETTINGS.redis_url}?namespace=user&ttl=180', **SETTINGS.redis_connection_kwargs)
+user_cache = Cache(ttl=180, namespace='user')
+
+
+keycloak_scheme = OpenIdConnect(
+    openIdConnectUrl=SETTINGS.well_known_url,
+    scheme_name='Keycloak OIDC',
 )
 
 
@@ -32,35 +40,60 @@ async def decode_jwt(token: str) -> Any:
     return payload
 
 
-async def get_current_user(token: Annotated[HTTPAuthorizationCredentials, Depends(keycloak_scheme)]) -> User:
+async def get_current_user(bearer: Annotated[str | None, Depends(keycloak_scheme)]) -> User:
+    if bearer is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail='Not authenticated',
+            headers={'WWW-Authenticate': 'Bearer'},
+        )
+
+    user = await user_cache.get(bearer)
+    if user:
+        return User(**json.loads(user))
+
+    logger.debug('bearer: %s', bearer)
+    headers = {'Authorization': bearer}
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(SETTINGS.keycloak_userinfo_url, headers=headers)
+            response.raise_for_status()
+            await user_cache.set(bearer, response.text)
+            return User(**response.json())
+        except httpx.HTTPStatusError as e:
+            raise HTTPException(
+                status_code=e.response.status_code,
+                detail='Could not validate credentials',
+                headers={'WWW-Authenticate': 'Bearer'},
+            ) from None
+
+
+async def get_current_user_from_jwt(token: Annotated[str | None, Depends(keycloak_scheme)]) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail='Could not validate credentials',
         headers={'WWW-Authenticate': 'Bearer'},
     )
+    if token is None:
+        raise credentials_exception from None
+
     try:
-        payload = await decode_jwt(token.credentials)
+        access_token = token.replace('Bearer ', '')
+        payload = await decode_jwt(access_token)
         user_id: str = payload.get('sub')
         if user_id is None:
             raise credentials_exception from None
     except (jwt.InvalidTokenError, ValidationError):
         raise credentials_exception from None
+    except jwt.PyJWKClientError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail='Get signing key from JWKS URI failed',
+            headers={'WWW-Authenticate': 'Bearer'},
+        ) from None
+
     user = User(**payload)
     if user is None:
         raise credentials_exception from None
 
     return user
-
-
-class RolesRequiredDependency:
-    def __init__(self, roles: list[str]):
-        self.roles = roles
-
-    def __call__(self, user: Annotated[User, Depends(get_current_user)]) -> User:
-        if not any(role in user.realm_access.roles for role in self.roles):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail='Not enough permissions',
-                headers={'WWW-Authenticate': 'Bearer'},
-            )
-        return user
