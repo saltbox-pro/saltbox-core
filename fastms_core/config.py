@@ -22,15 +22,25 @@ class Settings(BaseSettings):
     redis_url: str
     redis_username: str | None = None
     keycloak_server_url: str
-    keycloak_realm_name: str
+    keycloak_realm: str
     keycloak_audience: str = 'account'
     keycloak_algorithm: str = 'RS256'
+    keycloak_client: str
+    keycloak_client_secret: str
 
     model_config = SettingsConfigDict(env_file='.env')
 
     @property
     def keycloak_jwks_uri(self) -> str:
-        return f'{self.keycloak_server_url}/realms/{self.keycloak_realm_name}/protocol/openid-connect/certs'
+        return f'{self.keycloak_server_url}/realms/{self.keycloak_realm}/protocol/openid-connect/certs'
+
+    @property
+    def keycloak_userinfo_url(self) -> str:
+        return f'{self.keycloak_server_url}/realms/{self.keycloak_realm}/protocol/openid-connect/userinfo'
+
+    @property
+    def well_known_url(self) -> str:
+        return f'{self.keycloak_server_url}/realms/{self.keycloak_realm}/.well-known/openid-configuration'
 
     @property
     def mongo_url(self) -> str:
