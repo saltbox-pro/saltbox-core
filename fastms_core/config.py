@@ -26,7 +26,6 @@ class Settings(BaseSettings):
     keycloak_audience: str = 'account'
     keycloak_algorithm: str = 'RS256'
     keycloak_client: str
-    keycloak_client_secret: str
 
     model_config = SettingsConfigDict(env_file='.env')
 
