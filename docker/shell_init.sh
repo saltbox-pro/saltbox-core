@@ -13,7 +13,6 @@ err() {
   warn "$@" && exit 1
 }
 
-SALT_PASSWORD="$(cat /run/secrets/salt_api_password)"
 REDIS_PASSWORD="$(cat /run/secrets/redis_salt_password)"
 MONGO_PASSWORD="$(cat /run/secrets/mongo_admin_password)"
 
@@ -28,4 +27,4 @@ fi
 CELERY_BROKER_URL="${CELERY_BROKER_URL}@${REDIS_CELERY_HOST}:${REDIS_CELERY_PORT}"
 CELERY_BROKER_URL="${CELERY_BROKER_URL}/${REDIS_CELERY_DB}"
 
-export SALT_PASSWORD REDIS_PASSWORD MONGO_PASSWORD CELERY_BROKER_URL
+export REDIS_PASSWORD MONGO_PASSWORD CELERY_BROKER_URL

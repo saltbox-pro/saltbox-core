@@ -21,10 +21,6 @@ class Settings(BaseSettings):
     redis_tls_verification: Literal['none', 'optional', 'required'] = 'required'
     redis_url: str
     redis_username: str | None = None
-    salt_eauth: str = 'file'
-    salt_password: str
-    salt_url: str
-    salt_username: str
     keycloak_server_url: str
     keycloak_realm_name: str
     keycloak_audience: str = 'account'

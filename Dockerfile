@@ -1,6 +1,5 @@
 FROM registry.altlinux.org/alt/alt:p11 AS base
 LABEL version='1.0'
-ENV SALT_USERNAME='salt_box_core'
 EXPOSE 8000
 
 ## TODO
@@ -58,7 +57,6 @@ COPY --chmod=755 \
 
 ENV BASE_URL_ROOT_PATH=/
 ENV TIMEOUT_GRACEFUL_SHUTDOWN=5
-ENV SALT_EAUTH=file
 
 ENV REDIS_CELERY_PASSWORD_SECRET=/run/secrets/redis_celery_password
 ENV REDIS_CELERY_USERNAME=
@@ -77,7 +75,7 @@ ENTRYPOINT ["/usr/local/bin/uvicorn.sh"]
 ## Mount Core repository dir to /mnt/salt_box_core to serve with the container.
 
 FROM base AS dev
-LABEL name='salt-box-core-dev' version='1.0'
+LABEL name='salt-box-core-dev' version='1.1'
 # Install Core as editable package
 WORKDIR /mnt/salt_box_core/
 VOLUME /mnt/salt_box_core/
@@ -92,7 +90,7 @@ CMD ["dev"]
 ################
 
 FROM base AS main
-LABEL name='salt-box-core' version='1.0'
+LABEL name='salt-box-core' version='1.1'
 # Install Core as usual package
 RUN \
   --mount=type=bind,target=/mnt/salt_box_core/,readwrite \
