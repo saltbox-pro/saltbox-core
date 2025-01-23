@@ -1,4 +1,5 @@
 import logging.config
+from datetime import UTC, datetime, timedelta
 
 from beanie import PydanticObjectId
 from fastapi import APIRouter, HTTPException, status
@@ -40,6 +41,15 @@ async def minions_list(
     body: MinionsListBody,
 ) -> PaginatedResponse[MinionListSchema]:
     search = body.query
+
+    for field_name in ['created', 'modified', 'last_activity']:
+        if field_name in search.keys():
+            vals = search[field_name]
+            for k, v in vals.items():
+                if v == '$$FIVE_MINUTES_AGO':
+                    vals[k] = datetime.now(UTC) - timedelta(minutes=5)
+                else:
+                    vals[k] = datetime.fromisoformat(v)
 
     if body.collection_id:
         minions_collection = await collections_crud.get(body.collection_id)
