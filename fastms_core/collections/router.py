@@ -20,7 +20,7 @@ logging.config.dictConfig(LOG_CONFIG.model_dump())
 logger = logging.getLogger(__name__)
 
 
-collections_router = APIRouter(prefix='/collections', tags=['Collections'])
+collections_router = APIRouter(prefix='/collections-old', tags=['Collections'])
 
 
 @collections_router.get('', operation_id='collections_list')
