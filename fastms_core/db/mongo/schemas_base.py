@@ -1,12 +1,13 @@
-from typing import Generic, TypeVar
+from typing import Annotated, Generic, TypeVar
 
 from beanie import PydanticObjectId
 from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel, Field, computed_field, field_validator
+from pydantic import BaseModel, BeforeValidator, Field, computed_field, field_validator
 
 from fastms_core.config import SETTINGS
 
 SchemaType = TypeVar('SchemaType', bound=BaseModel)
+PyObjectId = Annotated[str, BeforeValidator(str)]
 
 
 class BaseDBSchema(BaseModel):
