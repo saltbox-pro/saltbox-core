@@ -17,6 +17,7 @@ logging.config.dictConfig(LOG_CONFIG.model_dump())
 logger = logging.getLogger(__name__)
 
 
+# TODO: use redis cache
 # user_cache = Cache.from_url(f'{SETTINGS.redis_url}?namespace=user&ttl=180', **SETTINGS.redis_connection_kwargs)
 user_cache = Cache(ttl=180, namespace='user')
 
