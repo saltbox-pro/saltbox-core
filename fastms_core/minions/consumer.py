@@ -57,7 +57,7 @@ class GrainsConsumer:
                 await asyncio.sleep(0.01)
 
 
-async def async_main():
+async def async_main() -> None:
     mongo_client = await init_mongo()
     grains_consumer = GrainsConsumer(channel='grains')
 
