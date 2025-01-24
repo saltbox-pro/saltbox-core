@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging.config
 import types
+from datetime import datetime
 from inspect import isclass
 from typing import Any, get_args
 from uuid import UUID
@@ -49,6 +50,7 @@ schema_text_lookups = [
     '=', '!=', 'contains', 'beginsWith', 'endsWith', 'doesNotContain',
     'doesNotBeginWith', 'doesNotEndWith', 'in', 'notIn'
 ]
+schema_datetime_lookups = ['=', '!=', '<', '>', '<=', '>=', 'in', 'notIn']
 schema_nullable_lookups = ['null', 'notNull']
 schema_lookups_map = {
     int: schema_number_lookups,
@@ -56,6 +58,7 @@ schema_lookups_map = {
     str: schema_text_lookups,
     bool: ['=', '!='],
     list: ['in', 'notIn'],
+    datetime: schema_datetime_lookups,
     PydanticObjectId: schema_text_lookups,
     UUID: schema_text_lookups,
 }
@@ -81,17 +84,23 @@ def get_model_schema(model: type[BaseModel], pre_path: str | None = None) -> lis
         computed_field_class = None
 
         try:
-            for field_class in get_args(field.annotation):
-                if field_class is types.NoneType:
-                    nullable_field = True
-                    continue
-                if isinstance(field_class, types.GenericAlias):
-                    if field_class.__origin__ in [dict, list]:
-                        raise UnsupportedSchemaType
-                if isclass(field_class) and issubclass(field_class, BaseModel):
-                    sub_model = field_class
-                    break
-                computed_field_class = field_class
+            field_annotations = get_args(field.annotation)
+
+            if field_annotations:
+                for field_class in field_annotations:
+                    if field_class is types.NoneType:
+                        nullable_field = True
+                        continue
+                    if isinstance(field_class, types.GenericAlias):
+                        if field_class.__origin__ in [dict, list]:
+                            raise UnsupportedSchemaType
+                    if isclass(field_class) and issubclass(field_class, BaseModel):
+                        sub_model = field_class
+                        break
+                    if field_class:
+                        computed_field_class = field_class
+            else:
+                computed_field_class = field.annotation
         except UnsupportedSchemaType:
             continue
 
