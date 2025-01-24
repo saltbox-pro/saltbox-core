@@ -52,13 +52,14 @@ async def get_current_user(bearer: Annotated[str | None, Depends(keycloak_scheme
     if user:
         return User(**json.loads(user))
 
-    logger.debug('bearer: %s', bearer)
+    # logger.info('bearer: %s', bearer)
     headers = {'Authorization': bearer}
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(SETTINGS.keycloak_userinfo_url, headers=headers)
             response.raise_for_status()
             await user_cache.set(bearer, response.text)
+            # logger.info('user: %s', user)
             return User(**response.json())
         except httpx.HTTPStatusError as e:
             raise HTTPException(
