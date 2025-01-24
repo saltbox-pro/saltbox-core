@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging.config
 
 from pymongo import AsyncMongoClient
+from pymongo.asynchronous.database import AsyncDatabase
 
 from fastms_core.config import LOG_CONFIG, SETTINGS
 
@@ -20,13 +21,13 @@ class _MongoClientSingleton:
         return cls.instance
 
 
-async def init_mongo() -> AsyncMongoClient:
+def get_mongo_db() -> AsyncDatabase:
     client = _MongoClientSingleton().mongo_client
 
     if client is None:
         msg = 'Mongo client is not initialized'
         raise ValueError(msg)
 
-    # mongo_db = client[SETTINGS.mongo_db]
+    mongo_db = client[SETTINGS.mongo_db]
 
-    return client
+    return mongo_db
