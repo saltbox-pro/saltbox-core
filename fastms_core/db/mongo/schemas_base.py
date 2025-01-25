@@ -15,8 +15,8 @@ class BaseDBSchema(BaseModel):
 
 
 class PaginatedResponse(BaseModel, Generic[SchemaType]):
-    total: int
-    data: list[SchemaType]
+    total: int = Field(description='Total number of items', default=0, ge=0)
+    data: list[SchemaType] = Field(description='Items list', default=[])
 
 
 class PaginatedListParams(BaseModel):

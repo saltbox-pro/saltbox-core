@@ -1,10 +1,9 @@
 from datetime import datetime
 from typing import Any
 
-from bson import ObjectId
 from pydantic import BaseModel, ConfigDict, Field
 
-from fastms_core.db.mongo.schemas_base import MongoQueryBaseSchema, PyObjectId
+from fastms_core.db.mongo.schemas_base import MongoQueryBaseSchema, PaginatedResponse, PyObjectId
 
 
 def datetime_now_sec() -> datetime:
@@ -14,13 +13,14 @@ def datetime_now_sec() -> datetime:
 class MinionCollectionSchema(MongoQueryBaseSchema):
     id: PyObjectId | None = Field(alias='_id', default=None)
     title: str = Field(...)
-    slug: str = Field(...)
+    slug: str = Field(..., pattern=r'^[a-z0-9-]+$')
 
     model_config = ConfigDict(
         populate_by_name=True,
         arbitrary_types_allowed=True,
         json_schema_extra={
             'example': {
+                'id': '5f7b1b3b7b3b7b3b7b3b7b3b',
                 'title': 'My collection',
                 'slug': 'my_collection',
                 'query': {'some_field': 'some_value'},
@@ -33,21 +33,8 @@ class MinionCollectionCreateSchema(MinionCollectionSchema):
     pass
 
 
-class MinionCollectionUpdateSchema(BaseModel):
-    title: str | None = Field(default=None)
-    slug: str | None = Field(default=None)
-
-    model_config = ConfigDict(
-        arbitrary_types_allowed=True,
-        json_encoders={ObjectId: str},
-        json_schema_extra={
-            'example': {
-                'title': 'My collection',
-                'slug': 'my_collection',
-                'query': {'some_field': 'some_value'},
-            }
-        },
-    )
+class MinionCollectionUpdateSchema(MinionCollectionSchema):
+    pass
 
 
 class MinionCollectionListSchema(MinionCollectionSchema):
@@ -56,6 +43,18 @@ class MinionCollectionListSchema(MinionCollectionSchema):
 
 class MinionCollectionSchemaWithAllowedActions(MinionCollectionSchema):
     allowed_actions: list[str] = Field(default_factory=list)
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            'example': {
+                'id': '5f7b1b3b7b3b7b3b7b3b7b3b',
+                'title': 'My collection',
+                'slug': 'my_collection',
+                'query': {'some_field': 'some_value'},
+                'allowed_actions': ['retrieve', 'update', 'delete'],
+            }
+        }
+    )
 
 
 class GrainsSchema(BaseModel):
@@ -197,7 +196,39 @@ class MinionUpdateSchema(MinionSchema):
 class MinionListSchema(MinionBaseSchema):
     grains: GrainsShortSchema | None = None
 
+    model_config = ConfigDict(
+        json_schema_extra={
+            'example': {
+                'id': '5f7b1b3b7b3b7b3b7b3b7b3b',
+                'minion_id': 'minion1',
+                'master': 'master1',
+                'created': '2021-01-01T00:00:00',
+                'modified': '2021-01-01T00:00:00',
+                'grains': {
+                    'id': 'grain_id',
+                    'fqdn': 'fqdn',
+                    'osfullname': 'Ubuntu',
+                    'domain': 'domain.com',
+                    'efi': True,
+                    'cpu_model': 'Intel',
+                    'mem_total': 1024,
+                },
+            }
+        }
+    )
+
 
 class MinionCollectionDetailSchema(MinionCollectionSchemaWithAllowedActions):
-    total: int = Field(default=0)
-    minions: list[MinionListSchema] = Field(default=[])
+    minions: PaginatedResponse[MinionListSchema]
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            'example': {
+                'title': 'My collection',
+                'slug': 'my_collection',
+                'query': {'some_field': 'some_value'},
+                'allowed_actions': ['retrieve', 'update', 'delete'],
+                'minions': {'total': 1, 'data': [{'minion_id': 'minion1', 'master': 'master1'}]},
+            }
+        },
+    )

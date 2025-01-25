@@ -55,8 +55,8 @@ APP.add_middleware(
     allow_headers=['*'],
 )
 
-APP.include_router(minions_router)
-APP.include_router(collections_router)
+APP.include_router(minions_router, deprecated=True)
+APP.include_router(collections_router, deprecated=True)
 APP.include_router(filters_router)
 APP.include_router(jobs_router)
 APP.include_router(jobs_ws_router)

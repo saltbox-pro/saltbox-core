@@ -1,8 +1,10 @@
+import logging.config
 from abc import ABC, abstractmethod
 from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel
 
+from fastms_core.config import LOG_CONFIG
 from fastms_core.db.mongo.new_config import get_mongo_db
 
 ModelType = TypeVar('ModelType', bound=BaseModel)
@@ -10,6 +12,10 @@ CreateSchemaType = TypeVar('CreateSchemaType', bound=BaseModel)
 UpdateSchemaType = TypeVar('UpdateSchemaType', bound=BaseModel)
 ListSchemaType = TypeVar('ListSchemaType', bound=BaseModel)
 FindQueryProjectionType = TypeVar('FindQueryProjectionType', bound=BaseModel)
+
+logging.config.dictConfig(LOG_CONFIG.model_dump())
+
+logger = logging.getLogger(__name__)
 
 
 class AbstractRepository(ABC, Generic[ModelType, ListSchemaType, CreateSchemaType, UpdateSchemaType]):
@@ -25,18 +31,12 @@ class AbstractRepository(ABC, Generic[ModelType, ListSchemaType, CreateSchemaTyp
     async def find_all(self, query: dict[str, Any] | None = None) -> list[ModelType]:
         pass
 
-    # @abstractmethod
-    # async def update_one(self, query: dict[str, Any], update: dict[str, Any]) -> int:
-    #     pass
-
-    # @abstractmethod
-    # async def delete_one(self, query: dict[str, Any]) -> int:
-    #     pass
-
 
 # Реализация для MongoDB
 class MongoDBRepository(AbstractRepository[ModelType, ListSchemaType, CreateSchemaType, UpdateSchemaType]):
-    def __init__(self, collection_name: str, model: type[ModelType]):
+    """A repository class for MongoDB operations"""
+
+    def __init__(self, collection_name: str, model: type[ModelType]) -> None:
         self.db = get_mongo_db()
         self.collection = self.db[collection_name]
         self.model = model
@@ -56,3 +56,25 @@ class MongoDBRepository(AbstractRepository[ModelType, ListSchemaType, CreateSche
     async def find_all(self, query: dict[str, Any] | None = None) -> list[ModelType]:
         documents = self.collection.find(query)
         return [self.model(**document) async for document in documents]
+
+    async def get_paginated(
+        self,
+        search: dict | None = None,
+        *,
+        page: int = 0,
+        per_page: int = 20,
+        projection_query: dict | None = None,
+    ) -> dict:
+        if not search:
+            search = {}
+
+        data_query = self.collection.find(search, projection_query).skip(page * per_page).limit(per_page)
+        data = [document async for document in data_query]
+        logger.info('data: %s', data)
+        total = await self.collection.count_documents(search)
+
+        # TODO (a.baikov): think about returning PaginatedResponse[ListSchemaType] instead of dict
+        # https://taiga.altlab.su/project/fastms/us/100
+        # return PaginatedResponse[ListSchemaType](total=total, data=data)
+
+        return {'total': total, 'data': data}
