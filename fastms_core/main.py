@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastms_core.collections.router import collections_router
 from fastms_core.config import APP_NAME, SETTINGS
 from fastms_core.db.mongo.config import init_mongo
+from fastms_core.db.mongo.init_db import init_mongo_db
 from fastms_core.db.redis import POOL
 from fastms_core.jobs.router import router as jobs_router
 from fastms_core.jobs.router import ws_router as jobs_ws_router
@@ -22,6 +23,7 @@ LOGGER = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator:
     mongo_client = await init_mongo()
+    await init_mongo_db()
 
     yield
     mongo_client.close()
