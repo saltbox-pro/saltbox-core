@@ -1,13 +1,12 @@
 import logging.config
 from typing import Annotated
 
-import httpx
 from bson import ObjectId
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query
 
-from fastms_core.config import LOG_CONFIG, SETTINGS
-from fastms_core.db.mongo.schemas_base import PaginatedListParams, User
-from fastms_core.dependencies import get_current_user  # , get_current_user_from_jwt
+from fastms_core.config import LOG_CONFIG
+from fastms_core.db.mongo.schemas_base import PaginatedListParams
+from fastms_core.minion_collections.authz import MinionCollectionAuthzService, get_authz_service
 from fastms_core.minion_collections.repository import CollectionRepository, MinionRepository
 from fastms_core.minion_collections.schemas import (
     MinionCollectionCreateSchema,
@@ -24,43 +23,42 @@ router = APIRouter(prefix='/collections', tags=['Minion Collections'])
 
 
 @router.get('', operation_id='minion_collections_list', response_model_by_alias=False)
-async def clients_list(
-    request: Request,
-    user: Annotated[User, Depends(get_current_user)],
+async def collections_list(
+    params: Annotated[PaginatedListParams, Query()],
+    authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
 ) -> list[MinionCollectionSchema]:
-    logger.info('user: %s', user.model_dump())
-    repository = CollectionRepository()
-    path_list = request.url.path.split('/')[3:]
-    logger.info('path_list: %s', path_list)
-    input_dict = {
-        'input': {
-            'user': user.model_dump(),
-            'path': path_list,
-            'method': request.method,
-            'action': 'retrieve',
-        }
-    }
-    async with httpx.AsyncClient() as r:
-        response = await r.post(f'{SETTINGS.opa_url}/v1/data/core/collections', json=input_dict)
-        response.raise_for_status()
-        response_json = response.json()
-        logger.info('response_json: %s', response_json)
-        if not response_json['result'] or not response_json['result']['allow']:
-            raise HTTPException(status_code=403, detail='Forbidden access')
+    logger.debug('user: %s', authz_service.user.model_dump())
 
-    query = {'slug': {'$in': response_json['result']['allowed_slugs']}}
+    authz_result = await authz_service.check_access('retrieve')
+    if not authz_result.allow:
+        raise HTTPException(status_code=403, detail='Not enough permissions')
+
+    repository = CollectionRepository()
+    query = {'slug': {'$in': authz_result.allowed_slugs}}
     return await repository.find_all(query)
 
 
 @router.get('/{slug}', operation_id='minion_collection_read', response_model_by_alias=False)
-async def clients_read(
-    request: Request,
+async def collection_retrieve(
     slug: str,
     params: Annotated[PaginatedListParams, Query()],
-    user: Annotated[User, Depends(get_current_user)],
+    authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
 ) -> MinionCollectionDetailSchema:
+    logger.debug('user: %s', authz_service.user.model_dump())
+
+    authz_result = await authz_service.check_access('retrieve')
+    if not authz_result.allow:
+        if slug != 'root':
+            raise HTTPException(status_code=403, detail='Not enough permissions')
+
+        # TODO (a.baikov): in this case we get first allowed collection, but without allowed actions
+        # need to implement a separate endpoint for root collection or move all logic to service layer
+        slug = authz_result.allowed_slugs[0]
+
     collections_repo = CollectionRepository()
-    client = await collections_repo.get_by_slug_protected(slug, user, request)
+    collection = await collections_repo.find_one({'slug': slug})
+    if not collection:
+        raise HTTPException(status_code=404, detail='Collection not found')
 
     minions_repo = MinionRepository()
     projection_query = {
@@ -78,29 +76,36 @@ async def clients_read(
     }
 
     minions = await minions_repo.get_paginated(
-        client.query, page=params.page, per_page=params.per_page, projection_query=projection_query
+        collection.query, page=params.page, per_page=params.per_page, projection_query=projection_query
     )
 
-    client.minions = minions.data
-    client.total = minions.total
-
-    return client
+    return MinionCollectionDetailSchema(
+        **collection.model_dump(),
+        allowed_actions=authz_result.allowed_actions,
+        minions={**minions},
+    )
 
 
 @router.get('/{slug}/{mid}', operation_id='minion_collection_read_minion', response_model_by_alias=False)
-async def clients_read_minion(
-    request: Request,
+async def collection_minion_retrieve(
     slug: str,
     mid: str,
-    user: Annotated[User, Depends(get_current_user)],
+    authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
 ) -> MinionSchema:
+    logger.debug('user: %s', authz_service.user.model_dump())
+    allow = await authz_service.allow('retrieve')
+    if not allow:
+        raise HTTPException(status_code=403, detail='Not enough permissions')
+
     collections_repo = CollectionRepository()
-    client = await collections_repo.get_by_slug_protected(slug, user, request)
+    collection = await collections_repo.find_one({'slug': slug})
+    if not collection:
+        raise HTTPException(status_code=404, detail='Collection not found')
 
     minions_repo = MinionRepository()
     query = {
         '$and': [
-            client.query,
+            collection.query,
             {'_id': ObjectId(mid)},
         ]
     }
@@ -112,12 +117,16 @@ async def clients_read_minion(
 
 
 @router.post('', operation_id='minion_collection_create', response_model_by_alias=False)
-async def clients_create(
+async def collection_create(
     collection: MinionCollectionCreateSchema,
-    user: Annotated[User, Depends(get_current_user)],
+    authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
 ) -> MinionCollectionSchema:
+    logger.debug('user: %s', authz_service.user)
+    allow = await authz_service.allow('create')
+    if not allow:
+        raise HTTPException(status_code=403, detail='Not enough permissions')
+
     repository = CollectionRepository()
-    logger.debug('user: %s', user)
     created = await repository.add(collection)
     if not created:
         raise HTTPException(status_code=400, detail='Collection not created')
