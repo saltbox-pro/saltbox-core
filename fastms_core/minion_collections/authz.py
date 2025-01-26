@@ -1,5 +1,5 @@
 import logging.config
-from typing import Annotated, Literal
+from typing import Annotated, Literal, overload
 
 import httpx
 from fastapi import Depends, Request
@@ -27,6 +27,7 @@ class AuthzResponse(BaseModel):
     result: OPAResult | bool
 
 
+# TODO (a.baikov): Must be refactored later
 class MinionCollectionAuthzService:
     def __init__(
         self,
@@ -59,9 +60,18 @@ class MinionCollectionAuthzService:
             logger.info('response.json(): %s', response.json())
             return AuthzResponse.model_validate(response.json())
 
-    async def check_access(self, action: str) -> OPAResult:
-        input_dict = self._prepare_input(action)
-        authz_response = await self._make_request(input_dict)
+    @overload
+    async def check_access(self, *, action: str) -> OPAResult: ...
+
+    @overload
+    async def check_access(self, *, input: dict) -> OPAResult: ...
+
+    async def check_access(self, *, action: str | None = None, input: dict | None = None) -> OPAResult:
+        if action:
+            input_dict = self._prepare_input(action)
+            authz_response = await self._make_request(input_dict)
+        elif input:
+            authz_response = await self._make_request({'input': input})
 
         if not isinstance(authz_response.result, OPAResult):
             msg = 'Expected OPAResult, got bool'
