@@ -1,4 +1,3 @@
-import logging.config
 from typing import Annotated
 
 from beanie import PydanticObjectId
@@ -12,13 +11,7 @@ from fastms_core.collections.schemas import (
     MinionCollectionSchema,
     MinionCollectionUpdateSchema,
 )
-from fastms_core.config import LOG_CONFIG
 from fastms_core.db.mongo.schemas_base import PaginatedResponse
-
-logging.config.dictConfig(LOG_CONFIG.model_dump())
-
-logger = logging.getLogger(__name__)
-
 
 collections_router = APIRouter(prefix='/collections-old', tags=['Collections'])
 

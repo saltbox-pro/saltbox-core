@@ -1,10 +1,8 @@
-import logging.config
 from abc import ABC, abstractmethod
 from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel
 
-from fastms_core.config import LOG_CONFIG
 from fastms_core.db.mongo.new_config import get_mongo_db
 
 ModelType = TypeVar('ModelType', bound=BaseModel)
@@ -12,10 +10,6 @@ CreateSchemaType = TypeVar('CreateSchemaType', bound=BaseModel)
 UpdateSchemaType = TypeVar('UpdateSchemaType', bound=BaseModel)
 ListSchemaType = TypeVar('ListSchemaType', bound=BaseModel)
 FindQueryProjectionType = TypeVar('FindQueryProjectionType', bound=BaseModel)
-
-logging.config.dictConfig(LOG_CONFIG.model_dump())
-
-logger = logging.getLogger(__name__)
 
 
 class AbstractRepository(ABC, Generic[ModelType, ListSchemaType, CreateSchemaType, UpdateSchemaType]):
@@ -70,7 +64,6 @@ class MongoDBRepository(AbstractRepository[ModelType, ListSchemaType, CreateSche
 
         data_query = self.collection.find(search, projection_query).skip(page * per_page).limit(per_page)
         data = [document async for document in data_query]
-        logger.info('data: %s', data)
         total = await self.collection.count_documents(search)
 
         # TODO (a.baikov): think about returning PaginatedResponse[ListSchemaType] instead of dict

@@ -1,17 +1,12 @@
-import logging.config
 from typing import Annotated, Literal, overload
 
 import httpx
 from fastapi import Depends, Request
 from pydantic import BaseModel, ConfigDict
 
-from fastms_core.config import LOG_CONFIG, SETTINGS
+from fastms_core.config import SETTINGS, logger
 from fastms_core.db.mongo.schemas_base import User
 from fastms_core.dependencies import get_current_user
-
-logging.config.dictConfig(LOG_CONFIG.model_dump())
-
-logger = logging.getLogger(__name__)
 
 
 class OPAResult(BaseModel):
@@ -57,7 +52,7 @@ class MinionCollectionAuthzService:
         async with httpx.AsyncClient() as r:
             response = await r.post(url, json=input_dict)
             response.raise_for_status()
-            logger.info('response.json(): %s', response.json())
+            logger.debug('response.json(): %s', response.json())
             return AuthzResponse.model_validate(response.json())
 
     @overload

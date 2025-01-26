@@ -1,3 +1,4 @@
+import logging.config
 from typing import Any, Literal
 
 from pydantic import BaseModel, Field
@@ -90,3 +91,7 @@ class LogConfig(BaseModel):
 
 SETTINGS = Settings()
 LOG_CONFIG = LogConfig(LOG_LEVEL='DEBUG' if SETTINGS.debug else 'INFO')
+
+logging.config.dictConfig(LOG_CONFIG.model_dump())
+
+logger = logging.getLogger(__name__)

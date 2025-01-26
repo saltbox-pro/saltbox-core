@@ -1,10 +1,8 @@
-import logging.config
 from typing import Annotated
 
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from fastms_core.config import LOG_CONFIG
 from fastms_core.db.mongo.schemas_base import PaginatedListParams, PaginatedResponse
 from fastms_core.minion_collections.authz import MinionCollectionAuthzService, get_authz_service
 from fastms_core.minion_collections.repository import CollectionRepository, MinionRepository
@@ -16,10 +14,6 @@ from fastms_core.minion_collections.schemas import (
     MinionSchema,
 )
 from fastms_core.minion_collections.services import MinionCollectionService, get_collection_service
-
-logging.config.dictConfig(LOG_CONFIG.model_dump())
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix='/collections', tags=['Minion Collections'])
 
@@ -99,7 +93,6 @@ async def collection_minion_retrieve(
     mid: str,
     authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
 ) -> MinionSchema:
-    logger.debug('user: %s', authz_service.user.model_dump())
     allow = await authz_service.allow('retrieve')
     if not allow:
         raise HTTPException(status_code=403, detail='Not enough permissions')

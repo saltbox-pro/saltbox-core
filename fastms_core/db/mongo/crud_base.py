@@ -1,4 +1,3 @@
-import logging.config
 from datetime import datetime
 from typing import Any, Generic, TypeVar
 
@@ -7,12 +6,7 @@ from beanie.odm.queries.find import FindMany
 from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 
-from fastms_core.config import LOG_CONFIG
 from fastms_core.db.mongo.schemas_base import PaginatedResponse
-
-logging.config.dictConfig(LOG_CONFIG.model_dump())
-
-logger = logging.getLogger(__name__)
 
 ModelType = TypeVar('ModelType', bound=Document)
 CreateSchemaType = TypeVar('CreateSchemaType', bound=BaseModel)
@@ -77,7 +71,7 @@ class CRUDBase(Generic[ModelType, ListSchemaType, CreateSchemaType, UpdateSchema
                 setattr(db_obj, field, datetime.now().astimezone().replace(microsecond=0))
             if field in update_data:
                 setattr(db_obj, field, update_data[field])
-        # TODO: Check if this saves changes with the setattr calls
+        # TODO (a.baikov): Check if this saves changes with the setattr calls
         await db_obj.save()
         return db_obj
 

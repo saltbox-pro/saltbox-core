@@ -1,5 +1,4 @@
 import json
-import logging.config
 from typing import Annotated, Any
 
 import httpx
@@ -9,15 +8,10 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OpenIdConnect
 from pydantic import ValidationError
 
-from fastms_core.config import LOG_CONFIG, SETTINGS
+from fastms_core.config import SETTINGS, logger
 from fastms_core.db.mongo.schemas_base import User
 
-logging.config.dictConfig(LOG_CONFIG.model_dump())
-
-logger = logging.getLogger(__name__)
-
-
-# TODO: use redis cache
+# TODO (a.baikov): use redis cache
 # user_cache = Cache.from_url(f'{SETTINGS.redis_url}?namespace=user&ttl=180', **SETTINGS.redis_connection_kwargs)
 user_cache = Cache(ttl=180, namespace='user')
 
@@ -53,14 +47,15 @@ async def get_current_user(bearer: Annotated[str | None, Depends(keycloak_scheme
     if user:
         return User(**json.loads(user))
 
-    # logger.info('bearer: %s', bearer)
     headers = {'Authorization': bearer}
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(SETTINGS.keycloak_userinfo_url, headers=headers)
             response.raise_for_status()
             await user_cache.set(bearer, response.text)
-            # logger.info('user: %s', user)
+
+            logger.debug('user: %s', user)
+
             return User(**response.json())
         except httpx.HTTPStatusError as e:
             raise HTTPException(

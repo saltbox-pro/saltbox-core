@@ -1,20 +1,13 @@
-from __future__ import annotations
-
-import logging.config
-
 from pymongo import AsyncMongoClient
 from pymongo.asynchronous.database import AsyncDatabase
 
-from fastms_core.config import LOG_CONFIG, SETTINGS
-
-logger = logging.getLogger(__name__)
-logging.config.dictConfig(LOG_CONFIG.model_dump())
+from fastms_core.config import SETTINGS
 
 
 class _MongoClientSingleton:
     mongo_client: AsyncMongoClient | None
 
-    def __new__(cls) -> _MongoClientSingleton:
+    def __new__(cls) -> '_MongoClientSingleton':
         if not hasattr(cls, 'instance'):
             cls.instance = super().__new__(cls)
             cls.instance.mongo_client = AsyncMongoClient(SETTINGS.mongo_url)
