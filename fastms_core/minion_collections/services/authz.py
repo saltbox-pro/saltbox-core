@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict
 
 from fastms_core.config import SETTINGS, logger
 from fastms_core.db.mongo.schemas_base import User
-from fastms_core.dependencies import get_current_user
+from fastms_core.dependencies import get_current_user_from_jwt
 
 
 class OPAResult(BaseModel):
@@ -97,6 +97,6 @@ class MinionCollectionAuthzService:
 
 
 async def get_authz_service(
-    request: Request, user: Annotated[User, Depends(get_current_user)]
+    request: Request, user: Annotated[User, Depends(get_current_user_from_jwt)]
 ) -> MinionCollectionAuthzService:
     return MinionCollectionAuthzService(user, request)
