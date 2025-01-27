@@ -2,7 +2,6 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Generic, TypeVar
 
-from bson import ObjectId
 from pydantic import BaseModel
 
 from fastms_core.config import logger
@@ -87,5 +86,6 @@ class MongoDBRepository(AbstractRepository[ModelType, ListSchemaType, CreateSche
         logger.info('Updated document: %s', updated)
         result = await self.collection.find_one(query)
         if not result:
-            raise ValueError('Document not found')
+            msg = 'Document not found'
+            raise ValueError(msg)
         return self.model(**result)
