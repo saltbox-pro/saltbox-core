@@ -6,7 +6,7 @@ from typing import Any, Union, get_args, get_origin
 from fastapi import HTTPException, status
 
 from fastms_core.config import LOG_CONFIG
-from fastms_core.minions.schemas import GrainsSchema, MinionSchema
+from fastms_core.minion_collections.schemas.minion_schemas import GrainsSchema, MinionSchema
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 

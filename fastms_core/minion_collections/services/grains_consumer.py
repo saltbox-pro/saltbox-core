@@ -1,27 +1,21 @@
 import asyncio
 import json
-import logging.config
 from typing import Any
 
 from redis import asyncio as aioredis
 
-from fastms_core.config import LOG_CONFIG, SETTINGS
-from fastms_core.db.mongo.config import init_mongo
-from fastms_core.minions.crud import minions_crud
-from fastms_core.minions.models import Minion
-from fastms_core.minions.schemas import MinionSchemaCreate
-
-logging.config.dictConfig(LOG_CONFIG.model_dump())
-
-logger = logging.getLogger(__name__)
+from fastms_core.config import SETTINGS, logger
+from fastms_core.minion_collections.repository import MinionRepository
+from fastms_core.minion_collections.schemas.minion_schemas import MinionCreateSchema
 
 
-# TODO: temporary solution, need to be refactored
+# TODO (a.baikov): temporary solution, need to be refactored
 class GrainsConsumer:
     def __init__(self, channel: str):
         self.redis_url: str = SETTINGS.redis_url
         self.con_kwargs = SETTINGS.redis_connection_kwargs
         self.channel = channel
+        self.repository = MinionRepository()
 
     async def handle_message(self, message: Any) -> None:
         if not isinstance(message, bytes):
@@ -37,11 +31,11 @@ class GrainsConsumer:
         }
 
         if data:
-            exist = await Minion.find_one({'minion_id': minion_id})
+            exist = await self.repository.find_one({'minion_id': minion_id})
             if exist:
-                await minions_crud.update(db_obj=exist, obj_in=minion_obj)
+                await self.repository.update_one({'minion_id': minion_id}, obj_in=minion_obj)
             else:
-                await minions_crud.create(obj_in=MinionSchemaCreate(**minion_obj))
+                await self.repository.add(MinionCreateSchema(**minion_obj))
 
     async def consume(self) -> None:
         redis = await aioredis.from_url(self.redis_url, **self.con_kwargs)
@@ -58,13 +52,10 @@ class GrainsConsumer:
 
 
 async def async_main() -> None:
-    mongo_client = await init_mongo()
     grains_consumer = GrainsConsumer(channel='grains')
 
     logger.info('Starting grains consumer')
     await grains_consumer.consume()
-
-    mongo_client.close()
 
 
 def main() -> None:

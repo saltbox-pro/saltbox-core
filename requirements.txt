@@ -11,3 +11,5 @@ python-multipart~=0.0.17
 redis~=5.2.0
 uvicorn[standard]~=0.32.0
 pyjwt[crypto]~=2.10.1
+pymongo~=4.9.2
+aiocache~=0.12.3

@@ -1,23 +1,16 @@
-from __future__ import annotations
-
-import logging.config
-
 from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient
 
 from fastms_core.collections.models import MinionCollection
-from fastms_core.config import LOG_CONFIG, SETTINGS
+from fastms_core.config import SETTINGS
 from fastms_core.minions.models import Minion
 from fastms_core.tasks.models import Task, TaskTemplate
-
-logger = logging.getLogger(__name__)
-logging.config.dictConfig(LOG_CONFIG.model_dump())
 
 
 class _MongoClientSingleton:
     mongo_client: AsyncIOMotorClient | None
 
-    def __new__(cls) -> _MongoClientSingleton:
+    def __new__(cls) -> '_MongoClientSingleton':
         if not hasattr(cls, 'instance'):
             cls.instance = super().__new__(cls)
             cls.instance.mongo_client = AsyncIOMotorClient(SETTINGS.mongo_url)

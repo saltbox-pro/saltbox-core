@@ -1,10 +1,13 @@
-from typing import Generic, TypeVar
+from typing import Annotated, Generic, TypeVar
 
 from beanie import PydanticObjectId
 from fastapi.exceptions import RequestValidationError
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, BeforeValidator, Field, computed_field, field_validator
+
+from fastms_core.config import SETTINGS
 
 SchemaType = TypeVar('SchemaType', bound=BaseModel)
+PyObjectId = Annotated[str, BeforeValidator(str)]
 
 
 class BaseDBSchema(BaseModel):
@@ -12,8 +15,8 @@ class BaseDBSchema(BaseModel):
 
 
 class PaginatedResponse(BaseModel, Generic[SchemaType]):
-    total: int
-    data: list[SchemaType]
+    total: int = Field(description='Total number of items', default=0, ge=0)
+    data: list[SchemaType] = Field(description='Items list', default=[])
 
 
 class PaginatedListParams(BaseModel):
@@ -58,14 +61,24 @@ class MongoQueryBaseSchema(BaseModel):
 
 
 class AccessModel(BaseModel):
-    roles: list[str]
+    roles: list[str] = Field(default=[])
 
 
 class User(BaseModel):
-    sub: str = Field(serialization_alias='id')
-    realm_access: AccessModel
+    sub: str  # = Field(serialization_alias='id')
+    resource_access: dict[str, AccessModel] | None = Field(default=None, exclude=True)
     email_verified: bool
     name: str
-    preferred_username: str
-    family_name: str
     email: str
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def roles(self) -> list[str]:
+        client_roles: list[str] = []
+        if self.resource_access:
+            try:
+                client_roles = self.resource_access[SETTINGS.keycloak_client].roles
+            except KeyError:
+                pass
+
+        return client_roles
