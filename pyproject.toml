@@ -26,7 +26,7 @@ dev = [
 ]
 
 [project.scripts]
-salt-box-minions-consumer = 'fastms_core.minions.consumer:main'
+salt-box-minions-consumer = 'fastms_core.minion_collections.services.grains_consumer:main'
 salt-box-tasks-watcher = 'fastms_core.tasks.tasks_watcher:main'
 
 [metadata]

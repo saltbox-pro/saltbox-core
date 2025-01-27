@@ -1,8 +1,11 @@
 from abc import ABC, abstractmethod
+from datetime import datetime
 from typing import Any, Generic, TypeVar
 
+from bson import ObjectId
 from pydantic import BaseModel
 
+from fastms_core.config import logger
 from fastms_core.db.mongo.new_config import get_mongo_db
 
 ModelType = TypeVar('ModelType', bound=BaseModel)
@@ -71,3 +74,18 @@ class MongoDBRepository(AbstractRepository[ModelType, ListSchemaType, CreateSche
         # return PaginatedResponse[ListSchemaType](total=total, data=data)
 
         return {'total': total, 'data': data}
+
+    async def update_one(self, query: dict[str, Any], obj_in: UpdateSchemaType | dict[str, Any]) -> ModelType:
+        if isinstance(obj_in, dict):
+            update_data = obj_in
+        else:
+            update_data = obj_in.model_dump(exclude_unset=True)
+
+        update_data['modified'] = datetime.now().astimezone().replace(microsecond=0)
+
+        updated = await self.collection.update_one(query, {'$set': update_data})
+        logger.info('Updated document: %s', updated)
+        result = await self.collection.find_one(query)
+        if not result:
+            raise ValueError('Document not found')
+        return self.model(**result)

@@ -2,7 +2,7 @@ import pymongo
 
 from fastms_core.config import logger
 from fastms_core.minion_collections.repository import CollectionRepository
-from fastms_core.minion_collections.schemas import MinionCollectionCreateSchema
+from fastms_core.minion_collections.schemas.collection_schemas import MinionCollectionCreateSchema
 
 
 async def init_collections() -> None:

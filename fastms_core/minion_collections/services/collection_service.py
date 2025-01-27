@@ -2,12 +2,12 @@ from fastapi import HTTPException
 
 from fastms_core.db.mongo.schemas_base import PaginatedResponse
 from fastms_core.minion_collections.repository import CollectionRepository, MinionRepository
-from fastms_core.minion_collections.schemas import (
+from fastms_core.minion_collections.schemas.collection_schemas import (
     MinionCollectionCreateSchema,
-    MinionCollectionDetailSchema,
     MinionCollectionListSchema,
     MinionCollectionSchema,
 )
+from fastms_core.minion_collections.schemas.minion_schemas import MinionCollectionDetailSchema
 
 
 class MinionCollectionService:
@@ -58,6 +58,10 @@ class MinionCollectionService:
             raise HTTPException(status_code=400, detail='Collection not created')
 
         return collection
+
+    async def minion_pipeline(self, pipeline: list[dict]) -> list:
+        cursor = await self.minions_repo.collection.aggregate(pipeline)
+        return await cursor.to_list()
 
 
 def get_collection_service() -> MinionCollectionService:
