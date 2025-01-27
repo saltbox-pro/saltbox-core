@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from fastms_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId
 from fastms_core.minion_collections.schemas.collection_schemas import MinionCollectionSchemaWithAllowedActions
@@ -134,6 +134,17 @@ class MinionBaseSchema(BaseModel):
 
 class MinionSchema(MinionBaseSchema):
     grains: GrainsSchema | None = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def additional_grains(self) -> dict[str, Any]:
+        additional_grains = {}
+        if self.grains:
+            for key, val in self.grains.model_dump().items():
+                if key not in GrainsSchema.model_fields.keys():
+                    additional_grains[key] = val
+
+        return additional_grains
 
 
 class MinionCreateSchema(MinionSchema):
