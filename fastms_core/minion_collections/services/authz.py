@@ -13,7 +13,7 @@ class OPAResult(BaseModel):
     allow: bool
     allowed_slugs: list[str] = []
     allowed_actions: list[str] = []
-    is_admin: bool
+    is_admin: bool = False
 
     model_config = ConfigDict(extra='allow')
 
