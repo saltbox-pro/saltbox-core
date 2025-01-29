@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Generic, TypeVar
 
+from bson.objectid import ObjectId
 from pydantic import BaseModel
 
 from fastms_core.config import logger
@@ -27,6 +28,10 @@ class AbstractRepository(ABC, Generic[ModelType, ListSchemaType, CreateSchemaTyp
     async def find_all(self, query: dict[str, Any] | None = None) -> list[ModelType]:
         pass
 
+    @abstractmethod
+    async def get(self, obj_id: Any) -> ModelType | None:
+        pass
+
 
 # Реализация для MongoDB
 class MongoDBRepository(AbstractRepository[ModelType, ListSchemaType, CreateSchemaType, UpdateSchemaType]):
@@ -44,6 +49,10 @@ class MongoDBRepository(AbstractRepository[ModelType, ListSchemaType, CreateSche
         if not created_document:
             return None
         return self.model(**created_document)
+
+    async def get(self, obj_id: ObjectId) -> ModelType | None:
+        document = await self.collection.find_one({'_id': obj_id})
+        return self.model(**document) if document else None
 
     async def find_one(self, query: dict[str, Any]) -> ModelType | None:
         document = await self.collection.find_one(query)

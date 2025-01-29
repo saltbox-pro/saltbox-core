@@ -1,7 +1,7 @@
 import json
 from typing import Any, ClassVar
 
-from fastms_core.collections.models import MinionCollection
+from fastms_core.minion_collections.schemas.collection_schemas import MinionCollectionSchema
 
 
 class MongoQueryToSaltTgtConverterUnknownKey(Exception):
@@ -54,7 +54,7 @@ class MongoQueryToSaltTgtConverter:
     }
 
     @classmethod
-    def convert_from_minions_collection_obj(cls, minions_collection_obj: MinionCollection) -> str:
+    def convert_from_minions_collection_obj(cls, minions_collection_obj: MinionCollectionSchema) -> str:
         return cls.__convert_to_tgt(query_dict=minions_collection_obj.query)
 
     @classmethod

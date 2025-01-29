@@ -1,9 +1,7 @@
 from beanie import init_beanie
 from motor.motor_asyncio import AsyncIOMotorClient
 
-from fastms_core.collections.models import MinionCollection
 from fastms_core.config import SETTINGS
-from fastms_core.minions.models import Minion
 from fastms_core.tasks.models import Task, TaskTemplate
 
 
@@ -25,6 +23,6 @@ async def init_mongo() -> AsyncIOMotorClient:
         raise ValueError(msg)
 
     mongo_db = client[SETTINGS.mongo_db]
-    await init_beanie(mongo_db, document_models=[Minion, MinionCollection, Task, TaskTemplate])
+    await init_beanie(mongo_db, document_models=[Task, TaskTemplate])
 
     return client

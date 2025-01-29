@@ -2,16 +2,18 @@ import logging.config
 from typing import Annotated
 
 from beanie import PydanticObjectId
+from bson.objectid import ObjectId
 from fastapi import Depends
 from redis.asyncio import Redis
 
-from fastms_core.collections.models import MinionCollection
 from fastms_core.config import LOG_CONFIG
 from fastms_core.db.redis import RedisDependency
 from fastms_core.jobs.exceptions import JobCreateException
 from fastms_core.jobs.schemas import JobCreate, JobResult
 from fastms_core.jobs.services import JobService, JobServiceDependency
-from fastms_core.minions.models import Minion
+from fastms_core.minion_collections.repository import CollectionRepository, MinionRepository
+from fastms_core.minion_collections.schemas.collection_schemas import MinionCollectionSchema
+from fastms_core.minion_collections.schemas.minion_schemas import MinionSchema
 from fastms_core.tasks.exceptions import TaskServieException
 from fastms_core.tasks.models import Task
 from fastms_core.tasks.schemas import (
@@ -43,6 +45,8 @@ class TaskLifespanService:
         self.rdb = rdb
         self.task_service = task_service
         self.job_service = job_service
+        self.minion_repository = MinionRepository()
+        self.collections_repository = CollectionRepository()
 
         if task_id and task:
             msg = "TaskLifespanService can't accept both `task_id` and `task` args at the same time"
@@ -103,19 +107,19 @@ class TaskLifespanService:
     async def __get_task_targeting(self) -> dict[str, list[str]]:
         task: Task = await self.get_task()
 
-        minions: list[Minion] = []
+        minions: list[MinionSchema] = []
         result: dict[str, list[str]] = {}
 
         if task.tgt_type == TaskTgtType.minions_list:
             minions_ids: list[str] = ','.split(task.tgt_value)
-            minions = await Minion.find({'_id': {'$in': minions_ids}}).to_list()
+            minions = await self.minion_repository.find_all(query={'_id': {'$in': minions_ids}})
         elif task.tgt_type == TaskTgtType.minions_collection:
-            collection: MinionCollection | None = await MinionCollection.get(task.tgt_value)
+            collection: MinionCollectionSchema | None = await self.collections_repository.get(ObjectId(task.tgt_value))
 
             if collection:
-                minions = await Minion.find(collection.query).to_list()
+                minions = await self.minion_repository.find_all(query=collection.query)
             else:
-                msg = f'Minion collection with id {task.tgt_type} not found'
+                msg = f'Minion collection with id {ObjectId(task.tgt_value)} not found!'
                 raise ValueError(msg)
 
         for minion in minions:
