@@ -18,7 +18,7 @@ user_cache = Cache(ttl=180, namespace='user')
 
 keycloak_scheme = OpenIdConnect(
     openIdConnectUrl=SETTINGS.well_known_url,
-    scheme_name='Keycloak OIDC',
+    scheme_name='KeycloakOIDC',
 )
 
 

@@ -4,10 +4,10 @@ from fastms_core.db.mongo.schemas_base import PaginatedResponse
 from fastms_core.minion_collections.repository import CollectionRepository, MinionRepository
 from fastms_core.minion_collections.schemas.collection_schemas import (
     MinionCollectionCreateSchema,
+    MinionCollectionDetailSchema,
     MinionCollectionListSchema,
     MinionCollectionSchema,
 )
-from fastms_core.minion_collections.schemas.minion_schemas import MinionCollectionDetailSchema
 
 
 class MinionCollectionService:
@@ -22,7 +22,9 @@ class MinionCollectionService:
 
         return PaginatedResponse[MinionCollectionListSchema](**response)
 
-    async def get_by_slug(self, slug: str, *, page: int = 0, per_page: int = 20) -> MinionCollectionDetailSchema:
+    async def get_by_slug(
+        self, slug: str, *, query: dict | None = None, page: int = 0, per_page: int = 20
+    ) -> MinionCollectionDetailSchema:
         collection = await self.collections_repo.find_one({'slug': slug})
         if not collection:
             raise HTTPException(status_code=404, detail='Collection not found')
@@ -41,12 +43,14 @@ class MinionCollectionService:
             'modified': 1,
         }
 
+        union_query = {'$and': [collection.query, query]} if query else collection.query
         minions = await self.minions_repo.get_paginated(
-            collection.query, page=page, per_page=per_page, projection_query=projection_query
+            union_query, page=page, per_page=per_page, projection_query=projection_query
         )
 
         return MinionCollectionDetailSchema(
             **collection.model_dump(),
+            allowed_actions=[],
             minions={**minions},
         )
 

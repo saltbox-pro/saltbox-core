@@ -3,8 +3,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-from fastms_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId
-from fastms_core.minion_collections.schemas.collection_schemas import MinionCollectionSchemaWithAllowedActions
+from fastms_core.db.mongo.schemas_base import PyObjectId
 from fastms_core.utilities.helpers import datetime_now_sec
 
 
@@ -111,7 +110,10 @@ class GrainsSchema(BaseModel):
     zfs_support: bool | None = Field(title='ZFS support', default=None)
     zfs_feature_flags: bool | None = Field(title='ZFS feature flags', default=None)
 
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(
+        extra='allow',
+        json_schema_extra={'additionalProperties': {'type': 'object'}},
+    )
 
 
 class GrainsShortSchema(BaseModel):
@@ -157,40 +159,3 @@ class MinionUpdateSchema(MinionSchema):
 
 class MinionListSchema(MinionBaseSchema):
     grains: GrainsShortSchema | None = None
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            'example': {
-                'id': '5f7b1b3b7b3b7b3b7b3b7b3b',
-                'minion_id': 'minion1',
-                'master': 'master1',
-                'created': '2021-01-01T00:00:00',
-                'modified': '2021-01-01T00:00:00',
-                'grains': {
-                    'id': 'grain_id',
-                    'fqdn': 'fqdn',
-                    'osfullname': 'Ubuntu',
-                    'domain': 'domain.com',
-                    'efi': True,
-                    'cpu_model': 'Intel',
-                    'mem_total': 1024,
-                },
-            }
-        }
-    )
-
-
-class MinionCollectionDetailSchema(MinionCollectionSchemaWithAllowedActions):
-    minions: PaginatedResponse[MinionListSchema]
-
-    model_config = ConfigDict(
-        json_schema_extra={
-            'example': {
-                'title': 'My collection',
-                'slug': 'my_collection',
-                'query': {'some_field': 'some_value'},
-                'allowed_actions': ['retrieve', 'update', 'delete'],
-                'minions': {'total': 1, 'data': [{'minion_id': 'minion1', 'master': 'master1'}]},
-            }
-        },
-    )

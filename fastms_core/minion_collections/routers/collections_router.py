@@ -8,14 +8,12 @@ from fastms_core.db.mongo.schemas_base import PaginatedListParams, PaginatedResp
 from fastms_core.minion_collections.repository import CollectionRepository, MinionRepository
 from fastms_core.minion_collections.schemas.collection_schemas import (
     MinionCollectionCreateSchema,
+    MinionCollectionDetailBody,
+    MinionCollectionDetailSchema,
     MinionCollectionListSchema,
     MinionCollectionSchema,
 )
-from fastms_core.minion_collections.schemas.minion_schemas import (
-    MinionCollectionDetailSchema,
-    MinionSchema,
-    # MinionUpdateSchema,
-)
+from fastms_core.minion_collections.schemas.minion_schemas import MinionSchema
 from fastms_core.minion_collections.services.authz import MinionCollectionAuthzService, get_authz_service
 from fastms_core.minion_collections.services.collection_service import MinionCollectionService, get_collection_service
 
@@ -44,7 +42,7 @@ async def collections_list(
 # TODO (a.baikov): Find another way to get default collection
 @router.get('/default', operation_id='minion_collection_default', response_model_by_alias=False)
 async def collection_default(
-    params: Annotated[PaginatedListParams, Query()],
+    body: MinionCollectionDetailBody,
     authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
     collection_service: Annotated[MinionCollectionService, Depends(get_collection_service)],
 ) -> MinionCollectionDetailSchema:
@@ -69,7 +67,7 @@ async def collection_default(
             }
         )
 
-    response = await collection_service.get_by_slug(slug, page=params.page, per_page=params.per_page)
+    response = await collection_service.get_by_slug(slug, query=body.query, page=body.page, per_page=body.per_page)
 
     response.allowed_actions = authz_result.allowed_actions
 
@@ -79,7 +77,7 @@ async def collection_default(
 @router.get('/{slug}', operation_id='minion_collection_read', response_model_by_alias=False)
 async def collection_retrieve(
     slug: str,
-    params: Annotated[PaginatedListParams, Query()],
+    body: MinionCollectionDetailBody,
     authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
     collection_service: Annotated[MinionCollectionService, Depends(get_collection_service)],
 ) -> MinionCollectionDetailSchema:
@@ -87,7 +85,7 @@ async def collection_retrieve(
     if not authz_result.allow:
         raise HTTPException(status_code=403, detail='Not enough permissions')
 
-    response = await collection_service.get_by_slug(slug, page=params.page, per_page=params.per_page)
+    response = await collection_service.get_by_slug(slug, query=body.query, page=body.page, per_page=body.per_page)
 
     response.allowed_actions = authz_result.allowed_actions
 
@@ -136,19 +134,3 @@ async def collection_create(
     created = await collection_service.create(collection)
 
     return created
-
-
-# @router.put('/{slug}/{mid}', operation_id='minion_collection_update_minion', response_model_by_alias=False)
-# async def minion_update(
-#     minion: MinionUpdateSchema,
-#     slug: str,
-#     mid: str,
-# ) -> MinionSchema:
-#     repository = MinionRepository()
-
-#     try:
-#         updated = await repository.update_one({'_id': ObjectId(mid)}, minion)
-#     except Exception as e:
-#         raise HTTPException(status_code=400, detail=str(e))
-
-#     return updated
