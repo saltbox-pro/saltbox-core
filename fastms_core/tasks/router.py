@@ -16,7 +16,7 @@ from fastms_core.tasks.models import TaskTemplate
 from fastms_core.tasks.schemas import (
     TaskCreateSchema,
     TaskListQueryParams,
-    TaskListSchema,
+    TaskListResponseSchema,
     TaskSchema,
     TaskTemplateCreateSchema,
     TaskTemplateListQueryParams,
@@ -106,9 +106,9 @@ async def template_delete(tid: PydanticObjectId, task_templates_service: TaskTem
 @router.get('', operation_id='tasks_list')
 async def tasks_list(
         params: Annotated[TaskListQueryParams, Query()], task_service: TaskServiceDependency
-) -> PaginatedResponse[TaskListSchema]:
+) -> PaginatedResponse[TaskListResponseSchema]:
     task_list = await task_service.get_list_paginated(
-        page=params.page, per_page=params.per_page, projection_model=TaskListSchema
+        page=params.page, per_page=params.per_page, projection_model=TaskListResponseSchema
     )
 
     return task_list

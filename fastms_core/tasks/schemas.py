@@ -240,5 +240,12 @@ class TaskListSchema(TaskDBSchema):
     pass
 
 
+class TaskListResponseSchema(TaskDBSchema):
+    targets_queue: Any = Field(exclude=True)
+    jobs: Any = Field(exclude=True)
+    minions_retries_counts: Any = Field(exclude=True)
+    failed_for_minions: Any = Field(exclude=True)
+
+
 class TaskListQueryParams(PaginatedListParams):
     model_config: ClassVar[ConfigDict] = {'extra': 'forbid'}
