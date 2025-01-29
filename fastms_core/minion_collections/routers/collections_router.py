@@ -40,7 +40,7 @@ async def collections_list(
 
 
 # TODO (a.baikov): Find another way to get default collection
-@router.get('/default', operation_id='minion_collection_default', response_model_by_alias=False)
+@router.post('/default', operation_id='minion_collection_default', response_model_by_alias=False)
 async def collection_default(
     body: MinionCollectionDetailBody,
     authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
