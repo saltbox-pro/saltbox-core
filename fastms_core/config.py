@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     redis_url: str
     redis_username: str | None = None
     keycloak_server_url: str
+    open_id_authority: str
     keycloak_realm: str
     keycloak_audience: str = 'account'
     keycloak_algorithm: str = 'RS256'
@@ -41,7 +42,7 @@ class Settings(BaseSettings):
 
     @property
     def well_known_url(self) -> str:
-        return f'{self.keycloak_server_url}/realms/{self.keycloak_realm}/.well-known/openid-configuration'
+        return f'{self.open_id_authority}/.well-known/openid-configuration'
 
     @property
     def mongo_url(self) -> str:
