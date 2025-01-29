@@ -74,7 +74,7 @@ async def collection_default(
     return response
 
 
-@router.get('/{slug}', operation_id='minion_collection_read', response_model_by_alias=False)
+@router.post('/{slug}', operation_id='minion_collection_read', response_model_by_alias=False)
 async def collection_retrieve(
     slug: str,
     body: MinionCollectionDetailBody,
