@@ -4,10 +4,10 @@ import logging.config
 from redis import asyncio as aioredis
 
 from fastms_core.config import LOG_CONFIG, SETTINGS
-from fastms_core.db.mongo.config import init_mongo
+from fastms_core.db.mongo.init_db import init_mongo_db
 from fastms_core.jobs.services import JobService
-from fastms_core.tasks.models import Task
-from fastms_core.tasks.services import TaskLifespanService, TaskService
+from fastms_core.tasks.schemas import TaskSchema
+from fastms_core.tasks.services import TaskLifespanService, TaskService, TaskTemplateService
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
@@ -25,12 +25,18 @@ class TasksWatcher:
         return self.redis
 
     async def process(self) -> None:
-        while True:
-            redis = await self.get_redis()
-            tasks = await Task.find({'status': Task.TaskStatus.running}).to_list()
+        redis = await self.get_redis()
 
-            job_service = JobService(rdb=redis)
-            task_service = TaskService(rdb=redis)
+        job_service = JobService(rdb=redis)
+        task_template_service = TaskTemplateService(rdb=redis)
+        task_service = TaskService(rdb=redis, task_template_service=task_template_service)
+
+        while True:
+
+            tasks: list[TaskSchema] = await task_service.get_list(
+                query={'status': TaskSchema.TaskStatus.running},
+                projection_schema=TaskSchema
+            )
 
             for task in tasks:
                 task_lifespan_service = TaskLifespanService(
@@ -45,13 +51,11 @@ class TasksWatcher:
 
 
 async def async_main():
-    mongo_client = await init_mongo()
+    await init_mongo_db()
     watcher = TasksWatcher()
 
     logger.info('Starting watcher')
     await watcher.process()
-
-    mongo_client.close()
 
 
 def main() -> None:

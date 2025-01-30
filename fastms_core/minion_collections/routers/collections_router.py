@@ -1,10 +1,8 @@
 from typing import Annotated
 
-from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-# from fastms_core.config import logger
-from fastms_core.db.mongo.schemas_base import PaginatedListParams, PaginatedResponse
+from fastms_core.db.mongo.schemas_base import PaginatedListParams, PaginatedResponse, PyObjectId
 from fastms_core.minion_collections.repository import CollectionRepository, MinionRepository
 from fastms_core.minion_collections.schemas.collection_schemas import (
     MinionCollectionCreateSchema,
@@ -111,7 +109,7 @@ async def collection_minion_retrieve(
     query = {
         '$and': [
             collection.query,
-            {'_id': ObjectId(mid)},
+            {'_id': PyObjectId(mid)},
         ]
     }
     minion = await minions_repo.find_one(query)

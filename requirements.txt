@@ -1,5 +1,4 @@
 # TODO Make compliant with ALT Linux p11
-beanie~=1.27.0  # FIXME is missing in ALT p11
 celery[gevent]~=5.3
 fastapi_offline~=1.7.2
 fastapi~=0.115.4

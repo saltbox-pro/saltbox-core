@@ -1,12 +1,11 @@
 import logging.config
 from typing import Annotated
 
-from beanie import PydanticObjectId
-from bson.objectid import ObjectId
 from fastapi import Depends
 from redis.asyncio import Redis
 
 from fastms_core.config import LOG_CONFIG
+from fastms_core.db.mongo.schemas_base import PyObjectId
 from fastms_core.db.redis import RedisDependency
 from fastms_core.jobs.exceptions import JobCreateException
 from fastms_core.jobs.schemas import JobCreate, JobResult
@@ -14,17 +13,17 @@ from fastms_core.jobs.services import JobService, JobServiceDependency
 from fastms_core.minion_collections.repository import CollectionRepository, MinionRepository
 from fastms_core.minion_collections.schemas.collection_schemas import MinionCollectionSchema
 from fastms_core.minion_collections.schemas.minion_schemas import MinionSchema
-from fastms_core.tasks.exceptions import TaskServieException
-from fastms_core.tasks.models import Task
 from fastms_core.tasks.schemas import (
     TaskJob,
     TaskJobReturnStatus,
     TaskJobStatus,
     TaskJobTarget,
+    TaskSchema,
     TaskTgtType,
     TaskUpdateSchema,
 )
 from fastms_core.tasks.services.tasks import TaskService, TaskServiceDependency
+from fastms_core.utilities.exceptions import ServiceError
 from fastms_core.utilities.helpers import get_now_stamp_str
 from fastms_core.utilities.jid import JID
 
@@ -39,8 +38,8 @@ class TaskLifespanService:
             rdb: Redis,
             task_service: TaskService,
             job_service: JobService,
-            task_id: PydanticObjectId | None = None,
-            task: Task | None = None
+            task_id: PyObjectId | None = None,
+            task: TaskSchema | None = None
     ):
         self.rdb = rdb
         self.task_service = task_service
@@ -50,23 +49,23 @@ class TaskLifespanService:
 
         if task_id and task:
             msg = "TaskLifespanService can't accept both `task_id` and `task` args at the same time"
-            raise TaskServieException(msg)
+            raise ServiceError(msg)
 
         self.task_id = task_id
         self.__task = task
 
-    async def get_task(self) -> Task:
+    async def get_task(self) -> TaskSchema:
         if self.__task:
             return self.__task
         elif self.task_id:
-            self.__task: Task = await self.task_service.get_obj(self.task_id)
+            self.__task: TaskSchema = await self.task_service.get_obj(obj_id=self.task_id, projection_schema=TaskSchema)
             return self.__task
 
         msg = 'Task does not set'
-        raise TaskServieException(msg)
+        raise ServiceError(msg)
 
-    async def update_task(self, notify=True, **kwargs) -> Task:
-        task: Task = await self.get_task()
+    async def update_task(self, notify=True, **kwargs) -> TaskSchema:
+        task: TaskSchema = await self.get_task()
 
         for attr, value in kwargs.items():
             task.__setattr__(attr, value)
@@ -74,6 +73,7 @@ class TaskLifespanService:
         self.__task = await self.task_service.update_obj(
             obj_id=task.id,
             obj_data=TaskUpdateSchema(**task.model_dump()),
+            projection_schema=TaskSchema,
             notify=notify
         )
 
@@ -89,14 +89,14 @@ class TaskLifespanService:
         ...  # TODO: stop jobs
 
     async def stop(self):
-        task: Task = await self.get_task()
+        task: TaskSchema = await self.get_task()
 
         if task.status == task.TaskStatus.running:
             await self.__stop_jobs()
             await self.update_task(status=task.TaskStatus.stopped)
 
     async def __can_start_job(self) -> bool:
-        task: Task = await self.get_task()
+        task: TaskSchema = await self.get_task()
 
         for job in task.jobs:
             if job.status == TaskJobStatus.running:
@@ -105,7 +105,7 @@ class TaskLifespanService:
         return True
 
     async def __get_task_targeting(self) -> dict[str, list[str]]:
-        task: Task = await self.get_task()
+        task: TaskSchema = await self.get_task()
 
         minions: list[MinionSchema] = []
         result: dict[str, list[str]] = {}
@@ -114,12 +114,13 @@ class TaskLifespanService:
             minions_ids: list[str] = ','.split(task.tgt_value)
             minions = await self.minion_repository.find_all(query={'_id': {'$in': minions_ids}})
         elif task.tgt_type == TaskTgtType.minions_collection:
-            collection: MinionCollectionSchema | None = await self.collections_repository.get(ObjectId(task.tgt_value))
+            collection: MinionCollectionSchema | None = \
+                await self.collections_repository.get(PyObjectId(task.tgt_value))
 
             if collection:
                 minions = await self.minion_repository.find_all(query=collection.query)
             else:
-                msg = f'Minion collection with id {ObjectId(task.tgt_value)} not found!'
+                msg = f'Minion collection with id {PyObjectId(task.tgt_value)} not found!'
                 raise ValueError(msg)
 
         for minion in minions:
@@ -128,7 +129,7 @@ class TaskLifespanService:
         return result
 
     async def __fill_jobs_queue(self, targets: dict[str, list[str]]) -> None:
-        task: Task = await self.get_task()
+        task: TaskSchema = await self.get_task()
 
         if task.targets_queue is None:
             task.targets_queue = []
@@ -157,7 +158,7 @@ class TaskLifespanService:
         await self.__fill_jobs_queue(targets)
 
     async def __check_job_returns(self, job: TaskJob):
-        task: Task = await self.get_task()
+        task: TaskSchema = await self.get_task()
         job_returns: list[JobResult] = await self.job_service.get_job_all_returns(JID(job.jid))
         targets_with_failed_job: dict[str, list[str]] = {}
 
@@ -185,7 +186,7 @@ class TaskLifespanService:
         await self.__fill_jobs_queue(targets_with_failed_job)
 
     async def __check_running_jobs(self) -> None:
-        task: Task = await self.get_task()
+        task: TaskSchema = await self.get_task()
 
         for job in task.jobs:
             if job.status != TaskJobStatus.running:
@@ -200,7 +201,7 @@ class TaskLifespanService:
                 job.status = TaskJobStatus.failed
 
     async def __create_job(self, job_target: TaskJobTarget):
-        task: Task = await self.get_task()
+        task: TaskSchema = await self.get_task()
 
         jid: JID = await self.job_service.create_job(JobCreate.model_validate({
             'jid_postfix': f't{task.id}',
@@ -219,7 +220,7 @@ class TaskLifespanService:
         ))
 
     async def __rub_jobs(self) -> None:
-        task: Task = await self.get_task()
+        task: TaskSchema = await self.get_task()
 
         if not task.targets_queue:
             return
@@ -236,7 +237,7 @@ class TaskLifespanService:
                 task.targets_queue.append(job_targeting)
 
     async def process(self) -> None:
-        task: Task = await self.get_task()
+        task: TaskSchema = await self.get_task()
 
         if task.status != task.TaskStatus.running:
             return
@@ -260,7 +261,7 @@ async def get_task_lifespan_service(
         rdb: RedisDependency,
         task_service: TaskServiceDependency,
         job_service: JobServiceDependency,
-        tid: PydanticObjectId | None = None
+        tid: PyObjectId | None = None
 ):
     task_service = TaskLifespanService(rdb=rdb, task_service=task_service, job_service=job_service, task_id=tid)
     yield task_service

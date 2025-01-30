@@ -7,10 +7,10 @@ from inspect import isclass
 from typing import Any, get_args
 from uuid import UUID
 
-from beanie.odm.fields import PydanticObjectId
 from pydantic import BaseModel
 
 from fastms_core.config import LOG_CONFIG
+from fastms_core.db.mongo.schemas_base import PyObjectId
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
@@ -59,7 +59,7 @@ schema_lookups_map = {
     bool: ['=', '!='],
     list: ['in', 'notIn'],
     datetime: schema_datetime_lookups,
-    PydanticObjectId: schema_text_lookups,
+    PyObjectId: schema_text_lookups,
     UUID: schema_text_lookups,
 }
 
@@ -68,7 +68,7 @@ schema_input_type_map = {
     float: 'number',
     str: 'text',
     bool: 'checkbox',
-    PydanticObjectId: 'text',
+    PyObjectId: 'text',
     UUID: 'text',
 }
 

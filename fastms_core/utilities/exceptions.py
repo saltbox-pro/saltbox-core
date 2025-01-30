@@ -1,0 +1,6 @@
+class ServiceError(Exception):
+    ...
+
+
+class ObjectDoesNotExistError(Exception):
+    ...

@@ -3,11 +3,10 @@ import re
 from enum import Enum
 from typing import Any, ClassVar
 
-from beanie import PydanticObjectId
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from fastms_core.config import LOG_CONFIG
-from fastms_core.db.mongo.schemas_base import BaseDBSchema, PaginatedListParams
+from fastms_core.db.mongo.schemas_base import BaseDBSchema, PaginatedListParams, PyObjectId
 from fastms_core.utilities.helpers import get_now_stamp_str
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
@@ -182,7 +181,7 @@ class TaskBaseSchema(BaseModel):
     stopped_stamp: str | None = Field(title='Stopped timestamp', default=None)
     finished_stamp: str | None = Field(title='Finished timestamp', default=None)
 
-    task_template_id: PydanticObjectId | None = Field(title='Task template')
+    task_template_id: PyObjectId | None = Field(title='Task template')
     fun: str = Field(title='Salt fun')
     task_args: list[str] = Field(title='Args')
     task_kwargs: dict[str, Any] = Field(title='Kwargs')
@@ -206,16 +205,20 @@ class TaskSchema(TaskDBSchema):
     pass
 
 
-class TaskCreateSchema(BaseModel):
-    task_template_id: PydanticObjectId = Field(title='Task template id')
+class TaskCreateSchema(TaskBaseSchema):
+    pass
+
+
+class TaskCreateFromTemplateSchema(BaseModel):
+    task_template_id: PyObjectId = Field(title='Task template id')
     variables_data: dict[str, Any] = Field(title='Variables data')
     tgt_type: TaskTgtType = Field(title='Targeting type')
-    tgt_value: str | PydanticObjectId = Field(title='Targeting value')
+    tgt_value: str | PyObjectId = Field(title='Targeting value')
     batch_size: int | None = Field(title='Batch size', default=None)
     max_retries: int = Field(title='Max retries', default=3)
 
     @model_validator(mode='after')
-    def validation_targeting(self) -> 'TaskCreateSchema':
+    def validation_targeting(self) -> 'TaskCreateFromTemplateSchema':
         if self.tgt_type == TaskTgtType.minions_list:
             if not isinstance(self.tgt_value, str):
                 msg: str = 'For task with type "minions_list" value of "tgt_value" must be a string'

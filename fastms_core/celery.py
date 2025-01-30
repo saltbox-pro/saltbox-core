@@ -1,10 +1,7 @@
+from datetime import UTC, timedelta
+
 from celery import Celery
-
-from fastms_core.config import APP_NAME
-
-from datetime import timedelta, timezone
-
-from fastms_core.config import SETTINGS
+from fastms_core.config import APP_NAME, SETTINGS
 
 
 class CeleryConfig:
@@ -28,7 +25,7 @@ class CeleryConfig:
     task_queues = None
     task_routes = {}
     task_serializer = 'json'
-    timezone = timezone.utc
+    timezone = UTC
     worker_pool_restarts = True
     worker_prefetch_multiplier = 0
     worker_send_task_events = True

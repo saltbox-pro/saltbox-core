@@ -2,11 +2,11 @@ from abc import ABC, abstractmethod
 from datetime import datetime
 from typing import Any, Generic, TypeVar
 
-from bson.objectid import ObjectId
 from pydantic import BaseModel
 
 from fastms_core.config import logger
 from fastms_core.db.mongo.new_config import get_mongo_db
+from fastms_core.db.mongo.schemas_base import PyObjectId
 
 ModelType = TypeVar('ModelType', bound=BaseModel)
 CreateSchemaType = TypeVar('CreateSchemaType', bound=BaseModel)
@@ -50,7 +50,7 @@ class MongoDBRepository(AbstractRepository[ModelType, ListSchemaType, CreateSche
             return None
         return self.model(**created_document)
 
-    async def get(self, obj_id: ObjectId) -> ModelType | None:
+    async def get(self, obj_id: PyObjectId) -> ModelType | None:
         document = await self.collection.find_one({'_id': obj_id})
         return self.model(**document) if document else None
 
