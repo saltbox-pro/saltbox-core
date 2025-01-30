@@ -111,8 +111,10 @@ class TaskLifespanService:
         result: dict[str, list[str]] = {}
 
         if task.tgt_type == TaskTgtType.minions_list:
-            minions_ids: list[str] = ','.split(task.tgt_value)
-            minions = await self.minion_repository.find_all(query={'_id': {'$in': minions_ids}})
+            minions_ids: list[str] = task.tgt_value.split(',')
+            minions = await self.minion_repository.find_all(
+                query={'_id': {'$in': [PyObjectId(minion_id) for minion_id in minions_ids]}},
+            )
         elif task.tgt_type == TaskTgtType.minions_collection:
             collection: MinionCollectionSchema | None = \
                 await self.collections_repository.get(PyObjectId(task.tgt_value))
