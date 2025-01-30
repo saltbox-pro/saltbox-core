@@ -15,7 +15,7 @@ from fastms_core.db.exceptions import (
     ObjectNotFoundError,
     RepositoryError,
 )
-from fastms_core.db.mongo.new_config import get_mongo_db
+from fastms_core.db.mongo.config import get_mongo_db
 from fastms_core.db.mongo.schemas_base import PyObjectId
 from fastms_core.db.repository_base import (
     AbstractRepository,

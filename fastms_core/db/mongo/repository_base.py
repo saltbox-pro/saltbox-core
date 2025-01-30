@@ -5,7 +5,7 @@ from typing import Any, Generic, TypeVar
 from pydantic import BaseModel
 
 from fastms_core.config import logger
-from fastms_core.db.mongo.new_config import get_mongo_db
+from fastms_core.db.mongo.config import get_mongo_db
 from fastms_core.db.mongo.schemas_base import PyObjectId
 
 ModelType = TypeVar('ModelType', bound=BaseModel)
