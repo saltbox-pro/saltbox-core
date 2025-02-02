@@ -202,7 +202,7 @@ class PubSubAuthenticatedWebSocket(AuthenticatedWebSocket):
         except (ValidationError, TypeError, json.JSONDecodeError) as e:
             LOGGER.error('Error processing pubsub message %s', e)
 
-    async def _process_channel_message_by_callback(self, message: RedisPubSubMessage, callback: type[Callable]) -> None:
+    async def _process_channel_message_by_callback(self, message: RedisPubSubMessage, callback: Callable) -> None:
         data_str = message['data'].decode()
         try:
             data = json.loads(data_str)
@@ -216,7 +216,7 @@ class PubSubAuthenticatedWebSocket(AuthenticatedWebSocket):
         except (ValidationError, TypeError, json.JSONDecodeError) as e:
             LOGGER.error('Error processing pubsub message %s', e)
 
-    async def _message_forwarder(self, channel: str, handler: type[BaseModel, Callable]) -> None:
+    async def _message_forwarder(self, channel: str, handler: type[BaseModel] | Callable) -> None:
         async with self._rdb.pubsub() as pubsub:
             await pubsub.psubscribe(channel)
             async for message in pubsub.listen():
@@ -230,14 +230,13 @@ class PubSubAuthenticatedWebSocket(AuthenticatedWebSocket):
                     await self._process_channel_message(message, handler)
                 elif callable(handler):
                     await self._process_channel_message_by_callback(message, handler)
-                else:
-                    msg = 'Unsupported handler type'
-                    raise Exception(msg)
+
+                msg = 'Unsupported handler type'
+                raise Exception(msg)
 
         LOGGER.debug('Exit from _message_forwarder')
 
-    # TODO: Add multiple channels support
-    async def handle_pubsub(self, channel_schema_map: dict[str, type[BaseModel, Callable]]) -> None:
+    async def handle_pubsub(self, channel_schema_map: dict[str, type[BaseModel] | Callable]) -> None:
         await self.accept()
         channel_tasks = []
         for channel, handler in channel_schema_map.items():
