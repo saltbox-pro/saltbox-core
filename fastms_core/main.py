@@ -10,8 +10,9 @@ from fastms_core.db.mongo.init_db import init_mongo_db
 from fastms_core.db.redis import POOL
 from fastms_core.jobs.router import router as jobs_router
 from fastms_core.jobs.router import ws_router as jobs_ws_router
-from fastms_core.minion_collections.routers.collections_router import router as minion_collections_router
+from fastms_core.minion_collections.routers.collections_router import router as collections_router
 from fastms_core.minion_collections.routers.filters_router import router as filters_router
+from fastms_core.minion_collections.routers.minion_router import router as minions_router
 from fastms_core.tasks.router import router as task_router
 from fastms_core.tasks.router import ws_router as task_ws_router
 
@@ -58,4 +59,5 @@ APP.include_router(jobs_router)
 APP.include_router(jobs_ws_router)
 APP.include_router(task_router)
 APP.include_router(task_ws_router)
-APP.include_router(minion_collections_router)
+APP.include_router(collections_router)
+APP.include_router(minions_router)

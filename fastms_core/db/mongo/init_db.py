@@ -1,12 +1,14 @@
 import pymongo
 
 from fastms_core.config import logger
-from fastms_core.minion_collections.repository import CollectionRepository
-from fastms_core.minion_collections.schemas.collection_schemas import MinionCollectionCreateSchema
+from fastms_core.db.mongo.config import get_mongo_db
+from fastms_core.minion_collections.repositories.collection_repository import CollectionRepository
+from fastms_core.minion_collections.schemas.collection_schemas import CollectionCreateSchema
 
 
 async def init_collections() -> None:
-    collections_repo = CollectionRepository()
+    db = get_mongo_db()
+    collections_repo = CollectionRepository(db)
 
     # Check existing indexes
     indexes = sorted(await collections_repo.collection.index_information())
@@ -23,12 +25,12 @@ async def init_collections() -> None:
     root_collection_exist = await collections_repo.collection.count_documents({'slug': 'root'})
     if not root_collection_exist:
         logger.debug("MinionCollection with slug `root` doesn't exist... Creating...")
-        obj = MinionCollectionCreateSchema(
+        obj = CollectionCreateSchema(
             title='Root collection',
             slug='root',
             query={},
         )
-        await collections_repo.add(obj)
+        await collections_repo.create(obj)
         logger.debug('MinionCollection with slug `root` created')
 
 

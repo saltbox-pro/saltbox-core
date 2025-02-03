@@ -7,9 +7,10 @@ from fastms_core.minion_collections.schemas.filter_schemas import (
     MinionFilterValuesBody,
     UniqueGrainValuesResponse,
 )
-from fastms_core.minion_collections.schemas.minion_schemas import MinionSchema
+from fastms_core.minion_collections.schemas.minion_schemas import MinionModel
 from fastms_core.minion_collections.services.authz import MinionCollectionAuthzService, get_authz_service
-from fastms_core.minion_collections.services.collection_service import MinionCollectionService, get_collection_service
+from fastms_core.minion_collections.services.collection_service import CollectionService, get_collection_service
+from fastms_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from fastms_core.minion_collections.services.pipeline_builder import MongoPiplineBuilder
 from fastms_core.utilities.model_schema import get_model_schema
 
@@ -18,14 +19,15 @@ router = APIRouter(prefix='/filters', tags=['Filters'])
 
 @router.get('/schema', operation_id='filter_schema')
 async def filter_schema() -> list[MinionFilterSchema]:
-    return [MinionFilterSchema.model_validate(field) for field in get_model_schema(MinionSchema)]
+    return [MinionFilterSchema.model_validate(field) for field in get_model_schema(MinionModel)]
 
 
 @router.post('/unique-grain-values', operation_id='filter_values')
 async def unique_field_values(
     body: MinionFilterValuesBody,
     authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
-    collection_service: Annotated[MinionCollectionService, Depends(get_collection_service)],
+    collection_service: Annotated[CollectionService, Depends(get_collection_service)],
+    minion_service: Annotated[MinionService, Depends(get_minion_service)],
 ) -> UniqueGrainValuesResponse:
     """Get unique values for a field in the Minion model"""
 
@@ -51,7 +53,7 @@ async def unique_field_values(
     pipline_builder = MongoPiplineBuilder(body.field, query)
     pipline = pipline_builder.build()
 
-    result = await collection_service.minion_pipeline(pipline)
+    result = await minion_service.minion_pipeline(pipline)
 
     response = UniqueGrainValuesResponse(
         total=len(result),

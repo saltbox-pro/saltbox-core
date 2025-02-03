@@ -16,62 +16,42 @@ class AbstractRepository(ABC, Generic[ModelType, ListSchemaType, CreateSchemaTyp
 
     @abstractmethod
     async def create(
-            self,
-            obj: CreateSchemaType,
-            projection_schema: type[ProjectionSchemaType] | None = None
+        self, obj: CreateSchemaType, projection_schema: type[ProjectionSchemaType] | None = None
     ) -> ProjectionSchemaType:
         pass
 
     @abstractmethod
     async def bulk_create(
-            self,
-            objs: list[CreateSchemaType],
-            projection_schema: type[ProjectionSchemaType] | None = None
+        self, objs: list[CreateSchemaType], projection_schema: type[ProjectionSchemaType] | None = None
     ) -> list[ProjectionSchemaType]:
         pass
 
     @abstractmethod
     async def filter(
-            self,
-            query: dict[str, Any] | None = None,
-            projection_schema: type[ProjectionSchemaType] | None = None
+        self, query: dict[str, Any] | None = None, projection_schema: type[ProjectionSchemaType] | None = None
     ) -> list[ProjectionSchemaType]:
         pass
 
     @abstractmethod
-    async def all(
-            self,
-            projection_schema: type[ProjectionSchemaType] | None = None
-    ) -> list[ProjectionSchemaType]:
+    async def all(self, projection_schema: type[ProjectionSchemaType] | None = None) -> list[ProjectionSchemaType]:
         pass
 
     @abstractmethod
     async def get(
-            self,
-            query: Any,
-            projection_schema: type[ProjectionSchemaType] | None = None
+        self, query: Any, projection_schema: type[ProjectionSchemaType] | None = None
     ) -> ProjectionSchemaType:
         pass
 
     @abstractmethod
     async def update(
-            self,
-            query: Any,
-            obj: UpdateSchemaType,
-            projection_schema: type[ProjectionSchemaType] | None = None
+        self, query: Any, obj: UpdateSchemaType, projection_schema: type[ProjectionSchemaType] | None = None
     ) -> ProjectionSchemaType:
         pass
 
     @abstractmethod
-    async def delete(
-            self,
-            query: Any
-    ) -> int:
+    async def delete(self, query: Any) -> int:
         pass
 
     @abstractmethod
-    async def bulk_delete(
-            self,
-            query: list[Any]
-    ) -> int:
+    async def bulk_delete(self, query: list[Any]) -> int:
         pass

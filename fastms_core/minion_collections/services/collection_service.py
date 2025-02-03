@@ -1,72 +1,50 @@
-from fastapi import HTTPException
+from typing import Annotated, Any
 
+from fastapi import Depends
+
+from fastms_core.db.exceptions import ObjectNotFoundError
 from fastms_core.db.mongo.schemas_base import PaginatedResponse
-from fastms_core.minion_collections.repository import CollectionRepository, MinionRepository
+from fastms_core.minion_collections.repositories.collection_repository import (
+    CollectionRepository,
+    get_collection_repository,
+)
 from fastms_core.minion_collections.schemas.collection_schemas import (
-    MinionCollectionCreateSchema,
-    MinionCollectionDetailSchema,
-    MinionCollectionListSchema,
-    MinionCollectionSchema,
+    CollectionCreateSchema,
+    CollectionModel,
+    CollectionUpdateSchema,
 )
 
 
-class MinionCollectionService:
-    def __init__(self) -> None:
-        self.collections_repo = CollectionRepository()
-        self.minions_repo = MinionRepository()
+class CollectionService:
+    def __init__(self, repo: CollectionRepository):
+        self.repo = repo
 
-    async def get_list(
-        self, query: dict | None = None, *, page: int = 0, per_page: int = 20
-    ) -> PaginatedResponse[MinionCollectionListSchema]:
-        response = await self.collections_repo.get_paginated(query, page=page, per_page=per_page)
+    async def get_by_slug(self, slug: str) -> CollectionModel:
+        document = await self.repo.find_one({'slug': slug})
+        if not document:
+            msg = 'Collection not found'
+            raise ObjectNotFoundError(msg)
+        return document
 
-        return PaginatedResponse[MinionCollectionListSchema](**response)
+    async def get_by_slug_or_none(self, slug: str) -> CollectionModel | None:
+        return await self.repo.find_one({'slug': slug})
 
-    async def get_by_slug(
-        self, slug: str, *, query: dict | None = None, page: int = 0, per_page: int = 20
-    ) -> MinionCollectionDetailSchema:
-        collection = await self.collections_repo.find_one({'slug': slug})
-        if not collection:
-            raise HTTPException(status_code=404, detail='Collection not found')
+    async def create(self, document: CollectionCreateSchema) -> CollectionModel:
+        return await self.repo.create(document)
 
-        projection_query = {
-            'minion_id': 1,
-            'master': 1,
-            'grains.id': 1,
-            'grains.fqdn': 1,
-            'grains.osfullname': 1,
-            'grains.domain': 1,
-            'grains.efi': 1,
-            'grains.cpu_model': 1,
-            'grains.mem_total': 1,
-            'created': 1,
-            'modified': 1,
-        }
+    async def get_paginated(
+        self, query: dict[str, Any] | None = None, limit: int = 0, skip: int = 0
+    ) -> PaginatedResponse[CollectionModel]:
+        total = await self.repo.count(query)
+        docs = await self.repo.find_all(query, limit=limit, skip=skip)
+        return PaginatedResponse[CollectionModel](total=total, data=docs)
 
-        union_query = {'$and': [collection.query, query]} if query else collection.query
-        minions = await self.minions_repo.get_paginated(
-            union_query, page=page, per_page=per_page, projection_query=projection_query
-        )
-
-        return MinionCollectionDetailSchema(
-            **collection.model_dump(),
-            allowed_actions=[],
-            minions={**minions},
-        )
-
-    async def create(self, data: MinionCollectionCreateSchema) -> MinionCollectionSchema:
-        if data.slug == 'default':
-            raise HTTPException(status_code=400, detail='Slug `default` is reserved')
-        collection = await self.collections_repo.add(data)
-        if not collection:
-            raise HTTPException(status_code=400, detail='Collection not created')
-
-        return collection
-
-    async def minion_pipeline(self, pipeline: list[dict]) -> list:
-        cursor = await self.minions_repo.collection.aggregate(pipeline)
-        return await cursor.to_list()
+    async def update(self, slug: str, document: CollectionUpdateSchema) -> CollectionModel:
+        result = await self.repo.update({'slug': slug}, document)
+        return result
 
 
-def get_collection_service() -> MinionCollectionService:
-    return MinionCollectionService()
+def get_collection_service(
+    repo: Annotated[CollectionRepository, Depends(get_collection_repository)],
+) -> CollectionService:
+    return CollectionService(repo)
