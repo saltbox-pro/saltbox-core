@@ -1,10 +1,10 @@
-from datetime import datetime
-from typing import Any
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-from fastms_core.db.mongo.schemas_base import PyObjectId
-from fastms_core.utilities.helpers import datetime_now_sec
+from fastms_core.db.mongo.schemas_base import CreatedModifiedMixin, IDMixin, MongoQuery, SkipLimitParams
+
+T = TypeVar('T')
 
 
 class GrainsSchema(BaseModel):
@@ -126,17 +126,27 @@ class GrainsShortSchema(BaseModel):
     mem_total: int | None = None
 
 
-class MinionBaseSchema(BaseModel):
-    id: PyObjectId | None = Field(alias='_id', default=None)
+class MinionEditableFieldsMixin(BaseModel, Generic[T]):
     minion_id: str = Field(title='Minion ID')
     master: str = Field(title='Master')
-    created: datetime = Field(default_factory=datetime_now_sec)
-    modified: datetime = Field(default_factory=datetime_now_sec)
+    grains: T = Field(title='Grains')
 
 
-class MinionSchema(MinionBaseSchema):
-    grains: GrainsSchema | None = None
+class MinionCreateSchema(MinionEditableFieldsMixin[GrainsSchema]):
+    pass
 
+
+class MinionUpdateSchema(MinionEditableFieldsMixin[GrainsSchema]):
+    model_config = ConfigDict(
+        extra='forbid',
+    )
+
+
+class MinionModel(CreatedModifiedMixin, MinionEditableFieldsMixin[GrainsSchema], IDMixin):
+    pass
+
+
+class MinionDetail(MinionModel):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def additional_grains(self) -> dict[str, Any]:
@@ -149,13 +159,23 @@ class MinionSchema(MinionBaseSchema):
         return additional_grains
 
 
-class MinionCreateSchema(MinionSchema):
+class MinionShort(CreatedModifiedMixin, MinionEditableFieldsMixin[GrainsShortSchema], IDMixin):
     pass
 
 
-class MinionUpdateSchema(MinionSchema):
+class MinionIDs(BaseModel, IDMixin):
     pass
 
 
-class MinionListSchema(MinionBaseSchema):
-    grains: GrainsShortSchema | None = None
+class MinionListbody(SkipLimitParams):
+    collection_slug: str
+    query: MongoQuery = Field(
+        default_factory=dict,
+        title='MongoDB Query',
+        description='A valid MongoDB query dictionary',
+        examples=[
+            {'grains.os': 'Ubuntu'},
+            {'grains.cpu_model': {'$regex': 'Intel'}},
+        ],
+        json_schema_extra={'example': {'grains.cpu_model': {'$not': {'$regex': 'Intel'}}}},
+    )

@@ -2,48 +2,45 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from fastms_core.db.mongo.schemas_base import PaginatedListParams, PaginatedResponse, PyObjectId
-from fastms_core.minion_collections.repository import CollectionRepository, MinionRepository
+from fastms_core.config import logger
+from fastms_core.db.exceptions import DuplicateKeyError, ObjectCreateError
+from fastms_core.db.mongo.schemas_base import PaginatedResponse, SkipLimitParams
 from fastms_core.minion_collections.schemas.collection_schemas import (
-    MinionCollectionCreateSchema,
-    MinionCollectionDetailBody,
-    MinionCollectionDetailSchema,
-    MinionCollectionListSchema,
-    MinionCollectionSchema,
+    CollectionCreateSchema,
+    CollectionDetailSchema,
+    CollectionModel,
 )
-from fastms_core.minion_collections.schemas.minion_schemas import MinionSchema
 from fastms_core.minion_collections.services.authz import MinionCollectionAuthzService, get_authz_service
-from fastms_core.minion_collections.services.collection_service import MinionCollectionService, get_collection_service
+from fastms_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 
 router = APIRouter(prefix='/collections', tags=['Minion Collections'])
 
 
-@router.get('', operation_id='minion_collections_list', response_model_by_alias=False)
+@router.get('', operation_id='minion_collections_list')
 async def collections_list(
-    params: Annotated[PaginatedListParams, Query()],
+    params: Annotated[SkipLimitParams, Query()],
     authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
-    collection_service: Annotated[MinionCollectionService, Depends(get_collection_service)],
-) -> PaginatedResponse[MinionCollectionListSchema]:
+    collection_service: Annotated[CollectionService, Depends(get_collection_service)],
+) -> PaginatedResponse[CollectionModel]:
     authz_result = await authz_service.check_access(action='retrieve')
     if not authz_result.allow:
         raise HTTPException(status_code=403, detail='Not enough permissions')
 
-    if authz_result.is_admin:
-        response = await collection_service.get_list({}, page=params.page, per_page=params.per_page)
-    else:
-        response = await collection_service.get_list(
-            {'slug': {'$in': authz_result.allowed_slugs}}, page=params.page, per_page=params.per_page
-        )
-    return response
+    query = None if authz_result.is_admin else {'slug': {'$in': authz_result.allowed_slugs}}
+
+    try:
+        return await collection_service.get_paginated(query=query, skip=params.skip, limit=params.limit)
+    except Exception as e:
+        logger.error('Error: %s', e)
+        raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
 
 
 # TODO (a.baikov): Find another way to get default collection
-@router.post('/default', operation_id='minion_collection_default', response_model_by_alias=False)
+@router.get('/default', operation_id='minion_collection_default')
 async def collection_default(
-    body: MinionCollectionDetailBody,
     authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
-    collection_service: Annotated[MinionCollectionService, Depends(get_collection_service)],
-) -> MinionCollectionDetailSchema:
+    collection_service: Annotated[CollectionService, Depends(get_collection_service)],
+) -> CollectionDetailSchema:
     """Retern `root` collection if user has access to it, otherwise return first allowed collection"""
     slug = 'root'
     authz_result = await authz_service.check_access(
@@ -65,70 +62,53 @@ async def collection_default(
             }
         )
 
-    response = await collection_service.get_by_slug(slug, query=body.query, page=body.page, per_page=body.per_page)
+    try:
+        response = await collection_service.get_by_slug(slug)
+        return CollectionDetailSchema(
+            **{**response.model_dump(), '_id': response.id, 'allowed_actions': authz_result.allowed_actions}
+        )
+    except Exception as e:
+        logger.error('Error: %s', e)
+        raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
 
-    response.allowed_actions = authz_result.allowed_actions
 
-    return response
-
-
-@router.post('/{slug}', operation_id='minion_collection_read', response_model_by_alias=False)
+@router.get('/{slug}', operation_id='minion_collection_read')
 async def collection_retrieve(
     slug: str,
-    body: MinionCollectionDetailBody,
     authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
-    collection_service: Annotated[MinionCollectionService, Depends(get_collection_service)],
-) -> MinionCollectionDetailSchema:
+    collection_service: Annotated[CollectionService, Depends(get_collection_service)],
+) -> CollectionDetailSchema:
     authz_result = await authz_service.check_access(action='retrieve')
     if not authz_result.allow:
         raise HTTPException(status_code=403, detail='Not enough permissions')
 
-    response = await collection_service.get_by_slug(slug, query=body.query, page=body.page, per_page=body.per_page)
-
-    response.allowed_actions = authz_result.allowed_actions
-
-    return response
-
-
-@router.get('/{slug}/{mid}', operation_id='minion_collection_read_minion', response_model_by_alias=False)
-async def collection_minion_retrieve(
-    slug: str,
-    mid: str,
-    authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
-) -> MinionSchema:
-    allow = await authz_service.allow('retrieve')
-    if not allow:
-        raise HTTPException(status_code=403, detail='Not enough permissions')
-
-    collections_repo = CollectionRepository()
-    collection = await collections_repo.find_one({'slug': slug})
-    if not collection:
-        raise HTTPException(status_code=404, detail='Collection not found')
-
-    minions_repo = MinionRepository()
-    query = {
-        '$and': [
-            collection.query,
-            {'_id': PyObjectId(mid)},
-        ]
-    }
-    minion = await minions_repo.find_one(query)
-    if not minion:
-        raise HTTPException(status_code=404, detail='Minion not found')
-
-    return minion
+    try:
+        response = await collection_service.get_by_slug(slug)
+        return CollectionDetailSchema(
+            **{**response.model_dump(), '_id': response.id, 'allowed_actions': authz_result.allowed_actions}
+        )
+    except Exception as e:
+        logger.error('Error: %s', e)
+        raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
 
 
-@router.post('', operation_id='minion_collection_create', response_model_by_alias=False)
+@router.post('', operation_id='minion_collection_create')
 async def collection_create(
-    collection: MinionCollectionCreateSchema,
+    collection: CollectionCreateSchema,
     authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
-    collection_service: Annotated[MinionCollectionService, Depends(get_collection_service)],
-) -> MinionCollectionSchema:
+    collection_service: Annotated[CollectionService, Depends(get_collection_service)],
+) -> CollectionModel:
     allow = await authz_service.allow('create')
     if not allow:
         raise HTTPException(status_code=403, detail='Not enough permissions')
 
-    created = await collection_service.create(collection)
-
-    return created
+    try:
+        return await collection_service.create(collection)
+    except ObjectCreateError as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
+    except DuplicateKeyError as e:
+        msg = f'Collection with slug `{collection.slug}` already exists'
+        raise HTTPException(status_code=400, detail=msg) from e
+    except Exception as e:
+        logger.error('Error: %s', e)
+        raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e

@@ -5,8 +5,9 @@ from typing import Any
 from redis import asyncio as aioredis
 
 from fastms_core.config import SETTINGS, logger
-from fastms_core.minion_collections.repository import MinionRepository
-from fastms_core.minion_collections.schemas.minion_schemas import MinionCreateSchema
+from fastms_core.db.mongo.config import get_mongo_db
+from fastms_core.minion_collections.repositories.minion_repository import MinionRepository
+from fastms_core.minion_collections.schemas.minion_schemas import MinionCreateSchema, MinionUpdateSchema
 
 
 # TODO (a.baikov): temporary solution, need to be refactored
@@ -15,7 +16,7 @@ class GrainsConsumer:
         self.redis_url: str = SETTINGS.redis_url
         self.con_kwargs = SETTINGS.redis_connection_kwargs
         self.channel = channel
-        self.repository = MinionRepository()
+        self.repository = MinionRepository(get_mongo_db())
 
     async def handle_message(self, message: Any) -> None:
         if not isinstance(message, bytes):
@@ -23,7 +24,6 @@ class GrainsConsumer:
         message = message.decode()
         data = json.loads(message)
         minion_id = data.get('id', '')
-
         minion_obj = {
             'minion_id': minion_id,
             'master': data.get('master', ''),
@@ -33,9 +33,9 @@ class GrainsConsumer:
         if data:
             exist = await self.repository.find_one({'minion_id': minion_id})
             if exist:
-                await self.repository.update_one({'minion_id': minion_id}, obj_in=minion_obj)
+                await self.repository.update({'minion_id': minion_id}, MinionUpdateSchema(**minion_obj))
             else:
-                await self.repository.add(MinionCreateSchema(**minion_obj))
+                await self.repository.create(MinionCreateSchema(**minion_obj))
 
     async def consume(self) -> None:
         redis = await aioredis.from_url(self.redis_url, **self.con_kwargs)

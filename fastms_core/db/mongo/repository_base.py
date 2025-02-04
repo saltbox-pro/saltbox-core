@@ -1,100 +1,142 @@
-from abc import ABC, abstractmethod
-from datetime import datetime
-from typing import Any, Generic, TypeVar
+from datetime import UTC, datetime
+from typing import Any, Generic, TypeVar, overload
 
 from pydantic import BaseModel
+from pymongo.asynchronous.collection import AsyncCollection
+from pymongo.asynchronous.database import AsyncDatabase
+from pymongo.errors import DuplicateKeyError as MongoDuplicateKeyError
 
-from fastms_core.config import logger
-from fastms_core.db.mongo.config import get_mongo_db
+# from fastms_core.config import logger
+from fastms_core.db.abc_repository import AbstractRepository
+from fastms_core.db.exceptions import DuplicateKeyError, ObjectCreateError, ObjectNotFoundError, ObjectUpdateError
 from fastms_core.db.mongo.schemas_base import PyObjectId
 
+T = TypeVar('T', bound=BaseModel)
+ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
 ModelType = TypeVar('ModelType', bound=BaseModel)
-CreateSchemaType = TypeVar('CreateSchemaType', bound=BaseModel)
-UpdateSchemaType = TypeVar('UpdateSchemaType', bound=BaseModel)
-ListSchemaType = TypeVar('ListSchemaType', bound=BaseModel)
-FindQueryProjectionType = TypeVar('FindQueryProjectionType', bound=BaseModel)
 
 
-class AbstractRepository(ABC, Generic[ModelType, ListSchemaType, CreateSchemaType, UpdateSchemaType]):
-    @abstractmethod
-    async def add(self, document: CreateSchemaType) -> ModelType | None:
-        pass
+class BaseMongoRepository(AbstractRepository[T], Generic[T]):
+    class Meta:
+        collection_name: str
 
-    @abstractmethod
-    async def find_one(self, query: dict[str, Any]) -> ModelType | None:
-        pass
+    def __init__(self, database: AsyncDatabase):
+        super().__init__()
+        self.__database: AsyncDatabase = database
+        self.default_model: type[T] = self.__orig_bases__[0].__args__[0]  # type: ignore
+        self.__validate()
 
-    @abstractmethod
-    async def find_all(self, query: dict[str, Any] | None = None) -> list[ModelType]:
-        pass
+    @property
+    def collection(self) -> AsyncCollection:
+        return self.__database[self.Meta.collection_name]
 
-    @abstractmethod
-    async def get(self, obj_id: Any) -> ModelType | None:
-        pass
+    def __validate(self) -> None:
+        if 'id' not in self.default_model.model_fields:
+            msg = 'Document class should have `id` field'
+            raise Exception(msg)
+        if not self.Meta.collection_name:
+            msg = 'Meta should contain `collection_name`'
+            raise Exception(msg)
 
+    def _get_projection_from_model(self, model: type[ProjectionModel]) -> dict[str, Any]:
+        projection = {}
+        for field_name, field in model.model_fields.items():
+            if field.annotation and issubclass(field.annotation, BaseModel):
+                sub_model = field.annotation
+                for sub_field_name in sub_model.model_fields:
+                    projection[f'{field_name}.{sub_field_name}'] = 1
+            else:
+                projection[field_name] = 1
 
-# Реализация для MongoDB
-class MongoDBRepository(AbstractRepository[ModelType, ListSchemaType, CreateSchemaType, UpdateSchemaType]):
-    """A repository class for MongoDB operations"""
+        return projection
 
-    def __init__(self, collection_name: str, model: type[ModelType]) -> None:
-        self.db = get_mongo_db()
-        self.collection = self.db[collection_name]
-        self.model = model
+    @overload
+    async def find_one(self, query: dict[str, Any]) -> T: ...
 
-    async def add(self, document: CreateSchemaType) -> ModelType | None:
-        new_document = await self.collection.insert_one(document.model_dump(by_alias=True, exclude={'id'}))
-        created_document = await self.collection.find_one({'_id': new_document.inserted_id})
+    @overload
+    async def find_one(self, query: dict[str, Any], projection_model: type[ProjectionModel]) -> ProjectionModel: ...
 
-        if not created_document:
+    async def find_one(
+        self, query: dict[str, Any], projection_model: type[ProjectionModel] | None = None
+    ) -> T | ProjectionModel | None:
+        projection = self._get_projection_from_model(projection_model) if projection_model else None
+
+        doc = await self.collection.find_one(filter=query, projection=projection)
+        if not doc:
             return None
-        return self.model(**created_document)
 
-    async def get(self, obj_id: PyObjectId) -> ModelType | None:
-        document = await self.collection.find_one({'_id': obj_id})
-        return self.model(**document) if document else None
+        return projection_model.model_validate(doc) if projection_model else self.default_model.model_validate(doc)
 
-    async def find_one(self, query: dict[str, Any]) -> ModelType | None:
-        document = await self.collection.find_one(query)
-        return self.model(**document) if document else None
+    @overload
+    async def find_all(self, query: dict[str, Any] | None, limit: int, skip: int) -> list[T]: ...
 
-    async def find_all(self, query: dict[str, Any] | None = None) -> list[ModelType]:
-        documents = self.collection.find(query)
-        return [self.model(**document) async for document in documents]
-
-    async def get_paginated(
+    @overload
+    async def find_all(
         self,
-        search: dict | None = None,
-        *,
-        page: int = 0,
-        per_page: int = 20,
-        projection_query: dict | None = None,
-    ) -> dict:
-        if not search:
-            search = {}
+        query: dict[str, Any] | None,
+        limit: int,
+        skip: int,
+        projection_model: type[ProjectionModel],
+    ) -> list[ProjectionModel]: ...
 
-        data_query = self.collection.find(search, projection_query).skip(page * per_page).limit(per_page)
-        data = [document async for document in data_query]
-        total = await self.collection.count_documents(search)
-
-        # TODO (a.baikov): think about returning PaginatedResponse[ListSchemaType] instead of dict
-        # https://taiga.altlab.su/project/fastms/us/100
-        # return PaginatedResponse[ListSchemaType](total=total, data=data)
-
-        return {'total': total, 'data': data}
-
-    async def update_one(self, query: dict[str, Any], obj_in: UpdateSchemaType | dict[str, Any]) -> ModelType:
-        if isinstance(obj_in, dict):
-            update_data = obj_in
+    async def find_all(
+        self,
+        query: dict[str, Any] | None = None,
+        limit: int = 0,
+        skip: int = 0,
+        projection_model: type[ProjectionModel] | None = None,
+    ) -> list[T] | list[ProjectionModel]:
+        projection = self._get_projection_from_model(projection_model) if projection_model else None
+        result = self.collection.find(filter=query, projection=projection, limit=limit, skip=skip)
+        if projection_model:
+            return [projection_model.model_validate(doc) for doc in await result.to_list()]
+            # return [projection_model.model_validate(doc) async for doc in result]
         else:
-            update_data = obj_in.model_dump(exclude_unset=True)
+            return [self.default_model.model_validate(doc) for doc in await result.to_list()]
 
-        update_data['modified'] = datetime.now().astimezone().replace(microsecond=0)
+    async def count(self, query: dict[str, Any] | None = None) -> int:
+        query = query or {}
+        return await self.collection.count_documents(query)
 
-        updated = await self.collection.update_one(query, {'$set': update_data})
-        logger.info('Updated document: %s', updated)
-        result = await self.collection.find_one(query)
-        if not result:
-            msg = 'Document not found'
-            raise ValueError(msg)
-        return self.model(**result)
+    async def create(self, document: ModelType | dict[str, Any]) -> T:
+        if isinstance(document, BaseModel):
+            document = document.model_dump(exclude={'id'})  # probably don't need to exclude id
+
+        # TODO (a.baikov): Move fields in Meta
+        if 'created' in self.default_model.model_fields:
+            document['created'] = datetime.now(UTC)
+        if 'modified' in self.default_model.model_fields:
+            document['modified'] = datetime.now(UTC)
+
+        try:
+            result = await self.collection.insert_one(document)
+        except MongoDuplicateKeyError as e:
+            raise DuplicateKeyError from e
+
+        if not result.inserted_id:
+            raise ObjectCreateError
+
+        created = await self.collection.find_one({'_id': result.inserted_id})
+        return self.default_model.model_validate(created)
+
+    async def update(self, query: dict[str, Any], document: ModelType | dict[str, Any]) -> T:
+        if isinstance(document, BaseModel):
+            document = document.model_dump(exclude={'id'}, exclude_unset=True)
+
+        if 'modified' in self.default_model.model_fields:
+            document['modified'] = datetime.now(UTC)
+
+        result = await self.collection.update_one(query, {'$set': document}, upsert=False)
+        if result.modified_count == 0:
+            raise ObjectUpdateError
+
+        updated = await self.find_one(query)
+        return updated
+
+    async def delete(self, id: PyObjectId) -> int:
+        exist = await self.count({'_id': id})
+        if not exist:
+            raise ObjectNotFoundError
+
+        result = await self.collection.delete_one({'_id': id})
+        return result.deleted_count

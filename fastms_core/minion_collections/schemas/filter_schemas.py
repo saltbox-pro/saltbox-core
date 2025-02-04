@@ -3,14 +3,24 @@ from typing import ClassVar, TypedDict
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from fastms_core.db.mongo.schemas_base import MongoQueryBaseSchema
-from fastms_core.minion_collections.schemas.minion_schemas import GrainsSchema, MinionSchema
+from fastms_core.db.mongo.schemas_base import MongoQuery
+from fastms_core.minion_collections.schemas.minion_schemas import GrainsSchema, MinionModel
 
 
-class MinionFilterValuesBody(MongoQueryBaseSchema):
+class MinionFilterValuesBody(BaseModel):
     collection_slug: str = Field(
         description='Collection slug',
         default='root',
+    )
+    query: MongoQuery = Field(
+        default_factory=dict,
+        title='MongoDB Query',
+        description='A valid MongoDB query dictionary',
+        examples=[
+            {'grains.os': 'Ubuntu'},
+            {'grains.cpu_model': {'$regex': 'Intel'}},
+        ],
+        json_schema_extra={'example': {'grains.cpu_model': {'$not': {'$regex': 'Intel'}}}},
     )
     field: str = Field(
         description='Field name to get unique values',
@@ -23,7 +33,7 @@ class MinionFilterValuesBody(MongoQueryBaseSchema):
     @field_validator('field')
     @classmethod
     def validate_field(cls, value: str) -> str:
-        if '.' not in value and value not in MinionSchema.model_fields:
+        if '.' not in value and value not in MinionModel.model_fields:
             raise RequestValidationError(
                 errors=[
                     {

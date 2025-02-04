@@ -42,13 +42,37 @@ schema_lookups_js_values = {
     'notBetween': {'name': 'notBetween', 'value': 'notBetween', 'label': 'not between'},
 }
 schema_all_lookups = [
-    '=', '!=', '<', '>', '<=', '>=', 'contains', 'beginsWith', 'endsWith', 'doesNotContain',  'doesNotBeginWith',
-    'doesNotEndWith', 'null', 'notNull', 'in', 'notIn', 'between', 'notBetween'
+    '=',
+    '!=',
+    '<',
+    '>',
+    '<=',
+    '>=',
+    'contains',
+    'beginsWith',
+    'endsWith',
+    'doesNotContain',
+    'doesNotBeginWith',
+    'doesNotEndWith',
+    'null',
+    'notNull',
+    'in',
+    'notIn',
+    'between',
+    'notBetween',
 ]
 schema_number_lookups = ['=', '!=', '<', '>', '<=', '>=', 'in', 'notIn']
 schema_text_lookups = [
-    '=', '!=', 'contains', 'beginsWith', 'endsWith', 'doesNotContain',
-    'doesNotBeginWith', 'doesNotEndWith', 'in', 'notIn'
+    '=',
+    '!=',
+    'contains',
+    'beginsWith',
+    'endsWith',
+    'doesNotContain',
+    'doesNotBeginWith',
+    'doesNotEndWith',
+    'in',
+    'notIn',
 ]
 schema_datetime_lookups = ['=', '!=', '<', '>', '<=', '>=', 'in', 'notIn']
 schema_nullable_lookups = ['null', 'notNull']

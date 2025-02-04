@@ -5,14 +5,16 @@ from fastapi import Depends
 from redis.asyncio import Redis
 
 from fastms_core.config import LOG_CONFIG
+from fastms_core.db.mongo.config import get_mongo_db
 from fastms_core.db.mongo.schemas_base import PyObjectId
 from fastms_core.db.redis import RedisDependency
 from fastms_core.jobs.exceptions import JobCreateException
 from fastms_core.jobs.schemas import JobCreate, JobResult
 from fastms_core.jobs.services import JobService, JobServiceDependency
-from fastms_core.minion_collections.repository import CollectionRepository, MinionRepository
-from fastms_core.minion_collections.schemas.collection_schemas import MinionCollectionSchema
-from fastms_core.minion_collections.schemas.minion_schemas import MinionSchema
+from fastms_core.minion_collections.repositories.collection_repository import CollectionRepository
+from fastms_core.minion_collections.repositories.minion_repository import MinionRepository
+from fastms_core.minion_collections.schemas.collection_schemas import CollectionModel
+from fastms_core.minion_collections.schemas.minion_schemas import MinionModel
 from fastms_core.tasks.schemas import (
     TaskJob,
     TaskJobReturnStatus,
@@ -34,18 +36,19 @@ logger = logging.getLogger(__name__)
 
 class TaskLifespanService:
     def __init__(
-            self,
-            rdb: Redis,
-            task_service: TaskService,
-            job_service: JobService,
-            task_id: PyObjectId | None = None,
-            task: TaskSchema | None = None
+        self,
+        rdb: Redis,
+        task_service: TaskService,
+        job_service: JobService,
+        task_id: PyObjectId | None = None,
+        task: TaskSchema | None = None,
     ):
         self.rdb = rdb
         self.task_service = task_service
         self.job_service = job_service
-        self.minion_repository = MinionRepository()
-        self.collections_repository = CollectionRepository()
+        self._mongo_db = get_mongo_db()
+        self.minion_repository = MinionRepository(self._mongo_db)
+        self.collections_repository = CollectionRepository(self._mongo_db)
 
         if task_id and task:
             msg = "TaskLifespanService can't accept both `task_id` and `task` args at the same time"
@@ -71,10 +74,7 @@ class TaskLifespanService:
             task.__setattr__(attr, value)
 
         self.__task = await self.task_service.update_obj(
-            obj_id=task.id,
-            obj_data=TaskUpdateSchema(**task.model_dump()),
-            projection_schema=TaskSchema,
-            notify=notify
+            obj_id=task.id, obj_data=TaskUpdateSchema(**task.model_dump()), projection_schema=TaskSchema, notify=notify
         )
 
         return self.__task
@@ -85,8 +85,7 @@ class TaskLifespanService:
         if task.status in [task.TaskStatus.created, task.TaskStatus.stopped]:
             await self.update_task(status=task.TaskStatus.running)
 
-    async def __stop_jobs(self):
-        ...  # TODO: stop jobs
+    async def __stop_jobs(self): ...  # TODO: stop jobs
 
     async def stop(self):
         task: TaskSchema = await self.get_task()
@@ -107,7 +106,7 @@ class TaskLifespanService:
     async def __get_task_targeting(self) -> dict[str, list[str]]:
         task: TaskSchema = await self.get_task()
 
-        minions: list[MinionSchema] = []
+        minions: list[MinionModel] = []
         result: dict[str, list[str]] = {}
 
         if task.tgt_type == TaskTgtType.minions_list:
@@ -116,8 +115,7 @@ class TaskLifespanService:
                 query={'_id': {'$in': [PyObjectId(minion_id) for minion_id in minions_ids]}},
             )
         elif task.tgt_type == TaskTgtType.minions_collection:
-            collection: MinionCollectionSchema | None = \
-                await self.collections_repository.get(PyObjectId(task.tgt_value))
+            collection: CollectionModel | None = await self.collections_repository.get(PyObjectId(task.tgt_value))
 
             if collection:
                 minions = await self.minion_repository.find_all(query=collection.query)
@@ -205,21 +203,27 @@ class TaskLifespanService:
     async def __create_job(self, job_target: TaskJobTarget):
         task: TaskSchema = await self.get_task()
 
-        jid: JID = await self.job_service.create_job(JobCreate.model_validate({
-            'jid_postfix': f't{task.id}',
-            'tgt': job_target.tgt,
-            'tgt_type': 'list',
-            'fun': task.fun,
-            'arg': task.task_args,
-            'kwarg': task.task_kwargs,
-            'salt_master': job_target.master,
-        }))
+        jid: JID = await self.job_service.create_job(
+            JobCreate.model_validate(
+                {
+                    'jid_postfix': f't{task.id}',
+                    'tgt': job_target.tgt,
+                    'tgt_type': 'list',
+                    'fun': task.fun,
+                    'arg': task.task_args,
+                    'kwarg': task.task_kwargs,
+                    'salt_master': job_target.master,
+                }
+            )
+        )
 
-        task.jobs.append(TaskJob(
-            jid=str(jid),
-            target=job_target,
-            returns_statuses={minion_id: TaskJobReturnStatus.waiting for minion_id in job_target.tgt.split(',')}
-        ))
+        task.jobs.append(
+            TaskJob(
+                jid=str(jid),
+                target=job_target,
+                returns_statuses={minion_id: TaskJobReturnStatus.waiting for minion_id in job_target.tgt.split(',')},
+            )
+        )
 
     async def __rub_jobs(self) -> None:
         task: TaskSchema = await self.get_task()
@@ -260,10 +264,10 @@ class TaskLifespanService:
 
 
 async def get_task_lifespan_service(
-        rdb: RedisDependency,
-        task_service: TaskServiceDependency,
-        job_service: JobServiceDependency,
-        tid: PyObjectId | None = None
+    rdb: RedisDependency,
+    task_service: TaskServiceDependency,
+    job_service: JobServiceDependency,
+    tid: PyObjectId | None = None,
 ):
     task_service = TaskLifespanService(rdb=rdb, task_service=task_service, job_service=job_service, task_id=tid)
     yield task_service
