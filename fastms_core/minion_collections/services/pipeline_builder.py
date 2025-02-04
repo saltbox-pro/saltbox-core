@@ -1,16 +1,11 @@
-import logging.config
 from collections.abc import Callable
 from types import UnionType
 from typing import Any, Union, get_args, get_origin
 
 from fastapi import HTTPException, status
 
-from fastms_core.config import LOG_CONFIG
+from fastms_core.config import logger
 from fastms_core.minion_collections.schemas.minion_schemas import GrainsSchema, MinionModel
-
-logging.config.dictConfig(LOG_CONFIG.model_dump())
-
-logger = logging.getLogger(__name__)
 
 
 class MongoPiplineBuilder:
@@ -32,6 +27,8 @@ class MongoPiplineBuilder:
         return {
             'grains.pythonversion': self._list_to_str_handler,
             'grains.hwaddr_interfaces': self._unique_keys_handler,
+            'created': self._datetime_handler,
+            'modified': self._datetime_handler,
         }
 
     def _detect_field_type(self) -> type[Any] | None:
@@ -45,7 +42,6 @@ class MongoPiplineBuilder:
         return field_type
 
     def _is_allowed_field_types(self) -> bool:
-        logger.info('self.field_type: %s', self.field_type)
         if self.field_type is str:
             return True
         if self._is_union():
@@ -61,6 +57,20 @@ class MongoPiplineBuilder:
         origin = get_origin(self.field_type)
         logger.info('origin: %s', origin)
         return origin is Union or origin is UnionType
+
+    def _datetime_handler(self) -> None:
+        self.pipeline.extend(
+            [
+                {
+                    '$group': {
+                        '_id': {'$dateToString': {'format': '%Y-%m-%d', 'date': f'${self.field_name}'}},
+                        'count': {'$sum': 1},
+                    }
+                },
+                {'$project': {'value': '$_id', 'count': 1, '_id': 0}},
+                {'$sort': {'value': 1}},
+            ]
+        )
 
     def _list_to_str_handler(self) -> None:
         self.pipeline.extend(

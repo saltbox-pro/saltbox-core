@@ -1,3 +1,4 @@
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException
@@ -9,6 +10,7 @@ from fastms_core.minion_collections.schemas.minion_schemas import MinionListbody
 from fastms_core.minion_collections.services.authz import MinionCollectionAuthzService, get_authz_service
 from fastms_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from fastms_core.minion_collections.services.minion_service import MinionService, get_minion_service
+from fastms_core.utilities.helpers import recursive_replace_dates
 
 router = APIRouter(prefix='/minions', tags=['Minions'])
 
@@ -31,9 +33,22 @@ async def minions_list(
     if not authz_result.allow:
         raise HTTPException(status_code=403, detail='Not enough permissions')
 
+    # HOTFIX for last_activity
+    search = body.query
+    for field_name in ['last_activity']:
+        if field_name in search.keys():
+            vals = search[field_name]
+            for k, v in vals.items():
+                if v == '$$FIVE_MINUTES_AGO':
+                    vals[k] = datetime.now(UTC) - timedelta(minutes=5)
+                else:
+                    vals[k] = datetime.fromisoformat(v)
+
+    search = recursive_replace_dates(search)
+
     try:
         collection = await collection_service.get_by_slug(body.collection_slug)
-        query = {'$and': [collection.query, body.query]}
+        query = {'$and': [collection.query, search]}
         resp = await minion_service.get_paginated(query=query, skip=body.skip, limit=body.limit)
         return resp
     except ObjectNotFoundError as e:
