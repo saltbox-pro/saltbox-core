@@ -146,7 +146,7 @@ class MinionModel(CreatedModifiedMixin, MinionEditableFieldsMixin[GrainsSchema],
     pass
 
 
-class MinionDetail(MinionModel):
+class MinionDetailSchema(MinionModel):
     @computed_field  # type: ignore[prop-decorator]
     @property
     def additional_grains(self) -> dict[str, Any]:
@@ -159,7 +159,7 @@ class MinionDetail(MinionModel):
         return additional_grains
 
 
-class MinionShort(CreatedModifiedMixin, MinionEditableFieldsMixin[GrainsShortSchema], IDMixin):
+class MinionShortSchema(CreatedModifiedMixin, MinionEditableFieldsMixin[GrainsShortSchema], IDMixin):
     pass
 
 
