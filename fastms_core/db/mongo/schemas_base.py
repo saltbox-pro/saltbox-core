@@ -24,6 +24,10 @@ from fastms_core.config import SETTINGS
 
 IS_PYDANTIC_V2_10 = int(pydantic.VERSION.split('.')[0]) >= 2 and int(pydantic.VERSION.split('.')[1]) >= 10
 ALLOWED_MONGO_QUERY_KEYS = [
+    '$and',
+    '$or',
+    '$nor',
+    '$not',
     '$eq',
     '$ne',
     '$gt',
@@ -42,6 +46,7 @@ ALLOWED_MONGO_QUERY_KEYS = [
     '$where',
     '$geoIntersects',
     '$geoWithin',
+    '$geoNear',
     '$near',
     '$nearSphere',
     '$all',
@@ -51,6 +56,9 @@ ALLOWED_MONGO_QUERY_KEYS = [
     '$bitsAllSet',
     '$bitsAnyClear',
     '$bitsAnySet',
+    '$comment',
+    '$meta',
+    '$slice',
 ]
 
 SchemaType = TypeVar('SchemaType', bound=BaseModel)
