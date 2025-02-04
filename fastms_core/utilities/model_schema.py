@@ -6,7 +6,6 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
-from fastms_core.config import logger
 from fastms_core.db.mongo.schemas_base import PyObjectId
 
 
@@ -118,7 +117,6 @@ def analyze_field(field: Any) -> tuple[type[BaseModel] | None, bool, Any]:
         field_annotations = (field.annotation,) if not field_annotations else field_annotations
 
         for field_class in field_annotations:
-            logger.info('field_class: %s', field_class)
             if field_class is type(None):
                 nullable_field = True
                 continue
