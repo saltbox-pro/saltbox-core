@@ -9,11 +9,6 @@ unsafe-fixes = false
 quote-style = 'single'
 docstring-code-format = true
 
-[flake8-quotes]
-docstring-quotes = 'single'
-inline-quotes = 'single'
-multiline-quotes = 'single'
-
 [lint]
 select = [
   'B',     # flake8-bugbear
@@ -47,6 +42,11 @@ ignore = [
 ]
 fixable = ['ALL']
 unfixable = ['F401', 'F841', 'UP035']
+
+[lint.flake8-quotes]
+docstring-quotes = 'single'
+inline-quotes = 'single'
+multiline-quotes = 'single'
 
 [lint.pydocstyle]
 convention = 'google'
