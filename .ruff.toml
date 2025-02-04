@@ -1,0 +1,66 @@
+target-version = 'py312'
+line-length = 120
+src = ['fastms_core', 'tests']
+extend-exclude = ['docs', 'env', '__pycache__', '*.egg', 'htmlcov']
+respect-gitignore = true
+unsafe-fixes = false
+
+[format]
+quote-style = 'single'
+docstring-code-format = true
+
+[flake8-quotes]
+docstring-quotes = 'single'
+inline-quotes = 'single'
+multiline-quotes = 'single'
+
+[lint]
+select = [
+  'B',     # flake8-bugbear
+  'C90',   # mccabe
+  'C4',    # flake8-comprehensions
+  'DTZ',   # flake8-datetimez https://docs.astral.sh/ruff/rules/#flake8-datetimez-dtz
+  'EM',    # flake8-errmsg
+  'UP',    # pyupgrade
+  'FA',    # flake8-future-annotations
+  'LOG',   # flake8-logging
+  'PTH',   # flake8-use-pathlib
+  'ASYNC', #flake8-async
+  'G',     # flake8-logging-format
+  'E',     # pycodestyle errors
+  'F',     # pyflakes
+  'I',     # isort
+  'S',     # flake8-bandit
+  'W',     # pycodestyle warnings
+  'N',     # pep8-naming
+  'RUF',   # ruff checks
+  'TD',    # flake8-todo
+]
+ignore = [
+  # 'E402',   # module level import not at top of file
+  'E722', # do not use bare except
+  'ERA',  # do not autoremove commented out code
+  'N818', # error-suffix-on-exception-name
+  'UP040', # type instead of TypeAlias PEP 695'
+  'TD003', # Found TODO in code
+  # 'G004', # Logging statement uses string formatting
+]
+fixable = ['ALL']
+unfixable = ['F401', 'F841', 'UP035']
+
+[lint.pydocstyle]
+convention = 'google'
+
+[lint.per-file-ignores]
+'tests/**/*.*' = ['S101', 'DTZ']
+# '*/models.py' = ['UP007']
+# '*/schemas.py' = ['UP007']
+
+[lint.isort]
+known-first-party = [
+    'fastms_core',
+    'tests',
+]
+
+[lint.mccabe]
+max-complexity = 10
