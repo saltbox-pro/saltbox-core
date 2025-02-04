@@ -23,14 +23,57 @@ from pydantic_core.core_schema import (
 from fastms_core.config import SETTINGS
 
 IS_PYDANTIC_V2_10 = int(pydantic.VERSION.split('.')[0]) >= 2 and int(pydantic.VERSION.split('.')[1]) >= 10
+ALLOWED_MONGO_QUERY_KEYS = [
+    '$and',
+    '$or',
+    '$nor',
+    '$not',
+    '$eq',
+    '$ne',
+    '$gt',
+    '$gte',
+    '$lt',
+    '$lte',
+    '$in',
+    '$nin',
+    '$exists',
+    '$type',
+    '$expr',
+    '$jsonSchema',
+    '$mod',
+    '$regex',
+    '$text',
+    '$where',
+    '$geoIntersects',
+    '$geoWithin',
+    '$geoNear',
+    '$near',
+    '$nearSphere',
+    '$all',
+    '$elemMatch',
+    '$size',
+    '$bitsAllClear',
+    '$bitsAllSet',
+    '$bitsAnyClear',
+    '$bitsAnySet',
+    '$comment',
+    '$meta',
+    '$slice',
+]
 
 SchemaType = TypeVar('SchemaType', bound=BaseModel)
 
 
 def validate_mongo_query(value: dict[str, Any]) -> dict[str, Any]:
     for key, val in value.items():
-        if key in {'$and', '$or'} and not isinstance(val, list):
-            msg = f'Value for "{key}" must be a list'
+        if key.startswith('$') and key not in ALLOWED_MONGO_QUERY_KEYS:
+            msg = f'Invalid or unsupported operator `{key}`'
+            raise ValueError(msg)
+        if isinstance(val, dict):
+            validate_mongo_query(val)
+
+        if key in {'$and', '$or', '$in'} and not isinstance(val, list):
+            msg = f'Value for `{key}` must be a `list`'
             raise ValueError(msg)
     return value
 

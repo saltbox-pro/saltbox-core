@@ -6,6 +6,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 
+# from fastms_core.config import logger
 from fastms_core.db.mongo.schemas_base import PyObjectId
 
 
@@ -86,6 +87,7 @@ schema_input_type_map = {
     bool: 'checkbox',
     PyObjectId: 'text',
     UUID: 'text',
+    datetime: 'date',
 }
 
 
@@ -138,8 +140,8 @@ def analyze_field(field: Any) -> tuple[type[BaseModel] | None, bool, Any]:
 def create_field_schema(
     full_field_name: str, field: Any, nullable_field: bool, computed_field_class: Any
 ) -> dict[str, Any]:
-    field_schema_lookups: list[str] = schema_lookups_map.get(type(computed_field_class), schema_text_lookups)
-    field_schema_type: str = schema_input_type_map.get(type(computed_field_class), 'text')
+    field_schema_lookups: list[str] = schema_lookups_map.get(computed_field_class, schema_text_lookups)
+    field_schema_type: str = schema_input_type_map.get(computed_field_class, 'text')
 
     if nullable_field:
         field_schema_lookups = field_schema_lookups + schema_nullable_lookups
