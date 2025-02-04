@@ -5,7 +5,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from fastms_core.config import logger
 from fastms_core.db.exceptions import ObjectNotFoundError
 from fastms_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId
-from fastms_core.minion_collections.schemas.minion_schemas import MinionListbody, MinionModel, MinionShort
+from fastms_core.minion_collections.schemas.minion_schemas import MinionListbody, MinionModel, MinionShortSchema
 from fastms_core.minion_collections.services.authz import MinionCollectionAuthzService, get_authz_service
 from fastms_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from fastms_core.minion_collections.services.minion_service import MinionService, get_minion_service
@@ -19,7 +19,7 @@ async def minions_list(
     authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
     minion_service: Annotated[MinionService, Depends(get_minion_service)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
-) -> PaginatedResponse[MinionShort]:
+) -> PaginatedResponse[MinionShortSchema]:
     authz_result = await authz_service.check_access(
         input={
             'user': authz_service.user.model_dump(),

@@ -9,7 +9,7 @@ from fastms_core.minion_collections.schemas.minion_schemas import (
     MinionCreateSchema,
     MinionIDs,
     MinionModel,
-    MinionShort,
+    MinionShortSchema,
     MinionUpdateSchema,
 )
 
@@ -36,16 +36,16 @@ class MinionService:
         query: dict[str, Any] | None = None,
         limit: int = 0,
         skip: int = 0,
-    ) -> PaginatedResponse[MinionShort]:
+    ) -> PaginatedResponse[MinionShortSchema]:
         total = await self.repo.count(query)
         docs = await self.repo.find_all(
             query,
             limit=limit,
             skip=skip,
-            projection_model=MinionShort,
+            projection_model=MinionShortSchema,
         )
         # logger.info('docs: %s', docs)
-        return PaginatedResponse[MinionShort](total=total, data=docs)
+        return PaginatedResponse[MinionShortSchema](total=total, data=docs)
 
     async def update(self, id: str, document: MinionUpdateSchema) -> MinionModel:
         result = await self.repo.update({'_id': id}, document)
