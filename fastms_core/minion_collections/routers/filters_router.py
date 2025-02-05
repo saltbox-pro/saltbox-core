@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from fastms_core.db.exceptions import PiplineBuilderError
 from fastms_core.minion_collections.schemas.filter_schemas import (
     MinionFilterSchema,
     MinionFilterValuesBody,
@@ -53,7 +54,10 @@ async def unique_field_values(
     pipline_builder = MongoPiplineBuilder(body.field, query)
     pipline = pipline_builder.build()
 
-    result = await minion_service.minion_pipeline(pipline)
+    try:
+        result = await minion_service.minion_pipeline(pipline)
+    except PiplineBuilderError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
     response = UniqueGrainValuesResponse(
         total=len(result),
