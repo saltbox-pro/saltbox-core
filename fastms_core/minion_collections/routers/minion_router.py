@@ -44,11 +44,9 @@ async def minions_list(
                 else:
                     vals[k] = datetime.fromisoformat(v)
 
-    search = recursive_replace_dates(search)
-
     try:
         collection = await collection_service.get_by_slug(body.collection_slug)
-        query = {'$and': [collection.query, search]}
+        query = {'$and': [recursive_replace_dates(collection.query), recursive_replace_dates(search)]}
         resp = await minion_service.get_paginated(query=query, skip=body.skip, limit=body.limit)
         return resp
     except ObjectNotFoundError as e:
