@@ -4,33 +4,28 @@ from typing import Annotated, Any
 from fastapi import Depends
 
 from fastms_core.db.redis import RedisDependency
-from fastms_core.tasks.repository import TaskTemplateRepository
-from fastms_core.tasks.schemas import (
+from fastms_core.tasks.repositories.task_template_repository import TaskTemplateRepository, get_task_template_repository
+from fastms_core.tasks.schemas.task_template_schemas import (
     TaskTemplateCreateSchema,
-    TaskTemplateListSchema,
-    TaskTemplateSchema,
+    TaskTemplateModel,
     TaskTemplateUpdateSchema,
     TaskTemplateVariable,
 )
-from fastms_core.utilities.service_base import BaseService
+from fastms_core.utilities.serivces.mongo_base_service import MongoBaseService
 
 
 class TaskTemplateService(
-    BaseService[
-        TaskTemplateRepository,
-        TaskTemplateSchema,
-        TaskTemplateListSchema,
-        TaskTemplateCreateSchema,
-        TaskTemplateUpdateSchema
-    ]
+    MongoBaseService[TaskTemplateRepository, TaskTemplateModel, TaskTemplateCreateSchema, TaskTemplateUpdateSchema]
 ):
     repository_class = TaskTemplateRepository
 
-    def __init__(self, rdb: RedisDependency):
-        self.rdb = rdb
-        super().__init__()
+    def __init__(self, repo: TaskTemplateRepository, rdb: RedisDependency):
+        super().__init__(repo=repo)
 
-    def get_context(self, task_template: TaskTemplateSchema, variables_data: dict) -> dict:  # noqa: C901
+        self.rdb = rdb
+
+    @staticmethod
+    def get_context(task_template: TaskTemplateModel, variables_data: dict) -> dict:  # noqa: C901
         context: dict = {}
 
         for variable in task_template.variables:
@@ -66,7 +61,7 @@ class TaskTemplateService(
         return context
 
     def get_task_args(
-            self, task_template: TaskTemplateSchema, variables_data: dict, context: dict[str, Any] | None
+        self, task_template: TaskTemplateModel, variables_data: dict, context: dict[str, Any] | None
     ) -> list:
         if context is None:
             context = self.get_context(task_template=task_template, variables_data=variables_data)
@@ -88,7 +83,7 @@ class TaskTemplateService(
         return task_args
 
     def get_task_kwargs(
-            self, task_template: TaskTemplateSchema, variables_data: dict, context: dict[str, Any] | None
+        self, task_template: TaskTemplateModel, variables_data: dict, context: dict[str, Any] | None
     ) -> dict:
         if context is None:
             context = self.get_context(task_template=task_template, variables_data=variables_data)
@@ -110,9 +105,7 @@ class TaskTemplateService(
         return task_kwargs
 
 
-async def get_task_template_service(rdb: RedisDependency):
-    task_template_service = TaskTemplateService(rdb=rdb)
-    yield task_template_service
-
-
-TaskTemplateServiceDependency = Annotated[TaskTemplateService, Depends(get_task_template_service)]
+async def get_task_template_service(
+    repo: Annotated[TaskTemplateRepository, Depends(get_task_template_repository)], rdb: RedisDependency
+) -> TaskTemplateService:
+    return TaskTemplateService(repo=repo, rdb=rdb)

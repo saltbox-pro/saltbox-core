@@ -228,11 +228,13 @@ class PubSubAuthenticatedWebSocket(AuthenticatedWebSocket):
 
                 if isclass(handler) and issubclass(handler, BaseModel):
                     await self._process_channel_message(message, handler)
+                    continue
                 elif callable(handler):
                     await self._process_channel_message_by_callback(message, handler)
-
-                msg = 'Unsupported handler type'
-                raise Exception(msg)
+                    continue
+                else:
+                    msg: str = f'Unsupported handler type {handler.__name__}'  # type: ignore
+                    raise Exception(msg)
 
         LOGGER.debug('Exit from _message_forwarder')
 

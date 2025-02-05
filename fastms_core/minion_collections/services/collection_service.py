@@ -20,23 +20,23 @@ class CollectionService:
         self.repo = repo
 
     async def get_by_slug(self, slug: str) -> CollectionModel:
-        document = await self.repo.find_one({'slug': slug})
+        document = await self.repo.get({'slug': slug})
         if not document:
             msg = 'Collection not found'
             raise ObjectNotFoundError(msg)
         return document
 
     async def get_by_slug_or_none(self, slug: str) -> CollectionModel | None:
-        return await self.repo.find_one({'slug': slug})
+        return await self.repo.get({'slug': slug})
 
     async def create(self, document: CollectionCreateSchema) -> CollectionModel:
         return await self.repo.create(document)
 
-    async def get_paginated(
+    async def get_list_paginated(
         self, query: dict[str, Any] | None = None, limit: int = 0, skip: int = 0
     ) -> PaginatedResponse[CollectionModel]:
         total = await self.repo.count(query)
-        docs = await self.repo.find_all(query, limit=limit, skip=skip)
+        docs = await self.repo.get_list(query, limit=limit, skip=skip)
         return PaginatedResponse[CollectionModel](total=total, data=docs)
 
     async def update(self, slug: str, document: CollectionUpdateSchema) -> CollectionModel:

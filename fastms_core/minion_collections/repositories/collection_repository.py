@@ -11,6 +11,8 @@ from fastms_core.minion_collections.schemas.collection_schemas import Collection
 class CollectionRepository(BaseMongoRepository[CollectionModel]):
     class Meta:
         collection_name = 'minion_collections'
+        auto_now_add_fields = ['created']
+        auto_now_fields = ['modified']
 
 
 def get_collection_repository(db: Annotated[AsyncDatabase, Depends(get_mongo)]) -> CollectionRepository:

@@ -49,7 +49,7 @@ async def minions_list(
     try:
         collection = await collection_service.get_by_slug(body.collection_slug)
         query = {'$and': [collection.query, search]}
-        resp = await minion_service.get_paginated(query=query, skip=body.skip, limit=body.limit)
+        resp = await minion_service.get_list_paginated(query=query, skip=body.skip, limit=body.limit)
         return resp
     except ObjectNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from None

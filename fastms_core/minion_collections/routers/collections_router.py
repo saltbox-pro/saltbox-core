@@ -29,7 +29,7 @@ async def collections_list(
     query = None if authz_result.is_admin else {'slug': {'$in': authz_result.allowed_slugs}}
 
     try:
-        return await collection_service.get_paginated(query=query, skip=params.skip, limit=params.limit)
+        return await collection_service.get_list_paginated(query=query, skip=params.skip, limit=params.limit)
     except Exception as e:
         logger.error('Error: %s', e)
         raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e

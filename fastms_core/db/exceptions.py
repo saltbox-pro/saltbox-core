@@ -7,22 +7,16 @@ class ObjectNotFoundError(RepositoryError):
         super().__init__(self.detail)
 
 
-class MultipleObjectsFoundError(RepositoryError): ...
+class MultipleObjectsFoundError(RepositoryError):
+    def __init__(self, detail: str = 'Multiple objects found') -> None:
+        self.detail = detail
+        super().__init__(self.detail)
 
 
 class DuplicateKeyError(RepositoryError):
     def __init__(self, detail: str = 'Duplicate key error') -> None:
         self.detail = detail
         super().__init__(self.detail)
-
-
-class ObjCreationError(RepositoryError): ...
-
-
-class ObjUpdateError(RepositoryError): ...
-
-
-class MultipleObjectsReturnError(RepositoryError): ...
 
 
 class ObjectCreateError(RepositoryError):

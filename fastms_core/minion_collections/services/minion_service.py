@@ -19,26 +19,26 @@ class MinionService:
         self.repo = repo
 
     async def get(self, id: PyObjectId) -> MinionModel:
-        document = await self.repo.find_one({'_id': id})
+        document = await self.repo.get({'_id': id})
         if not document:
             msg = 'Minion not found'
             raise ObjectNotFoundError(msg)
         return document
 
     async def get_or_none(self, id: PyObjectId) -> MinionModel | None:
-        return await self.repo.find_one({'_id': id})
+        return await self.repo.get({'_id': id})
 
     async def create(self, document: MinionCreateSchema) -> MinionModel:
         return await self.repo.create(document)
 
-    async def get_paginated(
+    async def get_list_paginated(
         self,
         query: dict[str, Any] | None = None,
         limit: int = 0,
         skip: int = 0,
     ) -> PaginatedResponse[MinionShortSchema]:
         total = await self.repo.count(query)
-        docs = await self.repo.find_all(
+        docs = await self.repo.get_list(
             query,
             limit=limit,
             skip=skip,
@@ -52,7 +52,7 @@ class MinionService:
         return result
 
     async def get_ids_by_query(self, query: dict[str, Any]) -> list[MinionIDs]:
-        return await self.repo.find_all(query, skip=0, limit=0, projection_model=MinionIDs)
+        return await self.repo.get_list(query, skip=0, limit=0, projection_model=MinionIDs)
 
     async def minion_pipeline(self, pipeline: list[dict]) -> list:
         cursor = await self.repo.collection.aggregate(pipeline)

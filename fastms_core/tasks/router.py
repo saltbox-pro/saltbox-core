@@ -1,31 +1,30 @@
 import logging.config
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Response, WebSocket, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, WebSocket, status
 
 from fastms_core import http_errors
 from fastms_core.config import LOG_CONFIG
-from fastms_core.db.mongo.schemas_base import PaginatedResponse
+from fastms_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId
 from fastms_core.db.redis import RedisDependency
 from fastms_core.jobs.exceptions import JobDoesNotExistsException
 from fastms_core.jobs.schemas import Job, JobResult
 from fastms_core.jobs.services import JobServiceDependency
-from fastms_core.tasks.schemas import (
+from fastms_core.tasks.schemas.task_schemas import (
     TaskCreateFromTemplateSchema,
     TaskListQueryParams,
     TaskListResponseSchema,
-    TaskSchema,
+    TaskModel,
+)
+from fastms_core.tasks.schemas.task_template_schemas import (
     TaskTemplateCreateSchema,
     TaskTemplateListQueryParams,
-    TaskTemplateListSchema,
-    TaskTemplateSchema,
+    TaskTemplateModel,
     TaskTemplateUpdateSchema,
 )
-from fastms_core.tasks.services import (
-    TaskServiceDependency,
-    TaskServiceLifespanDependency,
-    TaskTemplateServiceDependency,
-)
+from fastms_core.tasks.services.tasks import TaskService, get_task_service
+from fastms_core.tasks.services.tasks_lifespan import TaskLifespanService, get_task_lifespan_service
+from fastms_core.tasks.services.tasks_templates import TaskTemplateService, get_task_template_service
 from fastms_core.utilities.exceptions import ObjectDoesNotExistError
 from fastms_core.utilities.jid import JID
 from fastms_core.utilities.websocket import PubSubAuthenticatedWebSocket
@@ -49,10 +48,11 @@ ws_router = APIRouter(prefix='/tasks')
 
 @router.get('/template', operation_id='templates_list')
 async def templates_list(
-    params: Annotated[TaskTemplateListQueryParams, Query()], task_templates_service: TaskTemplateServiceDependency
-) -> PaginatedResponse[TaskTemplateListSchema]:
-    task_templates: PaginatedResponse[TaskTemplateListSchema] = await task_templates_service.get_list_paginated(
-        page=params.page, per_page=params.per_page, projection_schema=TaskTemplateListSchema
+    params: Annotated[TaskTemplateListQueryParams, Query()],
+    task_templates_service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
+) -> PaginatedResponse[TaskTemplateModel]:
+    task_templates: PaginatedResponse[TaskTemplateModel] = await task_templates_service.get_list_paginated(
+        query={}, limit=params.per_page, skip=params.page * params.per_page
     )
 
     return task_templates
@@ -60,23 +60,20 @@ async def templates_list(
 
 @router.post('/template', operation_id='template_create')
 async def template_create(
-        item: TaskTemplateCreateSchema, task_templates_service: TaskTemplateServiceDependency
-) -> TaskTemplateSchema:
-    obj: TaskTemplateSchema = await task_templates_service.create_obj(
-        obj_data=item, projection_schema=TaskTemplateSchema
-    )
+    item: TaskTemplateCreateSchema,
+    task_templates_service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
+) -> TaskTemplateModel:
+    obj: TaskTemplateModel = await task_templates_service.create(data=item)
 
     return obj
 
 
 @router.get('/template/{tid}', operation_id='template_retrieve')
 async def template_retrieve(
-        tid: str, task_templates_service: TaskTemplateServiceDependency
-) -> TaskTemplateSchema:
+    tid: PyObjectId, task_templates_service: Annotated[TaskTemplateService, Depends(get_task_template_service)]
+) -> TaskTemplateModel:
     try:
-        obj: TaskTemplateSchema = await task_templates_service.get_obj(
-            obj_id=tid, projection_schema=TaskTemplateSchema
-        )
+        obj: TaskTemplateModel = await task_templates_service.get(query=tid)
     except ObjectDoesNotExistError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task template does not found') from e
 
@@ -85,11 +82,13 @@ async def template_retrieve(
 
 @router.put('/template/{tid}', operation_id='template_update')
 async def template_update(
-        tid: str, item: TaskTemplateUpdateSchema, task_templates_service: TaskTemplateServiceDependency
-) -> TaskTemplateSchema:
+    tid: PyObjectId,
+    item: TaskTemplateUpdateSchema,
+    task_templates_service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
+) -> TaskTemplateModel:
     try:
-        updated_obj: TaskTemplateSchema = task_templates_service.update_obj(
-            obj_id=tid, obj_data=item, projection_schema=TaskTemplateSchema
+        updated_obj: TaskTemplateModel = await task_templates_service.update(
+            query=tid, data=item
         )
     except ObjectDoesNotExistError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task template does not found') from e
@@ -98,8 +97,10 @@ async def template_update(
 
 
 @router.delete('/template/{tid}', operation_id='template_delete', status_code=status.HTTP_204_NO_CONTENT)
-async def template_delete(tid: str, task_templates_service: TaskTemplateServiceDependency) -> Response:
-    deleted_count = await task_templates_service.delete_obj(id=tid)
+async def template_delete(
+    tid: PyObjectId, task_templates_service: Annotated[TaskTemplateService, Depends(get_task_template_service)]
+) -> Response:
+    deleted_count = await task_templates_service.delete(query=tid)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT, content=deleted_count)
 
@@ -109,19 +110,21 @@ async def template_delete(tid: str, task_templates_service: TaskTemplateServiceD
 
 @router.get('', operation_id='tasks_list')
 async def tasks_list(
-        params: Annotated[TaskListQueryParams, Query()], task_service: TaskServiceDependency
+    params: Annotated[TaskListQueryParams, Query()], task_service: Annotated[TaskService, Depends(get_task_service)]
 ) -> PaginatedResponse[TaskListResponseSchema]:
     task_list: PaginatedResponse[TaskListResponseSchema] = await task_service.get_list_paginated(
-        page=params.page, per_page=params.per_page, projection_schema=TaskListResponseSchema
+        query={}, limit=params.per_page, skip=params.page * params.per_page, projection_model=TaskListResponseSchema
     )
 
     return task_list
 
 
 @router.post('', operation_id='task_create')
-async def task_create(item: TaskCreateFromTemplateSchema, task_service: TaskServiceDependency) -> TaskSchema:
+async def task_create(
+    item: TaskCreateFromTemplateSchema, task_service: Annotated[TaskService, Depends(get_task_service)]
+) -> TaskModel:
     try:
-        task: TaskSchema = await task_service.create_obj(obj_data=item)
+        task: TaskModel = await task_service.create(data=item)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
@@ -129,9 +132,9 @@ async def task_create(item: TaskCreateFromTemplateSchema, task_service: TaskServ
 
 
 @router.get('/{tid}', operation_id='task_retrieve')
-async def task_retrieve(tid: str, task_service: TaskServiceDependency) -> TaskSchema:
+async def task_retrieve(tid: PyObjectId, task_service: Annotated[TaskService, Depends(get_task_service)]) -> TaskModel:
     try:
-        task: TaskSchema = await task_service.get_obj(obj_id=tid, projection_schema=TaskSchema)
+        task: TaskModel = await task_service.get(query=tid)
     except ObjectDoesNotExistError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task does not found') from e
 
@@ -140,14 +143,12 @@ async def task_retrieve(tid: str, task_service: TaskServiceDependency) -> TaskSc
 
 @router.get('/{tid}/jobs', operation_id='task_jobs')
 async def task_jobs(
-        tid: str,
-        task_service: TaskServiceDependency,
-        job_service: JobServiceDependency
+    tid: PyObjectId, task_service: Annotated[TaskService, Depends(get_task_service)], job_service: JobServiceDependency
 ) -> list[Job]:
     result: list[Job] = []
 
     try:
-        task: TaskSchema = await task_service.get_obj(obj_id=tid)
+        task: TaskModel = await task_service.get(query=tid)
 
         for task_job in task.jobs:
             try:
@@ -163,14 +164,12 @@ async def task_jobs(
 
 @router.get('/{tid}/returns', operation_id='task_returns')
 async def task_returns(
-        tid: str,
-        task_service: TaskServiceDependency,
-        job_service: JobServiceDependency
+    tid: PyObjectId, task_service: Annotated[TaskService, Depends(get_task_service)], job_service: JobServiceDependency
 ) -> list[JobResult]:
     result: list[JobResult] = []
 
     try:
-        task: TaskSchema = await task_service.get_obj(obj_id=tid, projection_schema=TaskSchema)
+        task: TaskModel = await task_service.get(query=tid)
 
         for task_job in task.jobs:
             try:
@@ -185,9 +184,11 @@ async def task_returns(
 
 
 @router.post('/{tid}/run', operation_id='task_run')
-async def task_run(task_lifespan_service: TaskServiceLifespanDependency) -> TaskSchema:
+async def task_run(
+    task_lifespan_service: Annotated[TaskLifespanService, Depends(get_task_lifespan_service)],
+) -> TaskModel:
     try:
-        task: TaskSchema = await task_lifespan_service.get_task()
+        task: TaskModel = await task_lifespan_service.get_task()
     except ObjectDoesNotExistError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task not found') from e
 
@@ -197,9 +198,11 @@ async def task_run(task_lifespan_service: TaskServiceLifespanDependency) -> Task
 
 
 @router.post('/{tid}/stop', operation_id='task_stop')
-async def task_stop(task_lifespan_service: TaskServiceLifespanDependency) -> TaskSchema:
+async def task_stop(
+    task_lifespan_service: Annotated[TaskLifespanService, Depends(get_task_lifespan_service)],
+) -> TaskModel:
     try:
-        task: TaskSchema = await task_lifespan_service.get_task()
+        task: TaskModel = await task_lifespan_service.get_task()
     except ObjectDoesNotExistError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task not found') from e
 
@@ -211,34 +214,35 @@ async def task_stop(task_lifespan_service: TaskServiceLifespanDependency) -> Tas
 @ws_router.websocket('')
 async def tasks_websocket(websocket: WebSocket, rdb: RedisDependency) -> None:
     secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
-    await secure_websocket.handle_pubsub({
-        'task:*:create': TaskSchema,
-        'task:*:update': TaskSchema,
-    })
+    await secure_websocket.handle_pubsub(
+        {
+            'task:*:create': TaskModel,
+            'task:*:update': TaskModel,
+        }
+    )
 
 
 @ws_router.websocket('/{tid}')
 async def task_websocket(
-    tid: str,
+    tid: PyObjectId,
     websocket: WebSocket,
     rdb: RedisDependency,
-    task_service: TaskServiceDependency
+    task_service: Annotated[TaskService, Depends(get_task_service)],
 ) -> None:
-    task: TaskSchema = await task_service.get_obj(obj_id=tid, projection_schema=TaskSchema)
+    task: TaskModel = await task_service.get(query=tid)
 
     if not task:
         msg = f'Task not found by ID={tid}'
         raise http_errors.WebSocketPolicyViolation(msg)
 
-    def job_new_handler(data) -> str:
-        return Job(**{
-            'status': Job.JobStatus.started,
-            **data
-        }).model_dump_json(by_alias=True)
+    def job_new_handler(data: dict) -> str:
+        return Job(**{'status': Job.JobStatus.started, **data}).model_dump_json(by_alias=True)
 
     secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
-    await secure_websocket.handle_pubsub({
-        f'task:{tid}:job:*:return': JobResult,
-        f'task:{tid}:job:*:new': job_new_handler,
-        f'task:{tid}:update': TaskSchema,
-    })
+    await secure_websocket.handle_pubsub(
+        {
+            f'task:{tid}:job:*:return': JobResult,
+            f'task:{tid}:job:*:new': job_new_handler,
+            f'task:{tid}:update': TaskModel,
+        }
+    )

@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from inspect import isclass
 from typing import Any, Generic, TypeVar, overload
 
 from pydantic import BaseModel
@@ -6,9 +7,14 @@ from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.asynchronous.database import AsyncDatabase
 from pymongo.errors import DuplicateKeyError as MongoDuplicateKeyError
 
-# from fastms_core.config import logger
 from fastms_core.db.abc_repository import AbstractRepository
-from fastms_core.db.exceptions import DuplicateKeyError, ObjectCreateError, ObjectNotFoundError, ObjectUpdateError
+from fastms_core.db.exceptions import (
+    DuplicateKeyError,
+    MultipleObjectsFoundError,
+    ObjectCreateError,
+    ObjectNotFoundError,
+    ObjectUpdateError,
+)
 from fastms_core.db.mongo.schemas_base import PyObjectId
 
 T = TypeVar('T', bound=BaseModel)
@@ -19,6 +25,8 @@ ModelType = TypeVar('ModelType', bound=BaseModel)
 class BaseMongoRepository(AbstractRepository[T], Generic[T]):
     class Meta:
         collection_name: str
+        auto_now_add_fields: list[str]
+        auto_now_fields: list[str]
 
     def __init__(self, database: AsyncDatabase):
         super().__init__()
@@ -37,11 +45,22 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
         if not self.Meta.collection_name:
             msg = 'Meta should contain `collection_name`'
             raise Exception(msg)
+        if hasattr(self.Meta, 'auto_now_add_fields') and self.Meta.auto_now_add_fields:
+            for field in self.Meta.auto_now_add_fields:
+                if field not in self.default_model.model_fields:
+                    msg = f'Meta `auto_now_add_fields` `{field}` should be in model fields'
+                    raise Exception(msg.format(field, self.Meta.collection_name))
+        if hasattr(self.Meta, 'auto_now_fields') and self.Meta.auto_now_fields:
+            for field in self.Meta.auto_now_fields:
+                if field not in self.default_model.model_fields:
+                    msg = f'Meta `auto_now_add_fields` `{field}` should be in model fields'
+                    raise Exception(msg.format(field, self.Meta.collection_name))
 
-    def _get_projection_from_model(self, model: type[ProjectionModel]) -> dict[str, Any]:
+    @staticmethod
+    def _get_projection_from_model(model: type[ProjectionModel]) -> dict[str, Any]:
         projection = {}
         for field_name, field in model.model_fields.items():
-            if field.annotation and issubclass(field.annotation, BaseModel):
+            if field.annotation and isclass(field.annotation) and issubclass(field.annotation, BaseModel):
                 sub_model = field.annotation
                 for sub_field_name in sub_model.model_fields:
                     projection[f'{field_name}.{sub_field_name}'] = 1
@@ -51,27 +70,40 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
         return projection
 
     @overload
-    async def find_one(self, query: dict[str, Any]) -> T: ...
+    async def get(self, query: PyObjectId | dict[str, Any]) -> T: ...
 
     @overload
-    async def find_one(self, query: dict[str, Any], projection_model: type[ProjectionModel]) -> ProjectionModel: ...
+    async def get(
+        self, query: PyObjectId | dict[str, Any], projection_model: type[ProjectionModel]
+    ) -> ProjectionModel: ...
 
-    async def find_one(
-        self, query: dict[str, Any], projection_model: type[ProjectionModel] | None = None
-    ) -> T | ProjectionModel | None:
+    async def get(
+        self, query: PyObjectId | dict[str, Any], projection_model: type[ProjectionModel] | None = None
+    ) -> ProjectionModel | T:
         projection = self._get_projection_from_model(projection_model) if projection_model else None
 
-        doc = await self.collection.find_one(filter=query, projection=projection)
-        if not doc:
-            return None
+        if isinstance(query, PyObjectId):
+            query = {'_id': query}
 
-        return projection_model.model_validate(doc) if projection_model else self.default_model.model_validate(doc)
+        result = await self.collection.find(filter=query, projection=projection).to_list()
+
+        if len(result) == 0:
+            raise ObjectNotFoundError
+        elif len(result) > 1:
+            raise MultipleObjectsFoundError
+
+        data = result[0]
+
+        if projection_model is not None:
+            return projection_model.model_validate(data)
+        else:
+            return self.default_model.model_validate(data)
 
     @overload
-    async def find_all(self, query: dict[str, Any] | None, limit: int, skip: int) -> list[T]: ...
+    async def get_list(self, query: dict[str, Any] | None, limit: int, skip: int) -> list[T]: ...
 
     @overload
-    async def find_all(
+    async def get_list(
         self,
         query: dict[str, Any] | None,
         limit: int,
@@ -79,7 +111,7 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
         projection_model: type[ProjectionModel],
     ) -> list[ProjectionModel]: ...
 
-    async def find_all(
+    async def get_list(
         self,
         query: dict[str, Any] | None = None,
         limit: int = 0,
@@ -98,45 +130,91 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
         query = query or {}
         return await self.collection.count_documents(query)
 
-    async def create(self, document: ModelType | dict[str, Any]) -> T:
-        if isinstance(document, BaseModel):
-            document = document.model_dump(exclude={'id'})  # probably don't need to exclude id
+    async def exists(self, query: dict[str, Any]) -> bool:
+        return await self.collection.count_documents(query, limit=1) == 1
 
-        # TODO (a.baikov): Move fields in Meta
-        if 'created' in self.default_model.model_fields:
-            document['created'] = datetime.now(UTC)
-        if 'modified' in self.default_model.model_fields:
-            document['modified'] = datetime.now(UTC)
+    @overload
+    async def create(self, data: ModelType | dict[str, Any]) -> T: ...
+
+    @overload
+    async def create(
+        self, data: ModelType | dict[str, Any], projection_model: type[ProjectionModel]
+    ) -> ProjectionModel: ...
+
+    async def create(
+        self,
+        data: ModelType | dict[str, Any],
+        projection_model: type[ProjectionModel] | None = None,
+    ) -> T | ProjectionModel:
+        if isinstance(data, BaseModel):
+            data = data.model_dump(exclude={'id'})  # probably don't need to exclude id
+
+        if hasattr(self.Meta, 'auto_now_add_fields') and self.Meta.auto_now_add_fields:
+            for field in self.Meta.auto_now_add_fields:
+                data[field] = datetime.now(UTC)
+        if hasattr(self.Meta, 'auto_now_fields') and self.Meta.auto_now_fields:
+            for field in self.Meta.auto_now_fields:
+                data[field] = datetime.now(UTC)
 
         try:
-            result = await self.collection.insert_one(document)
+            result = await self.collection.insert_one(data)
         except MongoDuplicateKeyError as e:
             raise DuplicateKeyError from e
 
         if not result.inserted_id:
             raise ObjectCreateError
 
-        created = await self.collection.find_one({'_id': result.inserted_id})
-        return self.default_model.model_validate(created)
+        if projection_model:
+            return await self.get(PyObjectId(result.inserted_id), projection_model=projection_model)
+        else:
+            return await self.get(PyObjectId(result.inserted_id))
 
-    async def update(self, query: dict[str, Any], document: ModelType | dict[str, Any]) -> T:
-        if isinstance(document, BaseModel):
-            document = document.model_dump(exclude={'id'}, exclude_unset=True)
+    @overload
+    async def update(self, query: PyObjectId | dict[str, Any], data: ModelType | dict[str, Any]) -> T: ...
 
-        if 'modified' in self.default_model.model_fields:
-            document['modified'] = datetime.now(UTC)
+    @overload
+    async def update(
+        self,
+        query: PyObjectId | dict[str, Any],
+        data: ModelType | dict[str, Any],
+        projection_model: type[ProjectionModel],
+    ) -> ProjectionModel: ...
 
-        result = await self.collection.update_one(query, {'$set': document}, upsert=False)
+    async def update(
+        self,
+        query: PyObjectId | dict[str, Any],
+        data: ModelType | dict[str, Any],
+        projection_model: type[ProjectionModel] | None = None,
+    ) -> T | ProjectionModel:
+        if isinstance(query, PyObjectId):
+            query = {'_id': query}
+
+        if isinstance(data, BaseModel):
+            data = data.model_dump(exclude={'id'}, exclude_unset=True)
+
+        if hasattr(self.Meta, 'auto_now_fields') and self.Meta.auto_now_fields:
+            for field in self.Meta.auto_now_fields:
+                data[field] = datetime.now(UTC)
+
+        result = await self.collection.update_one(query, {'$set': data}, upsert=False)
         if result.modified_count == 0:
             raise ObjectUpdateError
 
-        updated = await self.find_one(query)
-        return updated
+        if projection_model:
+            return await self.get(query, projection_model=projection_model)
+        else:
+            return await self.get(query)
 
-    async def delete(self, id: PyObjectId) -> int:
-        exist = await self.count({'_id': id})
-        if not exist:
+    async def delete(self, query: PyObjectId | dict[str, Any]) -> int:
+        if isinstance(query, PyObjectId):
+            query = {'_id': query}
+
+        count = await self.count(query)
+
+        if count == 0:
             raise ObjectNotFoundError
+        elif count > 1:
+            raise MultipleObjectsFoundError
 
-        result = await self.collection.delete_one({'_id': id})
+        result = await self.collection.delete_one(query)
         return result.deleted_count

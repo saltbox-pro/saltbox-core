@@ -4,10 +4,15 @@ import logging.config
 from redis import asyncio as aioredis
 
 from fastms_core.config import LOG_CONFIG, SETTINGS
+from fastms_core.db.mongo.config import get_mongo_db
 from fastms_core.db.mongo.init_db import init_mongo_db
 from fastms_core.jobs.services import JobService
-from fastms_core.tasks.schemas import TaskSchema
-from fastms_core.tasks.services import TaskLifespanService, TaskService, TaskTemplateService
+from fastms_core.tasks.repositories.task_repository import TaskRepository
+from fastms_core.tasks.repositories.task_template_repository import TaskTemplateRepository
+from fastms_core.tasks.schemas.task_schemas import TaskModel, TaskStatus
+from fastms_core.tasks.services.tasks import TaskService
+from fastms_core.tasks.services.tasks_lifespan import TaskLifespanService
+from fastms_core.tasks.services.tasks_templates import TaskTemplateService
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
@@ -17,6 +22,10 @@ logger = logging.getLogger(__name__)
 class TasksWatcher:
     def __init__(self) -> None:
         self.redis: aioredis.Redis | None = None
+        self.db = get_mongo_db()
+
+        self.task_repository: TaskRepository = TaskRepository(self.db)
+        self.task_template_repository: TaskTemplateRepository = TaskTemplateRepository(self.db)
 
     async def get_redis(self) -> aioredis.Redis:
         if self.redis is None:
@@ -28,29 +37,22 @@ class TasksWatcher:
         redis = await self.get_redis()
 
         job_service = JobService(rdb=redis)
-        task_template_service = TaskTemplateService(rdb=redis)
-        task_service = TaskService(rdb=redis, task_template_service=task_template_service)
+        task_template_service = TaskTemplateService(repo=self.task_template_repository, rdb=redis)
+        task_service = TaskService(repo=self.task_repository, rdb=redis, task_template_service=task_template_service)
 
         while True:
-
-            tasks: list[TaskSchema] = await task_service.get_list(
-                query={'status': TaskSchema.TaskStatus.running},
-                projection_schema=TaskSchema
-            )
+            tasks: list[TaskModel] = await task_service.get_list(query={'status': TaskStatus.running}, limit=0, skip=0)
 
             for task in tasks:
                 task_lifespan_service = TaskLifespanService(
-                    rdb=redis,
-                    task_service=task_service,
-                    job_service=job_service,
-                    task=task
+                    rdb=redis, task_service=task_service, job_service=job_service, task=task
                 )
-                await task_lifespan_service.process()  # TODO: move to celery task
+                await task_lifespan_service.process()  # TODO (i.moshkov): move to celery task
 
             await asyncio.sleep(1)
 
 
-async def async_main():
+async def async_main() -> None:
     await init_mongo_db()
     watcher = TasksWatcher()
 
