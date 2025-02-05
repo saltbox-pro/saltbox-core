@@ -1,8 +1,9 @@
 from typing import Annotated, Any
 
 from fastapi import Depends
+from pymongo.errors import OperationFailure
 
-from fastms_core.db.exceptions import ObjectNotFoundError
+from fastms_core.db.exceptions import ObjectNotFoundError, PiplineBuilderError
 from fastms_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId
 from fastms_core.minion_collections.repositories.minion_repository import MinionRepository, get_minion_repository
 from fastms_core.minion_collections.schemas.minion_schemas import (
@@ -55,8 +56,12 @@ class MinionService:
         return await self.repo.find_all(query, skip=0, limit=0, projection_model=MinionIDs)
 
     async def minion_pipeline(self, pipeline: list[dict]) -> list:
-        cursor = await self.repo.collection.aggregate(pipeline)
-        return await cursor.to_list()
+        try:
+            cursor = await self.repo.collection.aggregate(pipeline)
+            return await cursor.to_list()
+        except OperationFailure as e:
+            msg = f'Error during pipeline execution: {e}'
+            raise PiplineBuilderError(msg) from e
 
 
 def get_minion_service(

@@ -35,3 +35,6 @@ class ObjectUpdateError(RepositoryError):
     def __init__(self, detail: str = 'Object not updated') -> None:
         self.detail = detail
         super().__init__(self.detail)
+
+
+class PiplineBuilderError(RepositoryError): ...
