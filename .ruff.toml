@@ -1,6 +1,6 @@
 target-version = 'py312'
 line-length = 120
-src = ['fastms_core', 'tests']
+src = ['salt_box_core', 'tests']
 extend-exclude = ['docs', 'env', '__pycache__', '*.egg', 'htmlcov']
 respect-gitignore = true
 unsafe-fixes = false
@@ -58,7 +58,7 @@ convention = 'google'
 
 [lint.isort]
 known-first-party = [
-    'fastms_core',
+    'salt_box_core',
     'tests',
 ]
 

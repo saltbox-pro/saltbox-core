@@ -17,11 +17,11 @@ pytest -sv
 ```
 
 
-### Missing `fastms_core` modules
+### Missing `salt_box_core` modules
 
 In order to solve the following issue:
 ```
-ModuleNotFoundError: No module named 'fastms_core'
+ModuleNotFoundError: No module named 'salt_box_core'
 ```
 
 install the salt.box core as adviced in `README.md` or extend the `PYTHONPATH`:

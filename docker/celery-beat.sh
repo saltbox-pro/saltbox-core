@@ -2,7 +2,7 @@
 # shellcheck source=./shell_init.sh
 . /etc/shell_init.sh
 
-application=fastms_core.celery
+application=salt_box_core.celery
 
 [ -n "$1" ] && err "Unknown arg \"$1\""
 

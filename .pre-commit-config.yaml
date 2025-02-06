@@ -18,9 +18,9 @@ repos:
     rev: v0.9.4
     hooks:
       - id: ruff
-        files: "^fastms_core/"
+        files: "^salt_box_core/"
       - id: ruff
         args: ["check", "--select", "I", "--fix"]
-        files: "^fastms_core/"
+        files: "^salt_box_core/"
       - id: ruff-format
-        files: "^fastms_core/"
+        files: "^salt_box_core/"

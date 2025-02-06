@@ -10,7 +10,7 @@ case $1 in
   *) echo "unknown command \"$1\"" && exit 1 ;;
 esac
 
-cmd='uvicorn fastms_core.main:APP'
+cmd='uvicorn salt_box_core.main:APP'
 cmd="$cmd --host=0.0.0.0 --port=8000 --root-path='${BASE_URL_ROOT_PATH}'"
 cmd="$cmd --timeout-graceful-shutdown='${TIMEOUT_GRACEFUL_SHUTDOWN}'"
 cmd="$cmd $extra_args"

@@ -50,7 +50,7 @@ Build autotests image for branch:
 #   before_script:
 #     pip3 install -e .[dev]
 #   script:
-#     flake8 fastms_core
+#     flake8 salt_box_core
 #   cache:
 #     paths:
 #       - '.cache/pip/'
@@ -62,7 +62,7 @@ Ruff:
   before_script:
     pip3 install -e .[dev]
   script:
-    ruff check --select I fastms_core # --fix
+    ruff check --select I salt_box_core # --fix
   cache:
     paths:
       - '.cache/pip/'
@@ -74,7 +74,7 @@ Mypy:
   before_script:
     pip3 install -e .[dev]
   script:
-    mypy fastms_core
+    mypy salt_box_core
   cache:
     paths:
       - '.cache/pip/'
