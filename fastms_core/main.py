@@ -1,11 +1,10 @@
-import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from fastms_core.config import APP_NAME, SETTINGS
+from fastms_core.config import APP_NAME, SETTINGS, logger
 from fastms_core.db.mongo.init_db import init_mongo_db
 from fastms_core.db.redis import POOL
 from fastms_core.jobs.router import router as jobs_router
@@ -16,8 +15,6 @@ from fastms_core.minion_collections.routers.minion_router import router as minio
 from fastms_core.tasks.router import router as task_router
 from fastms_core.tasks.router import ws_router as task_ws_router
 
-LOGGER = logging.getLogger(__name__)
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator:
@@ -27,20 +24,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator:
     await POOL.aclose()  # type: ignore[attr-defined]
 
 
-def _get_app() -> ...:
+def _get_app() -> FastAPI:
     try:
         from fastapi_offline import FastAPIOffline
 
-        LOGGER.info('Using fastapi_offline to provide extra static')
+        app_t: FastAPI = FastAPIOffline(title=APP_NAME, lifespan=lifespan)
+        logger.info('Using fastapi_offline to provide extra static')
     except ModuleNotFoundError:
-        from fastapi import FastAPI
+        app_t = FastAPI(title=APP_NAME, lifespan=lifespan)
+        logger.warning('fastapi_offline not found')
 
-        app_t = FastAPI
-        LOGGER.warning('fastapi_offline not found')
-    else:
-        app_t = FastAPIOffline
-    finally:
-        return app_t(title=APP_NAME, lifespan=lifespan)
+    return app_t
 
 
 APP = _get_app()

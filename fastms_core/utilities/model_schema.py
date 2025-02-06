@@ -87,6 +87,7 @@ schema_input_type_map = {
     bool: 'checkbox',
     PyObjectId: 'text',
     UUID: 'text',
+    # datetime: 'datetime-local',
     datetime: 'date',
 }
 

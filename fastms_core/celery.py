@@ -1,18 +1,19 @@
 from datetime import UTC, timedelta
+from typing import Any, ClassVar
 
-from celery import Celery
+from celery import Celery  # type: ignore[import-untyped]
 from fastms_core.config import APP_NAME, SETTINGS
 
 
 class CeleryConfig:
-    accept_content = ['json']
-    beat_schedule = {}
+    accept_content: ClassVar[list[str]] = ['json']
+    beat_schedule: ClassVar[dict] = {}
     beat_schedule_filename = SETTINGS.celery_beat_schedule_filename
     broker_connection_retry_on_startup = True
     broker_url = SETTINGS.celery_broker_url
     enable_utc = True
     result_expires = timedelta(minutes=60)
-    # TODO May be useful to pass tests.
+    # TODO (a.karmanov): May be useful to pass tests.
     # task_always_eager = True
     task_create_missing_queues = True
     task_default_exchange = 'tasks'
@@ -22,8 +23,8 @@ class CeleryConfig:
     task_default_routing_key = 'def.other'
     task_ignore_result = False
     task_queue_max_priority = 10
-    task_queues = None
-    task_routes = {}
+    task_queues: Any = None
+    task_routes: ClassVar[dict] = {}
     task_serializer = 'json'
     timezone = UTC
     worker_pool_restarts = True

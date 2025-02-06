@@ -1,7 +1,7 @@
 import json
 from typing import Any, ClassVar
 
-from fastms_core.minion_collections.schemas.collection_schemas import MinionCollectionSchema
+from fastms_core.minion_collections.schemas.collection_schemas import CollectionModel
 
 
 class MongoQueryToSaltTgtConverterUnknownKey(Exception):
@@ -54,7 +54,7 @@ class MongoQueryToSaltTgtConverter:
     }
 
     @classmethod
-    def convert_from_minions_collection_obj(cls, minions_collection_obj: MinionCollectionSchema) -> str:
+    def convert_from_minions_collection_obj(cls, minions_collection_obj: CollectionModel) -> str:
         return cls.__convert_to_tgt(query_dict=minions_collection_obj.query)
 
     @classmethod
@@ -77,7 +77,7 @@ class MongoQueryToSaltTgtConverter:
                     group_result_list.append(process(data=item, comparison_op=group_op))
 
                 if len(group_result_list) > 1:
-                    return f'( {f' {cls.QUERY_TO_TGT_CONTAINS_OPERATORS_MAP[group_op]} '.join(group_result_list)} )'
+                    return f'( {f" {cls.QUERY_TO_TGT_CONTAINS_OPERATORS_MAP[group_op]} ".join(group_result_list)} )'
 
                 return group_result_list[0]
 
@@ -107,14 +107,14 @@ class MongoQueryToSaltTgtConverter:
                         return f'not {process_key(query_key=item_key)}:{process_value(query_item_value)}'
                     if query_op == cls.QUERY_REGEX_OPERATOR:
                         return (
-                            f'{process_key(query_key=item_key, tgt_type_letter='P')}:{process_value(query_item_value)}'
+                            f'{process_key(query_key=item_key, tgt_type_letter="P")}:{process_value(query_item_value)}'
                         )
                     if query_op in [cls.QUERY_IN_OPERATOR, cls.QUERY_NOT_IN_OPERATOR]:
                         if not isinstance(query_item_value, list):
                             raise MongoQueryToSaltTgtConverterInvalidValue()
 
                         query_item_value = '|'.join(map(str, query_item_value))
-                        tgt_str = f'{process_key(query_key=item_key, tgt_type_letter='P')}:({query_item_value})'
+                        tgt_str = f'{process_key(query_key=item_key, tgt_type_letter="P")}:({query_item_value})'
 
                         if query_op == cls.QUERY_NOT_IN_OPERATOR:
                             tgt_str = f'not {tgt_str}'
@@ -129,7 +129,7 @@ class MongoQueryToSaltTgtConverter:
 
                         query_item_value = query_item_value[cls.QUERY_REGEX_OPERATOR]
 
-                        return f'not {process_key(query_key=item_key, tgt_type_letter='P')}:{query_item_value}'
+                        return f'not {process_key(query_key=item_key, tgt_type_letter="P")}:{query_item_value}'
 
                     raise MongoQueryToSaltTgtConverterInvalidValue()
                 else:

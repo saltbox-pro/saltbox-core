@@ -83,7 +83,7 @@ async def minion_retrieve(
         logger.error('Error: %s', e)
         raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
 
-    ids = await minion_service.get_ids_by_query(query=collection.query)
+    ids = await minion_service.get_ids_by_query(query=recursive_replace_dates(collection.query))
     if id not in [i.id for i in ids]:
         raise HTTPException(status_code=404, detail='Minion not found')
 

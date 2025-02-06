@@ -43,9 +43,9 @@ ws_router = APIRouter(prefix='/jobs')
 
 @router.get('', operation_id='jobs_list')
 async def jobs_list(
-        job_service: JobServiceDependency,
-        start_datetime: pydantic.PastDatetime,
-        end_datetime: datetime.datetime | None = None
+    job_service: JobServiceDependency,
+    start_datetime: pydantic.PastDatetime,
+    end_datetime: datetime.datetime | None = None,
 ) -> list[Job]:
     try:
         jobs: list[Job] = await job_service.get_jobs(start_datetime=start_datetime, end_datetime=end_datetime)
@@ -72,10 +72,14 @@ async def job_retrieve(jid: IntJid, job_service: JobServiceDependency) -> Job:
 @router.post('', operation_id='job_create')
 async def job_create(item: CreateJobRequest, job_service: JobServiceDependency) -> CreateJobResponse:
     try:
-        jid: JID = await job_service.create_job(JobCreate.model_validate({
-            **item.model_dump(),
-            'salt_master': 'salt-master'  # TODO: get salt master from request
-        }))
+        jid: JID = await job_service.create_job(
+            JobCreate.model_validate(
+                {
+                    **item.model_dump(),
+                    'salt_master': 'salt-master',  # TODO (i.moshkov): get salt master from request
+                }
+            )
+        )
 
         return CreateJobResponse.model_validate({'jid': str(jid)})
     except JobCreateException as error:
@@ -113,14 +117,10 @@ async def job_returns_list(
     return GetJobReturnResponse(cursor=next_cursor, result=job_returns, length=len(job_returns))
 
 
-# TODO Use https://github.com/encode/broadcaster if need broadcasts
 @ws_router.websocket('')
 async def jobs_rets_websocket(websocket: WebSocket, rdb: RedisDependency) -> None:
-    def job_new_handler(data):
-        return Job(**{
-            'status': Job.JobStatus.started,
-            **data
-        }).model_dump_json(by_alias=True)
+    def job_new_handler(data: dict) -> str:
+        return Job(**{'status': Job.JobStatus.started, **data}).model_dump_json(by_alias=True)
 
     secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
     await secure_websocket.handle_pubsub({'job:*:new': job_new_handler})
