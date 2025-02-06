@@ -1,7 +1,7 @@
 from datetime import UTC, timedelta
 from typing import Any, ClassVar
 
-from celery import Celery  # type: ignore[import-untyped]
+from celery import Celery
 from salt_box_core.config import APP_NAME, SETTINGS
 
 

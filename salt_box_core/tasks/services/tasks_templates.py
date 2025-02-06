@@ -4,7 +4,10 @@ from typing import Annotated, Any
 from fastapi import Depends
 
 from salt_box_core.db.redis import RedisDependency
-from salt_box_core.tasks.repositories.task_template_repository import TaskTemplateRepository, get_task_template_repository
+from salt_box_core.tasks.repositories.task_template_repository import (
+    TaskTemplateRepository,
+    get_task_template_repository,
+)
 from salt_box_core.tasks.schemas.task_template_schemas import (
     TaskTemplateCreateSchema,
     TaskTemplateModel,
