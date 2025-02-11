@@ -13,6 +13,7 @@ from salt_box_core.minion_collections.services.authz import MinionCollectionAuth
 from salt_box_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from salt_box_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from salt_box_core.minion_collections.services.pipeline_builder import MongoPiplineBuilder
+from salt_box_core.utilities.helpers import recursive_replace_dates
 from salt_box_core.utilities.model_schema import get_model_schema
 
 router = APIRouter(prefix='/filters', tags=['Filters'])
@@ -51,7 +52,7 @@ async def unique_field_values(
 
     query = {'$and': [collection.query, body.query]}
 
-    pipline_builder = MongoPiplineBuilder(body.field, query)
+    pipline_builder = MongoPiplineBuilder(body.field, recursive_replace_dates(query))
     pipline = pipline_builder.build()
 
     try:
