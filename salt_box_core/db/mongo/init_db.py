@@ -4,6 +4,23 @@ from salt_box_core.config import logger
 from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.minion_collections.repositories.collection_repository import CollectionRepository
 from salt_box_core.minion_collections.schemas.collection_schemas import CollectionCreateSchema
+from salt_box_core.schema_sync.repository import JSONSchemaRepository
+
+
+async def init_json_schemas() -> None:
+    db = get_mongo_db()
+    json_schemas_repo = JSONSchemaRepository(db)
+
+    # Check existing indexes
+    indexes = sorted(await json_schemas_repo.collection.index_information())
+
+    # Create unique index for name if not exists
+    if 'name_unique_index_text' not in indexes:
+        result = await json_schemas_repo.collection.create_index(
+            [('name', pymongo.TEXT)], name='name_unique_index_text', unique=True
+        )
+        logger.debug('Index created: %s', result)
+        logger.debug('Indexes: %s', indexes)
 
 
 async def init_collections() -> None:
@@ -40,3 +57,7 @@ async def init_mongo_db() -> None:
     # Initialize minion_collections collection
     await init_collections()
     logger.info('MongoDB collections initialized')
+
+    # Initialize json_schemas collection
+    await init_json_schemas()
+    logger.info('JSON schemas initialized')

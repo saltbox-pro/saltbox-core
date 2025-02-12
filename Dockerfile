@@ -33,7 +33,7 @@ RUN \
 set -e
 mkdir --parents /var/cache/apt/archives/partial/ /var/lib/apt/lists/partial/
 apt-get update
-apt-get install -y glibc-pthread python3-module-pip
+apt-get install -y glibc-pthread python3-module-pip git
 EOF
 
 ## Outer dependencies
