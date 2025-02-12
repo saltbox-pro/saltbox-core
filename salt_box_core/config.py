@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     keycloak_algorithm: str = 'RS256'
     keycloak_client: str
     opa_url: str
+    salt_func_repo_url: str = 'https://dev.altlab.su/a.baikov/salt-func-schemas.git'
+    salt_func_local_repo_name: str = 'salt-func-schemas'
+    local_repos_path: str = './repos'
 
     model_config = SettingsConfigDict(env_file='.env')
 

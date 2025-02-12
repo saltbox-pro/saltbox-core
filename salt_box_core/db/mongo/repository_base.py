@@ -218,3 +218,7 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
 
         result = await self.collection.delete_one(query)
         return result.deleted_count
+
+    async def delete_many(self, query: dict[str, Any]) -> int:
+        result = await self.collection.delete_many(query)
+        return result.deleted_count
