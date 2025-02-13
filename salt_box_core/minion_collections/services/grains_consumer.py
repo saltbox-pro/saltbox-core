@@ -31,8 +31,7 @@ class GrainsConsumer:
         }
 
         if data:
-            exist = await self.repository.get({'minion_id': minion_id})
-            if exist:
+            if await self.repository.exists({'minion_id': minion_id}):
                 await self.repository.update({'minion_id': minion_id}, MinionUpdateSchema(**minion_obj))
             else:
                 await self.repository.create(MinionCreateSchema(**minion_obj))
