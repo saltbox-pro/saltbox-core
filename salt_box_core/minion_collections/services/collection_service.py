@@ -1,9 +1,8 @@
-from typing import Annotated, Any
+from typing import Annotated
 
 from fastapi import Depends
 
 from salt_box_core.db.exceptions import ObjectNotFoundError
-from salt_box_core.db.mongo.schemas_base import PaginatedResponse
 from salt_box_core.minion_collections.repositories.collection_repository import (
     CollectionRepository,
     get_collection_repository,
@@ -13,11 +12,12 @@ from salt_box_core.minion_collections.schemas.collection_schemas import (
     CollectionModel,
     CollectionUpdateSchema,
 )
+from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService
 
 
-class CollectionService:
-    def __init__(self, repo: CollectionRepository):
-        self.repo = repo
+class CollectionService(MongoBaseService[
+    CollectionRepository, CollectionModel, CollectionCreateSchema, CollectionUpdateSchema
+]):
 
     async def get_by_slug(self, slug: str) -> CollectionModel:
         document = await self.repo.get({'slug': slug})
@@ -29,18 +29,8 @@ class CollectionService:
     async def get_by_slug_or_none(self, slug: str) -> CollectionModel | None:
         return await self.repo.get({'slug': slug})
 
-    async def create(self, document: CollectionCreateSchema) -> CollectionModel:
-        return await self.repo.create(document)
-
-    async def get_list_paginated(
-        self, query: dict[str, Any] | None = None, limit: int = 0, skip: int = 0
-    ) -> PaginatedResponse[CollectionModel]:
-        total = await self.repo.count(query)
-        docs = await self.repo.get_list(query, limit=limit, skip=skip)
-        return PaginatedResponse[CollectionModel](total=total, data=docs)
-
-    async def update(self, slug: str, document: CollectionUpdateSchema) -> CollectionModel:
-        result = await self.repo.update({'slug': slug}, document)
+    async def update_by_slug(self, slug: str, data: CollectionUpdateSchema) -> CollectionModel:
+        result = await self.update({'slug': slug}, data)
         return result
 
 

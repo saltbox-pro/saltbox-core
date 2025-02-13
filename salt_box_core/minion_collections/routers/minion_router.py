@@ -47,7 +47,9 @@ async def minions_list(
     try:
         collection = await collection_service.get_by_slug(body.collection_slug)
         query = {'$and': [recursive_replace_dates(collection.query), recursive_replace_dates(search)]}
-        resp = await minion_service.get_list_paginated(query=query, skip=body.skip, limit=body.limit)
+        resp = await minion_service.get_list_paginated(
+            query=query, skip=body.skip, limit=body.limit, projection_model=MinionShortSchema
+        )
         return resp
     except ObjectNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from None
@@ -56,10 +58,10 @@ async def minions_list(
         raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
 
 
-@router.get('/{id}')
+@router.get('/{mid}')
 async def minion_retrieve(
     collection_slug: str,
-    id: PyObjectId,
+    mid: PyObjectId,
     authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
     minion_service: Annotated[MinionService, Depends(get_minion_service)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
@@ -84,7 +86,7 @@ async def minion_retrieve(
         raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
 
     ids = await minion_service.get_ids_by_query(query=recursive_replace_dates(collection.query))
-    if id not in [i.id for i in ids]:
+    if mid not in [i.id for i in ids]:
         raise HTTPException(status_code=404, detail='Minion not found')
 
-    return await minion_service.get(id)
+    return await minion_service.get(mid)
