@@ -7,6 +7,10 @@ from salt_box_core.config import LOG_CONFIG, SETTINGS
 from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.db.mongo.init_db import init_mongo_db
 from salt_box_core.jobs.services import JobService
+from salt_box_core.minion_collections.repositories.collection_repository import CollectionRepository
+from salt_box_core.minion_collections.repositories.minion_repository import MinionRepository
+from salt_box_core.minion_collections.services.collection_service import CollectionService
+from salt_box_core.minion_collections.services.minion_service import MinionService
 from salt_box_core.tasks.repositories.task_repository import TaskRepository
 from salt_box_core.tasks.repositories.task_template_repository import TaskTemplateRepository
 from salt_box_core.tasks.schemas.task_schemas import TaskModel, TaskStatus
@@ -24,6 +28,8 @@ class TasksWatcher:
         self.redis: aioredis.Redis | None = None
         self.db = get_mongo_db()
 
+        self.collections_repository: CollectionRepository = CollectionRepository(self.db)
+        self.minions_repository: MinionRepository = MinionRepository(self.db)
         self.task_repository: TaskRepository = TaskRepository(self.db)
         self.task_template_repository: TaskTemplateRepository = TaskTemplateRepository(self.db)
 
@@ -34,18 +40,27 @@ class TasksWatcher:
         return self.redis
 
     async def process(self) -> None:
-        redis = await self.get_redis()
+        redis: aioredis.Redis = await self.get_redis()
 
-        job_service = JobService(rdb=redis)
-        task_template_service = TaskTemplateService(repo=self.task_template_repository, rdb=redis)
-        task_service = TaskService(repo=self.task_repository, rdb=redis, task_template_service=task_template_service)
+        job_service: JobService = JobService(rdb=redis)
+        minion_service: MinionService = MinionService(repo=self.minions_repository)
+        collection_service: CollectionService = CollectionService(repo=self.collections_repository)
+        task_template_service: TaskTemplateService = TaskTemplateService(repo=self.task_template_repository, rdb=redis)
+        task_service: TaskService = TaskService(
+            repo=self.task_repository, rdb=redis, task_template_service=task_template_service
+        )
 
         while True:
             tasks: list[TaskModel] = await task_service.get_list(query={'status': TaskStatus.running}, limit=0, skip=0)
 
             for task in tasks:
                 task_lifespan_service = TaskLifespanService(
-                    rdb=redis, task_service=task_service, job_service=job_service, task=task
+                    rdb=redis,
+                    task_service=task_service,
+                    job_service=job_service,
+                    minion_service=minion_service,
+                    collection_service=collection_service,
+                    task=task,
                 )
                 await task_lifespan_service.process()  # TODO (i.moshkov): move to celery task
 

@@ -11,24 +11,25 @@ from salt_box_core.db.redis import RedisDependency
 from salt_box_core.jobs.exceptions import JobCreateException
 from salt_box_core.jobs.schemas import JobCreate, JobResult
 from salt_box_core.jobs.services import JobService, get_job_service
-from salt_box_core.minion_collections.repositories.collection_repository import CollectionRepository
-from salt_box_core.minion_collections.repositories.minion_repository import MinionRepository
 from salt_box_core.minion_collections.schemas.collection_schemas import CollectionModel
 from salt_box_core.minion_collections.schemas.minion_schemas import MinionModel
+from salt_box_core.minion_collections.services.collection_service import CollectionService, get_collection_service
+from salt_box_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from salt_box_core.tasks.schemas.task_schemas import (
     TaskForceUpdateSchema,
     TaskJob,
     TaskJobReturnStatus,
     TaskJobStatus,
     TaskJobTarget,
+    TaskJobTargetType,
     TaskModel,
     TaskStatus,
-    TaskTgtType,
 )
 from salt_box_core.tasks.services.tasks import TaskService, get_task_service
 from salt_box_core.utilities.exceptions import ServiceError
 from salt_box_core.utilities.helpers import get_now_stamp_str
 from salt_box_core.utilities.jid import JID
+from salt_box_core.utilities.mongo_query_to_salt_tgt_converter import MongoQueryToSaltTgtConverter
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
@@ -41,15 +42,17 @@ class TaskLifespanService:
         rdb: Redis,
         task_service: TaskService,
         job_service: JobService,
+        minion_service: MinionService,
+        collection_service: CollectionService,
         task_id: PyObjectId | None = None,
         task: TaskModel | None = None,
     ):
         self.rdb = rdb
         self.task_service = task_service
         self.job_service = job_service
+        self.minion_service = minion_service
+        self.collection_service = collection_service
         self._mongo_db = get_mongo_db()
-        self.minion_repository = MinionRepository(database=self._mongo_db)
-        self.collections_repository = CollectionRepository(database=self._mongo_db)
 
         if task_id and task:
             msg = "TaskLifespanService can't accept both `task_id` and `task` args at the same time"
@@ -108,36 +111,9 @@ class TaskLifespanService:
 
         return True
 
-    async def __get_task_targeting(self) -> dict[str, list[str]]:
+    async def __build_targets_list_from_dict(self, targets: dict[str, list[str]]) -> list[TaskJobTarget]:
         task: TaskModel = await self.get_task()
-
-        minions: list[MinionModel] = []
-        result: dict[str, list[str]] = {}
-
-        if task.tgt_type == TaskTgtType.minions_list:
-            minions_ids: list[str] = task.tgt_value.split(',')
-            minions = await self.minion_repository.get_list(
-                query={'_id': {'$in': [PyObjectId(minion_id) for minion_id in minions_ids]}}, limit=0, skip=0
-            )
-        elif task.tgt_type == TaskTgtType.minions_collection:
-            collection: CollectionModel | None = await self.collections_repository.get(PyObjectId(task.tgt_value))
-
-            if collection:
-                minions = await self.minion_repository.get_list(query=collection.query, limit=0, skip=0)
-            else:
-                msg = f'Minion collection with id {PyObjectId(task.tgt_value)} not found!'
-                raise ValueError(msg)
-
-        for minion in minions:
-            result.setdefault(minion.master, []).append(minion.minion_id)
-
-        return result
-
-    async def __fill_jobs_queue(self, targets: dict[str, list[str]]) -> None:
-        task: TaskModel = await self.get_task()
-
-        if task.targets_queue is None:
-            task.targets_queue = []
+        result: list[TaskJobTarget] = []
 
         targets_lists: dict[str, list[list[str]]] = {}
         temp_targets_lists: dict[str, list[str]] = {}
@@ -156,11 +132,54 @@ class TaskLifespanService:
 
         for master, targets_list in targets_lists.items():
             for tgt_list in targets_list:
-                task.targets_queue.append(TaskJobTarget(tgt=','.join(tgt_list), master=master))
+                result.append(TaskJobTarget(tgt=','.join(tgt_list), type=TaskJobTargetType.list, master=master))
+
+        return result
+
+    async def __get_task_targeting(self) -> list[TaskJobTarget]:
+        task: TaskModel = await self.get_task()
+        collection: CollectionModel = await self.collection_service.get(task.collection_id)
+        query: dict = collection.query
+
+        if task.query and task.minions:
+            query = {
+                '$and': [query, task.query, {'_id': {'$in': [PyObjectId(minion_id) for minion_id in task.minions]}}]
+            }
+        elif task.query:
+            query = {'$and': [query, task.query]}
+        elif task.minions:
+            query = {'$and': [query, {'_id': {'$in': [PyObjectId(minion_id) for minion_id in task.minions]}}]}
+
+        if task.minions or task.batch_size:
+            minions: list[MinionModel] = await self.minion_service.get_list(query=query, limit=0, skip=0)
+
+            _result: dict[str, list[str]] = {}
+
+            for minion in minions:
+                _result.setdefault(minion.master, []).append(minion.minion_id)
+
+            return await self.__build_targets_list_from_dict(_result)
+
+        return [
+            TaskJobTarget(
+                tgt=MongoQueryToSaltTgtConverter.convert_from_dict(query),
+                master='salt-master',  # TODO (i.moshkov): getting salt master
+                type=TaskJobTargetType.compound,
+            )
+        ]
+
+    async def __add_to_targets_queue(self, targets: list[TaskJobTarget]) -> None:
+        task: TaskModel = await self.get_task()
+
+        if task.targets_queue is None:
+            task.targets_queue = []
+
+        for target in targets:
+            task.targets_queue.append(target)
 
     async def __init_fill_jobs_queue(self) -> None:
-        targets: dict[str, list[str]] = await self.__get_task_targeting()
-        await self.__fill_jobs_queue(targets)
+        targets: list[TaskJobTarget] = await self.__get_task_targeting()
+        await self.__add_to_targets_queue(targets)
 
     async def __check_job_returns(self, job: TaskJob) -> None:
         task: TaskModel = await self.get_task()
@@ -169,8 +188,9 @@ class TaskLifespanService:
 
         for return_data in job_returns:
             minion_id: str = return_data.id
+            returns_status = job.returns_statuses.get(minion_id, TaskJobReturnStatus.waiting)
 
-            if job.returns_statuses[minion_id] != TaskJobReturnStatus.waiting:
+            if returns_status != TaskJobReturnStatus.waiting:
                 continue
 
             if return_data.success is True:
@@ -188,7 +208,8 @@ class TaskLifespanService:
 
             job.finished_stamp = get_now_stamp_str()
 
-        await self.__fill_jobs_queue(targets_with_failed_job)
+        targets = await self.__build_targets_list_from_dict(targets_with_failed_job)
+        await self.__add_to_targets_queue(targets)
 
     async def __check_running_jobs(self) -> None:
         task: TaskModel = await self.get_task()
@@ -198,6 +219,9 @@ class TaskLifespanService:
                 continue
 
             await self.__check_job_returns(job=job)
+
+            if not len(job.returns_statuses.keys()):
+                continue
 
             # TODO (i.moshkov): process long-time jobs
             if all(status == TaskJobReturnStatus.succeeded for status in job.returns_statuses.values()):
@@ -213,7 +237,7 @@ class TaskLifespanService:
                 {
                     'jid_postfix': f't{task.id}',
                     'tgt': job_target.tgt,
-                    'tgt_type': 'list',
+                    'tgt_type': job_target.type,
                     'fun': task.fun,
                     'arg': task.task_args,
                     'kwarg': task.task_kwargs,
@@ -226,7 +250,8 @@ class TaskLifespanService:
             TaskJob(
                 jid=str(jid),
                 target=job_target,
-                returns_statuses={minion_id: TaskJobReturnStatus.waiting for minion_id in job_target.tgt.split(',')},
+                # returns_statuses={minion_id: TaskJobReturnStatus.waiting for minion_id in job_target.tgt.split(',')},
+                # TODO (i.moshkov): waiting status
             )
         )
 
@@ -272,6 +297,15 @@ async def get_task_lifespan_service(
     rdb: RedisDependency,
     task_service: Annotated[TaskService, Depends(get_task_service)],
     job_service: Annotated[JobService, Depends(get_job_service)],
+    minion_service: Annotated[MinionService, Depends(get_minion_service)],
+    collection_service: Annotated[CollectionService, Depends(get_collection_service)],
     tid: PyObjectId | None = None,
 ) -> TaskLifespanService:
-    return TaskLifespanService(rdb=rdb, task_service=task_service, job_service=job_service, task_id=tid)
+    return TaskLifespanService(
+        rdb=rdb,
+        task_service=task_service,
+        job_service=job_service,
+        minion_service=minion_service,
+        collection_service=collection_service,
+        task_id=tid,
+    )

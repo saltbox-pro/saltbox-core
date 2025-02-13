@@ -72,8 +72,9 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateFromTemp
                 'fun': task_template.fun,
                 'task_args': task_args,
                 'task_kwargs': task_kwargs,
-                'tgt_type': data.tgt_type,
-                'tgt_value': data.tgt_value,
+                'collection_id': data.collection_id,
+                'query': data.query,
+                'minions': data.minions,
                 'batch_size': data.batch_size,
                 'max_retries': data.max_retries,
             }
