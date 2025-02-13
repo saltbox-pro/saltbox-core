@@ -15,9 +15,9 @@ async def init_json_schemas() -> None:
     indexes = sorted(await json_schemas_repo.collection.index_information())
 
     # Create unique index for name if not exists
-    if 'name_unique_index_text' not in indexes:
+    if 'name_unique_index_asc' not in indexes:
         result = await json_schemas_repo.collection.create_index(
-            [('name', pymongo.TEXT)], name='name_unique_index_text', unique=True
+            [('name', pymongo.ASCENDING)], name='name_unique_index_asc', unique=True
         )
         logger.debug('Index created: %s', result)
         logger.debug('Indexes: %s', indexes)
@@ -31,9 +31,9 @@ async def init_collections() -> None:
     indexes = sorted(await collections_repo.collection.index_information())
 
     # Create unique index for slug if not exists
-    if 'slug_unique_index_text' not in indexes:
+    if 'slug_unique_index_asc' not in indexes:
         result = await collections_repo.collection.create_index(
-            [('slug', pymongo.TEXT)], name='slug_unique_index_text', unique=True
+            [('slug', pymongo.ASCENDING)], name='slug_unique_index_asc', unique=True
         )
         logger.debug('Index created: %s', result)
         logger.debug('Indexes: %s', indexes)
