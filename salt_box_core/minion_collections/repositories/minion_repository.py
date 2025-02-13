@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, ClassVar
 
 from fastapi import Depends
 from pymongo.asynchronous.database import AsyncDatabase
@@ -11,6 +11,8 @@ from salt_box_core.minion_collections.schemas.minion_schemas import MinionModel
 class MinionRepository(BaseMongoRepository[MinionModel]):
     class Meta:
         collection_name = 'minions'
+        auto_now_add_fields: ClassVar[list[str]] = ['created']
+        auto_now_fields: ClassVar[list[str]] = ['modified']
 
 
 def get_minion_repository(db: Annotated[AsyncDatabase, Depends(get_mongo)]) -> MinionRepository:

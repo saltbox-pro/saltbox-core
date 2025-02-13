@@ -9,15 +9,12 @@ from salt_box_core.minion_collections.schemas.minion_schemas import (
     MinionCreateSchema,
     MinionIDs,
     MinionModel,
-    MinionShortSchema,
     MinionUpdateSchema,
 )
 from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService
 
 
 class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreateSchema, MinionUpdateSchema]):
-
-
     async def get_ids_by_query(self, query: dict[str, Any]) -> list[MinionIDs]:
         return await self.repo.get_list(query, skip=0, limit=0, projection_model=MinionIDs)
 
