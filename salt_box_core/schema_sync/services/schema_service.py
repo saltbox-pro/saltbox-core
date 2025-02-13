@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import Depends
 
 from salt_box_core.config import SETTINGS, logger
-from salt_box_core.db.exceptions import ObjectNotFoundError
+from salt_box_core.db.exceptions import DuplicateKeyError, ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId
 from salt_box_core.schema_sync.repository import JSONSchemaRepository, get_json_schema_repository
 from salt_box_core.schema_sync.schemas import JSONSchemaCreateSchema, JSONSchemaModel, JSONSchemaShortSchema
@@ -40,16 +40,23 @@ class JSONSchemaService:
         created = []
         updated = []
         for schema in schema_docs:
-            logger.debug('schema.name: %s', schema.name)
             try:
                 exist_doc = await self.repo.get({'name': schema.name}, projection_model=JSONSchemaShortSchema)
             except ObjectNotFoundError:
                 exist_doc = None
 
             if not exist_doc:
-                await self.repo.create(schema)
+                logger.debug('Try create: %s', schema)
+                try:
+                    await self.repo.create(schema)
+                except DuplicateKeyError:
+                    msg = f'JSON schema with name {schema.name} already exists'
+                    logger.debug(msg)
+                    raise DuplicateKeyError(msg) from None
+
                 created.append(schema.name)
             elif exist_doc.commit_hash != schema.commit_hash:
+                logger.debug('Try update: %s', schema.name)
                 await self.repo.update({'name': schema.name}, schema)
                 updated.append(schema.name)
 
