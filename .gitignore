@@ -3,6 +3,11 @@
 *.pyc
 /build/
 __pycache__
+.pytest_cache/
+.coverage
+htmlcov/
+.ruff_cache/
+.mypy_cache/
 
 # Virtual environments
 */.venv
