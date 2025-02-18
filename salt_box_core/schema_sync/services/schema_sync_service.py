@@ -23,8 +23,10 @@ class SchemaGitRepoService:
 
     def clone_or_pull(self) -> None:
         try:
+            logger.debug('Try to clon repo %s', self.repo_url)
             self.repo = Repo.clone_from(self.repo_url, self.local_path)
         except Exception:
+            logger.debug('Repo exists -> Try to pull repo')
             self.repo = Repo.init(self.local_path)
             origin = self.repo.remote(name='origin')
             origin.pull()
@@ -36,19 +38,30 @@ class SchemaGitRepoService:
         commits = list(self.repo.iter_commits(paths=file_str, max_count=1))
         return commits[0].hexsha if commits else ''
 
-    async def parse_schemas(self) -> list:
+    async def parse_schemas(self) -> tuple[list[dict], list[str]]:
         schemas = []
+        errors = []
         for file in Path(self.local_path).rglob('*.json'):
             try:
                 content = json.loads(file.read_text())
+                if not isinstance(content, dict):
+                    msg = f'{file}: Schema is not a dictionary'
+                    errors.append(msg)
+
+                if 'json-schema' not in content.keys() and 'title' in content.keys():
+                    json_schema = content
+                else:
+                    json_schema = content.get('json_schema', {})
+
                 schema = {
                     'name': file.name.replace('.json', ''),
-                    'content': content,
+                    'json_schema': json_schema,
+                    'ui_schema': content.get('ui_schema', {}),
                     'commit_hash': self.get_latest_commit_hash(file),
                 }
                 schemas.append(schema)
-            except json.JSONDecodeError:
-                msg = f'Failed to parse {file}'
+            except json.JSONDecodeError as e:
+                msg = f'{file}: Failed to parse file ({e!s})'
                 logger.error(msg)
-                pass
-        return schemas
+                errors.append(msg)
+        return schemas, errors

@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import DuplicateKeyError
 from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId, SkipLimitParams
-from salt_box_core.schema_sync.schemas import JSONSchemaModel, JSONSchemaShortSchema
+from salt_box_core.schema_sync.schemas import JSONSchemaModel, JSONSchemaShortSchema, JSONSchemaSyncResponse
 from salt_box_core.schema_sync.services.schema_service import JSONSchemaService, get_json_schema_service
 
 router = APIRouter(prefix='/json-schemas', tags=['JSON Schemas'])
@@ -34,12 +34,15 @@ async def get_json_schema(
 @router.post('/sync')
 async def sync_schemas(
     service: Annotated[JSONSchemaService, Depends(get_json_schema_service)],
-) -> dict:
+) -> JSONSchemaSyncResponse:
     try:
         return await service.sync()
     except DuplicateKeyError as e:
         logger.error('Error: %s', e)
         raise HTTPException(status_code=409, detail=f'{e!s}') from e
+    except TimeoutError as e:
+        logger.error('Error: %s', e)
+        raise HTTPException(status_code=408, detail=f'{e!s}') from e
     except Exception as e:
         logger.error('Error: %s', e)
         raise HTTPException(status_code=500, detail=f'Something went wrong...: {e!s}') from e
