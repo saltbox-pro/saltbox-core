@@ -5,7 +5,8 @@ from salt_box_core.db.mongo.schemas_base import CreatedModifiedMixin, IDMixin
 
 class JSONSchemaReadOnlyFieldsMixin:
     name: str = Field(title='Schema name')
-    content: dict = Field(title='Schema content')
+    json_schema: dict = Field(title='JSON schema')
+    ui_schema: dict = Field(title='UI schema', default_factory=dict)
     commit_hash: str = Field(title='Commit hash')
 
 
@@ -17,4 +18,14 @@ class JSONSchemaShortSchema(BaseModel, CreatedModifiedMixin, IDMixin):
     commit_hash: str = Field(title='Commit hash')
 
 
-class JSONSchemaModel(BaseModel, JSONSchemaReadOnlyFieldsMixin, CreatedModifiedMixin, IDMixin): ...
+class JSONSchemaBaseSchema(BaseModel, JSONSchemaReadOnlyFieldsMixin): ...
+
+
+class JSONSchemaModel(JSONSchemaBaseSchema, CreatedModifiedMixin, IDMixin): ...
+
+
+class JSONSchemaSyncResponse(BaseModel):
+    created: list[str]
+    updated: list[str]
+    removed_count: int
+    errors: list[str]

@@ -1,3 +1,4 @@
+import asyncio
 from typing import Annotated
 
 from fastapi import Depends
@@ -6,7 +7,12 @@ from salt_box_core.config import SETTINGS, logger
 from salt_box_core.db.exceptions import DuplicateKeyError, ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId
 from salt_box_core.schema_sync.repository import JSONSchemaRepository, get_json_schema_repository
-from salt_box_core.schema_sync.schemas import JSONSchemaCreateSchema, JSONSchemaModel, JSONSchemaShortSchema
+from salt_box_core.schema_sync.schemas import (
+    JSONSchemaCreateSchema,
+    JSONSchemaModel,
+    JSONSchemaShortSchema,
+    JSONSchemaSyncResponse,
+)
 from salt_box_core.schema_sync.services.schema_sync_service import SchemaGitRepoService
 
 
@@ -28,10 +34,15 @@ class JSONSchemaService:
         docs = await self.repo.get_list(query, limit=limit, skip=skip, projection_model=JSONSchemaShortSchema)
         return PaginatedResponse[JSONSchemaShortSchema](total=total, data=docs)
 
-    async def sync(self) -> dict:
+    async def sync(self) -> JSONSchemaSyncResponse:
         git_repo = SchemaGitRepoService(SETTINGS.salt_func_repo_url)
-        git_repo.clone_or_pull()
-        schemas = await git_repo.parse_schemas()
+        try:
+            await asyncio.wait_for(asyncio.to_thread(git_repo.clone_or_pull), timeout=30)
+        except TimeoutError:
+            msg = 'Timeout error while cloning or pulling git repo'
+            logger.error(msg)
+            raise TimeoutError(msg) from None
+        schemas, errors = await git_repo.parse_schemas()
         parsed_schema_names = [schema['name'] for schema in schemas]
         removed_count = await self.repo.delete_many({'name': {'$nin': parsed_schema_names}})
 
@@ -46,7 +57,7 @@ class JSONSchemaService:
                 exist_doc = None
 
             if not exist_doc:
-                logger.debug('Try create: %s', schema)
+                logger.debug('Try create: %s', schema.name)
                 try:
                     await self.repo.create(schema)
                 except DuplicateKeyError:
@@ -60,7 +71,12 @@ class JSONSchemaService:
                 await self.repo.update({'name': schema.name}, schema)
                 updated.append(schema.name)
 
-        return {'created': created, 'updated': updated, 'removed_count': removed_count}
+        return JSONSchemaSyncResponse(
+            created=created,
+            updated=updated,
+            removed_count=removed_count,
+            errors=errors,
+        )
 
 
 def get_json_schema_service(

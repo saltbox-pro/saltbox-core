@@ -68,9 +68,12 @@ class Settings(BaseSettings):
         return result
 
 
+SETTINGS = Settings()
+
+
 class LogConfig(BaseModel):
     LOG_FORMAT: str = '%(levelprefix)s %(message)s'
-    LOG_LEVEL: str = 'INFO'
+    LOG_LEVEL: str = 'DEBUG' if SETTINGS.debug else 'INFO'
 
     version: int = 1
     disable_existing_loggers: bool = False
@@ -93,8 +96,7 @@ class LogConfig(BaseModel):
     }
 
 
-SETTINGS = Settings()
-LOG_CONFIG = LogConfig(LOG_LEVEL='DEBUG' if SETTINGS.debug else 'INFO')
+LOG_CONFIG = LogConfig()
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
