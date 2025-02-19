@@ -76,7 +76,6 @@ async def job_create(item: CreateJobRequest, job_service: JobServiceDependency) 
             JobCreate.model_validate(
                 {
                     **item.model_dump(),
-                    'salt_master': 'salt-master',  # TODO (i.moshkov): get salt master from request
                 }
             )
         )

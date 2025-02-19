@@ -40,16 +40,22 @@ class JobService:
         create_job_hash_name: str = JOB_CREATE_HASH_NAME.format(jid=jid)
 
         try:
+            _data = {
+                'jid': f'{jid}-{job_data.jid_postfix}' if job_data.jid_postfix else jid,
+                'fun': job_data.fun,
+                'tgt': job_data.tgt,
+                'tgt_type': job_data.tgt_type,
+            }
+
+            if job_data.data and job_data.data.data_args:
+                _data['data_args'] = json.dumps(job_data.data.data_args)
+            if job_data.data and job_data.data.data_kwargs:
+                _data['data_kwargs'] = json.dumps(job_data.data.data_kwargs)
+
             await self.rdb.hmset(
                 name=create_job_hash_name,
-                mapping={
-                    'jid': f'{jid}-{job_data.jid_postfix}' if job_data.jid_postfix else jid,
-                    'fun': job_data.fun,
-                    'tgt': job_data.tgt,
-                    'tgt_type': job_data.tgt_type,
-                    'arg': json.dumps(job_data.arg),
-                    'kwarg': json.dumps(job_data.kwarg),
-                },
+                # TODO (i.moshkov): check and fix later
+                mapping=_data,  # type: ignore[arg-type]
             )
             await self.rdb.expire(name=create_job_hash_name, time=60 * 10)
 

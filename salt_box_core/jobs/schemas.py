@@ -36,6 +36,11 @@ class NullObj(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
 
+class JobData(BaseModel):  # type: ignore[no-redef]
+    data_args: list | None = Field(alias='args', default=None)
+    data_kwargs: dict | None = Field(alias='kwargs', default=None)
+
+
 class Job(BaseModel):
     class JobStatus(str, Enum):
         in_queue = 'in_queue'
@@ -73,8 +78,7 @@ class JobCreate(BaseModel):
     tgt: str
     tgt_type: str
     fun: str
-    arg: list | None = None
-    kwarg: dict | None = None
+    data: JobData | None = None
     jid: str | None = None
     jid_postfix: str | None = None
     salt_master: str | None = None
@@ -127,8 +131,8 @@ class CreateJobRequest(BaseModel):
     tgt: str = '*'
     tgt_type: str = 'glob'
     fun: str = 'test.ping'
-    arg: list = []
-    kwarg: dict = {}
+    salt_master: str = 'salt-master'
+    data: JobData | None = None
 
 
 class GetJobReturnResponse(BaseModel):
