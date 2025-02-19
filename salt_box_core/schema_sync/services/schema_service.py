@@ -4,35 +4,23 @@ from typing import Annotated
 from fastapi import Depends
 
 from salt_box_core.config import SETTINGS, logger
-from salt_box_core.db.exceptions import DuplicateKeyError, ObjectNotFoundError
-from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId
+from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.schema_sync.repository import JSONSchemaRepository, get_json_schema_repository
 from salt_box_core.schema_sync.schemas import (
     JSONSchemaCreateSchema,
     JSONSchemaModel,
-    JSONSchemaShortSchema,
     JSONSchemaSyncResponse,
+    JSONSchemaUpdateSchema,
 )
 from salt_box_core.schema_sync.services.schema_sync_service import SchemaGitRepoService
+from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService
 
 
-class JSONSchemaService:
-    def __init__(self, repo: JSONSchemaRepository) -> None:
-        self.repo = repo
-
-    async def get(self, id: PyObjectId) -> JSONSchemaModel:
-        document = await self.repo.get({'_id': id})
-        if not document:
-            msg = 'JSON schema not found'
-            raise ObjectNotFoundError(msg)
-        return document
-
-    async def get_list_paginated(
-        self, query: None = None, limit: int = 0, skip: int = 0
-    ) -> PaginatedResponse[JSONSchemaShortSchema]:
-        total = await self.repo.count(query)
-        docs = await self.repo.get_list(query, limit=limit, skip=skip, projection_model=JSONSchemaShortSchema)
-        return PaginatedResponse[JSONSchemaShortSchema](total=total, data=docs)
+class JSONSchemaService(
+    MongoBaseService[JSONSchemaRepository, JSONSchemaModel, JSONSchemaCreateSchema, JSONSchemaUpdateSchema]
+):
+    async def get_by_name(self, name: str) -> JSONSchemaModel:
+        return await self.repo.get({'name': name})
 
     async def sync(self) -> JSONSchemaSyncResponse:
         git_repo = SchemaGitRepoService(SETTINGS.salt_func_repo_url)
@@ -46,30 +34,24 @@ class JSONSchemaService:
         parsed_schema_names = [schema['name'] for schema in schemas]
         removed_count = await self.repo.delete_many({'name': {'$nin': parsed_schema_names}})
 
-        schema_docs = [JSONSchemaCreateSchema(**schema) for schema in schemas]
-
         created = []
         updated = []
-        for schema in schema_docs:
+        for schema in schemas:
             try:
-                exist_doc = await self.repo.get({'name': schema.name}, projection_model=JSONSchemaShortSchema)
+                existing_schema = await self.get_by_name(schema['name'])
             except ObjectNotFoundError:
-                exist_doc = None
+                existing_schema = None
 
-            if not exist_doc:
-                logger.debug('Try create: %s', schema.name)
-                try:
-                    await self.repo.create(schema)
-                except DuplicateKeyError:
-                    msg = f'JSON schema with name {schema.name} already exists'
-                    logger.debug(msg)
-                    raise DuplicateKeyError(msg) from None
-
-                created.append(schema.name)
-            elif exist_doc.commit_hash != schema.commit_hash:
-                logger.debug('Try update: %s', schema.name)
-                await self.repo.update({'name': schema.name}, schema)
-                updated.append(schema.name)
+            if not existing_schema:
+                logger.debug('Try create: %s', schema['name'])
+                schema_create_obj = JSONSchemaCreateSchema(**schema)
+                await self.create(schema_create_obj)
+                created.append(schema_create_obj.name)
+            elif existing_schema.commit_hash != schema['commit_hash']:
+                logger.debug('Try update: %s', schema['name'])
+                schema_update_obj = JSONSchemaUpdateSchema(**schema)
+                await self.update({'name': schema['name']}, schema_update_obj)
+                updated.append(schema_update_obj.name)
 
         return JSONSchemaSyncResponse(
             created=created,
