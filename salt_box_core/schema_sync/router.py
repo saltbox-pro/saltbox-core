@@ -25,20 +25,16 @@ async def get_json_schemas_list(
         raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
 
 
-@router.get('/{name}')
-async def get_json_schema(
-    name: str,
+@router.get('/clean')
+async def clean_schemas(
     service: Annotated[JSONSchemaService, Depends(get_json_schema_service)],
-) -> JSONSchemaModel:
-    if await service.exists({'name': name}):
-        return await service.get_by_name(name)
-    # Try get default schema
+) -> None:
     try:
-        return await service.get_by_name('default')
-    except ObjectNotFoundError:
-        msg = f'Schema with name `{name}` not found. Default schema also not found: check schema repository'
+        await service.remove_repo_data()
+    except Exception as e:
+        msg = f'Error while cleaning schemas: {e!s}'
         logger.error(msg)
-        raise HTTPException(status_code=404, detail=msg) from None
+        raise HTTPException(status_code=500, detail=msg) from e
 
 
 @router.post('/sync')
@@ -56,3 +52,19 @@ async def sync_schemas(
     except Exception as e:
         logger.error('Error: %s', e)
         raise HTTPException(status_code=500, detail=f'Something went wrong...: {e!s}') from e
+
+
+@router.get('/{name}')
+async def get_json_schema(
+    name: str,
+    service: Annotated[JSONSchemaService, Depends(get_json_schema_service)],
+) -> JSONSchemaModel:
+    if await service.exists({'name': name}):
+        return await service.get_by_name(name)
+    # Try get default schema
+    try:
+        return await service.get_by_name('default')
+    except ObjectNotFoundError:
+        msg = f'Schema with name `{name}` not found. Default schema also not found: check schema repository'
+        logger.error(msg)
+        raise HTTPException(status_code=404, detail=msg) from None

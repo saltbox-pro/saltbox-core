@@ -1,4 +1,6 @@
 import asyncio
+import shutil
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends
@@ -21,6 +23,16 @@ class JSONSchemaService(
 ):
     async def get_by_name(self, name: str) -> JSONSchemaModel:
         return await self.repo.get({'name': name})
+
+    async def remove_repo_data(self) -> None:
+        path = Path(SETTINGS.local_repos_path) / SETTINGS.salt_func_local_repo_name
+        if path.exists():
+            logger.debug('Remove repo data from %s', path)
+            for item in path.iterdir():
+                if item.is_dir():
+                    await asyncio.to_thread(shutil.rmtree, item)
+                else:
+                    await asyncio.to_thread(item.unlink)
 
     async def sync(self) -> JSONSchemaSyncResponse:
         git_repo = SchemaGitRepoService(SETTINGS.salt_func_repo_url)
