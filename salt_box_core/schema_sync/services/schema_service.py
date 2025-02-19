@@ -5,34 +5,23 @@ from fastapi import Depends
 
 from salt_box_core.config import SETTINGS, logger
 from salt_box_core.db.exceptions import DuplicateKeyError, ObjectNotFoundError
-from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId
 from salt_box_core.schema_sync.repository import JSONSchemaRepository, get_json_schema_repository
 from salt_box_core.schema_sync.schemas import (
     JSONSchemaCreateSchema,
     JSONSchemaModel,
     JSONSchemaShortSchema,
     JSONSchemaSyncResponse,
+    JSONSchemaUpdateSchema,
 )
 from salt_box_core.schema_sync.services.schema_sync_service import SchemaGitRepoService
+from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService
 
 
-class JSONSchemaService:
-    def __init__(self, repo: JSONSchemaRepository) -> None:
-        self.repo = repo
-
-    async def get(self, id: PyObjectId) -> JSONSchemaModel:
-        document = await self.repo.get({'_id': id})
-        if not document:
-            msg = 'JSON schema not found'
-            raise ObjectNotFoundError(msg)
-        return document
-
-    async def get_list_paginated(
-        self, query: None = None, limit: int = 0, skip: int = 0
-    ) -> PaginatedResponse[JSONSchemaShortSchema]:
-        total = await self.repo.count(query)
-        docs = await self.repo.get_list(query, limit=limit, skip=skip, projection_model=JSONSchemaShortSchema)
-        return PaginatedResponse[JSONSchemaShortSchema](total=total, data=docs)
+class JSONSchemaService(
+    MongoBaseService[JSONSchemaRepository, JSONSchemaModel, JSONSchemaCreateSchema, JSONSchemaUpdateSchema]
+):
+    async def get_by_name(self, name: str) -> JSONSchemaModel:
+        return await self.repo.get({'name': name})
 
     async def sync(self) -> JSONSchemaSyncResponse:
         git_repo = SchemaGitRepoService(SETTINGS.salt_func_repo_url)
