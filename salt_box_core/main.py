@@ -13,6 +13,7 @@ from salt_box_core.minion_collections.routers.collections_router import router a
 from salt_box_core.minion_collections.routers.filters_router import router as filters_router
 from salt_box_core.minion_collections.routers.minion_router import router as minions_router
 from salt_box_core.schema_sync.router import router as schema_sync_router
+from salt_box_core.sls_repos.routers.settings_router import router as settings_sls_router
 from salt_box_core.tasks.router import router as task_router
 from salt_box_core.tasks.router import ws_router as task_ws_router
 
@@ -57,3 +58,4 @@ APP.include_router(task_ws_router)
 APP.include_router(collections_router)
 APP.include_router(minions_router)
 APP.include_router(schema_sync_router)
+APP.include_router(router=settings_sls_router, prefix='/settings', tags=['Settings'])
