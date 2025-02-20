@@ -55,6 +55,11 @@ class TaskStatus(str, Enum):
     stopped = 'stopped'
 
 
+class TaskData(BaseModel):  # type: ignore[no-redef]
+    data_args: list | None = Field(alias='args', default=None)
+    data_kwargs: dict | None = Field(alias='kwargs', default=None)
+
+
 class TaskReadOnlyFieldsMixin:
     status: TaskStatus = Field(title='Status', default=TaskStatus.created)
 
@@ -104,6 +109,8 @@ class TaskModel(BaseModel, CreatedModifiedMixin, TaskEditableFieldsMixin, TaskRe
 class TaskCreateFromTemplateSchema(BaseModel):
     task_template_id: PyObjectId = Field(title='Task template id')
     variables_data: dict[str, Any] = Field(title='Variables data')
+    salt_masters: list[str] = ['salt-master']
+    data: TaskData | None = None
 
     collection_id: PyObjectId = Field(title='Collection')
     query: dict = Field(title='Query', default={})
