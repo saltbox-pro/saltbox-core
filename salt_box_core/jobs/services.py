@@ -6,6 +6,7 @@ from typing import Annotated
 
 import pydantic
 from fastapi import Depends
+from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 from redis import exceptions as redis_exceptions
 
 from salt_box_core.config import LOG_CONFIG, SETTINGS
@@ -18,6 +19,7 @@ from salt_box_core.jobs.exceptions import (
     JobServiceInvalidArgsException,
 )
 from salt_box_core.jobs.schemas import Job, JobCreate, JobResult
+from salt_box_core.schema_sync.services.schema_service import JSONSchemaService, get_json_schema_service
 from salt_box_core.utilities.jid import JID, JidError
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
@@ -28,8 +30,9 @@ JOB_CREATE_HASH_NAME: str = 'job_create:{jid}'
 
 
 class JobService:
-    def __init__(self, rdb: RedisDependency):
+    def __init__(self, rdb: RedisDependency, json_schema_service: JSONSchemaService):
         self.rdb = rdb
+        self.json_schema_service = json_schema_service
 
     async def create_job(self, job_data: JobCreate) -> JID:
         if not job_data.jid:
@@ -40,17 +43,25 @@ class JobService:
         create_job_hash_name: str = JOB_CREATE_HASH_NAME.format(jid=jid)
 
         try:
-            _data = {
+            validated_data: dict = await self.json_schema_service.get_validated_data(
+                name=job_data.fun,
+                data=job_data.data.model_dump(exclude_none=True, by_alias=True) if job_data.data else {},
+            )
+        except JsonSchemaValidationError as err:
+            raise JobCreateException(err) from err
+
+        try:
+            _data: dict[str, str] = {
                 'jid': f'{jid}-{job_data.jid_postfix}' if job_data.jid_postfix else jid,
                 'fun': job_data.fun,
                 'tgt': job_data.tgt,
                 'tgt_type': job_data.tgt_type,
             }
 
-            if job_data.data and job_data.data.data_args:
-                _data['data_args'] = json.dumps(job_data.data.data_args)
-            if job_data.data and job_data.data.data_kwargs:
-                _data['data_kwargs'] = json.dumps(job_data.data.data_kwargs)
+            if 'data_args' in validated_data:
+                _data['data_args'] = json.dumps(validated_data['data_args'])
+            if 'data_kwargs' in validated_data:
+                _data['data_kwargs'] = json.dumps(validated_data['data_kwargs'])
 
             await self.rdb.hmset(
                 name=create_job_hash_name,
@@ -193,8 +204,10 @@ class JobService:
             return False
 
 
-async def get_job_service(rdb: RedisDependency) -> AsyncGenerator[JobService, None]:
-    job_service = JobService(rdb=rdb)
+async def get_job_service(
+    rdb: RedisDependency, json_schema_service: Annotated[JSONSchemaService, Depends(get_json_schema_service)]
+) -> AsyncGenerator[JobService, None]:
+    job_service = JobService(rdb=rdb, json_schema_service=json_schema_service)
     yield job_service
 
 

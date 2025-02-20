@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Annotated
 
 from fastapi import Depends
+from jsonschema import Draft4Validator, validators
 
 from salt_box_core.config import SETTINGS, logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
@@ -18,11 +19,41 @@ from salt_box_core.schema_sync.services.schema_sync_service import SchemaGitRepo
 from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService
 
 
+def extend_validator_with_default(validator_class: type[Draft4Validator]) -> type[Draft4Validator]:
+    validate_properties = validator_class.VALIDATORS['properties']
+
+    def set_defaults(validator, properties, instance, schema):  # type: ignore[no-untyped-def]
+        valid = True
+        for error in validate_properties(validator, properties, instance, schema):
+            valid = False
+            yield error
+
+        if valid:
+            for _property, _sub_schema in properties.items():
+                if 'default' in _sub_schema and not isinstance(instance, list):
+                    instance.setdefault(_property, _sub_schema['default'])
+
+    return validators.extend(validator_class, {'properties': set_defaults})  # type: ignore[no-any-return]
+
+
+Draft4ValidatorWithDefaults = extend_validator_with_default(Draft4Validator)
+
+
 class JSONSchemaService(
     MongoBaseService[JSONSchemaRepository, JSONSchemaModel, JSONSchemaCreateSchema, JSONSchemaUpdateSchema]
 ):
     async def get_by_name(self, name: str) -> JSONSchemaModel:
         return await self.repo.get({'name': name})
+
+    async def get_validated_data(self, name: str, data: dict) -> dict:
+        try:
+            json_schema = await self.get_by_name(name)
+        except ObjectNotFoundError:
+            json_schema = await self.get_by_name('default')
+
+        Draft4Validator(json_schema.json_schema).validate(data)
+
+        return data
 
     async def remove_repo_data(self) -> None:
         path = Path(SETTINGS.local_repos_path) / SETTINGS.salt_func_local_repo_name

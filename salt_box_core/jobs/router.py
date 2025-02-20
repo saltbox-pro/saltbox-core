@@ -75,7 +75,7 @@ async def job_create(item: CreateJobRequest, job_service: JobServiceDependency) 
         jid: JID = await job_service.create_job(
             JobCreate.model_validate(
                 {
-                    **item.model_dump(),
+                    **item.model_dump(by_alias=True),
                 }
             )
         )
