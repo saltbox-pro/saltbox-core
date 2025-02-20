@@ -104,17 +104,20 @@ class MongoBaseService(AbstractService[Repository], Generic[Repository, ModelTyp
         return await self.repo.exists(query)
 
     @overload
-    async def update(self, query: dict[str, Any] | PyObjectId, data: UpdateSchema) -> ModelType: ...
+    async def update(self, query: dict[str, Any] | PyObjectId, data: UpdateSchema | dict[str, Any]) -> ModelType: ...
 
     @overload
     async def update(
-        self, query: dict[str, Any] | PyObjectId, data: UpdateSchema, projection_model: type[ProjectionModel]
+        self,
+        query: dict[str, Any] | PyObjectId,
+        data: UpdateSchema | dict[str, Any],
+        projection_model: type[ProjectionModel],
     ) -> ProjectionModel: ...
 
     async def update(
         self,
         query: dict[str, Any] | PyObjectId,
-        data: UpdateSchema,
+        data: UpdateSchema | dict[str, Any],
         projection_model: type[ProjectionModel] | None = None,
     ) -> ModelType | ProjectionModel:
         if isinstance(query, PyObjectId):
