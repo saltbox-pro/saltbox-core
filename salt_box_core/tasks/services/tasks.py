@@ -95,7 +95,6 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateFromTemp
         self,
         query: dict[str, Any] | PyObjectId,
         data: TaskUpdateSchema | TaskForceUpdateSchema | dict[str, Any],
-        projection_model: None = None,
         notify: bool = True,
     ) -> TaskModel: ...
 
@@ -104,16 +103,18 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateFromTemp
         self,
         query: dict[str, Any] | PyObjectId,
         data: TaskUpdateSchema | TaskForceUpdateSchema | dict[str, Any],
-        projection_model: type[ProjectionModel],
         notify: bool = True,
+        *,
+        projection_model: type[ProjectionModel],
     ) -> ProjectionModel: ...
 
     async def update(
         self,
         query: dict[str, Any] | PyObjectId,
         data: TaskUpdateSchema | TaskForceUpdateSchema | dict[str, Any],
-        projection_model: type[ProjectionModel] | None = None,
         notify: bool = True,
+        *,
+        projection_model: type[ProjectionModel] | None = None,
     ) -> TaskModel | ProjectionModel:
         try:
             obj = await self.get(query=query, projection_model=TaskModel)

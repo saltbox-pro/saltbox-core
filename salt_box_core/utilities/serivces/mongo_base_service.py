@@ -104,13 +104,20 @@ class MongoBaseService(AbstractService[Repository], Generic[Repository, ModelTyp
         return await self.repo.exists(query)
 
     @overload
-    async def update(self, query: dict[str, Any] | PyObjectId, data: UpdateSchema | dict[str, Any]) -> ModelType: ...
+    async def update(
+        self,
+        query: dict[str, Any] | PyObjectId,
+        data: UpdateSchema | dict[str, Any],
+        exclude_unset: bool = True,
+    ) -> ModelType: ...
 
     @overload
     async def update(
         self,
         query: dict[str, Any] | PyObjectId,
         data: UpdateSchema | dict[str, Any],
+        exclude_unset: bool = True,
+        *,
         projection_model: type[ProjectionModel],
     ) -> ProjectionModel: ...
 
@@ -118,15 +125,19 @@ class MongoBaseService(AbstractService[Repository], Generic[Repository, ModelTyp
         self,
         query: dict[str, Any] | PyObjectId,
         data: UpdateSchema | dict[str, Any],
+        exclude_unset: bool = True,
+        *,
         projection_model: type[ProjectionModel] | None = None,
     ) -> ModelType | ProjectionModel:
         if isinstance(query, PyObjectId):
             query = {'_id': query}
 
         if projection_model:
-            result = await self.repo.update(query=query, data=data, projection_model=projection_model)
+            result = await self.repo.update(
+                query=query, data=data, projection_model=projection_model, exclude_unset=exclude_unset
+            )
         else:
-            result = await self.repo.update(query=query, data=data)
+            result = await self.repo.update(query=query, data=data, exclude_unset=exclude_unset)
 
         return result
 
@@ -135,3 +146,6 @@ class MongoBaseService(AbstractService[Repository], Generic[Repository, ModelTyp
             query = {'_id': query}
 
         return await self.repo.delete(query)
+
+    async def delete_many(self, query: dict[str, Any]) -> int:
+        return await self.repo.delete_many(query=query)
