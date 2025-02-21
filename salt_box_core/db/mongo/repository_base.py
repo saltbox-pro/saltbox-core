@@ -7,6 +7,7 @@ from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.asynchronous.database import AsyncDatabase
 from pymongo.errors import DuplicateKeyError as MongoDuplicateKeyError
 
+# from salt_box_core.config import logger
 from salt_box_core.db.abc_repository import AbstractRepository
 from salt_box_core.db.exceptions import (
     DuplicateKeyError,
@@ -170,13 +171,20 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
             return await self.get(PyObjectId(result.inserted_id))
 
     @overload
-    async def update(self, query: PyObjectId | dict[str, Any], data: ModelType | dict[str, Any]) -> T: ...
+    async def update(
+        self,
+        query: PyObjectId | dict[str, Any],
+        data: ModelType | dict[str, Any],
+        exclude_unset: bool = True,
+    ) -> T: ...
 
     @overload
     async def update(
         self,
         query: PyObjectId | dict[str, Any],
         data: ModelType | dict[str, Any],
+        exclude_unset: bool = True,
+        *,
         projection_model: type[ProjectionModel],
     ) -> ProjectionModel: ...
 
@@ -184,13 +192,14 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
         self,
         query: PyObjectId | dict[str, Any],
         data: ModelType | dict[str, Any],
+        exclude_unset: bool = True,
         projection_model: type[ProjectionModel] | None = None,
     ) -> T | ProjectionModel:
         if isinstance(query, PyObjectId):
             query = {'_id': query}
 
         if isinstance(data, BaseModel):
-            data = data.model_dump(exclude={'id'}, exclude_unset=True)
+            data = data.model_dump(exclude={'id'}, exclude_unset=exclude_unset)
 
         if hasattr(self.Meta, 'auto_now_fields') and self.Meta.auto_now_fields:
             for field in self.Meta.auto_now_fields:

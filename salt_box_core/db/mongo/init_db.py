@@ -5,7 +5,23 @@ from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.minion_collections.repositories.collection_repository import CollectionRepository
 from salt_box_core.minion_collections.schemas.collection_schemas import CollectionCreateSchema
 from salt_box_core.schema_sync.repository import JSONSchemaRepository
-from salt_box_core.sls_repos.repository import SettingsSlsRepoRepository
+from salt_box_core.sls_repos.repository import SettingsSlsRepoRepository, SlsTplRepository
+
+
+async def init_sls_tpl_settings() -> None:
+    db = get_mongo_db()
+    sls_tpl_repo = SlsTplRepository(db)
+
+    # Check existing indexes
+    indexes = sorted(await sls_tpl_repo.collection.index_information())
+
+    # Create unique index for name and repo_id if not exists
+    if 'name_repo_id_unique_index' not in indexes:
+        result = await sls_tpl_repo.collection.create_index(
+            [('name', pymongo.ASCENDING), ('repo_id', pymongo.ASCENDING)], name='name_repo_id_unique_index', unique=True
+        )
+        logger.debug('Index created: %s', result)
+        logger.debug('Indexes: %s', indexes)
 
 
 async def init_sls_repos_settings() -> None:
@@ -82,3 +98,7 @@ async def init_mongo_db() -> None:
     # Initialize sls_repos_settings collection
     await init_sls_repos_settings()
     logger.debug('SLS repos settings initialized')
+
+    # Initialize sls_tpl_settings collection
+    await init_sls_tpl_settings()
+    logger.debug('SLS templates settings initialized')
