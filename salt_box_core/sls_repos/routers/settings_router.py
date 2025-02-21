@@ -5,13 +5,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import DuplicateKeyError, ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId, SkipLimitParams
-from salt_box_core.sls_repos.schemas import (
+from salt_box_core.schema_sync.schemas import JSONSchemaSyncResponse
+from salt_box_core.sls_repos.schemas.settings_schemas import (
     SettingsSlsRepoCreateSchema,
     SettingsSlsRepoModel,
     SettingsSlsRepoShortSchema,
     SettingsSlsRepoUpdateSchema,
 )
 from salt_box_core.sls_repos.services.sls_repo_service import SettingsSlsRepoService, get_sls_repo_service
+from salt_box_core.sls_repos.services.sls_tpl_service import SlsTplService, get_sls_tpl_service
 
 router = APIRouter(prefix='/sls-repos', tags=['Settings'])
 
@@ -92,9 +94,10 @@ async def sls_repo_settings_update(
 async def sls_repo_settings_delete(
     sid: PyObjectId,
     service: Annotated[SettingsSlsRepoService, Depends(get_sls_repo_service)],
+    tpl_service: Annotated[SlsTplService, Depends(get_sls_tpl_service)],
 ) -> Response:
     try:
-        await service.delete(sid)
+        await service.delete_and_clean(sid, tpl_service)
     except Exception as e:
         msg = f'Error while deleting repository: {e!s}'
         logger.error(msg)
@@ -106,9 +109,10 @@ async def sls_repo_settings_delete(
 async def sls_repo_settings_sync(
     sid: PyObjectId,
     service: Annotated[SettingsSlsRepoService, Depends(get_sls_repo_service)],
-) -> None:
+    tpl_service: Annotated[SlsTplService, Depends(get_sls_tpl_service)],
+) -> JSONSchemaSyncResponse:
     try:
-        await service.sync(sid)
+        return await service.sync(sid, tpl_service)
     except Exception as e:
         logger.error('Error: %s', e)
         raise HTTPException(
