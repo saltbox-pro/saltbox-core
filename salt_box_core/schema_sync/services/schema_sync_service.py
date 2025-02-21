@@ -1,4 +1,6 @@
+import asyncio
 import json
+import re
 from pathlib import Path
 
 from git import Repo
@@ -25,7 +27,8 @@ class SchemaGitRepoService:
         try:
             logger.debug('Try to clon repo %s', self.repo_url)
             self.repo = Repo.clone_from(self.repo_url, self.local_path)
-        except Exception:
+        except Exception as e:
+            logger.error('Failed to clone repo: %s', str(e))
             logger.debug('Repo exists -> Try to pull repo')
             self.repo = Repo.init(self.local_path)
             origin = self.repo.remote(name='origin')
@@ -37,6 +40,54 @@ class SchemaGitRepoService:
         logger.debug(msg)
         commits = list(self.repo.iter_commits(paths=file_str, max_count=1))
         return commits[0].hexsha if commits else ''
+
+    async def extract_schema(self, file: Path) -> tuple[dict | None, str | None]:
+        with Path.open(file) as f:
+            content = f.read()
+
+        pattern = re.compile(r'{#start_schema(.*?)end_schema#}', re.DOTALL)
+        match = pattern.search(content)
+
+        if match:
+            schema_content = match.group(1).strip()
+            try:
+                logger.debug('Try ast_eval file: %s', file)
+                schema_dict = json.loads(schema_content)
+                if not isinstance(schema_dict, dict):
+                    msg = f'{file}: Schema is not a dictionary'
+                    return None, msg
+
+                if 'json_schema' not in schema_dict.keys() and 'title' in schema_dict.keys():
+                    json_schema = schema_dict
+                else:
+                    json_schema = schema_dict.get('json_schema', {})
+
+                logger.debug('resolved path: %s', file.resolve())
+
+                schema = {
+                    'title': json_schema['title'],
+                    'name': file.name.replace('.sls', ''),
+                    'json_schema': json_schema,
+                    'ui_schema': schema_dict.get('ui_schema', {}),
+                    'commit_hash': self.get_latest_commit_hash(file),
+                }
+                return schema, None
+            except json.JSONDecodeError as e:
+                msg = f'{file}: Failed to parse file ({e!s})'
+                logger.error(msg)
+                return None, msg
+        else:
+            return None, None
+
+    async def extract_schema_from_sls(self) -> tuple[list[dict], list[str]]:
+        files = list(Path(self.local_path).rglob('*.sls'))
+        tasks = [self.extract_schema(file) for file in files]
+        results = await asyncio.gather(*tasks)
+
+        schemas = [result[0] for result in results if result[0] is not None]
+        errors = [result[1] for result in results if result[1] is not None]
+
+        return schemas, errors
 
     async def parse_schemas(self) -> tuple[list[dict], list[str]]:
         schemas = []
