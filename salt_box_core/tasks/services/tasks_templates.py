@@ -3,7 +3,7 @@ from typing import Annotated, Any
 
 from fastapi import Depends
 
-from salt_box_core.db.redis import RedisDependency
+from salt_box_core.db.mongo.schemas_base import PyObjectId
 from salt_box_core.tasks.repositories.task_template_repository import (
     TaskTemplateRepository,
     get_task_template_repository,
@@ -20,12 +20,8 @@ from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService
 class TaskTemplateService(
     MongoBaseService[TaskTemplateRepository, TaskTemplateModel, TaskTemplateCreateSchema, TaskTemplateUpdateSchema]
 ):
-    repository_class = TaskTemplateRepository
-
-    def __init__(self, repo: TaskTemplateRepository, rdb: RedisDependency):
-        super().__init__(repo=repo)
-
-        self.rdb = rdb
+    async def get_by_name(self, name: str, sid: PyObjectId) -> TaskTemplateModel:
+        return await self.repo.get({'name': name, 'repo_id': sid})
 
     @staticmethod
     def get_context(task_template: TaskTemplateModel, variables_data: dict) -> dict:  # noqa: C901
@@ -109,6 +105,6 @@ class TaskTemplateService(
 
 
 async def get_task_template_service(
-    repo: Annotated[TaskTemplateRepository, Depends(get_task_template_repository)], rdb: RedisDependency
+    repo: Annotated[TaskTemplateRepository, Depends(get_task_template_repository)],
 ) -> TaskTemplateService:
-    return TaskTemplateService(repo=repo, rdb=rdb)
+    return TaskTemplateService(repo)

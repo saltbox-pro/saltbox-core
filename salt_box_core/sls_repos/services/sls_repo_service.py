@@ -20,8 +20,8 @@ from salt_box_core.sls_repos.schemas.settings_schemas import (
     SettingsSlsRepoModel,
     SettingsSlsRepoUpdateSchema,
 )
-from salt_box_core.sls_repos.schemas.tpl_schemas import SlsTplCreateSchema, SlsTplUpdateSchema
-from salt_box_core.sls_repos.services.sls_tpl_service import SlsTplService
+from salt_box_core.tasks.schemas.task_template_schemas import TaskTemplateCreateSchema, TaskTemplateUpdateSchema
+from salt_box_core.tasks.services.tasks_templates import TaskTemplateService
 from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService
 
 
@@ -49,7 +49,7 @@ class SettingsSlsRepoService(
         # return task id
         pass
 
-    async def delete_and_clean(self, sid: PyObjectId, tpl_service: SlsTplService) -> None:
+    async def delete_and_clean(self, sid: PyObjectId, tpl_service: TaskTemplateService) -> None:
         repo_settings = await self.get(sid)
         # Remove all templates from this repo
         try:
@@ -72,7 +72,7 @@ class SettingsSlsRepoService(
 
         await self.delete(sid)
 
-    async def sync(self, sid: PyObjectId, sls_tpl_service: SlsTplService) -> JSONSchemaSyncResponse:
+    async def sync(self, sid: PyObjectId, sls_tpl_service: TaskTemplateService) -> JSONSchemaSyncResponse:
         repo_settings = await self.get(sid)
         git_repo = SchemaGitRepoService(
             repo_url=repo_settings.repo_url.unicode_string(),
@@ -122,12 +122,12 @@ class SettingsSlsRepoService(
 
             if not existing_schema:
                 logger.debug('Try create: %s', schema['name'])
-                schema_create_obj = SlsTplCreateSchema(**schema, repo_id=sid)
+                schema_create_obj = TaskTemplateCreateSchema(**schema, repo_id=sid)
                 await sls_tpl_service.create(schema_create_obj)
                 created.append(schema_create_obj.name)
             elif existing_schema.commit_hash != schema['commit_hash'] and existing_schema.repo_id == sid:
                 logger.debug('Try update: %s', schema['name'])
-                schema_update_obj = SlsTplUpdateSchema(**schema)
+                schema_update_obj = TaskTemplateUpdateSchema(**schema)
                 await sls_tpl_service.update({'name': schema['name']}, schema_update_obj)
                 updated.append(schema_update_obj.name)
 

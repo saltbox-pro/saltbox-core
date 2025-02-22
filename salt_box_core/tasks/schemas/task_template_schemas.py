@@ -1,16 +1,10 @@
-import logging.config
-import re
 from enum import Enum
 from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from salt_box_core.config import LOG_CONFIG
-from salt_box_core.db.mongo.schemas_base import CreatedModifiedMixin, IDMixin, PaginatedListParams
-
-logging.config.dictConfig(LOG_CONFIG.model_dump())
-
-logger = logging.getLogger(__name__)
+# from salt_box_core.config import logger
+from salt_box_core.db.mongo.schemas_base import CreatedModifiedMixin, IDMixin, PaginatedListParams, PyObjectId
 
 
 class TaskTemplateVariable(BaseModel):
@@ -63,9 +57,7 @@ class TaskTemplateVariable(BaseModel):
         return value
 
 
-class TaskTemplateReadOnlyFieldsMixin:
-    # slug: str = Field(title='Slug', pattern=r'^[a-z0-9-]+$', min_length=3, max_length=30)
-
+class ReadOnlyFieldsShortMixin:
     fun: str = Field(title='Salt fun', examples=['salt.ping'])
 
     variables: list[TaskTemplateVariable] = Field(title='Variables')
@@ -74,53 +66,38 @@ class TaskTemplateReadOnlyFieldsMixin:
         title='Kwargs', examples=[{'const_kwarg': 'const_kwarg_value', 'var_kwarg': '<<task_var.var_name>>'}]
     )
 
-
-class TaskTemplateEditableFieldsMixin:
-    title: str = Field(title='Title')
-
-
-class TaskTemplateCreateSchema(BaseModel, TaskTemplateEditableFieldsMixin, TaskTemplateReadOnlyFieldsMixin):
-    @model_validator(mode='after')
-    def validate_variables(self) -> 'TaskTemplateCreateSchema':
-        str_values_of_args_and_kwargs: list[str] = [
-            val for val in self.task_args + list(self.task_kwargs.values()) if isinstance(val, str)
-        ]
-        var_names: list[str] = [var.name for var in self.variables]
-
-        # Check for unused variables
-        for var_name in var_names:
-            var_str = f'<<task_var.{var_name}>>'
-            var_found: bool = False
-
-            for arg in str_values_of_args_and_kwargs:
-                if var_str in arg:
-                    var_found = True
-                    break
-
-            if var_found is False:
-                msg: str = f'The variable "{var_name}" is defined, but not used'
-                raise ValueError(msg)
-
-        # Check for unknown variables
-        var_pattern = r'<<task_var\.(.+)>>'
-        for var in str_values_of_args_and_kwargs:
-            for match in re.finditer(var_pattern, var):
-                if match.group(1) not in var_names:
-                    msg = f'The variable "{match.group(1)}" is not defined'
-                    raise ValueError(msg)
-
-        return self
+    title: str = Field(title='Template title')
+    name: str = Field(title='sls name')
+    repo_id: PyObjectId = Field(title='Repository ID')
+    commit_hash: str = Field(title='Commit hash')
 
 
-class TaskTemplateUpdateSchema(BaseModel, TaskTemplateEditableFieldsMixin):
+class ReadOnlyFieldsFullMixin(ReadOnlyFieldsShortMixin):
+    json_schema: dict = Field(title='JSON schema')
+    ui_schema: dict = Field(title='UI schema', default_factory=dict)
+
+
+class EditableFieldsShortMixin: ...
+
+
+class EditableFieldsFullMixin(EditableFieldsShortMixin): ...
+
+
+class TaskTemplateCreateSchema(BaseModel, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin):
+    pass
+
+
+class TaskTemplateUpdateSchema(BaseModel, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin):
     model_config = ConfigDict(
         extra='forbid',
     )
 
 
-class TaskTemplateModel(
-    BaseModel, CreatedModifiedMixin, TaskTemplateEditableFieldsMixin, TaskTemplateReadOnlyFieldsMixin, IDMixin
-):
+class TaskTemplateShortSchema(BaseModel, ReadOnlyFieldsShortMixin, EditableFieldsShortMixin, IDMixin):
+    pass
+
+
+class TaskTemplateModel(BaseModel, CreatedModifiedMixin, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin, IDMixin):
     pass
 
 

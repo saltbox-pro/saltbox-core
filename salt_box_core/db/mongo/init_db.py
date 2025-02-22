@@ -5,12 +5,13 @@ from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.minion_collections.repositories.collection_repository import CollectionRepository
 from salt_box_core.minion_collections.schemas.collection_schemas import CollectionCreateSchema
 from salt_box_core.schema_sync.repository import JSONSchemaRepository
-from salt_box_core.sls_repos.repository import SettingsSlsRepoRepository, SlsTplRepository
+from salt_box_core.sls_repos.repository import SettingsSlsRepoRepository
+from salt_box_core.tasks.repositories.task_template_repository import TaskTemplateRepository
 
 
-async def init_sls_tpl_settings() -> None:
+async def init_task_tpl() -> None:
     db = get_mongo_db()
-    sls_tpl_repo = SlsTplRepository(db)
+    sls_tpl_repo = TaskTemplateRepository(db)
 
     # Check existing indexes
     indexes = sorted(await sls_tpl_repo.collection.index_information())
@@ -99,6 +100,6 @@ async def init_mongo_db() -> None:
     await init_sls_repos_settings()
     logger.debug('SLS repos settings initialized')
 
-    # Initialize sls_tpl_settings collection
-    await init_sls_tpl_settings()
-    logger.debug('SLS templates settings initialized')
+    # Initialize sls_tpl collection
+    await init_task_tpl()
+    logger.debug('SLS templates initialized')

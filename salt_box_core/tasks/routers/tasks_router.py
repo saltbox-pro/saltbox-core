@@ -1,7 +1,7 @@
 import logging.config
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, WebSocket, status
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, status
 
 from salt_box_core import http_errors
 from salt_box_core.config import LOG_CONFIG
@@ -16,15 +16,8 @@ from salt_box_core.tasks.schemas.task_schemas import (
     TaskListResponseSchema,
     TaskModel,
 )
-from salt_box_core.tasks.schemas.task_template_schemas import (
-    TaskTemplateCreateSchema,
-    TaskTemplateListQueryParams,
-    TaskTemplateModel,
-    TaskTemplateUpdateSchema,
-)
 from salt_box_core.tasks.services.tasks import TaskService, get_task_service
 from salt_box_core.tasks.services.tasks_lifespan import TaskLifespanService, get_task_lifespan_service
-from salt_box_core.tasks.services.tasks_templates import TaskTemplateService, get_task_template_service
 from salt_box_core.utilities.exceptions import ObjectDoesNotExistError
 from salt_box_core.utilities.jid import JID
 from salt_box_core.utilities.websocket import PubSubAuthenticatedWebSocket
@@ -41,71 +34,6 @@ router = APIRouter(
 )
 
 ws_router = APIRouter(prefix='/tasks')
-
-
-# Task templates views
-
-
-@router.get('/template', operation_id='templates_list')
-async def templates_list(
-    params: Annotated[TaskTemplateListQueryParams, Query()],
-    task_templates_service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
-) -> PaginatedResponse[TaskTemplateModel]:
-    task_templates: PaginatedResponse[TaskTemplateModel] = await task_templates_service.get_list_paginated(
-        query={}, limit=params.per_page, skip=params.page * params.per_page
-    )
-
-    return task_templates
-
-
-@router.post('/template', operation_id='template_create')
-async def template_create(
-    item: TaskTemplateCreateSchema,
-    task_templates_service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
-) -> TaskTemplateModel:
-    obj: TaskTemplateModel = await task_templates_service.create(data=item)
-
-    return obj
-
-
-@router.get('/template/{tid}', operation_id='template_retrieve')
-async def template_retrieve(
-    tid: PyObjectId, task_templates_service: Annotated[TaskTemplateService, Depends(get_task_template_service)]
-) -> TaskTemplateModel:
-    try:
-        obj: TaskTemplateModel = await task_templates_service.get(query=tid)
-    except ObjectDoesNotExistError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task template does not found') from e
-
-    return obj
-
-
-@router.put('/template/{tid}', operation_id='template_update')
-async def template_update(
-    tid: PyObjectId,
-    item: TaskTemplateUpdateSchema,
-    task_templates_service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
-) -> TaskTemplateModel:
-    try:
-        updated_obj: TaskTemplateModel = await task_templates_service.update(
-            query=tid, data=item
-        )
-    except ObjectDoesNotExistError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task template does not found') from e
-
-    return updated_obj
-
-
-@router.delete('/template/{tid}', operation_id='template_delete', status_code=status.HTTP_204_NO_CONTENT)
-async def template_delete(
-    tid: PyObjectId, task_templates_service: Annotated[TaskTemplateService, Depends(get_task_template_service)]
-) -> Response:
-    deleted_count = await task_templates_service.delete(query=tid)
-
-    return Response(status_code=status.HTTP_204_NO_CONTENT, content=deleted_count)
-
-
-# Tasks views
 
 
 @router.get('', operation_id='tasks_list')

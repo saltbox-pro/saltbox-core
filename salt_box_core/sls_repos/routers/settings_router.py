@@ -13,7 +13,7 @@ from salt_box_core.sls_repos.schemas.settings_schemas import (
     SettingsSlsRepoUpdateSchema,
 )
 from salt_box_core.sls_repos.services.sls_repo_service import SettingsSlsRepoService, get_sls_repo_service
-from salt_box_core.sls_repos.services.sls_tpl_service import SlsTplService, get_sls_tpl_service
+from salt_box_core.tasks.services.tasks_templates import TaskTemplateService, get_task_template_service
 
 router = APIRouter(prefix='/sls-repos', tags=['Settings'])
 
@@ -94,7 +94,7 @@ async def sls_repo_settings_update(
 async def sls_repo_settings_delete(
     sid: PyObjectId,
     service: Annotated[SettingsSlsRepoService, Depends(get_sls_repo_service)],
-    tpl_service: Annotated[SlsTplService, Depends(get_sls_tpl_service)],
+    tpl_service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
 ) -> Response:
     try:
         await service.delete_and_clean(sid, tpl_service)
@@ -109,7 +109,7 @@ async def sls_repo_settings_delete(
 async def sls_repo_settings_sync(
     sid: PyObjectId,
     service: Annotated[SettingsSlsRepoService, Depends(get_sls_repo_service)],
-    tpl_service: Annotated[SlsTplService, Depends(get_sls_tpl_service)],
+    tpl_service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
 ) -> JSONSchemaSyncResponse:
     try:
         return await service.sync(sid, tpl_service)
