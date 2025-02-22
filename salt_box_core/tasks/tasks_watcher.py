@@ -49,7 +49,7 @@ class TasksWatcher:
         job_service: JobService = JobService(rdb=redis, json_schema_service=json_schema_service)
         minion_service: MinionService = MinionService(repo=self.minions_repository)
         collection_service: CollectionService = CollectionService(repo=self.collections_repository)
-        task_template_service: TaskTemplateService = TaskTemplateService(repo=self.task_template_repository, rdb=redis)
+        task_template_service: TaskTemplateService = TaskTemplateService(repo=self.task_template_repository)
         task_service: TaskService = TaskService(
             repo=self.task_repository, rdb=redis, task_template_service=task_template_service
         )

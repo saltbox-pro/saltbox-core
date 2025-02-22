@@ -8,19 +8,22 @@ from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId, SkipLimitParams
 from salt_box_core.sls_repos.schemas.settings_schemas import SettingsSlsRepoShortSchema
-from salt_box_core.sls_repos.schemas.tpl_schemas import SlsTplModel, SlsTplShortSchema
 from salt_box_core.sls_repos.services.sls_repo_service import SettingsSlsRepoService, get_sls_repo_service
-from salt_box_core.sls_repos.services.sls_tpl_service import SlsTplService, get_sls_tpl_service
+from salt_box_core.tasks.schemas.task_template_schemas import (
+    TaskTemplateModel,
+    TaskTemplateShortSchema,
+)
+from salt_box_core.tasks.services.tasks_templates import TaskTemplateService, get_task_template_service
 
-router = APIRouter(prefix='/sls-templates', tags=['SLS Templates'])
+router = APIRouter(prefix='/tasks/template', tags=['Task Templates'])
 
 
 @router.get('')
-async def sls_template_list(
+async def task_template_list(
     params: Annotated[SkipLimitParams, Query()],
-    service: Annotated[SlsTplService, Depends(get_sls_tpl_service)],
+    service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
     repo_settings_service: Annotated[SettingsSlsRepoService, Depends(get_sls_repo_service)],
-) -> PaginatedResponse[SlsTplShortSchema]:
+) -> PaginatedResponse[TaskTemplateShortSchema]:
     active_repos = await repo_settings_service.get_list(
         query={'is_active': True}, skip=0, limit=0, projection_model=SettingsSlsRepoShortSchema
     )
@@ -30,7 +33,7 @@ async def sls_template_list(
             query={'repo_id': {'$in': active_repo_ids}},
             skip=params.skip,
             limit=params.limit,
-            projection_model=SlsTplShortSchema,
+            projection_model=TaskTemplateShortSchema,
         )
     except Exception as e:
         msg = f'{e!s}'
@@ -39,10 +42,10 @@ async def sls_template_list(
 
 
 @router.get('/{tpl_id}')
-async def sls_template_get(
+async def task_template_retrieve(
     tpl_id: PyObjectId,
-    service: Annotated[SlsTplService, Depends(get_sls_tpl_service)],
-) -> SlsTplModel:
+    service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
+) -> TaskTemplateModel:
     try:
         return await service.get(tpl_id)
     except ObjectNotFoundError as e:

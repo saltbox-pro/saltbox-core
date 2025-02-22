@@ -65,11 +65,16 @@ class SchemaGitRepoService:
                 logger.debug('resolved path: %s', file.resolve())
 
                 schema = {
+                    'fun': 'state.apply',
                     'title': json_schema['title'],
                     'name': file.name.replace('.sls', ''),
                     'json_schema': json_schema,
                     'ui_schema': schema_dict.get('ui_schema', {}),
                     'commit_hash': self.get_latest_commit_hash(file),
+                    # TODO (i.moshkov): Remove
+                    'variables': [],
+                    'task_args': [],
+                    'task_kwargs': {},
                 }
                 return schema, None
             except json.JSONDecodeError as e:
