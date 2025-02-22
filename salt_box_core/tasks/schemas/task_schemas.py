@@ -108,7 +108,6 @@ class TaskModel(BaseModel, CreatedModifiedMixin, TaskEditableFieldsMixin, TaskRe
 
 class TaskCreateFromTemplateSchema(BaseModel):
     task_template_id: PyObjectId = Field(title='Task template id')
-    variables_data: dict[str, Any] = Field(title='Variables data')
     salt_masters: list[str] = ['salt-master']
     data: TaskData | None = None
 

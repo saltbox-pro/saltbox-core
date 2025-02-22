@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from typing import Annotated, Any, TypeVar, overload
 
 from fastapi import Depends
+from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 from pydantic import BaseModel
 from redis.asyncio import Redis
 
@@ -22,7 +23,7 @@ from salt_box_core.tasks.schemas.task_template_schemas import (
     TaskTemplateModel,
 )
 from salt_box_core.tasks.services.tasks_templates import TaskTemplateService, get_task_template_service
-from salt_box_core.utilities.exceptions import ObjectDoesNotExistError
+from salt_box_core.utilities.exceptions import ObjectDoesNotExistError, ServiceError
 from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService
 
 ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
@@ -61,17 +62,21 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateFromTemp
     ) -> TaskModel | ProjectionModel:
         task_template: TaskTemplateModel = await self.task_template_service.get(query=data.task_template_id)
 
-        context: dict = self.task_template_service.get_context(
-            task_template=task_template, variables_data=data.variables_data
-        )
-        task_args = self.task_template_service.get_task_args(task_template, data.variables_data, context)
-        task_kwargs = self.task_template_service.get_task_kwargs(task_template, data.variables_data, context)
+        try:
+            validated_data: dict = await self.task_template_service.get_validated_data(
+                name=task_template.name,
+                sid=task_template.repo_id,
+                data=data.data.model_dump(exclude_none=True, by_alias=True) if data.data else {},
+            )
+        except JsonSchemaValidationError as err:
+            raise ServiceError(err) from err
+
         creation_data = TaskCreateSchema.model_validate(
             {
                 'task_template_id': task_template.id,
                 'fun': task_template.fun,
-                'task_args': task_args,
-                'task_kwargs': task_kwargs,
+                'task_args': validated_data['args'] if 'args' in validated_data else [],
+                'task_kwargs': validated_data['kwargs'] if 'kwargs' in validated_data else {},
                 'collection_id': data.collection_id,
                 'query': data.query,
                 'minions': data.minions,
