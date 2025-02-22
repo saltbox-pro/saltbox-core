@@ -95,6 +95,7 @@ class JobResult(BaseModel):
 
     id: str
     success: bool
+    salt_master: str
     return_: Any = Field(alias='return')
     retcode: int
     jid: StrJid
