@@ -50,7 +50,7 @@ class SchemaGitRepoService:
 
         # take only path from `states` dir
         try:
-            salt_find_sls_index = file.parts.index(self.salt_find_sls_dir)
+            salt_find_sls_index = file.parts.index(self.local_name)
             path_parts = file.parts[salt_find_sls_index + 1 : -1]
         except ValueError:
             path_parts = ()
