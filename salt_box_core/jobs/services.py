@@ -58,10 +58,10 @@ class JobService:
                 'tgt_type': job_data.tgt_type,
             }
 
-            if 'data_args' in validated_data:
-                _data['data_args'] = json.dumps(validated_data['data_args'])
-            if 'data_kwargs' in validated_data:
-                _data['data_kwargs'] = json.dumps(validated_data['data_kwargs'])
+            if 'args' in validated_data:
+                _data['arg'] = json.dumps(validated_data['args'])
+            if 'kwargs' in validated_data:
+                _data['kwarg'] = json.dumps(validated_data['kwargs'])
 
             await self.rdb.hmset(
                 name=create_job_hash_name,

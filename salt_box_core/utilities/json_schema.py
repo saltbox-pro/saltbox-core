@@ -1,7 +1,8 @@
-from jsonschema import Draft4Validator, validators
+from jsonschema import Draft202012Validator as JsonSchemaValidator
+from jsonschema import validators
 
 
-def extend_validator_with_default(validator_class: type[Draft4Validator]) -> type[Draft4Validator]:
+def extend_validator_with_default(validator_class: type[JsonSchemaValidator]) -> type[JsonSchemaValidator]:
     validate_properties = validator_class.VALIDATORS['properties']
 
     def set_defaults(validator, properties, instance, schema):  # type: ignore[no-untyped-def]
@@ -18,4 +19,4 @@ def extend_validator_with_default(validator_class: type[Draft4Validator]) -> typ
     return validators.extend(validator_class, {'properties': set_defaults})  # type: ignore[no-any-return]
 
 
-Draft4ValidatorWithDefaults = extend_validator_with_default(Draft4Validator)
+Draft4ValidatorWithDefaults = extend_validator_with_default(JsonSchemaValidator)
