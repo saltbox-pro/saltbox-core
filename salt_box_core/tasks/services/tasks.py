@@ -71,12 +71,18 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateFromTemp
         except JsonSchemaValidationError as err:
             raise ServiceError(err) from err
 
+        task_args = validated_data['args'] if 'args' in validated_data else []
+        task_kwargs = validated_data['kwargs'] if 'kwargs' in validated_data else {}
+
+        if task_template.fun == 'state.apply' and 'moods' not in task_kwargs:
+            task_kwargs['moods'] = task_template.name
+
         creation_data = TaskCreateSchema.model_validate(
             {
                 'task_template_id': task_template.id,
                 'fun': task_template.fun,
-                'task_args': validated_data['args'] if 'args' in validated_data else [],
-                'task_kwargs': validated_data['kwargs'] if 'kwargs' in validated_data else {},
+                'task_args': task_args,
+                'task_kwargs': task_kwargs,
                 'collection_id': data.collection_id,
                 'query': data.query,
                 'minions': data.minions,
