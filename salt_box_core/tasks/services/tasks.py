@@ -75,7 +75,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateFromTemp
         task_kwargs = validated_data['kwargs'] if 'kwargs' in validated_data else {}
 
         if task_template.fun == 'state.apply' and 'moods' not in task_kwargs:
-            task_kwargs['moods'] = task_template.name
+            task_kwargs['mods'] = task_template.name
 
         creation_data = TaskCreateSchema.model_validate(
             {
