@@ -20,8 +20,9 @@ class SchemaGitRepoService:
             self.repo_url = f'https://{self.login}:{self.token}@{parts[1]}'
 
         self.local_name = local_name or self.repo_url.rstrip('/').split('/')[-1].replace('.git', '')
-        self.local_path = Path(SETTINGS.local_repos_path) / self.local_name
+        self.local_path = './' / Path(SETTINGS.local_repos_path) / self.local_name
         self.repo: Repo
+        self.salt_find_sls_dir = 'states'
 
     def clone_or_pull(self) -> None:
         try:
@@ -45,19 +46,32 @@ class SchemaGitRepoService:
         with Path.open(file) as f:
             content = f.read()
 
+        logger.debug('file: %s', file.parts)
+
+        # take only path from `states` dir
+        try:
+            salt_find_sls_index = file.parts.index(self.salt_find_sls_dir)
+            path_parts = file.parts[salt_find_sls_index + 1 : -1]
+        except ValueError:
+            path_parts = ()
+        logger.debug('parts_after_salt_find_sls: %s', path_parts)
+
+        name = '.'.join(path_parts) + '.' + file.stem
+
         pattern = re.compile(r'{#start_schema(.*?)end_schema#}', re.DOTALL)
         match = pattern.search(content)
 
         if match:
             schema_content = match.group(1).strip()
             try:
-                logger.debug('Try ast_eval file: %s', file)
+                logger.debug('Try json_load from file: %s', file)
                 schema_dict = json.loads(schema_content)
                 if not isinstance(schema_dict, dict):
                     msg = f'{file}: Schema is not a dictionary'
                     return None, msg
 
                 if 'json_schema' not in schema_dict.keys() and 'title' in schema_dict.keys():
+                    # For v1 format without ui_schema
                     json_schema = schema_dict
                 else:
                     json_schema = schema_dict.get('json_schema', {})
@@ -67,7 +81,7 @@ class SchemaGitRepoService:
                 schema = {
                     'fun': 'state.apply',
                     'title': json_schema['title'],
-                    'name': file.name.replace('.sls', ''),
+                    'name': name,
                     'json_schema': json_schema,
                     'ui_schema': schema_dict.get('ui_schema', {}),
                     'commit_hash': self.get_latest_commit_hash(file),

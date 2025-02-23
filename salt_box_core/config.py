@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     opa_url: str
     salt_func_repo_url: str = 'https://dev.altlab.su/a.baikov/salt-func-schemas.git'
     salt_func_local_repo_name: str = 'salt-func-schemas'
-    local_repos_path: str = './repos'
+    local_repos_path: str = 'repos'
 
     model_config = SettingsConfigDict(env_file='.env')
 
