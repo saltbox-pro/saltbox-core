@@ -239,8 +239,10 @@ class TaskLifespanService:
                     'tgt': job_target.tgt,
                     'tgt_type': job_target.type,
                     'fun': task.fun,
-                    'arg': task.task_args,
-                    'kwarg': task.task_kwargs,
+                    'data': {
+                        'args': task.task_args,
+                        'kwargs': task.task_kwargs,
+                    },
                     'salt_master': job_target.master,
                 }
             )
