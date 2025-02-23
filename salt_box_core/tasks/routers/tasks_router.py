@@ -51,6 +51,10 @@ async def tasks_list(
 async def task_create(
     item: TaskCreateFromTemplateSchema, task_service: Annotated[TaskService, Depends(get_task_service)]
 ) -> TaskModel:
+    # TODO (i.moshkov): remove this
+    if item.query == {'$and': [{'$expr': True}]}:
+        item.query = {}
+
     try:
         task: TaskModel = await task_service.create(data=item)
     except ValueError as e:
