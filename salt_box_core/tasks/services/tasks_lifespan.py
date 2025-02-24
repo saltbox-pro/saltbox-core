@@ -27,7 +27,7 @@ from salt_box_core.tasks.schemas.task_schemas import (
 )
 from salt_box_core.tasks.services.tasks import TaskService, get_task_service
 from salt_box_core.utilities.exceptions import ServiceError
-from salt_box_core.utilities.helpers import get_now_stamp_str
+from salt_box_core.utilities.helpers import get_now_stamp_str, recursive_replace_dates
 from salt_box_core.utilities.jid import JID
 from salt_box_core.utilities.mongo_query_to_salt_tgt_converter import MongoQueryToSaltTgtConverter
 
@@ -136,6 +136,24 @@ class TaskLifespanService:
 
         return result
 
+    def __check_query(self, _query: dict[str, Any]) -> bool:
+        for query_key, query_item in _query.items():
+            if query_key.startswith('grains.'):
+                continue
+
+            if query_key.startswith('$'):
+                if isinstance(query_item, dict):
+                    if self.__check_query(query_item):
+                        return True
+                elif isinstance(query_item, list):
+                    for item in [item for item in query_item if isinstance(item, dict)]:
+                        if self.__check_query(item):
+                            return True
+            else:
+                return True
+
+        return False
+
     async def __get_task_targeting(self) -> list[TaskJobTarget]:
         task: TaskModel = await self.get_task()
         collection: CollectionModel = await self.collection_service.get(task.collection_id)
@@ -150,7 +168,10 @@ class TaskLifespanService:
         elif task.minions:
             query = {'$and': [query, {'_id': {'$in': [PyObjectId(minion_id) for minion_id in task.minions]}}]}
 
-        if task.minions or task.batch_size:
+        not_compound_compatible_query: bool = self.__check_query(query)
+
+        if task.minions or task.batch_size or not_compound_compatible_query:
+            query = recursive_replace_dates(query)
             minions: list[MinionModel] = await self.minion_service.get_list(query=query, limit=0, skip=0)
 
             _result: dict[str, list[str]] = {}
