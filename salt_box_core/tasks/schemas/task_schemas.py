@@ -74,6 +74,11 @@ class TaskTemplateShort(BaseModel):
     commit_hash: str
 
 
+class TaskMinion(BaseModel):
+    minion_id: str
+    master: str
+
+
 class TaskReadOnlyFieldsMixin:
     task_template: TaskTemplateShort = Field(title='Task template')
 
@@ -100,8 +105,8 @@ class TaskEditableFieldsMixin:
 
     targets_queue: list[TaskJobTarget] | None = Field(title='Jobs queue', default=None)
     jobs: list[TaskJob] = Field(title='Jobs', default=[])
-    minions_retries_counts: dict[str, int] = Field(title='Minions retries cunts', default={})
-    failed_for_minions: list[str] = Field(title='Minions failed', default=[])
+    minions_retries_counts: dict[str, dict[str, int]] = Field(title='Minions retries cunts', default={})
+    failed_for_minions: list[TaskMinion] = Field(title='Minions failed', default=[])
 
 
 class TaskCreateSchema(BaseModel, TaskEditableFieldsMixin, TaskReadOnlyFieldsMixin):

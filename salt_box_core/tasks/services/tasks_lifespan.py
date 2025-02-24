@@ -8,8 +8,8 @@ from salt_box_core.config import LOG_CONFIG
 from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.db.mongo.schemas_base import PyObjectId
 from salt_box_core.db.redis import RedisDependency
-from salt_box_core.jobs.exceptions import JobCreateException
-from salt_box_core.jobs.schemas import JobCreate, JobResult
+from salt_box_core.jobs.exceptions import JobCreateException, JobDoesNotExistsException
+from salt_box_core.jobs.schemas import Job, JobCreate, JobResult
 from salt_box_core.jobs.services import JobService, get_job_service
 from salt_box_core.minion_collections.schemas.collection_schemas import CollectionModel
 from salt_box_core.minion_collections.schemas.minion_schemas import MinionModel
@@ -21,6 +21,7 @@ from salt_box_core.tasks.schemas.task_schemas import (
     TaskJobStatus,
     TaskJobTarget,
     TaskJobTargetType,
+    TaskMinion,
     TaskModel,
     TaskStatus,
     TaskUpdateSchema,
@@ -103,6 +104,13 @@ class TaskLifespanService:
         if task.status == TaskStatus.running:
             await self.__stop_jobs()
             await self.update_task(status=TaskStatus.stopped)
+
+    async def restart_failed(self) -> None:
+        task: TaskModel = await self.get_task()
+
+        if task.status == TaskStatus.finished:
+            await self.__fill_jobs_queue_from_failed(ignore_limits=True)
+            await self.update_task(status=TaskStatus.running)
 
     async def __can_start_job(self) -> bool:
         task: TaskModel = await self.get_task()
@@ -207,10 +215,10 @@ class TaskLifespanService:
     async def __check_job_returns(self, job: TaskJob) -> None:
         task: TaskModel = await self.get_task()
         job_returns: list[JobResult] = await self.job_service.get_job_all_returns(JID(job.jid))
-        targets_with_failed_job: dict[str, list[str]] = {}
 
         for return_data in job_returns:
             minion_id: str = return_data.id
+            master: str = return_data.salt_master
             returns_status = job.returns_statuses.get(minion_id, TaskJobReturnStatus.waiting)
 
             if returns_status != TaskJobReturnStatus.waiting:
@@ -219,19 +227,33 @@ class TaskLifespanService:
             if return_data.success is True:
                 job.returns_statuses[minion_id] = TaskJobReturnStatus.succeeded
             else:
-                task.minions_retries_counts.setdefault(minion_id, 0)
-                task.minions_retries_counts[minion_id] += 1
+                task.minions_retries_counts.setdefault(master, {}).setdefault(minion_id, 0)
+                task.minions_retries_counts[master][minion_id] += 1
 
-                if task.minions_retries_counts[minion_id] <= task.max_retries - 1:
-                    targets_with_failed_job.setdefault(job.target.master, []).append(minion_id)
-                else:
-                    task.failed_for_minions.append(minion_id)
+                failed_minion = TaskMinion(minion_id=minion_id, master=master)
+                if failed_minion not in task.failed_for_minions:
+                    task.failed_for_minions.append(failed_minion)
 
                 job.returns_statuses[minion_id] = TaskJobReturnStatus.failed
 
             job.finished_stamp = get_now_stamp_str()
 
-        targets = await self.__build_targets_list_from_dict(targets_with_failed_job)
+        await self.__fill_jobs_queue_from_failed()
+
+    async def __fill_jobs_queue_from_failed(self, ignore_limits: bool = False) -> None:
+        task: TaskModel = await self.get_task()
+        targets_dict: dict[str, list[str]] = {}
+
+        failed_for_minions = task.failed_for_minions
+        task.failed_for_minions = []
+
+        for minion in failed_for_minions:
+            if ignore_limits or task.minions_retries_counts[minion.master][minion.minion_id] <= task.max_retries - 1:
+                targets_dict.setdefault(minion.master, []).append(minion.minion_id)
+            else:
+                task.failed_for_minions.append(minion)
+
+        targets = await self.__build_targets_list_from_dict(targets_dict)
         await self.__add_to_targets_queue(targets)
 
     async def __check_running_jobs(self) -> None:
@@ -241,12 +263,23 @@ class TaskLifespanService:
             if job.status != TaskJobStatus.running:
                 continue
 
+            try:
+                job_data: Job = await self.job_service.get_job(JID(job.jid))
+            except JobDoesNotExistsException:
+                job.status = TaskJobStatus.failed
+                continue
+
+            if job_data.status != Job.JobStatus.started:
+                continue
+
+            for minion_id in job_data.minions:
+                job.returns_statuses.setdefault(minion_id, TaskJobReturnStatus.waiting)
+
             await self.__check_job_returns(job=job)
 
             if not len(job.returns_statuses.keys()):
                 continue
 
-            # TODO (i.moshkov): process long-time jobs
             if all(status == TaskJobReturnStatus.succeeded for status in job.returns_statuses.values()):
                 job.status = TaskJobStatus.succeeded
             elif not any(status == TaskJobReturnStatus.waiting for status in job.returns_statuses.values()):
@@ -309,10 +342,14 @@ class TaskLifespanService:
         await self.__rub_jobs()
 
         if not task.targets_queue:
+            can_finish: bool = True
+
             for job in task.jobs:
                 if job.status == TaskJobStatus.running:
+                    can_finish = False
                     break
-            else:
+
+            if can_finish:
                 task.status = TaskStatus.finished
 
         await self.update_task(notify=True)

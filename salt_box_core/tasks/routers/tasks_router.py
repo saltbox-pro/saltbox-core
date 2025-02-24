@@ -149,6 +149,20 @@ async def task_stop(
     return task
 
 
+@router.post('/{tid}/restart_failed', operation_id='restart_failed')
+async def restart_failed(
+    task_lifespan_service: Annotated[TaskLifespanService, Depends(get_task_lifespan_service)],
+) -> TaskModel:
+    try:
+        task: TaskModel = await task_lifespan_service.get_task()
+    except ObjectDoesNotExistError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task not found') from e
+
+    await task_lifespan_service.restart_failed()
+
+    return task
+
+
 @ws_router.websocket('')
 async def tasks_websocket(websocket: WebSocket, rdb: RedisDependency) -> None:
     secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
