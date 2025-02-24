@@ -42,8 +42,13 @@ class TaskTemplateUpdateSchema(BaseModel, EditableFieldsFullMixin, ReadOnlyField
     )
 
 
+class RepoInTaskTemplateSchema(BaseModel):
+    name: str = Field(title='Repository name')
+    repo_url: str = Field(title='Repository URL')
+
+
 class TaskTemplateShortSchema(BaseModel, ReadOnlyFieldsShortMixin, EditableFieldsShortMixin, IDMixin):
-    pass
+    repo_info: RepoInTaskTemplateSchema
 
 
 class TaskTemplateModel(BaseModel, CreatedModifiedMixin, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin, IDMixin):
