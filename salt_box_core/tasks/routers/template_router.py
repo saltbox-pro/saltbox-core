@@ -6,10 +6,11 @@ from salt_box_core.config import logger
 
 # from salt_box_core.db.exceptions import DuplicateKeyError, ObjectNotFoundError
 from salt_box_core.db.exceptions import ObjectNotFoundError
-from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId, SkipLimitParams
+from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId
 from salt_box_core.sls_repos.schemas.settings_schemas import SettingsSlsRepoShortSchema
 from salt_box_core.sls_repos.services.sls_repo_service import SettingsSlsRepoService, get_sls_repo_service
 from salt_box_core.tasks.schemas.task_template_schemas import (
+    TaskTemplateListQueryParams,
     TaskTemplateModel,
     TaskTemplateShortSchema,
 )
@@ -20,7 +21,7 @@ router = APIRouter(prefix='/tasks/template', tags=['Task Templates'])
 
 @router.get('')
 async def task_template_list(
-    params: Annotated[SkipLimitParams, Query()],
+    params: Annotated[TaskTemplateListQueryParams, Query()],
     service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
     repo_settings_service: Annotated[SettingsSlsRepoService, Depends(get_sls_repo_service)],
 ) -> PaginatedResponse[TaskTemplateShortSchema]:
@@ -28,9 +29,18 @@ async def task_template_list(
         query={'is_active': True}, skip=0, limit=0, projection_model=SettingsSlsRepoShortSchema
     )
     active_repo_ids = [repo.id for repo in active_repos]
+    selected_repos_query = {'repo_id': {'$in': params.repo_ids}} if params.repo_ids else {}
+
+    query = {
+        '$and': [
+            {'repo_id': {'$in': active_repo_ids}},
+            selected_repos_query,
+        ]
+    }
+
     try:
         return await service.get_list_paginated(
-            query={'repo_id': {'$in': active_repo_ids}},
+            query=query,
             skip=params.skip,
             limit=params.limit,
             projection_model=TaskTemplateShortSchema,
