@@ -27,6 +27,10 @@ class CollectionService(
         result = await self.update({'slug': slug}, data)
         return result
 
+    async def delete_by_slug(self, slug: str) -> int:
+        result = await self.delete({'slug': slug})
+        return result
+
 
 def get_collection_service(
     repo: Annotated[CollectionRepository, Depends(get_collection_repository)],
