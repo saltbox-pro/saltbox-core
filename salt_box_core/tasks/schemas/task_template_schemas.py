@@ -3,7 +3,12 @@ from typing import ClassVar
 from pydantic import BaseModel, ConfigDict, Field
 
 # from salt_box_core.config import logger
-from salt_box_core.db.mongo.schemas_base import CreatedModifiedMixin, IDMixin, PaginatedListParams, PyObjectId
+from salt_box_core.db.mongo.schemas_base import (
+    CreatedModifiedMixin,
+    IDMixin,
+    PyObjectId,
+    SkipLimitParams,
+)
 
 
 class ReadOnlyFieldsShortMixin:
@@ -37,13 +42,19 @@ class TaskTemplateUpdateSchema(BaseModel, EditableFieldsFullMixin, ReadOnlyField
     )
 
 
+class RepoInTaskTemplateSchema(BaseModel):
+    name: str = Field(title='Repository name')
+    repo_url: str = Field(title='Repository URL')
+
+
 class TaskTemplateShortSchema(BaseModel, ReadOnlyFieldsShortMixin, EditableFieldsShortMixin, IDMixin):
-    pass
+    repo_info: RepoInTaskTemplateSchema
 
 
 class TaskTemplateModel(BaseModel, CreatedModifiedMixin, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin, IDMixin):
     pass
 
 
-class TaskTemplateListQueryParams(PaginatedListParams):
+class TaskTemplateListQueryParams(SkipLimitParams):
+    repo_ids: list[PyObjectId] | None = None
     model_config: ClassVar[ConfigDict] = {'extra': 'forbid'}
