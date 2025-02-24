@@ -4,11 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import DuplicateKeyError, ObjectCreateError, ObjectNotFoundError
-from salt_box_core.db.mongo.schemas_base import PaginatedResponse, SkipLimitParams
+from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId, SkipLimitParams
 from salt_box_core.minion_collections.schemas.collection_schemas import (
     CollectionCreateSchema,
     CollectionDetailSchema,
     CollectionModel,
+    CollectionUpdateSchema,
 )
 from salt_box_core.minion_collections.services.authz import MinionCollectionAuthzService, get_authz_service
 from salt_box_core.minion_collections.services.collection_service import CollectionService, get_collection_service
@@ -111,6 +112,45 @@ async def collection_create(
     except DuplicateKeyError as e:
         msg = f'Collection with slug `{collection.slug}` already exists'
         raise HTTPException(status_code=400, detail=msg) from e
+    except Exception as e:
+        logger.error('Error: %s', e)
+        raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
+
+
+@router.put('/{cid}', operation_id='minion_collection_update')
+async def collection_update(
+    cid: PyObjectId,
+    collection: CollectionUpdateSchema,
+    authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
+    collection_service: Annotated[CollectionService, Depends(get_collection_service)],
+) -> CollectionModel:
+    allow = await authz_service.allow('update')
+    if not allow:
+        raise HTTPException(status_code=403, detail='Not enough permissions')
+
+    try:
+        return await collection_service.update(cid, collection)
+    except ObjectNotFoundError:
+        raise HTTPException(status_code=404, detail='Collection not found') from None
+    except Exception as e:
+        logger.error('Error: %s', e)
+        raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
+
+
+@router.delete('/{cid}', operation_id='minion_collection_delete')
+async def collection_delete(
+    cid: PyObjectId,
+    authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
+    collection_service: Annotated[CollectionService, Depends(get_collection_service)],
+) -> None:
+    allow = await authz_service.allow('delete')
+    if not allow:
+        raise HTTPException(status_code=403, detail='Not enough permissions')
+
+    try:
+        await collection_service.delete(cid)
+    except ObjectNotFoundError:
+        raise HTTPException(status_code=404, detail='Collection not found') from None
     except Exception as e:
         logger.error('Error: %s', e)
         raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
