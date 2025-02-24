@@ -16,7 +16,6 @@ from salt_box_core.minion_collections.schemas.minion_schemas import MinionModel
 from salt_box_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from salt_box_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from salt_box_core.tasks.schemas.task_schemas import (
-    TaskForceUpdateSchema,
     TaskJob,
     TaskJobReturnStatus,
     TaskJobStatus,
@@ -24,6 +23,7 @@ from salt_box_core.tasks.schemas.task_schemas import (
     TaskJobTargetType,
     TaskModel,
     TaskStatus,
+    TaskUpdateSchema,
 )
 from salt_box_core.tasks.services.tasks import TaskService, get_task_service
 from salt_box_core.utilities.exceptions import ServiceError
@@ -82,7 +82,9 @@ class TaskLifespanService:
             task.__setattr__(attr, value)
 
         self.__task = await self.task_service.update(
-            query=task.id, data=TaskForceUpdateSchema.model_validate(task.model_dump()), notify=notify
+            query=task.id,
+            data=TaskUpdateSchema.model_validate(task.model_dump(exclude=set('id'))),
+            notify=notify,
         )
 
         return self.__task

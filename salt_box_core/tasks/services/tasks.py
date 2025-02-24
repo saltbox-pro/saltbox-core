@@ -14,9 +14,9 @@ from salt_box_core.tasks.repositories.task_repository import TaskRepository, get
 from salt_box_core.tasks.schemas.task_schemas import (
     TaskCreateFromTemplateSchema,
     TaskCreateSchema,
-    TaskForceUpdateSchema,
     TaskModel,
     TaskStatus,
+    TaskTemplateShort,
     TaskUpdateSchema,
 )
 from salt_box_core.tasks.schemas.task_template_schemas import (
@@ -79,7 +79,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateFromTemp
 
         creation_data = TaskCreateSchema.model_validate(
             {
-                'task_template_id': task_template.id,
+                'task_template': TaskTemplateShort(**task_template.model_dump()),
                 'fun': task_template.fun,
                 'task_args': task_args,
                 'task_kwargs': task_kwargs,
@@ -88,6 +88,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateFromTemp
                 'minions': data.minions,
                 'batch_size': data.batch_size,
                 'max_retries': data.max_retries,
+                'user': data.user,
             }
         )
 
@@ -105,7 +106,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateFromTemp
     async def update(
         self,
         query: dict[str, Any] | PyObjectId,
-        data: TaskUpdateSchema | TaskForceUpdateSchema | dict[str, Any],
+        data: TaskUpdateSchema | dict[str, Any],
         notify: bool = True,
     ) -> TaskModel: ...
 
@@ -113,7 +114,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateFromTemp
     async def update(
         self,
         query: dict[str, Any] | PyObjectId,
-        data: TaskUpdateSchema | TaskForceUpdateSchema | dict[str, Any],
+        data: TaskUpdateSchema | dict[str, Any],
         notify: bool = True,
         *,
         projection_model: type[ProjectionModel],
@@ -122,7 +123,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateFromTemp
     async def update(
         self,
         query: dict[str, Any] | PyObjectId,
-        data: TaskUpdateSchema | TaskForceUpdateSchema | dict[str, Any],
+        data: TaskUpdateSchema | dict[str, Any],
         notify: bool = True,
         *,
         projection_model: type[ProjectionModel] | None = None,

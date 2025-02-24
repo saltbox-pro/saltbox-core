@@ -190,3 +190,9 @@ class User(BaseModel):
                 pass
 
         return client_roles
+
+
+class UserShort(BaseModel):
+    sub: str
+    name: str
+    email: str

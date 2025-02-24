@@ -5,13 +5,15 @@ from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, status
 
 from salt_box_core import http_errors
 from salt_box_core.config import LOG_CONFIG
-from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId
+from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId, User
 from salt_box_core.db.redis import RedisDependency
+from salt_box_core.dependencies import get_current_user_from_jwt
 from salt_box_core.jobs.exceptions import JobDoesNotExistsException
 from salt_box_core.jobs.schemas import Job, JobResult
 from salt_box_core.jobs.services import JobServiceDependency
 from salt_box_core.tasks.schemas.task_schemas import (
     TaskCreateFromTemplateSchema,
+    TaskCreateRequestSchema,
     TaskListQueryParams,
     TaskListResponseSchema,
     TaskModel,
@@ -49,14 +51,18 @@ async def tasks_list(
 
 @router.post('', operation_id='task_create')
 async def task_create(
-    item: TaskCreateFromTemplateSchema, task_service: Annotated[TaskService, Depends(get_task_service)]
+    item: TaskCreateRequestSchema,
+    task_service: Annotated[TaskService, Depends(get_task_service)],
+    user: Annotated[User, Depends(get_current_user_from_jwt)],
 ) -> TaskModel:
     # TODO (i.moshkov): remove this
     if item.query == {'$and': [{'$expr': True}]}:
         item.query = {}
 
+    create_data = TaskCreateFromTemplateSchema(**{'user': user.model_dump(), **item.model_dump()})
+
     try:
-        task: TaskModel = await task_service.create(data=item)
+        task: TaskModel = await task_service.create(data=create_data)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 

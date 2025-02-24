@@ -6,7 +6,13 @@ from typing import Any, ClassVar
 from pydantic import BaseModel, ConfigDict, Field
 
 from salt_box_core.config import LOG_CONFIG
-from salt_box_core.db.mongo.schemas_base import CreatedModifiedMixin, IDMixin, PaginatedListParams, PyObjectId
+from salt_box_core.db.mongo.schemas_base import (
+    CreatedModifiedMixin,
+    IDMixin,
+    PaginatedListParams,
+    PyObjectId,
+    UserShort,
+)
 from salt_box_core.utilities.helpers import get_now_stamp_str
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
@@ -60,21 +66,16 @@ class TaskData(BaseModel):  # type: ignore[no-redef]
     data_kwargs: dict | None = Field(alias='kwargs', default=None)
 
 
+class TaskTemplateShort(BaseModel):
+    id: PyObjectId
+    title: str
+    name: str
+    repo_id: PyObjectId
+    commit_hash: str
+
+
 class TaskReadOnlyFieldsMixin:
-    status: TaskStatus = Field(title='Status', default=TaskStatus.created)
-
-    run_dt: datetime | None = Field(title='Run datetime', default=None)
-    stopped_dt: datetime | None = Field(title='Stopped datetime', default=None)
-    finished_dt: datetime | None = Field(title='Finished datetime', default=None)
-
-    targets_queue: list[TaskJobTarget] | None = Field(title='Jobs queue', default=None)
-    jobs: list[TaskJob] = Field(title='Jobs', default=[])
-    minions_retries_counts: dict[str, int] = Field(title='Minions retries cunts', default={})
-    failed_for_minions: list[str] = Field(title='Minions failed', default=[])
-
-
-class TaskEditableFieldsMixin:
-    task_template_id: PyObjectId = Field(title='Task template')
+    task_template: TaskTemplateShort = Field(title='Task template')
 
     fun: str = Field(title='Salt fun')
     task_args: list[str] = Field(title='Args')
@@ -87,6 +88,21 @@ class TaskEditableFieldsMixin:
     batch_size: int | None = Field(title='Batch size', default=None)
     max_retries: int = Field(title='Max retries', default=3)
 
+    user: UserShort
+
+
+class TaskEditableFieldsMixin:
+    status: TaskStatus = Field(title='Status', default=TaskStatus.created)
+
+    run_dt: datetime | None = Field(title='Run datetime', default=None)
+    stopped_dt: datetime | None = Field(title='Stopped datetime', default=None)
+    finished_dt: datetime | None = Field(title='Finished datetime', default=None)
+
+    targets_queue: list[TaskJobTarget] | None = Field(title='Jobs queue', default=None)
+    jobs: list[TaskJob] = Field(title='Jobs', default=[])
+    minions_retries_counts: dict[str, int] = Field(title='Minions retries cunts', default={})
+    failed_for_minions: list[str] = Field(title='Minions failed', default=[])
+
 
 class TaskCreateSchema(BaseModel, TaskEditableFieldsMixin, TaskReadOnlyFieldsMixin):
     pass
@@ -94,19 +110,15 @@ class TaskCreateSchema(BaseModel, TaskEditableFieldsMixin, TaskReadOnlyFieldsMix
 
 class TaskUpdateSchema(BaseModel, TaskEditableFieldsMixin):
     model_config = ConfigDict(
-        extra='forbid',
+        extra='ignore',
     )
-
-
-class TaskForceUpdateSchema(BaseModel, TaskEditableFieldsMixin, TaskReadOnlyFieldsMixin):
-    pass
 
 
 class TaskModel(BaseModel, CreatedModifiedMixin, TaskEditableFieldsMixin, TaskReadOnlyFieldsMixin, IDMixin):
     pass
 
 
-class TaskCreateFromTemplateSchema(BaseModel):
+class TaskCreateRequestSchema(BaseModel):
     task_template_id: PyObjectId = Field(title='Task template id')
     salt_masters: list[str] = ['salt-master']
     data: TaskData | None = None
@@ -117,6 +129,10 @@ class TaskCreateFromTemplateSchema(BaseModel):
 
     batch_size: int | None = Field(title='Batch size', default=None)
     max_retries: int = Field(title='Max retries', default=3)
+
+
+class TaskCreateFromTemplateSchema(TaskCreateRequestSchema):
+    user: UserShort
 
 
 class TaskListResponseSchema(TaskModel):
