@@ -1,11 +1,16 @@
+import csv
+from datetime import UTC, datetime
+from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import Depends
 from pymongo.errors import OperationFailure
 
+from salt_box_core.config import logger
 from salt_box_core.db.exceptions import PiplineBuilderError
 from salt_box_core.minion_collections.repositories.minion_repository import MinionRepository, get_minion_repository
 from salt_box_core.minion_collections.schemas.minion_schemas import (
+    GrainsSchema,
     MinionCreateSchema,
     MinionIDs,
     MinionModel,
@@ -25,6 +30,31 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
         except OperationFailure as e:
             msg = f'Error during pipeline execution: {e}'
             raise PiplineBuilderError(msg) from e
+
+    async def export_to_csv(self, query: dict[str, Any], skip: int = 0, limit: int = 0) -> str:
+        data = await self.get_list(query, skip=skip, limit=limit)
+        if not data:
+            return ''
+
+        Path('./reports').mkdir(parents=True, exist_ok=True)
+        current_datetime = datetime.now(UTC).strftime('%Y%m%d_%H%M%S')
+        file_path = f'./reports/minions_{current_datetime}.csv'
+
+        minion_keys = MinionModel.model_fields
+        grains_keys = GrainsSchema.model_fields
+
+        keys = [key for key in minion_keys.keys() if key != 'grains'] + [f'grains.{key}' for key in grains_keys.keys()]
+        logger.debug('keys: %s', keys)
+
+        with Path(file_path).open(mode='w', newline='') as file:  # noqa: ASYNC230
+            writer = csv.DictWriter(file, fieldnames=keys)
+            writer.writeheader()
+            for item in data:
+                row = item.model_dump(exclude={'grains'})
+                row.update({f'grains.{key}': item.grains.model_dump()[key] for key in grains_keys.keys()})
+                writer.writerow(row)
+
+        return file_path
 
 
 def get_minion_service(

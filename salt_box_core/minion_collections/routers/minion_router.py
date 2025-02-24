@@ -2,6 +2,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi.responses import FileResponse
 
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
@@ -46,11 +47,64 @@ async def minions_list(
 
     try:
         collection = await collection_service.get_by_slug(body.collection_slug)
-        query = {'$and': [recursive_replace_dates(collection.query), recursive_replace_dates(search)]}
+
+        if collection.query and search:
+            query = {'$and': [recursive_replace_dates(collection.query), recursive_replace_dates(search)]}
+        else:
+            query = recursive_replace_dates(collection.query) if collection.query else recursive_replace_dates(search)
+
+        logger.debug('query: %s', query)
+
         resp = await minion_service.get_list_paginated(
             query=query, skip=body.skip, limit=body.limit, projection_model=MinionShortSchema
         )
         return resp
+    except ObjectNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from None
+    except Exception as e:
+        logger.error('Error: %s', e)
+        raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
+
+
+@router.post('/export', operation_id='minions_export', response_class=FileResponse)
+async def minions_export(
+    body: Annotated[MinionListbody, Body()],
+    authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
+    minion_service: Annotated[MinionService, Depends(get_minion_service)],
+    collection_service: Annotated[CollectionService, Depends(get_collection_service)],
+) -> FileResponse:
+    authz_result = await authz_service.check_access(
+        input={
+            'user': authz_service.user.model_dump(),
+            'path': ['collections', body.collection_slug],
+            'method': 'GET',
+            'action': 'retrieve',
+        }
+    )
+    if not authz_result.allow:
+        raise HTTPException(status_code=403, detail='Not enough permissions')
+
+    try:
+        collection = await collection_service.get_by_slug(body.collection_slug)
+
+        if collection.query and body.query:
+            query = {'$and': [recursive_replace_dates(collection.query), recursive_replace_dates(body.query)]}
+        else:
+            query = (
+                recursive_replace_dates(collection.query) if collection.query else recursive_replace_dates(body.query)
+            )
+
+        logger.debug('query: %s', query)
+        file_path = await minion_service.export_to_csv(query=query, skip=body.skip, limit=body.limit)
+        if not file_path:
+            raise HTTPException(status_code=404, detail='No data found')
+        headers = {'Content-Disposition': f'attachment; filename={file_path.split("/")[-1]}'}
+        return FileResponse(
+            file_path,
+            filename=file_path.split('/')[-1],
+            media_type='text/csv',
+            headers=headers,
+        )
     except ObjectNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from None
     except Exception as e:
