@@ -9,6 +9,10 @@ from salt_box_core.db.mongo.schemas_base import (
 
 class CollectionReadOnlyFieldsMixin:
     slug: str = Field(title='Slug', pattern=r'^[a-z0-9-]+$', min_length=3, max_length=30)
+
+
+class CollectionEditableFieldsMixin:
+    title: str = Field(title='Title', min_length=3, max_length=50)
     query: MongoQuery = Field(
         default_factory=dict,
         title='MongoDB Query',
@@ -19,10 +23,6 @@ class CollectionReadOnlyFieldsMixin:
         ],
         json_schema_extra={'example': {'grains.cpu_model': {'$not': {'$regex': 'Intel'}}}},
     )
-
-
-class CollectionEditableFieldsMixin:
-    title: str = Field(title='Title', min_length=3, max_length=50)
 
 
 class CollectionCreateSchema(BaseModel, CollectionEditableFieldsMixin, CollectionReadOnlyFieldsMixin):
