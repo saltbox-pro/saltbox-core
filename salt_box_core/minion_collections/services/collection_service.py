@@ -2,7 +2,6 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.minion_collections.repositories.collection_repository import (
     CollectionRepository,
     get_collection_repository,
@@ -15,16 +14,11 @@ from salt_box_core.minion_collections.schemas.collection_schemas import (
 from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService
 
 
-class CollectionService(MongoBaseService[
-    CollectionRepository, CollectionModel, CollectionCreateSchema, CollectionUpdateSchema
-]):
-
+class CollectionService(
+    MongoBaseService[CollectionRepository, CollectionModel, CollectionCreateSchema, CollectionUpdateSchema]
+):
     async def get_by_slug(self, slug: str) -> CollectionModel:
-        document = await self.repo.get({'slug': slug})
-        if not document:
-            msg = 'Collection not found'
-            raise ObjectNotFoundError(msg)
-        return document
+        return await self.repo.get({'slug': slug})
 
     async def get_by_slug_or_none(self, slug: str) -> CollectionModel | None:
         return await self.repo.get({'slug': slug})
