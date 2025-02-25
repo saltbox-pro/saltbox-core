@@ -14,9 +14,7 @@ from salt_box_core.db.mongo.schemas_base import (
 class ReadOnlyFieldsShortMixin:
     title: str = Field(title='Template title')
     name: str = Field(title='sls name')
-
     fun: str = Field(title='Salt fun', examples=['salt.ping'])
-
     repo_id: PyObjectId = Field(title='Repository ID')
     commit_hash: str = Field(title='Commit hash')
 
@@ -24,6 +22,7 @@ class ReadOnlyFieldsShortMixin:
 class ReadOnlyFieldsFullMixin(ReadOnlyFieldsShortMixin):
     json_schema: dict = Field(title='JSON schema')
     ui_schema: dict = Field(title='UI schema', default_factory=dict)
+    sls_content: str = Field(title='SLS content')
 
 
 class EditableFieldsShortMixin: ...

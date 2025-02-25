@@ -84,6 +84,7 @@ class SchemaGitRepoService:
                     'name': name,
                     'json_schema': json_schema,
                     'ui_schema': schema_dict.get('ui_schema', {}),
+                    'sls_content': content,
                     'commit_hash': self.get_latest_commit_hash(file),
                 }
                 return schema, None
