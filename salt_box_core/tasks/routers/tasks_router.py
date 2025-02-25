@@ -59,7 +59,7 @@ async def task_create(
     if item.query == {'$and': [{'$expr': True}]}:
         item.query = {}
 
-    create_data = TaskCreateFromTemplateSchema(**{'user': user.model_dump(), **item.model_dump()})
+    create_data = TaskCreateFromTemplateSchema(**{'user': user.model_dump(), **item.model_dump(by_alias=True)})
 
     try:
         task: TaskModel = await task_service.create(data=create_data)
