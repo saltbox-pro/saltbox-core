@@ -51,7 +51,10 @@ class TasksWatcher:
         collection_service: CollectionService = CollectionService(repo=self.collections_repository)
         task_template_service: TaskTemplateService = TaskTemplateService(repo=self.task_template_repository)
         task_service: TaskService = TaskService(
-            repo=self.task_repository, rdb=redis, task_template_service=task_template_service
+            repo=self.task_repository,
+            rdb=redis,
+            task_template_service=task_template_service,
+            collections_service=collection_service,
         )
 
         while True:

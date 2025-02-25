@@ -74,6 +74,12 @@ class TaskTemplateShort(BaseModel):
     commit_hash: str
 
 
+class CollectionShort(BaseModel):
+    id: PyObjectId
+    slug: str
+    title: str
+
+
 class TaskMinion(BaseModel):
     minion_id: str
     master: str
@@ -86,7 +92,7 @@ class TaskReadOnlyFieldsMixin:
     task_args: list[str] = Field(title='Args')
     task_kwargs: dict[str, Any] = Field(title='Kwargs')
 
-    collection_id: PyObjectId = Field(title='Collection')
+    collection: CollectionShort = Field(title='Collection')
     query: dict[str, Any] = Field(title='Query', default={})
     minions: list[PyObjectId] = Field(title='Minions', default=[])
 

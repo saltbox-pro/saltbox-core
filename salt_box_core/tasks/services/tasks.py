@@ -10,8 +10,10 @@ from redis.asyncio import Redis
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import PyObjectId
 from salt_box_core.db.redis import RedisDependency
+from salt_box_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from salt_box_core.tasks.repositories.task_repository import TaskRepository, get_task_repository
 from salt_box_core.tasks.schemas.task_schemas import (
+    CollectionShort,
     TaskCreateFromTemplateSchema,
     TaskCreateSchema,
     TaskModel,
@@ -32,10 +34,17 @@ ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
 class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateFromTemplateSchema, TaskUpdateSchema]):
     repository_class = TaskRepository
 
-    def __init__(self, repo: TaskRepository, rdb: Redis, task_template_service: TaskTemplateService):
+    def __init__(
+        self,
+        repo: TaskRepository,
+        rdb: Redis,
+        task_template_service: TaskTemplateService,
+        collections_service: CollectionService,
+    ):
         super().__init__(repo=repo)
 
         self.task_template_service = task_template_service
+        self.collections_service = collections_service
         self.rdb = rdb
 
     @overload
@@ -61,6 +70,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateFromTemp
         notify: bool | None = None,
     ) -> TaskModel | ProjectionModel:
         task_template: TaskTemplateModel = await self.task_template_service.get(query=data.task_template_id)
+        collection = await self.collections_service.get(query=data.collection_id)
 
         try:
             validated_data: dict = await self.task_template_service.get_validated_data(
@@ -83,7 +93,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateFromTemp
                 'fun': task_template.fun,
                 'task_args': task_args,
                 'task_kwargs': task_kwargs,
-                'collection_id': data.collection_id,
+                'collection': CollectionShort(**collection.model_dump()),
                 'query': data.query,
                 'minions': data.minions,
                 'batch_size': data.batch_size,
@@ -187,5 +197,8 @@ async def get_task_service(
     repo: Annotated[TaskRepository, Depends(get_task_repository)],
     rdb: RedisDependency,
     task_template_service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
+    collections_service: Annotated[CollectionService, Depends(get_collection_service)],
 ) -> TaskService:
-    return TaskService(repo=repo, rdb=rdb, task_template_service=task_template_service)
+    return TaskService(
+        repo=repo, rdb=rdb, task_template_service=task_template_service, collections_service=collections_service
+    )

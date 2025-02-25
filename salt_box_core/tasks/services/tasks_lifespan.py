@@ -166,7 +166,7 @@ class TaskLifespanService:
 
     async def __get_task_targeting(self) -> list[TaskJobTarget]:
         task: TaskModel = await self.get_task()
-        collection: CollectionModel = await self.collection_service.get(task.collection_id)
+        collection: CollectionModel = await self.collection_service.get(task.collection.id)
         query: dict = collection.query
 
         if task.query and task.minions:
