@@ -7,7 +7,11 @@ from fastapi.responses import FileResponse
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId
-from salt_box_core.minion_collections.schemas.minion_schemas import MinionListbody, MinionModel, MinionShortSchema
+from salt_box_core.minion_collections.schemas.minion_schemas import (
+    MinionDetailSchema,
+    MinionListbody,
+    MinionShortSchema,
+)
 from salt_box_core.minion_collections.services.authz import MinionCollectionAuthzService, get_authz_service
 from salt_box_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from salt_box_core.minion_collections.services.minion_service import MinionService, get_minion_service
@@ -119,7 +123,7 @@ async def minion_retrieve(
     authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
     minion_service: Annotated[MinionService, Depends(get_minion_service)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
-) -> MinionModel:
+) -> MinionDetailSchema:
     authz_result = await authz_service.check_access(
         input={
             'user': authz_service.user.model_dump(),
@@ -143,4 +147,4 @@ async def minion_retrieve(
     if mid not in [i.id for i in ids]:
         raise HTTPException(status_code=404, detail='Minion not found')
 
-    return await minion_service.get(mid)
+    return await minion_service.get(mid, projection_model=MinionDetailSchema)
