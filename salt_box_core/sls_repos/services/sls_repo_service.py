@@ -43,11 +43,15 @@ class SettingsSlsRepoService(
             return document
         return await self.update(query=sid, data={'is_active': False})
 
-    async def sync_all(self) -> None:
-        # get all active repos
-        # for each repo call self.sync in celery task
-        # return task id
-        pass
+    async def sync_all(self, sls_tpl_service: TaskTemplateService) -> None:
+        active_repos = await self.get_list(query={'is_active': True}, skip=0, limit=0)
+        for repo in active_repos:
+            try:
+                await self.sync(repo.id, sls_tpl_service)
+            except Exception as e:
+                msg = f'{e!s}'
+                logger.error(msg)
+                raise
 
     async def delete_and_clean(self, sid: PyObjectId, tpl_service: TaskTemplateService) -> None:
         repo_settings = await self.get(sid)

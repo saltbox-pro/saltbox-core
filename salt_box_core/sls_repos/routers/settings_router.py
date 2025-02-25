@@ -37,9 +37,10 @@ async def sls_repo_settings_list(
 @router.post('/sync_all')
 async def sls_repo_settings_sync_all(
     service: Annotated[SettingsSlsRepoService, Depends(get_sls_repo_service)],
+    tpl_service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
 ) -> None:
     try:
-        await service.sync_all()
+        await service.sync_all(tpl_service)
     except Exception as e:
         logger.error('Error: %s', e)
         raise HTTPException(
