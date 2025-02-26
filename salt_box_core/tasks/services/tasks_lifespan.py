@@ -22,13 +22,15 @@ from salt_box_core.tasks.schemas.task_schemas import (
     TaskJobTarget,
     TaskJobTargetType,
     TaskMinion,
+    TaskMinionJobStatus,
+    TaskMinionStatus,
     TaskModel,
     TaskStatus,
     TaskUpdateSchema,
 )
 from salt_box_core.tasks.services.tasks import TaskService, get_task_service
 from salt_box_core.utilities.exceptions import ServiceError
-from salt_box_core.utilities.helpers import get_now_stamp_str, recursive_replace_dates
+from salt_box_core.utilities.helpers import recursive_replace_dates, utc_now
 from salt_box_core.utilities.jid import JID
 from salt_box_core.utilities.mongo_query_to_salt_tgt_converter import MongoQueryToSaltTgtConverter
 
@@ -109,248 +111,273 @@ class TaskLifespanService:
         task: TaskModel = await self.get_task()
 
         if task.status == TaskStatus.finished:
-            await self.__fill_jobs_queue_from_failed(ignore_limits=True)
+            for minion in task.minions.values():
+                if minion.status == TaskMinionStatus.failed:
+                    minion.status = TaskMinionStatus.pending
+
+            await self.__create_jobs(ignore_limits=True)
             await self.update_task(status=TaskStatus.running)
 
     async def __can_start_job(self) -> bool:
         task: TaskModel = await self.get_task()
+        running_job_count: int = 0
 
-        for job in task.jobs:
+        for job in task.jobs.values():
             if job.status == TaskJobStatus.running:
-                return False
+                running_job_count += 1
+
+                if running_job_count >= task.max_jobs_count_at_same_time:
+                    return False
 
         return True
 
-    async def __build_targets_list_from_dict(self, targets: dict[str, list[str]]) -> list[TaskJobTarget]:
-        task: TaskModel = await self.get_task()
-        result: list[TaskJobTarget] = []
+    @staticmethod
+    def __get_minion_key(master: str, minion_id: str) -> str:
+        return f'{master}_{minion_id}'
 
-        targets_lists: dict[str, list[list[str]]] = {}
-        temp_targets_lists: dict[str, list[str]] = {}
-
-        for master, minions_ids in targets.items():
-            for minion_id in minions_ids:
-                temp_targets_lists.setdefault(master, []).append(minion_id)
-
-                if task.batch_size and len(temp_targets_lists[master]) >= task.batch_size:
-                    targets_lists.setdefault(master, []).append(temp_targets_lists[master][:])
-                    temp_targets_lists[master] = []
-        else:
-            for master, temp_targets_list in temp_targets_lists.items():
-                if len(temp_targets_list):
-                    targets_lists.setdefault(master, []).append(temp_targets_list)
-
-        for master, targets_list in targets_lists.items():
-            for tgt_list in targets_list:
-                result.append(TaskJobTarget(tgt=','.join(tgt_list), type=TaskJobTargetType.list, master=master))
-
-        return result
-
-    def __check_query(self, _query: dict[str, Any]) -> bool:
+    def __check_compound_compatible_query(self, _query: dict[str, Any]) -> bool:
         for query_key, query_item in _query.items():
             if query_key.startswith('grains.'):
                 continue
 
             if query_key.startswith('$'):
                 if isinstance(query_item, dict):
-                    if self.__check_query(query_item):
+                    if self.__check_compound_compatible_query(query_item):
                         return True
                 elif isinstance(query_item, list):
                     for item in [item for item in query_item if isinstance(item, dict)]:
-                        if self.__check_query(item):
+                        if self.__check_compound_compatible_query(item):
                             return True
             else:
                 return True
 
         return False
 
-    async def __get_task_targeting(self) -> list[TaskJobTarget]:
+    async def __get__targeting_query(self) -> dict:
         task: TaskModel = await self.get_task()
-        collection: CollectionModel = await self.collection_service.get(task.collection.id)
+        collection: CollectionModel = await self.collection_service.get(task.target_collection.id)
         query: dict = collection.query
 
-        if task.query and task.minions:
+        if task.target_query and task.target_minions:
             query = {
-                '$and': [query, task.query, {'_id': {'$in': [PyObjectId(minion_id) for minion_id in task.minions]}}]
+                '$and': [
+                    query,
+                    task.target_query,
+                    {'_id': {'$in': [PyObjectId(minion_id) for minion_id in task.target_minions]}},
+                ]
             }
-        elif task.query:
-            query = {'$and': [query, task.query]}
-        elif task.minions:
-            query = {'$and': [query, {'_id': {'$in': [PyObjectId(minion_id) for minion_id in task.minions]}}]}
+        elif task.target_query:
+            query = {'$and': [query, task.target_query]}
+        elif task.target_minions:
+            query = {'$and': [query, {'_id': {'$in': [PyObjectId(minion_id) for minion_id in task.target_minions]}}]}
 
-        not_compound_compatible_query: bool = self.__check_query(query)
+        query = recursive_replace_dates(query)
 
-        if task.minions or task.batch_size or not_compound_compatible_query:
-            query = recursive_replace_dates(query)
-            minions: list[MinionModel] = await self.minion_service.get_list(query=query, limit=0, skip=0)
+        return query
 
-            _result: dict[str, list[str]] = {}
-
-            for minion in minions:
-                _result.setdefault(minion.master, []).append(minion.minion_id)
-
-            return await self.__build_targets_list_from_dict(_result)
-
-        return [
-            TaskJobTarget(
-                tgt=MongoQueryToSaltTgtConverter.convert_from_dict(query),
-                master='salt-master',  # TODO (i.moshkov): getting salt master
-                type=TaskJobTargetType.compound,
-            )
-        ]
-
-    async def __add_to_targets_queue(self, targets: list[TaskJobTarget]) -> None:
+    async def __fill_minions_by_targeting(self) -> None:
         task: TaskModel = await self.get_task()
+        targeting_query = await self.__get__targeting_query()
+        not_compound_compatible_query: bool = self.__check_compound_compatible_query(targeting_query)
+        minions: list[MinionModel] = await self.minion_service.get_list(query=targeting_query, limit=0, skip=0)
+        minions_by_master: dict[str, list[str]] = {}
 
-        if task.targets_queue is None:
-            task.targets_queue = []
+        for minion in minions:
+            if minion.master in task.target_masters or not len(task.target_masters):
+                task.minions[self.__get_minion_key(minion.master, minion.minion_id)] = TaskMinion(
+                    master=minion.master,
+                    minion_id=minion.minion_id,
+                )
+                minions_by_master.setdefault(minion.master, []).append(minion.minion_id)
 
-        for target in targets:
-            task.targets_queue.append(target)
+        if not_compound_compatible_query or task.batch_size:
+            await self.__create_jobs()
+        else:
+            for master in task.target_masters:
+                try:
+                    await self.__create_job(
+                        minions=minions_by_master[master],
+                        compound=MongoQueryToSaltTgtConverter.convert_from_dict(query_dict=targeting_query),
+                        master=master,
+                    )
+                except JobCreateException:
+                    continue
 
-    async def __init_fill_jobs_queue(self) -> None:
-        targets: list[TaskJobTarget] = await self.__get_task_targeting()
-        await self.__add_to_targets_queue(targets)
-
-    async def __check_job_returns(self, job: TaskJob) -> None:
+    async def __create_job(self, master: str, minions: list[str], compound: str | None = None) -> None:
         task: TaskModel = await self.get_task()
-        job_returns: list[JobResult] = await self.job_service.get_job_all_returns(JID(job.jid))
-
-        for return_data in job_returns:
-            minion_id: str = return_data.id
-            master: str = return_data.salt_master
-            returns_status = job.returns_statuses.get(minion_id, TaskJobReturnStatus.waiting)
-
-            if returns_status != TaskJobReturnStatus.waiting:
-                continue
-
-            if return_data.success is True:
-                job.returns_statuses[minion_id] = TaskJobReturnStatus.succeeded
-            else:
-                task.minions_retries_counts.setdefault(master, {}).setdefault(minion_id, 0)
-                task.minions_retries_counts[master][minion_id] += 1
-
-                failed_minion = TaskMinion(minion_id=minion_id, master=master)
-                if failed_minion not in task.failed_for_minions:
-                    task.failed_for_minions.append(failed_minion)
-
-                job.returns_statuses[minion_id] = TaskJobReturnStatus.failed
-
-            job.finished_stamp = get_now_stamp_str()
-
-        await self.__fill_jobs_queue_from_failed()
-
-    async def __fill_jobs_queue_from_failed(self, ignore_limits: bool = False) -> None:
-        task: TaskModel = await self.get_task()
-        targets_dict: dict[str, list[str]] = {}
-
-        failed_for_minions = task.failed_for_minions
-        task.failed_for_minions = []
-
-        for minion in failed_for_minions:
-            if ignore_limits or task.minions_retries_counts[minion.master][minion.minion_id] <= task.max_retries - 1:
-                targets_dict.setdefault(minion.master, []).append(minion.minion_id)
-            else:
-                task.failed_for_minions.append(minion)
-
-        targets = await self.__build_targets_list_from_dict(targets_dict)
-        await self.__add_to_targets_queue(targets)
-
-    async def __check_running_jobs(self) -> None:
-        task: TaskModel = await self.get_task()
-
-        for job in task.jobs:
-            if job.status != TaskJobStatus.running:
-                continue
-
-            try:
-                job_data: Job = await self.job_service.get_job(JID(job.jid))
-            except JobDoesNotExistsException:
-                job.status = TaskJobStatus.failed
-                continue
-
-            if job_data.status != Job.JobStatus.started:
-                continue
-
-            for minion_id in job_data.minions:
-                job.returns_statuses.setdefault(minion_id, TaskJobReturnStatus.waiting)
-
-            await self.__check_job_returns(job=job)
-
-            if not len(job.returns_statuses.keys()):
-                continue
-
-            if all(status == TaskJobReturnStatus.succeeded for status in job.returns_statuses.values()):
-                job.status = TaskJobStatus.succeeded
-            elif not any(status == TaskJobReturnStatus.waiting for status in job.returns_statuses.values()):
-                job.status = TaskJobStatus.failed
-
-    async def __create_job(self, job_target: TaskJobTarget) -> None:
-        task: TaskModel = await self.get_task()
+        tgt: str = compound if compound else ','.join(minions)
+        tgt_type: TaskJobTargetType = TaskJobTargetType.compound if compound else TaskJobTargetType.list
 
         jid: JID = await self.job_service.create_job(
             JobCreate.model_validate(
                 {
                     'jid_postfix': f't{task.id}',
-                    'tgt': job_target.tgt,
-                    'tgt_type': job_target.type,
+                    'tgt': tgt,
+                    'tgt_type': tgt_type,
                     'fun': task.fun,
                     'data': {
                         'args': task.task_args,
                         'kwargs': task.task_kwargs,
                     },
-                    'salt_master': job_target.master,
+                    'salt_master': master,
                 }
             )
         )
 
-        task.jobs.append(
-            TaskJob(
-                jid=str(jid),
-                target=job_target,
-                # returns_statuses={minion_id: TaskJobReturnStatus.waiting for minion_id in job_target.tgt.split(',')},
-                # TODO (i.moshkov): waiting status
-            )
+        task.jobs[str(jid)] = TaskJob(
+            jid=str(jid), target=TaskJobTarget(tgt=tgt, tgt_type=tgt_type, master=master), minions_by_targeting=minions
         )
 
-    async def __rub_jobs(self) -> None:
-        task: TaskModel = await self.get_task()
+        for minion in minions:
+            task.minions[self.__get_minion_key(master=master, minion_id=minion)].status = TaskMinionStatus.in_work
+            task.minions[self.__get_minion_key(master=master, minion_id=minion)].jobs[str(jid)] = (
+                TaskMinionJobStatus.created
+            )
 
-        if not task.targets_queue:
+    async def __create_jobs(self, ignore_limits: bool = True) -> None:
+        task: TaskModel = await self.get_task()
+        minions_queue: dict[str, list[list[str]]] = {}
+
+        if not await self.__can_start_job():
             return
 
-        can_start_job: bool = await self.__can_start_job()
+        for minion in task.minions.values():
+            if minion.status == TaskMinionStatus.pending:
+                if len(minion.jobs) >= task.max_retries and not ignore_limits:
+                    minion.status = TaskMinionStatus.failed
+                    continue
 
-        if can_start_job:
-            job_targeting = task.targets_queue.pop(0)
+                minions_queue.setdefault(minion.master, [[]])
+
+                if task.batch_size and 0 < task.batch_size <= len(minions_queue[minion.master][-1]):
+                    minions_queue[minion.master].append([])
+
+                minions_queue[minion.master][-1].append(minion.minion_id)
+
+        for master, master_tgt_list in minions_queue.items():
+            for tgt in master_tgt_list:
+                try:
+                    await self.__create_job(minions=tgt, master=master)
+                except JobCreateException:
+                    continue
+
+    async def __check_jobs(self) -> None:
+        task: TaskModel = await self.get_task()
+
+        for task_job in task.jobs.values():
+            if task_job.status in [TaskJobStatus.failed, TaskJobStatus.succeeded]:
+                continue
 
             try:
-                await self.__create_job(job_target=job_targeting)
-            except JobCreateException as error:
-                logger.warning(error)
-                task.targets_queue.append(job_targeting)
+                job_data: Job = await self.job_service.get_job(JID(task_job.jid))
+
+            except JobDoesNotExistsException:
+                task_job.status = TaskJobStatus.failed
+                continue
+
+            if job_data.status == Job.JobStatus.in_queue:
+                continue
+
+            if not task_job.minions_from_salt:
+                task_job.minions_from_salt = job_data.minions
+                await self.__check_minions_in_job(task_job=task_job, job_data=job_data)
+
+            await self.__check_job_returns(task_job=task_job, jid=JID(task_job.jid))
+            await self.__update_task_job_status(task_job=task_job)
+
+    async def __check_minions_in_job(self, task_job: TaskJob, job_data: Job) -> None:
+        task: TaskModel = await self.get_task()
+
+        for minion_id in task_job.minions_by_targeting:
+            minion = task.minions[self.__get_minion_key(master=task_job.target.master, minion_id=minion_id)]
+
+            if minion_id not in job_data.minions:
+                minion.jobs[task_job.jid] = TaskMinionJobStatus.ignored
+
+                if len(minion.jobs) >= task.max_retries:
+                    minion.status = TaskMinionStatus.failed
+                else:
+                    minion.status = TaskMinionStatus.pending
+            else:
+                minion.jobs[task_job.jid] = TaskMinionJobStatus.in_work
+
+        for minion_id in job_data.minions:
+            task_job.returns_statuses.setdefault(minion_id, TaskJobReturnStatus.waiting)
+            minion_key: str = self.__get_minion_key(master=task_job.target.master, minion_id=minion_id)
+
+            if minion_key not in task.minions.keys():
+                task.minions[minion_key] = TaskMinion(
+                    minion_id=minion_id,
+                    master=task_job.target.master,
+                    jobs={task_job.jid: TaskMinionJobStatus.created},
+                )
+
+    async def __check_job_returns(self, task_job: TaskJob, jid: JID) -> None:
+        task: TaskModel = await self.get_task()
+        job_returns: list[JobResult] = await self.job_service.get_job_all_returns(jid)
+
+        for job_return in job_returns:
+            minion_id: str = job_return.id
+            master: str = job_return.salt_master
+            minion_key: str = self.__get_minion_key(master=master, minion_id=minion_id)
+            returns_status = task_job.returns_statuses.get(minion_id, TaskJobReturnStatus.waiting)
+
+            if returns_status != TaskJobReturnStatus.waiting:
+                continue
+
+            if job_return.success is True:
+                task_job.returns_statuses[minion_id] = TaskJobReturnStatus.succeeded
+                task.minions[minion_key].status = TaskMinionStatus.success
+                task.minions[minion_key].jobs[task_job.jid] = TaskMinionJobStatus.success
+            else:
+                task_job.returns_statuses[minion_id] = TaskJobReturnStatus.failed
+                task.minions[minion_key].jobs[task_job.jid] = TaskMinionJobStatus.failed
+                if len(task.minions[minion_key].jobs) >= task.max_retries:
+                    task.minions[minion_key].status = TaskMinionStatus.failed
+                else:
+                    task.minions[minion_key].status = TaskMinionStatus.pending
+
+    @staticmethod
+    async def __update_task_job_status(task_job: TaskJob) -> None:
+        has_failed: bool = False
+        has_not_finished: bool = False
+
+        for returns_status in task_job.returns_statuses.values():
+            if returns_status not in [
+                TaskJobReturnStatus.succeeded.value,
+                TaskJobReturnStatus.failed.value,
+                TaskJobReturnStatus.timeout.value,
+            ]:
+                has_not_finished = True
+
+            if returns_status in [TaskJobReturnStatus.failed, TaskJobReturnStatus.timeout]:
+                has_failed = True
+
+        if not has_not_finished:
+            task_job.finished_dt = utc_now()
+
+            if has_failed:
+                task_job.status = TaskJobStatus.failed
+            else:
+                task_job.status = TaskJobStatus.succeeded
 
     async def process(self) -> None:
         task: TaskModel = await self.get_task()
 
         if task.status != TaskStatus.running:
             return
-        if task.targets_queue is None:
-            await self.__init_fill_jobs_queue()
 
-        await self.__check_running_jobs()
-        await self.__rub_jobs()
+        if not task.minions:
+            await self.__fill_minions_by_targeting()
+        else:
+            await self.__check_jobs()
+            await self.__create_jobs()
 
-        if not task.targets_queue:
-            can_finish: bool = True
-
-            for job in task.jobs:
-                if job.status == TaskJobStatus.running:
-                    can_finish = False
-                    break
-
-            if can_finish:
-                task.status = TaskStatus.finished
+        for job in task.jobs.values():
+            if job.status in [TaskJobStatus.pending, TaskJobStatus.running]:
+                break
+        else:
+            task.status = TaskStatus.finished
 
         await self.update_task(notify=True)
 
