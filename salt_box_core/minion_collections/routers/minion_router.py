@@ -147,4 +147,9 @@ async def minion_retrieve(
     if mid not in [i.id for i in ids]:
         raise HTTPException(status_code=404, detail='Minion not found')
 
-    return await minion_service.get(mid, projection_model=MinionDetailSchema)
+    minion = await minion_service.get(mid)
+
+    # TODO (a.baikov): doing like this because of additional_grains. Need to find a better way
+    minion = MinionDetailSchema(**minion.model_dump(exclude={'id'}), _id=minion.id)
+
+    return minion
