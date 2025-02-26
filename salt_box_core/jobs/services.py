@@ -107,7 +107,7 @@ class JobService:
         if job_data:
             return Job(
                 **{
-                    'jid': job_data[b'jid'].decode(),
+                    'jid': job_data[b'jid'].decode()[:20],
                     'tgt': job_data[b'tgt'].decode(),
                     'tgt_type': job_data[b'tgt_type'].decode(),
                     'fun': job_data[b'fun'].decode(),
