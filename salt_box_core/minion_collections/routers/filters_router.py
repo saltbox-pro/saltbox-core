@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from salt_box_core.db.exceptions import PiplineBuilderError
+from salt_box_core.db.exceptions import ObjectNotFoundError, PiplineBuilderError
 from salt_box_core.minion_collections.schemas.filter_schemas import (
     MinionFilterSchema,
     MinionFilterValuesBody,
@@ -45,10 +45,11 @@ async def unique_field_values(
     if not authz_result.allow:
         raise HTTPException(status_code=403, detail='Not enough permissions')
 
-    collection = await collection_service.get_by_slug(body.collection_slug)
-
-    if not collection:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Collection not found')
+    try:
+        collection = await collection_service.get_by_slug(body.collection_slug)
+    except ObjectNotFoundError:
+        msg = f"Collection '{body.collection_slug}' not found"
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=msg) from None
 
     query = {'$and': [collection.query, body.query]}
 
