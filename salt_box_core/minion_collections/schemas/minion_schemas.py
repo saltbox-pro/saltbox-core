@@ -11,7 +11,7 @@ class GrainsSchema(BaseModel):
     id: str | None = Field(title='ID', default=None)
     host: str | None = Field(title='Host', default=None)
     fqdn: str | None = Field(title='FQDN', default=None)
-    master: str | None = Field(title='Master', default=None)
+    master: str | None = Field(title='Grains master', default=None)
     fqdns: list | None = Field(title='FQDNs', default=None)
 
     # CPU
