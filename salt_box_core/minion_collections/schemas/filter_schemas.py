@@ -63,7 +63,7 @@ class MinionFilterValuesBody(BaseModel):
 
 
 class GrainValue(TypedDict):
-    value: str | None
+    value: str | int | None
     count: int
 
 

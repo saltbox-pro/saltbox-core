@@ -7,6 +7,21 @@ from fastapi import HTTPException, status
 from salt_box_core.config import logger
 from salt_box_core.minion_collections.schemas.minion_schemas import GrainsSchema, MinionModel
 
+LIST_HANDLER_FIELDS = [
+    'grains.fqdns',
+    'grains.cpu_flags',
+    'grains.osrelease_info',
+    'grains.ipv4',
+    'grains.ipv6',
+    'grains.fqdn_ip4',
+    'grains.fqdn_ip6',
+    'grains.disks',
+    'grains.systempath',
+    'grains.pythonpath',
+    'grains.ssds',
+]
+LIST_TO_STR_FIELDS = ['grains.pythonversion', 'grains.saltversioninfo']
+
 
 class MongoPiplineBuilder:
     """MongoDB aggregation pipeline builder"""
@@ -24,12 +39,16 @@ class MongoPiplineBuilder:
 
     @property
     def _field_handler_map(self) -> dict[str, Callable[..., None]]:
-        return {
-            'grains.pythonversion': self._list_to_str_handler,
+        handler_mapping = {
             'grains.hwaddr_interfaces': self._unique_keys_handler,
             'created': self._datetime_handler,
             'modified': self._datetime_handler,
         }
+        for field in LIST_HANDLER_FIELDS:
+            handler_mapping[field] = self._separate_list_items_handler
+        for field in LIST_TO_STR_FIELDS:
+            handler_mapping[field] = self._list_to_str_handler
+        return handler_mapping
 
     def _detect_field_type(self) -> type[Any] | None:
         """Detect field type by field name"""
@@ -42,20 +61,16 @@ class MongoPiplineBuilder:
         return field_type
 
     def _is_allowed_field_types(self) -> bool:
-        if self.field_type is str:
+        if self.field_type in [str, int]:
             return True
         if self._is_union():
-            logger.info('Its Union!')
             types = get_args(self.field_type)
-            logger.info('types: %s', types)
-            logger.info('Equal?: %s', types == (str, type(None)))
-            if types == (str, type(None)):
+            if types == (str, type(None)) or types == (int, type(None)):
                 return True
         return False
 
     def _is_union(self) -> bool:
         origin = get_origin(self.field_type)
-        logger.info('origin: %s', origin)
         return origin is Union or origin is UnionType
 
     def _datetime_handler(self) -> None:
@@ -107,7 +122,7 @@ class MongoPiplineBuilder:
             ]
         )
 
-    def _str_handler(self) -> None:
+    def _str_int_handler(self) -> None:
         self.pipeline.extend(
             [
                 {'$group': {'_id': f'${self.field_name}', 'count': {'$sum': 1}}},
@@ -140,16 +155,16 @@ class MongoPiplineBuilder:
 
     def _build_pipeline(self) -> None:
         if self.field_name in self._field_handler_map:
+            logger.debug(f'Apply custom handler {self._field_handler_map[self.field_name].__name__}')
             self._field_handler_map[self.field_name]()
             return
         if self._is_allowed_field_types():
-            logger.info('Apply str handler')
-            self._str_handler()
+            logger.debug('Apply str handler')
+            self._str_int_handler()
             return
         msg = f'Unsupported field: {self.field_name}'
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
 
     def build(self) -> list:
         self._build_pipeline()
-        logger.info('self.pipeline: %s', self.pipeline)
         return self.pipeline
