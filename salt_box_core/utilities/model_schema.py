@@ -14,6 +14,20 @@ class UnsupportedSchemaType(Exception):
     pass
 
 
+# TODO (a.baikov): remove this in new version querybuilder
+TEMP_EXCLUDE_FIELDS_LIST = [
+    'id',
+    'gpus',
+    'dns',
+    'hwaddr_interfaces',
+    'ip4_interfaces',
+    'ip6_interfaces',
+    'ip_interfaces',
+    'kernelparams',
+    'locale_info',
+    'pythonversion',
+    'saltversioninfo',
+]
 schema_lookups_js_values = {
     '=': {'name': '=', 'value': '=', 'label': '='},
     '!=': {'name': '!=', 'value': '!=', 'label': '!='},
@@ -73,7 +87,7 @@ schema_lookups_map = {
     int: schema_number_lookups,
     float: schema_number_lookups,
     str: schema_text_lookups,
-    bool: ['=', '!='],
+    bool: ['='],
     list: ['in', 'notIn'],
     datetime: schema_datetime_lookups,
     PyObjectId: schema_text_lookups,
@@ -96,7 +110,7 @@ def get_model_schema(model: type[BaseModel], pre_path: str | None = None) -> lis
     schema = []
 
     for field_name, field in model.model_fields.items():
-        if field_name in ['id']:
+        if field_name in TEMP_EXCLUDE_FIELDS_LIST:
             continue
         full_field_name = f'{pre_path}.{field_name}' if pre_path else field_name
 
@@ -125,6 +139,9 @@ def analyze_field(field: Any) -> tuple[type[BaseModel] | None, bool, Any]:
                 continue
             if isinstance(field_class, types.GenericAlias):
                 if field_class.__origin__ in [dict, list]:
+                    if field_class in [list[str], list[int], list[Any]]:
+                        computed_field_class = list
+                        continue
                     raise UnsupportedSchemaType
             if isclass(field_class) and issubclass(field_class, BaseModel):
                 sub_model = field_class
