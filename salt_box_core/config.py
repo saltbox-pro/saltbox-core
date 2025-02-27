@@ -72,7 +72,7 @@ SETTINGS = Settings()
 
 
 class LogConfig(BaseModel):
-    LOG_FORMAT: str = '%(levelprefix)s %(message)s'
+    LOG_FORMAT: str = '%(levelprefix)s [%(filename)s] %(message)s'
     LOG_LEVEL: str = 'DEBUG' if SETTINGS.debug else 'INFO'
 
     version: int = 1
