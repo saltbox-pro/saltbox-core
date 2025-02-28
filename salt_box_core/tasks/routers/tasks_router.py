@@ -88,7 +88,7 @@ async def task_jobs(
     try:
         task: TaskModel = await task_service.get(query=tid)
 
-        for task_job in task.jobs:
+        for task_job in task.jobs.values():
             try:
                 job = await job_service.get_job(JID(task_job.jid))
                 result.append(job)
@@ -109,7 +109,7 @@ async def task_returns(
     try:
         task: TaskModel = await task_service.get(query=tid)
 
-        for task_job in task.jobs:
+        for task_job in task.jobs.values():
             try:
                 job_returns: list[JobResult] = await job_service.get_job_all_returns(JID(task_job.jid))
                 result.extend(job_returns)
@@ -159,6 +159,22 @@ async def restart_failed(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task not found') from e
 
     await task_lifespan_service.restart_failed()
+
+    return task
+
+
+@router.post('/{tid}/restart_failed_on_minion', operation_id='restart_failed_on_minion')
+async def restart_failed_on_minion(
+    master: str,
+    minion_id: str,
+    task_lifespan_service: Annotated[TaskLifespanService, Depends(get_task_lifespan_service)],
+) -> TaskModel:
+    try:
+        task: TaskModel = await task_lifespan_service.get_task()
+    except ObjectDoesNotExistError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task not found') from e
+
+    await task_lifespan_service.restart_failed_on_minion(master=master, minion_id=minion_id)
 
     return task
 

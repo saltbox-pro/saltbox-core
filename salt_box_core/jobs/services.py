@@ -86,6 +86,8 @@ class JobService:
 
         return JID(jid)
 
+    async def stop_job(self, jid: JID) -> None: ...  # TODO (i.moshkov): stop jobs
+
     async def _get_job_from_store(self, jid: JID) -> Job | None:
         ts = jid.to_timestamp()
         job_data = await self.rdb.zrange('jobs', start=ts, end=ts, byscore=True)  # type: ignore[call-overload]
@@ -107,7 +109,7 @@ class JobService:
         if job_data:
             return Job(
                 **{
-                    'jid': job_data[b'jid'].decode(),
+                    'jid': job_data[b'jid'].decode()[:20],
                     'tgt': job_data[b'tgt'].decode(),
                     'tgt_type': job_data[b'tgt_type'].decode(),
                     'fun': job_data[b'fun'].decode(),

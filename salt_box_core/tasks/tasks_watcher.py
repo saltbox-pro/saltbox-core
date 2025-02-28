@@ -36,6 +36,8 @@ class TasksWatcher:
         self.task_repository: TaskRepository = TaskRepository(self.db)
         self.task_template_repository: TaskTemplateRepository = TaskTemplateRepository(self.db)
 
+        logger.info('Tasks watcher started')
+
     async def get_redis(self) -> aioredis.Redis:
         if self.redis is None:
             self.redis = await aioredis.from_url(SETTINGS.redis_url, **SETTINGS.redis_connection_kwargs)
@@ -57,8 +59,12 @@ class TasksWatcher:
             collections_service=collection_service,
         )
 
+        logger.info('Processing tasks...')
+
         while True:
-            tasks: list[TaskModel] = await task_service.get_list(query={'status': TaskStatus.running}, limit=0, skip=0)
+            tasks: list[TaskModel] = await task_service.get_list(
+                query={'status': {'$in': [TaskStatus.running, TaskStatus.stopping]}}, limit=0, skip=0
+            )
 
             for task in tasks:
                 task_lifespan_service = TaskLifespanService(
@@ -75,10 +81,11 @@ class TasksWatcher:
 
 
 async def async_main() -> None:
+    logger.info('Starting watcher')
+
     await init_mongo_db()
     watcher = TasksWatcher()
 
-    logger.info('Starting watcher')
     await watcher.process()
 
 

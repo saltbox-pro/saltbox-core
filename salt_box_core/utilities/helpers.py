@@ -10,6 +10,10 @@ DATETIME_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}\+\d{2
 DATETIME_PATTERN_NO_MS = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$')
 
 
+def utc_now() -> datetime:
+    return datetime.now(UTC)
+
+
 def get_now_stamp_str() -> str:
     return str(datetime.now(UTC).timestamp())
 

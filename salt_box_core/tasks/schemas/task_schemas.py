@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from salt_box_core.config import LOG_CONFIG
 from salt_box_core.db.mongo.schemas_base import (
@@ -13,14 +13,18 @@ from salt_box_core.db.mongo.schemas_base import (
     PyObjectId,
     UserShort,
 )
-from salt_box_core.utilities.helpers import get_now_stamp_str
+from salt_box_core.utilities.helpers import utc_now
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
 logger = logging.getLogger(__name__)
 
 
+# Task job
+
+
 class TaskJobStatus(str, Enum):
+    pending = 'pending'
     running = 'running'
     succeeded = 'succeeded'
     failed = 'failed'
@@ -40,24 +44,65 @@ class TaskJobTargetType(str, Enum):
 
 class TaskJobTarget(BaseModel):
     tgt: str = Field(title='Salt tgt')
-    type: TaskJobTargetType = Field(title='Salt tgt type')
+    tgt_type: TaskJobTargetType = Field(title='Salt tgt type')
     master: str = Field(title='Master')
 
 
 class TaskJob(BaseModel):
     jid: str = Field(title='JID')
     target: TaskJobTarget = Field(title='Job salt target')
-    status: TaskJobStatus = Field(title='Job status', default=TaskJobStatus.running)
+    status: TaskJobStatus = Field(title='Job status', default=TaskJobStatus.pending)
     returns_statuses: dict[str, TaskJobReturnStatus] = Field(title='Job returns statuses by minions', default={})
 
-    created_stamp: str = Field(title='Created stamp', default_factory=get_now_stamp_str)
-    finished_stamp: str | None = Field(title='Finished stamp', default=None)
+    minions_by_targeting: list[str] = Field(title='List of minions ids by targeting')
+    minions_from_salt: list[str] | None = Field(title='Computed minions by salt', default=None)
+
+    created_dt: datetime = Field(title='Created stamp', default_factory=utc_now)
+    finished_dt: datetime | None = Field(title='Finished stamp', default=None)
+
+
+# Task minion
+
+
+class TaskMinionStatus(str, Enum):
+    pending = 'pending'
+    in_work = 'in_work'
+    success = 'success'
+    failed = 'failed'
+
+
+class TaskMinionJobStatus(str, Enum):
+    created = 'created'
+    in_work = 'in_work'
+    success = 'success'
+    failed = 'failed'
+    ignored = 'ignored'
+
+
+class TaskMinion(BaseModel):
+    minion_id: str
+    master: str
+
+    status: TaskMinionStatus = Field(title='status', default=TaskMinionStatus.pending)
+
+    jobs: dict[str, TaskMinionJobStatus] = Field(title='Jobs', default={})
+
+    start_last_dt: datetime | None = Field(title='Last job start dt', default=None)
+    finished_dt: datetime | None = Field(title='Processing finished dt', default=None)
+
+    @computed_field(title='Count job runs')
+    def count_runs(self) -> int:
+        return len(self.jobs)
+
+
+# Task
 
 
 class TaskStatus(str, Enum):
     created = 'created'
     running = 'running'
     finished = 'finished'
+    stopping = 'stopping'
     stopped = 'stopped'
 
 
@@ -80,11 +125,6 @@ class CollectionShort(BaseModel):
     title: str
 
 
-class TaskMinion(BaseModel):
-    minion_id: str
-    master: str
-
-
 class TaskReadOnlyFieldsMixin:
     task_template: TaskTemplateShort = Field(title='Task template')
 
@@ -92,12 +132,15 @@ class TaskReadOnlyFieldsMixin:
     task_args: list[str] = Field(title='Args')
     task_kwargs: dict[str, Any] = Field(title='Kwargs')
 
-    collection: CollectionShort = Field(title='Collection')
-    query: dict[str, Any] = Field(title='Query', default={})
-    minions: list[PyObjectId] = Field(title='Minions', default=[])
+    target_collection: CollectionShort = Field(title='Target collection')
+    target_query: dict[str, Any] = Field(title='Target query', default={})
+    target_minions: list[PyObjectId] = Field(title='Target minions', default=[])
+    target_masters: list[str] = Field(title='Target masters', default=[])
 
+    # batch_size: int = Field(title='Batch size', ge=1, le=10000, default=1000)
     batch_size: int | None = Field(title='Batch size', default=None)
-    max_retries: int = Field(title='Max retries', default=3)
+    max_jobs_count_at_same_time: int = Field(title='Max jobs count at some time', ge=1, default=1)
+    max_retries: int = Field(title='Max retries', ge=1, default=3)
 
     user: UserShort
 
@@ -109,10 +152,8 @@ class TaskEditableFieldsMixin:
     stopped_dt: datetime | None = Field(title='Stopped datetime', default=None)
     finished_dt: datetime | None = Field(title='Finished datetime', default=None)
 
-    targets_queue: list[TaskJobTarget] | None = Field(title='Jobs queue', default=None)
-    jobs: list[TaskJob] = Field(title='Jobs', default=[])
-    minions_retries_counts: dict[str, dict[str, int]] = Field(title='Minions retries cunts', default={})
-    failed_for_minions: list[TaskMinion] = Field(title='Minions failed', default=[])
+    jobs: dict[str, TaskJob] = Field(title='Jobs', default={})
+    minions: dict[str, TaskMinion] = Field(title='Minions failed', default={})
 
 
 class TaskCreateSchema(BaseModel, TaskEditableFieldsMixin, TaskReadOnlyFieldsMixin):
@@ -147,10 +188,8 @@ class TaskCreateFromTemplateSchema(TaskCreateRequestSchema):
 
 
 class TaskListResponseSchema(TaskModel):
-    targets_queue: Any = Field(exclude=True)
     jobs: Any = Field(exclude=True)
-    minions_retries_counts: Any = Field(exclude=True)
-    failed_for_minions: Any = Field(exclude=True)
+    minions: Any = Field(exclude=True)
 
 
 class TaskListQueryParams(PaginatedListParams):

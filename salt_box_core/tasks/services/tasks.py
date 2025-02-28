@@ -1,5 +1,4 @@
 import json
-from datetime import UTC, datetime
 from typing import Annotated, Any, TypeVar, overload
 
 from fastapi import Depends
@@ -26,6 +25,7 @@ from salt_box_core.tasks.schemas.task_template_schemas import (
 )
 from salt_box_core.tasks.services.tasks_templates import TaskTemplateService, get_task_template_service
 from salt_box_core.utilities.exceptions import ObjectDoesNotExistError, ServiceError
+from salt_box_core.utilities.helpers import utc_now
 from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService
 
 ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
@@ -93,9 +93,11 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateFromTemp
                 'fun': task_template.fun,
                 'task_args': task_args,
                 'task_kwargs': task_kwargs,
-                'collection': CollectionShort(**collection.model_dump()),
-                'query': data.query,
-                'minions': data.minions,
+                'target_collection': CollectionShort(**collection.model_dump()),
+                'target_query': data.query,
+                'target_minions': data.minions,
+                # TODO (i.moshkov): collect masters from store
+                'target_masters': data.salt_masters if data.salt_masters else ['salt-master'],
                 'batch_size': data.batch_size,
                 'max_retries': data.max_retries,
                 'user': data.user,
@@ -149,7 +151,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateFromTemp
                 }.get(data.status)
 
                 if stamp_field_name:
-                    data.__setattr__(stamp_field_name, datetime.now(UTC))
+                    data.__setattr__(stamp_field_name, utc_now())
 
             if projection_model:
                 updated_obj: TaskModel | ProjectionModel = await self.repo.update(
