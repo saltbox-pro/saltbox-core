@@ -122,12 +122,15 @@ class TaskLifespanService:
             await self.__create_jobs(ignore_limits=True)
             await self.update_task(status=TaskStatus.running)
 
-    async def __can_start_job(self) -> bool:
+    async def __can_start_job(self, master: str | None = None) -> bool:
         task: TaskModel = await self.get_task()
         running_job_count: int = 0
 
         for job in task.jobs.values():
             if job.status == TaskJobStatus.running:
+                if master and master != job.target.master:
+                    continue
+
                 running_job_count += 1
 
                 if running_job_count >= task.max_jobs_count_at_same_time:
@@ -242,9 +245,6 @@ class TaskLifespanService:
         task: TaskModel = await self.get_task()
         minions_queue: dict[str, list[list[str]]] = {}
 
-        if not await self.__can_start_job():
-            return
-
         for minion in task.minions.values():
             if minion.status == TaskMinionStatus.pending:
                 if len(minion.jobs) >= task.max_retries and not ignore_limits:
@@ -260,6 +260,9 @@ class TaskLifespanService:
 
         for master, master_tgt_list in minions_queue.items():
             for tgt in master_tgt_list:
+                if not self.__can_start_job(master=master):
+                    continue
+
                 try:
                     await self.__create_job(minions=tgt, master=master)
                 except JobCreateException:
