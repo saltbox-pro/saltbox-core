@@ -21,7 +21,7 @@ router = APIRouter(prefix='/filters', tags=['Filters'])
 
 @router.get('/schema', operation_id='filter_schema')
 async def filter_schema() -> list[MinionFilterSchema]:
-    return [MinionFilterSchema.model_validate(field) for field in get_model_schema(MinionModel)]
+    return [MinionFilterSchema(**field) for field in get_model_schema(MinionModel)]
 
 
 @router.post('/unique-grain-values', operation_id='filter_values')

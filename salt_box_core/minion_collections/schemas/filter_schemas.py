@@ -82,4 +82,6 @@ class MinionFilterSchema(BaseModel):
     name: str
     label: str
     operators: list[MinionFilterOperatorsSchema]
-    input_type: str = Field(serialization_alias='inputType')
+    input_type: str | None = Field(serialization_alias='inputType', default=None)
+    value_editor_type: str | None = Field(serialization_alias='valueEditorType', default=None)
+    default_value: bool | None = Field(serialization_alias='defaultValue', default=None)

@@ -166,9 +166,21 @@ def create_field_schema(
 
     field_schema_lookups_computed = [schema_lookups_js_values[lookup] for lookup in field_schema_lookups]
 
-    return {
+    field_schema = {
         'name': full_field_name,
         'label': field.title if field.title else full_field_name,
         'operators': field_schema_lookups_computed,
-        'input_type': field_schema_type,
     }
+    if field_schema_type == 'checkbox':
+        field_schema['value_editor_type'] = field_schema_type
+        field_schema['default_value'] = False
+    else:
+        field_schema['input_type'] = field_schema_type
+
+    # TODO (a.baikov): use this for datetime fields
+    # if full_field_name in ['created', 'modified']:
+    #     field_schema['value_editor_type'] = 'datetime-local'
+    #     field_schema['input_type'] = 'datetime-local'
+    #     field_schema['datatype'] = 'timestamp with time zone'
+
+    return field_schema
