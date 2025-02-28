@@ -235,11 +235,12 @@ class TaskLifespanService:
             jid=str(jid), target=TaskJobTarget(tgt=tgt, tgt_type=tgt_type, master=master), minions_by_targeting=minions
         )
 
-        for minion in minions:
-            task.minions[self.__get_minion_key(master=master, minion_id=minion)].status = TaskMinionStatus.in_work
-            task.minions[self.__get_minion_key(master=master, minion_id=minion)].jobs[str(jid)] = (
-                TaskMinionJobStatus.created
-            )
+        for minion_id in minions:
+            minion = task.minions[self.__get_minion_key(master=master, minion_id=minion_id)]
+
+            minion.status = TaskMinionStatus.in_work
+            minion.jobs[str(jid)] = TaskMinionJobStatus.created
+            minion.start_last_dt = task.jobs[str(jid)].created_dt
 
     async def __create_jobs(self, ignore_limits: bool = True) -> None:
         task: TaskModel = await self.get_task()
@@ -260,7 +261,7 @@ class TaskLifespanService:
 
         for master, master_tgt_list in minions_queue.items():
             for tgt in master_tgt_list:
-                if not self.__can_start_job(master=master):
+                if not await self.__can_start_job(master=master):
                     continue
 
                 try:
@@ -322,6 +323,7 @@ class TaskLifespanService:
     async def __check_job_returns(self, task_job: TaskJob, jid: JID) -> None:
         task: TaskModel = await self.get_task()
         job_returns: list[JobResult] = await self.job_service.get_job_all_returns(jid)
+        now = utc_now()
 
         for job_return in job_returns:
             minion_id: str = job_return.id
@@ -331,6 +333,8 @@ class TaskLifespanService:
 
             if returns_status != TaskJobReturnStatus.waiting:
                 continue
+
+            task.minions[minion_key].finished_dt = now
 
             if job_return.success is True:
                 task_job.returns_statuses[minion_id] = TaskJobReturnStatus.succeeded

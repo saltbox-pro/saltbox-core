@@ -3,7 +3,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from salt_box_core.config import LOG_CONFIG
 from salt_box_core.db.mongo.schemas_base import (
@@ -86,6 +86,13 @@ class TaskMinion(BaseModel):
     status: TaskMinionStatus = Field(title='status', default=TaskMinionStatus.pending)
 
     jobs: dict[str, TaskMinionJobStatus] = Field(title='Jobs', default={})
+
+    start_last_dt: datetime | None = Field(title='Last job start dt', default=None)
+    finished_dt: datetime | None = Field(title='Processing finished dt', default=None)
+
+    @computed_field(title='Count job runs')
+    def count_runs(self) -> int:
+        return len(self.jobs)
 
 
 # Task
