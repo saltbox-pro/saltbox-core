@@ -98,14 +98,18 @@ class TaskLifespanService:
         if task.status in [TaskStatus.created, TaskStatus.stopped]:
             await self.update_task(status=TaskStatus.running)
 
-    async def __stop_jobs(self) -> None: ...  # TODO (i.moshkov): stop jobs
+    async def __stop_jobs(self) -> None:
+        task: TaskModel = await self.get_task()
+
+        for jid in task.jobs.keys():
+            await self.job_service.stop_job(JID(jid))
 
     async def stop(self) -> None:
         task: TaskModel = await self.get_task()
 
         if task.status == TaskStatus.running:
             await self.__stop_jobs()
-            await self.update_task(status=TaskStatus.stopped)
+            await self.update_task(status=TaskStatus.stopping)
 
     async def restart_failed(self) -> None:
         task: TaskModel = await self.get_task()
@@ -364,20 +368,22 @@ class TaskLifespanService:
     async def process(self) -> None:
         task: TaskModel = await self.get_task()
 
-        if task.status != TaskStatus.running:
+        if task.status not in [TaskStatus.running, TaskStatus.stopping]:
             return
 
-        if not task.minions:
+        if not task.minions and task.status == TaskStatus.running:
             await self.__fill_minions_by_targeting()
         else:
             await self.__check_jobs()
-            await self.__create_jobs()
+
+            if task.status == TaskStatus.running:
+                await self.__create_jobs()
 
         for job in task.jobs.values():
             if job.status in [TaskJobStatus.pending, TaskJobStatus.running]:
                 break
         else:
-            task.status = TaskStatus.finished
+            task.status = TaskStatus.stopped if task.status == TaskStatus.stopping else TaskStatus.finished
 
         await self.update_task(notify=True)
 

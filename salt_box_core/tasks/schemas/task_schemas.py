@@ -95,6 +95,7 @@ class TaskStatus(str, Enum):
     created = 'created'
     running = 'running'
     finished = 'finished'
+    stopping = 'stopping'
     stopped = 'stopped'
 
 
