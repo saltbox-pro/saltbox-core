@@ -88,7 +88,7 @@ async def task_jobs(
     try:
         task: TaskModel = await task_service.get(query=tid)
 
-        for task_job in task.jobs:
+        for task_job in task.jobs.values():
             try:
                 job = await job_service.get_job(JID(task_job.jid))
                 result.append(job)
@@ -109,7 +109,7 @@ async def task_returns(
     try:
         task: TaskModel = await task_service.get(query=tid)
 
-        for task_job in task.jobs:
+        for task_job in task.jobs.values():
             try:
                 job_returns: list[JobResult] = await job_service.get_job_all_returns(JID(task_job.jid))
                 result.extend(job_returns)
