@@ -5,7 +5,7 @@ import httpx
 import jwt
 from aiocache import Cache  # type: ignore[import-untyped]
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OpenIdConnect
+from fastapi.security import OAuth2PasswordBearer
 from pydantic import ValidationError
 
 from salt_box_core.config import SETTINGS, logger
@@ -16,8 +16,9 @@ from salt_box_core.db.mongo.schemas_base import User
 user_cache = Cache(ttl=180, namespace='user')
 
 
-keycloak_scheme = OpenIdConnect(
-    openIdConnectUrl=SETTINGS.well_known_url,
+keycloak_scheme = OAuth2PasswordBearer(
+    tokenUrl=SETTINGS.keycloak_token_url,
+    scopes={'openid': 'OpenID Connect'},
     scheme_name='KeycloakOIDC',
 )
 
@@ -35,26 +36,20 @@ async def decode_jwt(token: str) -> Any:
     return payload
 
 
-async def get_current_user(bearer: Annotated[str | None, Depends(keycloak_scheme)]) -> User:
-    if bearer is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail='Not authenticated',
-            headers={'WWW-Authenticate': 'Bearer'},
-        )
-
-    user = await user_cache.get(bearer)
+async def get_current_user(access_token: Annotated[str | None, Depends(keycloak_scheme)]) -> User:
+    # Before use this method, you must add roles to userinfo endpoint in Keycloak
+    user = await user_cache.get(access_token)
     if user:
         return User(**json.loads(user))
 
-    headers = {'Authorization': bearer}
+    headers = {'Authorization': f'Bearer {access_token}'}
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(SETTINGS.keycloak_userinfo_url, headers=headers)
             response.raise_for_status()
-            await user_cache.set(bearer, response.text)
+            await user_cache.set(access_token, response.text)
 
-            logger.debug('user: %s', user)
+            logger.debug('user: %s', response.text)
 
             return User(**response.json())
         except httpx.HTTPStatusError as e:
@@ -65,19 +60,18 @@ async def get_current_user(bearer: Annotated[str | None, Depends(keycloak_scheme
             ) from None
 
 
-async def get_current_user_from_jwt(token: Annotated[str | None, Depends(keycloak_scheme)]) -> User:
+async def get_current_user_from_jwt(access_token: Annotated[str | None, Depends(keycloak_scheme)]) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail='Could not validate credentials',
         headers={'WWW-Authenticate': 'Bearer'},
     )
-    if token is None:
+    if access_token is None:
         raise credentials_exception from None
 
     try:
-        access_token = token.replace('Bearer ', '')
-        payload = await decode_jwt(access_token)
-        user_id: str = payload.get('sub')
+        payload: dict = await decode_jwt(access_token)
+        user_id: str | None = payload.get('sub')
         if user_id is None:
             raise credentials_exception from None
     except (jwt.InvalidTokenError, ValidationError):
