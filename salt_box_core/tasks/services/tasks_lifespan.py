@@ -122,6 +122,26 @@ class TaskLifespanService:
             await self.__create_jobs(ignore_limits=True)
             await self.update_task(status=TaskStatus.running)
 
+    async def restart_failed_on_minion(self, master: str, minion_id: str) -> None:
+        task: TaskModel = await self.get_task()
+        minion_key = self.__get_minion_key(master=master, minion_id=minion_id)
+
+        if task.status != TaskStatus.finished:
+            return
+
+        try:
+            minion = task.minions[minion_key]
+        except IndexError:
+            return
+
+        if minion.status != TaskMinionStatus.failed:
+            return
+
+        minion.status = TaskMinionStatus.pending
+
+        await self.__create_jobs(ignore_limits=True)
+        await self.update_task(status=TaskStatus.running)
+
     async def __can_start_job(self, master: str | None = None) -> bool:
         task: TaskModel = await self.get_task()
         running_job_count: int = 0

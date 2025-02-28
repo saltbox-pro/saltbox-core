@@ -163,6 +163,22 @@ async def restart_failed(
     return task
 
 
+@router.post('/{tid}/restart_failed_on_minion', operation_id='restart_failed_on_minion')
+async def restart_failed_on_minion(
+    master: str,
+    minion_id: str,
+    task_lifespan_service: Annotated[TaskLifespanService, Depends(get_task_lifespan_service)],
+) -> TaskModel:
+    try:
+        task: TaskModel = await task_lifespan_service.get_task()
+    except ObjectDoesNotExistError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task not found') from e
+
+    await task_lifespan_service.restart_failed_on_minion(master=master, minion_id=minion_id)
+
+    return task
+
+
 @ws_router.websocket('')
 async def tasks_websocket(websocket: WebSocket, rdb: RedisDependency) -> None:
     secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
