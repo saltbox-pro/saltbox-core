@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import DuplicateKeyError, ObjectCreateError, ObjectNotFoundError
@@ -145,13 +145,14 @@ async def collection_delete(
     slug: str,
     authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
-) -> None:
+) -> Response:
     allow = await authz_service.allow('delete')
     if not allow:
         raise HTTPException(status_code=403, detail='Not enough permissions')
 
     try:
         await collection_service.delete_by_slug(slug)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
     except ObjectNotFoundError:
         raise HTTPException(status_code=404, detail='Collection not found') from None
     except Exception as e:
