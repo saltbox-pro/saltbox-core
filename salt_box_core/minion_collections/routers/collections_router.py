@@ -140,7 +140,17 @@ async def collection_update(
         raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
 
 
-@router.delete('/{slug}', operation_id='minion_collection_delete')
+@router.delete(
+    '/{slug}',
+    operation_id='minion_collection_delete',
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        204: {'description': 'No Content'},
+        403: {'description': 'Forbidden'},
+        404: {'description': 'Not Found'},
+        422: {'description': 'Unprocessable Entity'},
+    },
+)
 async def collection_delete(
     slug: str,
     authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
