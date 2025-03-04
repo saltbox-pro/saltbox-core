@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from salt_box_core.config import logger
-from salt_box_core.db.exceptions import DuplicateKeyError, ObjectCreateError, ObjectNotFoundError
+from salt_box_core.db.exceptions import DuplicateKeyError, ObjectCreateError, ObjectNotFoundError, ObjectUpdateError
 from salt_box_core.db.mongo.schemas_base import PaginatedResponse, SkipLimitParams
 from salt_box_core.minion_collections.schemas.collection_schemas import (
     CollectionCreateSchema,
@@ -133,7 +133,7 @@ async def collection_update(
         return CollectionDetailSchema(
             **{**response.model_dump(), '_id': response.id, 'allowed_actions': authz_result.allowed_actions}
         )
-    except ObjectNotFoundError:
+    except ObjectUpdateError:
         raise HTTPException(status_code=404, detail='Collection not found') from None
     except Exception as e:
         logger.error('Error: %s', e)
