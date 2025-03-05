@@ -9,8 +9,8 @@ from salt_box_core.config import LOG_CONFIG
 from salt_box_core.db.mongo.schemas_base import (
     CreatedModifiedMixin,
     IDMixin,
-    PaginatedListParams,
     PyObjectId,
+    SkipLimitParams,
     UserShort,
 )
 from salt_box_core.utilities.helpers import utc_now
@@ -192,5 +192,6 @@ class TaskListResponseSchema(TaskModel):
     minions: Any = Field(exclude=True)
 
 
-class TaskListQueryParams(PaginatedListParams):
+class TaskListQueryParams(SkipLimitParams):
+    collection_slug: str
     model_config: ClassVar[ConfigDict] = {'extra': 'forbid'}
