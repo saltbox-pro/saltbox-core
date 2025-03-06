@@ -148,8 +148,8 @@ class IDMixin:
 
 
 class CreatedModifiedMixin:
-    created: datetime
-    modified: datetime
+    created: datetime = Field(title='Created')
+    modified: datetime = Field(title='Modified')
 
 
 class PaginatedResponse(BaseModel, Generic[SchemaType]):

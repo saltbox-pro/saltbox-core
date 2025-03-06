@@ -9,7 +9,7 @@ from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId
 from salt_box_core.minion_collections.schemas.minion_schemas import (
     MinionDetailSchema,
-    MinionListbody,
+    MinionListBody,
     MinionShortSchema,
 )
 from salt_box_core.minion_collections.services.authz import MinionCollectionAuthzService, get_authz_service
@@ -22,7 +22,7 @@ router = APIRouter(prefix='/minions', tags=['Minions'])
 
 @router.post('', operation_id='minions_list')
 async def minions_list(
-    body: Annotated[MinionListbody, Body()],
+    body: Annotated[MinionListBody, Body()],
     authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
     minion_service: Annotated[MinionService, Depends(get_minion_service)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
@@ -72,7 +72,7 @@ async def minions_list(
 
 @router.post('/export', operation_id='minions_export', response_class=FileResponse)
 async def minions_export(
-    body: Annotated[MinionListbody, Body()],
+    body: Annotated[MinionListBody, Body()],
     authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
     minion_service: Annotated[MinionService, Depends(get_minion_service)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],

@@ -27,7 +27,7 @@ dev = [
 ]
 
 [project.scripts]
-salt-box-minions-consumer = 'salt_box_core.minion_collections.services.grains_consumer:main'
+salt-box-salt-bridge-consumer = 'salt_box_core.minion_collections.salt_bridge_redis_consumer:main'
 salt-box-tasks-watcher = 'salt_box_core.tasks.tasks_watcher:main'
 
 [metadata]

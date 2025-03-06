@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
@@ -130,6 +131,7 @@ class MinionEditableFieldsMixin(BaseModel, Generic[T]):
     minion_id: str = Field(title='Minion ID')
     master: str = Field(title='Master')
     grains: T = Field(title='Grains')
+    last_activity: datetime | None = Field(title='Last activity', default=None)
 
 
 class MinionCreateSchema(MinionEditableFieldsMixin[GrainsSchema]):
@@ -138,7 +140,7 @@ class MinionCreateSchema(MinionEditableFieldsMixin[GrainsSchema]):
 
 class MinionUpdateSchema(MinionEditableFieldsMixin[GrainsSchema]):
     model_config = ConfigDict(
-        extra='forbid',
+        extra='ignore',
     )
 
 
@@ -167,7 +169,7 @@ class MinionIDs(BaseModel, IDMixin):
     pass
 
 
-class MinionListbody(SkipLimitParams):
+class MinionListBody(SkipLimitParams):
     collection_slug: str
     query: MongoQuery = Field(
         default_factory=dict,
