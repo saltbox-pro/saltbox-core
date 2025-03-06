@@ -1,7 +1,7 @@
 import csv
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, overload
 
 from fastapi import Depends
 from pymongo.errors import OperationFailure
@@ -16,10 +16,28 @@ from salt_box_core.minion_collections.schemas.minion_schemas import (
     MinionModel,
     MinionUpdateSchema,
 )
-from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService
+from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService, ProjectionModel
 
 
 class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreateSchema, MinionUpdateSchema]):
+    @overload
+    async def get_by_master_and_id(self, master: str, minion_id: str) -> MinionModel: ...
+
+    @overload
+    async def get_by_master_and_id(
+        self, master: str, minion_id: str, projection_model: type[ProjectionModel]
+    ) -> ProjectionModel: ...
+
+    async def get_by_master_and_id(
+        self, master: str, minion_id: str, projection_model: type[ProjectionModel] | None = None
+    ) -> MinionModel | ProjectionModel:
+        query = {'master': master, 'minion_id': minion_id}
+
+        if projection_model:
+            return await self.get(query=query, projection_model=projection_model)
+        else:
+            return await self.get(query=query)
+
     async def get_ids_by_query(self, query: dict[str, Any]) -> list[MinionIDs]:
         return await self.repo.get_list(query, skip=0, limit=0, projection_model=MinionIDs)
 
