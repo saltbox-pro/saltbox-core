@@ -5,6 +5,7 @@ from fastapi import Depends
 from redis.asyncio import Redis
 
 from salt_box_core.config import LOG_CONFIG
+from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.db.mongo.schemas_base import PyObjectId
 from salt_box_core.db.redis import RedisDependency
@@ -16,6 +17,7 @@ from salt_box_core.minion_collections.schemas.minion_schemas import MinionModel
 from salt_box_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from salt_box_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from salt_box_core.tasks.schemas.task_schemas import (
+    TaskCreateFromTemplateSchema,
     TaskJob,
     TaskJobReturnStatus,
     TaskJobStatus,
@@ -25,6 +27,7 @@ from salt_box_core.tasks.schemas.task_schemas import (
     TaskMinionJobStatus,
     TaskMinionStatus,
     TaskModel,
+    TaskPostProcessingType,
     TaskStatus,
     TaskUpdateSchema,
 )
@@ -92,11 +95,27 @@ class TaskLifespanService:
 
         return self.__task
 
-    async def run(self) -> None:
+    async def run(self, force: bool = False) -> None:
         task = await self.get_task()
 
-        if task.status in [TaskStatus.created, TaskStatus.stopped]:
+        if task.status in [TaskStatus.created, TaskStatus.stopped] or force:
             await self.update_task(status=TaskStatus.running)
+
+            if task.parent_task_id:
+                try:
+                    parent_task = await self.task_service.get(task.parent_task_id)
+
+                    await self.task_service.update(
+                        query=parent_task.id,
+                        data={
+                            **TaskUpdateSchema.model_validate(parent_task.model_dump(exclude=set('id'))).model_dump(
+                                by_alias=True
+                            ),
+                            'status': TaskStatus.running,
+                        },
+                    )
+                except ObjectNotFoundError:
+                    await self.update_task(parent_task_id=None)
 
     async def __stop_jobs(self) -> None:
         task: TaskModel = await self.get_task()
@@ -120,7 +139,7 @@ class TaskLifespanService:
                     minion.status = TaskMinionStatus.pending
 
             await self.__create_jobs(ignore_limits=True)
-            await self.update_task(status=TaskStatus.running)
+            await self.run(force=True)
 
     async def restart_failed_on_minion(self, master: str, minion_id: str) -> None:
         task: TaskModel = await self.get_task()
@@ -392,25 +411,100 @@ class TaskLifespanService:
             else:
                 task_job.status = TaskJobStatus.succeeded
 
+    async def __postprocessing(self) -> None:  # noqa: C901
+        task: TaskModel = await self.get_task()
+
+        if not task.postprocessing:
+            return
+
+        if not task.postprocessing_dt:
+            task.postprocessing_dt = utc_now()
+
+        if task.postprocessing.type == TaskPostProcessingType.on_success:
+            for task_minion in task.minions.values():
+                if task_minion.status != TaskMinionStatus.success:
+                    task.status = TaskStatus.finished
+                    return
+
+        if task.postprocessing.wait_minions:
+            for minion_data in task.postprocessing.wait_minions:
+                try:
+                    minion = await self.minion_service.get_by_master_and_id(
+                        master=minion_data.master, minion_id=minion_data.minion_id
+                    )
+                except ObjectNotFoundError:
+                    return
+
+                if not minion.last_activity:
+                    return
+
+                if minion.last_activity < task.postprocessing_dt:
+                    return
+
+        if task.postprocessing.notify:
+            # TODO (i.moshkov): notify user
+            task.postprocessing.notify_dt = utc_now()
+
+        if task.postprocessing.task_create_request:
+            if not task.postprocessing.task_create_id:
+                created_task: TaskModel = await self.task_service.create(
+                    TaskCreateFromTemplateSchema.model_validate(
+                        {
+                            **task.postprocessing.task_create_request.model_dump(by_alias=True),
+                            'user': task.user,
+                            'parent_task_id': task.id,
+                        }
+                    )
+                )
+                await self.task_service.update(
+                    query=created_task.id,
+                    data=TaskUpdateSchema.model_validate({**created_task.model_dump(), 'status': TaskStatus.running}),
+                )
+                task.postprocessing.task_create_id = created_task.id
+
+                return
+            else:
+                try:
+                    children_task = await self.task_service.get(task.postprocessing.task_create_id)
+                except ObjectNotFoundError:
+                    task.postprocessing.task_create_id = None
+                    return
+
+                if children_task.status == TaskStatus.stopped:
+                    task.status = TaskStatus.stopped
+                    return
+
+                if children_task.status == TaskStatus.finished:
+                    task.status = TaskStatus.finished
+        else:
+            task.status = TaskStatus.finished
+
     async def process(self) -> None:
         task: TaskModel = await self.get_task()
 
-        if task.status not in [TaskStatus.running, TaskStatus.stopping]:
+        if task.status not in [TaskStatus.running, TaskStatus.stopping, TaskStatus.postprocessing]:
             return
 
         if not task.minions and task.status == TaskStatus.running:
             await self.__fill_minions_by_targeting()
-        else:
+        elif task.status in [TaskStatus.running, TaskStatus.stopping]:
             await self.__check_jobs()
 
             if task.status == TaskStatus.running:
                 await self.__create_jobs()
 
-        for job in task.jobs.values():
-            if job.status in [TaskJobStatus.pending, TaskJobStatus.running]:
-                break
-        else:
-            task.status = TaskStatus.stopped if task.status == TaskStatus.stopping else TaskStatus.finished
+            for job in task.jobs.values():
+                if job.status in [TaskJobStatus.pending, TaskJobStatus.running]:
+                    break
+            else:
+                if task.status == TaskStatus.stopping:
+                    task.status = TaskStatus.stopped
+                elif task.postprocessing:
+                    task.status = TaskStatus.postprocessing
+                else:
+                    task.status = TaskStatus.finished
+        elif task.status == TaskStatus.postprocessing:
+            await self.__postprocessing()
 
         await self.update_task(notify=True)
 

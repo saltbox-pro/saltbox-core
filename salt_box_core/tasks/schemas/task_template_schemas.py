@@ -37,7 +37,7 @@ class TaskTemplateCreateSchema(BaseModel, EditableFieldsFullMixin, ReadOnlyField
 
 class TaskTemplateUpdateSchema(BaseModel, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin):
     model_config = ConfigDict(
-        extra='forbid',
+        extra='ignore',
     )
 
 

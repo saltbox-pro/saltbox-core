@@ -6,6 +6,7 @@ from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 from pydantic import BaseModel
 from redis.asyncio import Redis
 
+# from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import PyObjectId
 from salt_box_core.db.redis import RedisDependency
@@ -16,6 +17,7 @@ from salt_box_core.tasks.schemas.task_schemas import (
     TaskCreateFromTemplateSchema,
     TaskCreateSchema,
     TaskModel,
+    TaskPostProcessing,
     TaskStatus,
     TaskTemplateShort,
     TaskUpdateSchema,
@@ -89,6 +91,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateFromTemp
 
         creation_data = TaskCreateSchema.model_validate(
             {
+                'parent_task_id': data.parent_task_id,
                 'task_template': TaskTemplateShort(**task_template.model_dump()),
                 'fun': task_template.fun,
                 'task_args': task_args,
@@ -103,6 +106,8 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateFromTemp
                 'user': data.user,
             }
         )
+        if data.postprocessing:
+            creation_data.postprocessing = TaskPostProcessing.model_validate(data.postprocessing.model_dump())
 
         if projection_model:
             task: TaskModel | ProjectionModel = await self.repo.create(creation_data, projection_model=projection_model)
@@ -147,6 +152,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateFromTemp
                 stamp_field_name = {
                     TaskStatus.running: 'run_dt',
                     TaskStatus.stopped: 'stopped_dt',
+                    TaskStatus.postprocessing: 'postprocessing_dt',
                     TaskStatus.finished: 'finished_dt',
                 }.get(data.status)
 

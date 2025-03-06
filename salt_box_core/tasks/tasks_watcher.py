@@ -63,7 +63,9 @@ class TasksWatcher:
 
         while True:
             tasks: list[TaskModel] = await task_service.get_list(
-                query={'status': {'$in': [TaskStatus.running, TaskStatus.stopping]}}, limit=0, skip=0
+                query={'status': {'$in': [TaskStatus.running, TaskStatus.stopping, TaskStatus.postprocessing]}},
+                limit=0,
+                skip=0,
             )
 
             for task in tasks:

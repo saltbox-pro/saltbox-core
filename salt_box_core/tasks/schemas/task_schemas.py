@@ -95,20 +95,50 @@ class TaskMinion(BaseModel):
         return len(self.jobs)
 
 
+# Task postprocessing
+
+
+class TaskPostProcessingType(str, Enum):
+    on_success = 'on_success'
+    on_anyway = 'on_anyway'
+
+
+class TaskPostProcessingMinionForWait(BaseModel):
+    minion_id: str = Field(title='Minion ID')
+    master: str = Field(title='Master')
+
+
+class TaskPostProcessingCreate(BaseModel):
+    type: TaskPostProcessingType = Field(title='Postprocessing type')
+
+    wait_minions: list[TaskPostProcessingMinionForWait] = Field(title='Wait minions', default=[])
+    wait_minions_ttl: int = Field(title='Wait minions TTL', ge=1, default=60 * 5)
+
+    task_create_request: 'TaskCreateRequestSchema | None' = Field(title='Create task', default=None)
+
+    notify: bool = Field(title='Notify', default=False)
+
+
+class TaskPostProcessing(TaskPostProcessingCreate):
+    task_create_id: PyObjectId | None = Field(title='Task ID', default=None)
+    notify_dt: datetime | None = Field(title='Notify dt', default=None)
+
+
 # Task
 
 
 class TaskStatus(str, Enum):
     created = 'created'
     running = 'running'
-    finished = 'finished'
     stopping = 'stopping'
     stopped = 'stopped'
+    postprocessing = 'postprocessing'
+    finished = 'finished'
 
 
 class TaskData(BaseModel):  # type: ignore[no-redef]
-    data_args: list | None = Field(alias='args', default=None)
-    data_kwargs: dict | None = Field(alias='kwargs', default=None)
+    args: list | None = Field(default=None)
+    kwargs: dict | None = Field(default=None)
 
 
 class TaskTemplateShort(BaseModel):
@@ -126,6 +156,7 @@ class CollectionShort(BaseModel):
 
 
 class TaskReadOnlyFieldsMixin:
+    parent_task_id: PyObjectId | None = Field(title='Parent task id', default=None)
     task_template: TaskTemplateShort = Field(title='Task template')
 
     fun: str = Field(title='Salt fun')
@@ -137,7 +168,6 @@ class TaskReadOnlyFieldsMixin:
     target_minions: list[PyObjectId] = Field(title='Target minions', default=[])
     target_masters: list[str] = Field(title='Target masters', default=[])
 
-    # batch_size: int = Field(title='Batch size', ge=1, le=10000, default=1000)
     batch_size: int | None = Field(title='Batch size', default=None)
     max_jobs_count_at_same_time: int = Field(title='Max jobs count at some time', ge=1, default=1)
     max_retries: int = Field(title='Max retries', ge=1, default=3)
@@ -150,10 +180,13 @@ class TaskEditableFieldsMixin:
 
     run_dt: datetime | None = Field(title='Run datetime', default=None)
     stopped_dt: datetime | None = Field(title='Stopped datetime', default=None)
+    postprocessing_dt: datetime | None = Field(title='Postprocessing datetime', default=None)
     finished_dt: datetime | None = Field(title='Finished datetime', default=None)
 
     jobs: dict[str, TaskJob] = Field(title='Jobs', default={})
     minions: dict[str, TaskMinion] = Field(title='Minions failed', default={})
+
+    postprocessing: TaskPostProcessing | None = Field(title='Postprocessing', default=None)
 
 
 class TaskCreateSchema(BaseModel, TaskEditableFieldsMixin, TaskReadOnlyFieldsMixin):
@@ -180,16 +213,21 @@ class TaskCreateRequestSchema(BaseModel):
     minions: list[PyObjectId] = Field(title='Minions', default=[])
 
     batch_size: int | None = Field(title='Batch size', default=None)
+    max_jobs_count_at_same_time: int = Field(title='Max jobs count at some time', ge=1, default=1)
     max_retries: int = Field(title='Max retries', default=3)
+
+    postprocessing: TaskPostProcessingCreate | None = Field(title='Postprocessing', default=None)
 
 
 class TaskCreateFromTemplateSchema(TaskCreateRequestSchema):
     user: UserShort
+    parent_task_id: PyObjectId | None = Field(title='Parent task id', default=None)
 
 
 class TaskListResponseSchema(TaskModel):
     jobs: Any = Field(exclude=True)
     minions: Any = Field(exclude=True)
+    postprocessing: Any = Field(exclude=True)
 
 
 class TaskListQueryParams(SkipLimitParams):
