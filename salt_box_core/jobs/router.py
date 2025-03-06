@@ -86,7 +86,7 @@ async def job_create(item: CreateJobRequest, job_service: JobServiceDependency) 
 
 
 @router.get('/{jid}/returns-count', operation_id='job_returns_count')
-async def job_returns_count(jid: IntJid, job_service: JobServiceDependency) -> Annotated[int, Field(gte=0)]:
+async def job_returns_count(jid: IntJid, job_service: JobServiceDependency) -> Annotated[int, Field(ge=0)]:
     """
     How many return data records for job at the moment.
 
@@ -128,14 +128,17 @@ async def jobs_rets_websocket(websocket: WebSocket, rdb: RedisDependency) -> Non
 @ws_router.websocket('/{jid}/return')
 async def jobs_endpoint_websocket(
     jid: IntJid,
+    job_service: JobServiceDependency,
     websocket: WebSocket,
     rdb: RedisDependency,
 ) -> None:
-    ts = JID(jid).to_timestamp()
-    jid_in_jobs = bool(await rdb.zcount('jobs', min=ts, max=ts))
-    if not jid_in_jobs:
+    _jid = JID(jid)
+
+    try:
+        await job_service.get_job(_jid)
+    except JobDoesNotExistsException as e:
         msg = f'Job not found by JID={jid}'
-        raise http_errors.WebSocketPolicyViolation(msg)
+        raise http_errors.WebSocketPolicyViolation(msg) from e
 
     secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
     await secure_websocket.handle_pubsub({f'job:{jid}:return': JobResult})
