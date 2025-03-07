@@ -64,6 +64,11 @@ class TaskJob(BaseModel):
 # Task minion
 
 
+class TaskTargetMinion(BaseModel):
+    minion_id: str
+    master: str
+
+
 class TaskMinionStatus(str, Enum):
     pending = 'pending'
     in_work = 'in_work'
@@ -165,7 +170,7 @@ class TaskReadOnlyFieldsMixin:
 
     target_collection: CollectionShort = Field(title='Target collection')
     target_query: dict[str, Any] = Field(title='Target query', default={})
-    target_minions: list[PyObjectId] = Field(title='Target minions', default=[])
+    target_minions: list[TaskTargetMinion] = Field(title='Target minions', default=[])
     target_masters: list[str] = Field(title='Target masters', default=[])
 
     batch_size: int | None = Field(title='Batch size', default=None)
@@ -210,7 +215,7 @@ class TaskCreateRequestSchema(BaseModel):
 
     collection_id: PyObjectId = Field(title='Collection')
     query: dict = Field(title='Query', default={})
-    minions: list[PyObjectId] = Field(title='Minions', default=[])
+    minions: list[TaskTargetMinion] = Field(title='Minions', default=[])
 
     batch_size: int | None = Field(title='Batch size', default=None)
     max_jobs_count_at_same_time: int = Field(title='Max jobs count at some time', ge=1, default=1)

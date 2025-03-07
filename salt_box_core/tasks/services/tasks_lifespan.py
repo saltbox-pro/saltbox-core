@@ -202,20 +202,24 @@ class TaskLifespanService:
     async def __get__targeting_query(self) -> dict:
         task: TaskModel = await self.get_task()
         collection: CollectionModel = await self.collection_service.get(task.target_collection.id)
-        query: dict = collection.query
+        sub_queries: list[dict] = [collection.query]
 
-        if task.target_query and task.target_minions:
-            query = {
-                '$and': [
-                    query,
-                    task.target_query,
-                    {'_id': {'$in': [PyObjectId(minion_id) for minion_id in task.target_minions]}},
-                ]
-            }
-        elif task.target_query:
-            query = {'$and': [query, task.target_query]}
-        elif task.target_minions:
-            query = {'$and': [query, {'_id': {'$in': [PyObjectId(minion_id) for minion_id in task.target_minions]}}]}
+        if task.target_query:
+            sub_queries.append(task.target_query)
+        if task.target_minions:
+            sub_queries.append(
+                {
+                    '$or': [
+                        {'minion_id': minion_target.minion_id, 'master': minion_target.master}
+                        for minion_target in task.target_minions
+                    ]
+                }
+            )
+
+        if len(sub_queries) > 1:
+            query = {'$and': sub_queries}
+        else:
+            query = sub_queries[0]
 
         query = recursive_replace_dates(query)
 
