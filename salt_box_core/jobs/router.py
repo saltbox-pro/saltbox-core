@@ -1,9 +1,8 @@
-import datetime
 import logging.config
 from typing import Annotated
 
 import pydantic
-from fastapi import APIRouter, WebSocket
+from fastapi import APIRouter, Query, WebSocket
 from pydantic import Field, ValidationError
 
 from salt_box_core import http_errors
@@ -23,6 +22,7 @@ from salt_box_core.jobs.schemas import (
     Job,
     JobCreate,
     JobResult,
+    JobsListRequest,
 )
 from salt_box_core.jobs.services import JobServiceDependency
 from salt_box_core.utilities.jid import JID
@@ -43,12 +43,13 @@ ws_router = APIRouter(prefix='/jobs')
 
 @router.get('', operation_id='jobs_list')
 async def jobs_list(
+    request: Annotated[JobsListRequest, Query()],
     job_service: JobServiceDependency,
-    start_datetime: pydantic.PastDatetime,
-    end_datetime: datetime.datetime | None = None,
 ) -> list[Job]:
     try:
-        jobs: list[Job] = await job_service.get_jobs(start_datetime=start_datetime, end_datetime=end_datetime)
+        jobs: list[Job] = await job_service.get_jobs(
+            start_datetime=request.start_datetime, end_datetime=request.end_datetime
+        )
         return jobs
     except ValidationError as err:
         raise http_errors.InternalServerError(detail=err.errors()) from err

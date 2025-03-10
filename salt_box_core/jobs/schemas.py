@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime
 from enum import Enum
-from typing import Annotated, Any, TypeVar, cast
+from typing import Annotated, Any, Self, TypeVar, cast
 
 from pydantic import (
     BaseModel,
@@ -59,7 +60,7 @@ class Job(BaseModel):
     status: JobStatus
 
     @computed_field(title='Timestamp decoded from JID')
-    def fms_jid_timestamp(self) -> PastDatetime:
+    def fms_jid_timestamp(self) -> Annotated[datetime, PastDatetime]:
         return JID(self.jid).to_datetime()
 
     @model_validator(mode='before')
@@ -122,6 +123,19 @@ class PubData(BaseModel):
 
     jid: StrJid
     minions: list[str] = Field(min_length=1)
+
+
+class JobsListRequest(BaseModel):
+    start_datetime: Annotated[datetime, PastDatetime]
+    end_datetime: datetime | None = None
+
+    @model_validator(mode='after')
+    def dt_validate(self) -> Self:
+        if self.end_datetime and self.start_datetime > self.end_datetime:
+            msg = '`end_datetime` must be before `start_datetime`'
+            raise ValueError(msg)
+
+        return self
 
 
 class CreateJobResponse(BaseModel):
