@@ -23,6 +23,7 @@ from salt_box_core.tasks.schemas.task_schemas import (
 )
 from salt_box_core.tasks.services.tasks import TaskService, get_task_service
 from salt_box_core.tasks.services.tasks_lifespan import TaskLifespanService, get_task_lifespan_service
+from salt_box_core.utilities.exceptions import ServiceError
 from salt_box_core.utilities.jid import JID
 from salt_box_core.utilities.websocket import PubSubAuthenticatedWebSocket
 
@@ -77,6 +78,8 @@ async def task_create(
     try:
         task: TaskModel = await task_service.create(data=create_data)
     except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
+    except ServiceError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     except ObjectNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
