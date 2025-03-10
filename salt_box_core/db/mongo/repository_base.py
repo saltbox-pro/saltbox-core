@@ -89,7 +89,7 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
         result = await self.collection.find(filter=query, projection=projection).to_list()
 
         if len(result) == 0:
-            raise ObjectNotFoundError
+            raise ObjectNotFoundError(obj_type=self.Meta.collection_name, query=query)
         elif len(result) > 1:
             raise MultipleObjectsFoundError
 
@@ -221,7 +221,7 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
         count = await self.count(query)
 
         if count == 0:
-            raise ObjectNotFoundError
+            raise ObjectNotFoundError(obj_type=self.Meta.collection_name, query=query)
         elif count > 1:
             raise MultipleObjectsFoundError
 
