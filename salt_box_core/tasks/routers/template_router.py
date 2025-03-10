@@ -6,7 +6,8 @@ from salt_box_core.config import logger
 
 # from salt_box_core.db.exceptions import DuplicateKeyError, ObjectNotFoundError
 from salt_box_core.db.exceptions import ObjectNotFoundError
-from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId
+from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId, User
+from salt_box_core.dependencies import get_current_user_from_jwt
 from salt_box_core.sls_repos.schemas.settings_schemas import SettingsSlsRepoShortSchema
 from salt_box_core.sls_repos.services.sls_repo_service import SettingsSlsRepoService, get_sls_repo_service
 from salt_box_core.tasks.schemas.task_template_schemas import (
@@ -24,6 +25,7 @@ async def task_template_list(
     params: Annotated[TaskTemplateListQueryParams, Query()],
     service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
     repo_settings_service: Annotated[SettingsSlsRepoService, Depends(get_sls_repo_service)],
+    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> PaginatedResponse[TaskTemplateShortSchema]:
     active_repos = await repo_settings_service.get_list(
         query={'is_active': True}, skip=0, limit=0, projection_model=SettingsSlsRepoShortSchema
@@ -55,6 +57,7 @@ async def task_template_list(
 async def task_template_retrieve(
     tpl_id: PyObjectId,
     service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
+    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> TaskTemplateModel:
     try:
         return await service.get(tpl_id)
