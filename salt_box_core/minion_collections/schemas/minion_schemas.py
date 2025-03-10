@@ -113,6 +113,7 @@ class GrainsSchema(BaseModel):
 
     model_config = ConfigDict(
         extra='allow',
+        str_strip_whitespace=True,
         # json_schema_extra={'additionalProperties': {'type': 'object'}},
     )
 
