@@ -125,7 +125,7 @@ def sync_sls_repo_task(self: Any, repo_id: str) -> dict:
         update_data = {
             'last_synced': datetime.now(UTC),
             'is_last_sync_successful': True,
-            'last_sync_error': '',
+            'last_sync_error': '\n'.join(errors) if errors else '',
         }
         settings_collection.update_one({'_id': ObjectId(repo_id)}, {'$set': update_data})
 
