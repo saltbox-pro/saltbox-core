@@ -14,7 +14,7 @@ from salt_box_core.db.mongo.schemas_base import (
 from salt_box_core.jobs.schemas.job_sc_schemas import JobSchemaModel, JobSchemaShortSchema
 from salt_box_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
 
-router = APIRouter(prefix='/job-schemas', tags=['Job Schemas'])
+router = APIRouter(prefix='/json-schemas', tags=['JSON Schemas'])
 
 
 @router.get('')
