@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Any
 
 from redis import Redis
@@ -71,12 +72,17 @@ def sync_schemas_repo_task(self: Any, repo_url: str) -> dict:
             if not existing_schema:
                 logger.debug('Try create: %s', schema['name'])
                 schema_create_obj = JobSchemaCreateSchema(**schema)
-                collection.insert_one(schema_create_obj.model_dump())
+                collection.insert_one(
+                    {**schema_create_obj.model_dump(), 'created': datetime.now(UTC), 'modified': datetime.now(UTC)}
+                )
                 created.append(schema_create_obj.name)
             elif existing_schema['commit_hash'] != schema['commit_hash']:
                 logger.debug('Try update: %s', schema['name'])
                 schema_update_obj = JobSchemaUpdateSchema(**schema)
-                collection.update_one({'name': schema['name']}, {'$set': schema_update_obj.model_dump()})
+                collection.update_one(
+                    {'name': schema['name']},
+                    {'$set': {**schema_update_obj.model_dump(), 'modified': datetime.now(UTC)}},
+                )
                 updated.append(schema_update_obj.name)
 
         return {
