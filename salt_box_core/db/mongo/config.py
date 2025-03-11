@@ -1,7 +1,8 @@
-from typing import Generator
+from collections.abc import Generator
 
-from pymongo import AsyncMongoClient
+from pymongo import AsyncMongoClient, MongoClient
 from pymongo.asynchronous.database import AsyncDatabase
+from pymongo.database import Database
 
 from salt_box_core.config import SETTINGS, logger
 
@@ -36,3 +37,9 @@ def get_mongo() -> Generator[AsyncDatabase, None, None]:
         yield db
     finally:
         pass
+
+
+def get_sync_mongo_db(db_name: str = SETTINGS.mongo_db) -> Database:
+    client: MongoClient = MongoClient(SETTINGS.mongo_url)
+    db = client[db_name]
+    return db

@@ -2,17 +2,23 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
+from salt_box_core.celery import celery
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import DuplicateKeyError, ObjectNotFoundError
-from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId, SkipLimitParams
-from salt_box_core.schema_sync.schemas import JSONSchemaSyncResponse
-from salt_box_core.sls_repos.schemas.settings_schemas import (
+from salt_box_core.db.mongo.schemas_base import (
+    CeleryTaskIdResponse,
+    CeleryTaskStatus,
+    PaginatedResponse,
+    PyObjectId,
+    SkipLimitParams,
+)
+from salt_box_core.settings.schemas.sls_repos_schemas import (
     SettingsSlsRepoCreateSchema,
     SettingsSlsRepoModel,
     SettingsSlsRepoShortSchema,
     SettingsSlsRepoUpdateSchema,
 )
-from salt_box_core.sls_repos.services.sls_repo_service import SettingsSlsRepoService, get_sls_repo_service
+from salt_box_core.settings.services.sls_repo_service import SettingsSlsRepoService, get_sls_repo_service
 from salt_box_core.tasks.services.tasks_templates import TaskTemplateService, get_task_template_service
 
 router = APIRouter(prefix='/sls-repos', tags=['Settings'])
@@ -37,15 +43,27 @@ async def sls_repo_settings_list(
 @router.post('/sync_all')
 async def sls_repo_settings_sync_all(
     service: Annotated[SettingsSlsRepoService, Depends(get_sls_repo_service)],
-    tpl_service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
-) -> None:
+) -> list[str]:
     try:
-        await service.sync_all(tpl_service)
+        return await service.sync_all()
     except Exception as e:
         logger.error('Error: %s', e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f'Something went wrong...: {e!s}'
         ) from e
+
+
+@router.get('/sync-status/{task_id}')
+async def get_sync_status(task_id: str) -> CeleryTaskStatus:
+    task_result = celery.AsyncResult(task_id)
+
+    return CeleryTaskStatus(
+        task_id=task_result.id,
+        status=task_result.status,
+        result=str(task_result.result),
+        date_done=task_result.date_done,
+        children=[str(child) for child in task_result.children] if task_result.children else [],
+    )
 
 
 @router.get('/{sid}')
@@ -110,10 +128,10 @@ async def sls_repo_settings_delete(
 async def sls_repo_settings_sync(
     sid: PyObjectId,
     service: Annotated[SettingsSlsRepoService, Depends(get_sls_repo_service)],
-    tpl_service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
-) -> JSONSchemaSyncResponse:
+) -> CeleryTaskIdResponse:
     try:
-        return await service.sync(sid, tpl_service)
+        res = await service.sync(sid)
+        return CeleryTaskIdResponse(task_id=res)
     except Exception as e:
         logger.error('Error: %s', e)
         raise HTTPException(

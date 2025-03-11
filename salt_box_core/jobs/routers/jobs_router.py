@@ -14,7 +14,7 @@ from salt_box_core.jobs.exceptions import (
     JobServiceException,
     JobServiceInvalidArgsException,
 )
-from salt_box_core.jobs.schemas import (
+from salt_box_core.jobs.schemas.job_schemas import (
     CreateJobRequest,
     CreateJobResponse,
     GetJobReturnResponse,
@@ -24,7 +24,7 @@ from salt_box_core.jobs.schemas import (
     JobResult,
     JobsListRequest,
 )
-from salt_box_core.jobs.services import JobServiceDependency
+from salt_box_core.jobs.services.job_services import JobServiceDependency
 from salt_box_core.utilities.jid import JID
 from salt_box_core.utilities.websocket import PubSubAuthenticatedWebSocket
 

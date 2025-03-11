@@ -5,15 +5,15 @@ from pymongo.asynchronous.database import AsyncDatabase
 
 from salt_box_core.db.mongo.config import get_mongo
 from salt_box_core.db.mongo.repository_base import BaseMongoRepository
-from salt_box_core.schema_sync.schemas import JSONSchemaModel
+from salt_box_core.jobs.schemas.job_sc_schemas import JobSchemaModel
 
 
-class JSONSchemaRepository(BaseMongoRepository[JSONSchemaModel]):
+class JobSchemaRepository(BaseMongoRepository[JobSchemaModel]):
     class Meta:
-        collection_name = 'json_schemas'
+        collection_name = 'job_schemas'
         auto_now_add_fields: ClassVar[list[str]] = ['created']
         auto_now_fields: ClassVar[list[str]] = ['modified']
 
 
-def get_json_schema_repository(db: Annotated[AsyncDatabase, Depends(get_mongo)]) -> JSONSchemaRepository:
-    return JSONSchemaRepository(db)
+def get_job_schema_repository(db: Annotated[AsyncDatabase, Depends(get_mongo)]) -> JobSchemaRepository:
+    return JobSchemaRepository(db)

@@ -5,7 +5,7 @@ from pymongo.asynchronous.database import AsyncDatabase
 
 from salt_box_core.db.mongo.config import get_mongo
 from salt_box_core.db.mongo.repository_base import BaseMongoRepository
-from salt_box_core.sls_repos.schemas.settings_schemas import SettingsSlsRepoModel
+from salt_box_core.settings.schemas.sls_repos_schemas import SettingsSlsRepoModel
 
 
 class SettingsSlsRepoRepository(BaseMongoRepository[SettingsSlsRepoModel]):
