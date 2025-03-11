@@ -18,8 +18,8 @@ from salt_box_core.jobs.exceptions import (
     JobServiceException,
     JobServiceInvalidArgsException,
 )
-from salt_box_core.jobs.schemas import Job, JobCreate, JobResult
-from salt_box_core.schema_sync.services.schema_service import JSONSchemaService, get_json_schema_service
+from salt_box_core.jobs.schemas.job_schemas import Job, JobCreate, JobResult
+from salt_box_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
 from salt_box_core.utilities.jid import JID, JidError
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
@@ -30,7 +30,7 @@ JOB_CREATE_HASH_NAME: str = 'job_create:{jid}'
 
 
 class JobService:
-    def __init__(self, rdb: RedisDependency, json_schema_service: JSONSchemaService):
+    def __init__(self, rdb: RedisDependency, json_schema_service: JobSchemaService):
         self.rdb = rdb
         self.json_schema_service = json_schema_service
 
@@ -207,7 +207,7 @@ class JobService:
 
 
 async def get_job_service(
-    rdb: RedisDependency, json_schema_service: Annotated[JSONSchemaService, Depends(get_json_schema_service)]
+    rdb: RedisDependency, json_schema_service: Annotated[JobSchemaService, Depends(get_job_schema_service)]
 ) -> AsyncGenerator[JobService, None]:
     job_service = JobService(rdb=rdb, json_schema_service=json_schema_service)
     yield job_service
