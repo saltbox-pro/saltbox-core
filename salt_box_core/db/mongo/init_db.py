@@ -2,10 +2,10 @@ import pymongo
 
 from salt_box_core.config import logger
 from salt_box_core.db.mongo.config import get_mongo_db
+from salt_box_core.jobs.repositories.job_sc_repository import JobSchemaRepository
 from salt_box_core.minion_collections.repositories.collection_repository import CollectionRepository
 from salt_box_core.minion_collections.schemas.collection_schemas import CollectionCreateSchema
-from salt_box_core.schema_sync.repository import JSONSchemaRepository
-from salt_box_core.sls_repos.repository import SettingsSlsRepoRepository
+from salt_box_core.settings.repository import SettingsSlsRepoRepository
 from salt_box_core.tasks.repositories.task_template_repository import TaskTemplateRepository
 
 
@@ -41,9 +41,9 @@ async def init_sls_repos_settings() -> None:
         logger.debug('Indexes: %s', indexes)
 
 
-async def init_json_schemas() -> None:
+async def init_job_schemas() -> None:
     db = get_mongo_db()
-    json_schemas_repo = JSONSchemaRepository(db)
+    json_schemas_repo = JobSchemaRepository(db)
 
     # Check existing indexes
     indexes = sorted(await json_schemas_repo.collection.index_information())
@@ -93,8 +93,8 @@ async def init_mongo_db() -> None:
     logger.debug('MongoDB collections initialized')
 
     # Initialize json_schemas collection
-    await init_json_schemas()
-    logger.debug('JSON schemas initialized')
+    await init_job_schemas()
+    logger.debug('Job schemas initialized')
 
     # Initialize sls_repos_settings collection
     await init_sls_repos_settings()
