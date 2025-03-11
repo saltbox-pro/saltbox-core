@@ -8,8 +8,8 @@ from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId, User
 from salt_box_core.dependencies import get_current_user_from_jwt
-from salt_box_core.sls_repos.schemas.settings_schemas import SettingsSlsRepoShortSchema
-from salt_box_core.sls_repos.services.sls_repo_service import SettingsSlsRepoService, get_sls_repo_service
+from salt_box_core.settings.schemas.sls_repos_schemas import SettingsSlsRepoShortSchema
+from salt_box_core.settings.services.sls_repo_service import SettingsSlsRepoService, get_sls_repo_service
 from salt_box_core.tasks.schemas.task_template_schemas import (
     TaskTemplateListQueryParams,
     TaskTemplateModel,

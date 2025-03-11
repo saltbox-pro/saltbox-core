@@ -10,8 +10,8 @@ from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId, U
 from salt_box_core.db.redis import RedisDependency
 from salt_box_core.dependencies import get_current_user_from_jwt
 from salt_box_core.jobs.exceptions import JobDoesNotExistsException
-from salt_box_core.jobs.schemas import Job, JobResult
-from salt_box_core.jobs.services import JobServiceDependency
+from salt_box_core.jobs.schemas.job_schemas import Job, JobResult
+from salt_box_core.jobs.services.job_services import JobServiceDependency
 from salt_box_core.minion_collections.schemas.collection_schemas import CollectionModel
 from salt_box_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from salt_box_core.tasks.schemas.task_schemas import (

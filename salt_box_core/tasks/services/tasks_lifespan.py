@@ -10,8 +10,8 @@ from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.db.mongo.schemas_base import PyObjectId
 from salt_box_core.db.redis import RedisDependency
 from salt_box_core.jobs.exceptions import JobCreateException, JobDoesNotExistsException
-from salt_box_core.jobs.schemas import Job, JobCreate, JobResult
-from salt_box_core.jobs.services import JobService, get_job_service
+from salt_box_core.jobs.schemas.job_schemas import Job, JobCreate, JobResult
+from salt_box_core.jobs.services.job_services import JobService, get_job_service
 from salt_box_core.minion_collections.schemas.collection_schemas import CollectionModel
 from salt_box_core.minion_collections.schemas.minion_schemas import MinionModel
 from salt_box_core.minion_collections.services.collection_service import CollectionService, get_collection_service
