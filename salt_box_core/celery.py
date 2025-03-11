@@ -11,6 +11,13 @@ class CeleryConfig:
     beat_schedule_filename = SETTINGS.celery_beat_schedule_filename
     broker_connection_retry_on_startup = True
     broker_url = SETTINGS.celery_broker_url
+    # result_backend = SETTINGS.celery_broker_url
+    result_backend = SETTINGS.mongo_url
+    mongodb_backend_settings: ClassVar[dict] = {
+        'database': SETTINGS.mongo_db,
+        'taskmeta_collection': 'celery_taskmeta',
+    }
+    result_serializer = 'json'
     enable_utc = True
     result_expires = timedelta(minutes=60)
     # TODO (a.karmanov): May be useful to pass tests.
@@ -34,4 +41,4 @@ class CeleryConfig:
 
 celery = Celery(APP_NAME)
 celery.config_from_object(CeleryConfig)
-celery.autodiscover_tasks()
+celery.autodiscover_tasks(['salt_box_core.settings', 'salt_box_core.jobs'])
