@@ -118,9 +118,9 @@ def sync_sls_repo_task(self: Any, repo_id: str) -> dict:
                     {**schema_create_obj.model_dump(), 'created': datetime.now(UTC), 'modified': datetime.now(UTC)}
                 )
                 created.append(schema_create_obj.name)
-            elif existing_schema['commit_hash'] != schema['commit_hash'] and existing_schema.repo_id == sid:
+            elif existing_schema['commit_hash'] != schema['commit_hash'] and existing_schema['repo_id'] == sid:
                 logger.debug('Try update: %s', schema['name'])
-                schema_update_obj = TaskTemplateUpdateSchema(**schema)
+                schema_update_obj = TaskTemplateUpdateSchema(**schema, repo_id=sid)
                 tpl_collection.update_one(
                     {'name': schema['name']},
                     {'$set': {**schema_update_obj.model_dump(), 'modified': datetime.now(UTC)}},
