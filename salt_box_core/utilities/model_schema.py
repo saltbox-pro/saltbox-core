@@ -178,9 +178,9 @@ def create_field_schema(
         field_schema['input_type'] = field_schema_type
 
     # TODO (a.baikov): use this for datetime fields
-    # if full_field_name in ['created', 'modified']:
-    #     field_schema['value_editor_type'] = 'datetime-local'
-    #     field_schema['input_type'] = 'datetime-local'
-    #     field_schema['datatype'] = 'timestamp with time zone'
+    if full_field_name in ['created', 'modified', 'last_activity']:
+        field_schema['value_editor_type'] = 'datetime-local'
+        field_schema['input_type'] = 'datetime-local'
+        field_schema['datatype'] = 'timestamp with time zone'
 
     return field_schema

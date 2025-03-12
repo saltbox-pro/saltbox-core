@@ -8,6 +8,8 @@ DATE_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 DATETIME_PATTERN = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}\+\d{2}:\d{2}$')
 # 2025-11-14T09:50:38
 DATETIME_PATTERN_NO_MS = re.compile(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$')
+# 2025-03-12 00:00:00
+DATETIME_PATTERN_NO_TZ = re.compile(r'^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$')
 
 
 def utc_now() -> datetime:
@@ -33,5 +35,7 @@ def recursive_replace_dates(obj: Any) -> Any:
         return datetime.strptime(obj, '%Y-%m-%dT%H:%M:%S.%f%z')
     elif isinstance(obj, str) and DATETIME_PATTERN_NO_MS.match(obj):
         return datetime.strptime(obj, '%Y-%m-%dT%H:%M:%S').replace(tzinfo=UTC)
+    elif isinstance(obj, str) and DATETIME_PATTERN_NO_TZ.match(obj):
+        return datetime.strptime(obj, '%Y-%m-%d %H:%M:%S').replace(tzinfo=UTC)
     else:
         return obj
