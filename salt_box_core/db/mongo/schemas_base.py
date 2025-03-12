@@ -205,6 +205,6 @@ class CeleryTaskIdResponse(BaseModel):
 class CeleryTaskStatus(BaseModel):
     task_id: str = Field(title='Celery Task ID')
     status: str = Field(title='Task status')
-    result: Any | None = Field(title='Task result')
+    result: dict | None = Field(title='Task result')
     date_done: datetime | None = Field(title='Task completion date')
     children: list[str] | None = Field(title='Task children')
