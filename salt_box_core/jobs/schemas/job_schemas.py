@@ -103,7 +103,7 @@ class JobResult(BaseModel):
     fun: str
     fun_args: list | None = None
     fun_kwarg: dict | None = None
-    user: str
+    user: str | None = None
     stamp: str = Field(alias='_stamp')
 
     @model_validator(mode='before')
