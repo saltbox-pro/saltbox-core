@@ -19,7 +19,7 @@ class OPAResult(BaseModel):
 
 
 class AuthzResponse(BaseModel):
-    decision_id: str
+    decision_id: str | None = None
     result: OPAResult | bool
 
 
