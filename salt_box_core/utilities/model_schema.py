@@ -97,7 +97,7 @@ schema_lookups_map = {
 schema_input_type_map = {
     int: 'number',
     float: 'number',
-    str: 'text',
+    str: None,
     bool: 'checkbox',
     PyObjectId: 'text',
     UUID: 'text',
@@ -159,7 +159,7 @@ def create_field_schema(
     full_field_name: str, field: Any, nullable_field: bool, computed_field_class: Any
 ) -> dict[str, Any]:
     field_schema_lookups: list[str] = schema_lookups_map.get(computed_field_class, schema_text_lookups)
-    field_schema_type: str = schema_input_type_map.get(computed_field_class, 'text')
+    field_schema_type: str | None = schema_input_type_map.get(computed_field_class, None)
 
     if nullable_field:
         field_schema_lookups = field_schema_lookups + schema_nullable_lookups
