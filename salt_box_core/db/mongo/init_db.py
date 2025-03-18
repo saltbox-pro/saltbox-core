@@ -3,6 +3,8 @@ import pymongo
 from salt_box_core.config import logger
 from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.jobs.repositories.job_sc_repository import JobSchemaRepository
+from salt_box_core.masters.repositories.master_repository import MasterRepository
+from salt_box_core.masters.schemas.master_schemas import MasterCreateSchema, MasterStatus
 from salt_box_core.minion_collections.repositories.collection_repository import CollectionRepository
 from salt_box_core.minion_collections.schemas.collection_schemas import CollectionCreateSchema
 from salt_box_core.settings.repository import SettingsSlsRepoRepository
@@ -85,6 +87,50 @@ async def init_collections() -> None:
         logger.debug('MinionCollection with slug `root` created')
 
 
+async def init_masters() -> None:
+    db = get_mongo_db()
+    masters_repo = MasterRepository(db)
+
+    # Check existing indexes
+    indexes = sorted(await masters_repo.collection.index_information())
+
+    # Create unique index for name if not exists
+    if 'name_unique_index_asc' not in indexes:
+        result = await masters_repo.collection.create_index(
+            [('name', pymongo.ASCENDING)], name='name_unique_index_asc', unique=True
+        )
+        logger.debug('Index created: %s', result)
+
+    # Create unique index for alias if not exists
+    if 'alias_unique_index_asc' not in indexes:
+        result = await masters_repo.collection.create_index(
+            [('alias', pymongo.ASCENDING)], name='alias_unique_index_asc', unique=True
+        )
+        logger.debug('Index created: %s', result)
+
+    logger.debug('Indexes: %s', indexes)
+
+    # Create unique index for name and alias if not exists
+    if 'name_alias_unique_index_asc' not in indexes:
+        result = await masters_repo.collection.create_index(
+            keys=[('name', pymongo.ASCENDING), ('alias', pymongo.ASCENDING)],
+            name='name_alias_unique_index_asc',
+            unique=True,
+        )
+        logger.debug('Index created: %s', result)
+
+    logger.debug('Indexes: %s', indexes)
+
+    # TODO @: Temporally create salt-master master if not exists
+    if not await masters_repo.collection.count_documents({'name': 'salt-master'}):
+        logger.debug("Master with name `salt-master` doesn't exist... Creating...")
+        obj = MasterCreateSchema.model_validate(
+            {'name': 'salt-master', 'title': 'salt-master', 'status': MasterStatus.accepted}
+        )
+        await masters_repo.create(obj)
+        logger.debug('Master with name `salt-master` created')
+
+
 async def init_mongo_db() -> None:
     """Initialize MongoDB collections"""
 
@@ -103,3 +149,7 @@ async def init_mongo_db() -> None:
     # Initialize sls_tpl collection
     await init_task_tpl()
     logger.debug('SLS templates initialized')
+
+    # Initialize masters collection
+    await init_masters()
+    logger.debug('Masters initialized')

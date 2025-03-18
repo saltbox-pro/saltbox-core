@@ -10,6 +10,7 @@ from salt_box_core.db.redis import POOL
 from salt_box_core.jobs.routers.job_sc_router import router as job_schemas_router
 from salt_box_core.jobs.routers.jobs_router import router as jobs_router
 from salt_box_core.jobs.routers.jobs_router import ws_router as jobs_ws_router
+from salt_box_core.masters.routers.master_route import router as masters_router
 from salt_box_core.minion_collections.routers.collections_router import router as collections_router
 from salt_box_core.minion_collections.routers.filters_router import router as filters_router
 from salt_box_core.minion_collections.routers.minion_router import router as minions_router
@@ -60,4 +61,5 @@ APP.include_router(task_router)
 APP.include_router(task_ws_router)
 APP.include_router(collections_router)
 APP.include_router(minions_router)
+APP.include_router(masters_router)
 APP.include_router(router=settings_sls_router, prefix='/settings', tags=['Settings'])
