@@ -110,6 +110,9 @@ class GitRepoService:
         schemas = []
         errors = []
         for file in Path(self.local_path).rglob('*.json'):
+            if any(part in file.parts for part in ['.vscode', '.idea']):
+                logger.debug('Exclude file: %s', file)
+                continue
             try:
                 content = json.loads(file.read_text())
                 if not isinstance(content, dict):
