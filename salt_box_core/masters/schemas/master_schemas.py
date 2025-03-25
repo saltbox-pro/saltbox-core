@@ -15,6 +15,10 @@ class MasterReadOnlyFieldsMixin:
     name: str = Field(title='Slug')
 
 
+class MasterSecretsMixin:
+    secret: str | None = Field(title='Secret', default=None)  # TODO @: make encrypted
+
+
 class MasterEditableFieldsMixin:
     title: str = Field(title='Title', min_length=3, max_length=50)
 
@@ -22,17 +26,23 @@ class MasterEditableFieldsMixin:
     alias: str | None = Field(title='Alias', default=None)
 
 
-class MasterCreateSchema(BaseModel, MasterEditableFieldsMixin, MasterReadOnlyFieldsMixin):
+class MasterCreateSchema(BaseModel, MasterEditableFieldsMixin, MasterReadOnlyFieldsMixin, MasterSecretsMixin):
     pass
 
 
-class MasterUpdateSchema(BaseModel, MasterEditableFieldsMixin):
+class MasterUpdateSchema(BaseModel, MasterEditableFieldsMixin, MasterSecretsMixin):
     model_config = ConfigDict(
-        extra='forbid',
+        extra='ignore',
     )
 
 
-class MasterModel(BaseModel, CreatedModifiedMixin, MasterEditableFieldsMixin, MasterReadOnlyFieldsMixin, IDMixin):
+class MasterModel(
+    BaseModel, CreatedModifiedMixin, MasterEditableFieldsMixin, MasterReadOnlyFieldsMixin, MasterSecretsMixin, IDMixin
+):
+    pass
+
+
+class MasterViewSchema(BaseModel, CreatedModifiedMixin, MasterEditableFieldsMixin, MasterReadOnlyFieldsMixin, IDMixin):
     pass
 
 

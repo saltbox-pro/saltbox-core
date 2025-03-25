@@ -4,7 +4,6 @@ from salt_box_core.config import logger
 from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.jobs.repositories.job_sc_repository import JobSchemaRepository
 from salt_box_core.masters.repositories.master_repository import MasterRepository
-from salt_box_core.masters.schemas.master_schemas import MasterCreateSchema, MasterStatus
 from salt_box_core.minion_collections.repositories.collection_repository import CollectionRepository
 from salt_box_core.minion_collections.schemas.collection_schemas import CollectionCreateSchema
 from salt_box_core.settings.repository import SettingsSlsRepoRepository
@@ -120,15 +119,6 @@ async def init_masters() -> None:
         logger.debug('Index created: %s', result)
 
     logger.debug('Indexes: %s', indexes)
-
-    # TODO @: Temporally create salt-master master if not exists
-    if not await masters_repo.collection.count_documents({'name': 'salt-master'}):
-        logger.debug("Master with name `salt-master` doesn't exist... Creating...")
-        obj = MasterCreateSchema.model_validate(
-            {'name': 'salt-master', 'title': 'salt-master', 'status': MasterStatus.accepted}
-        )
-        await masters_repo.create(obj)
-        logger.debug('Master with name `salt-master` created')
 
 
 async def init_mongo_db() -> None:

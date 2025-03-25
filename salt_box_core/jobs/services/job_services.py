@@ -1,16 +1,18 @@
-import datetime
 import json
 import logging.config
 from collections.abc import AsyncGenerator
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
-import pydantic
 from fastapi import Depends
 from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
+from pydantic import Field, NonNegativeInt, PastDatetime
+from pydantic import ValidationError as PydanticValidationError
 from redis import exceptions as redis_exceptions
 
 from salt_box_core.config import LOG_CONFIG, SETTINGS
 from salt_box_core.db.redis import RedisDependency
+from salt_box_core.event_bus.masters_bus import send_message_to_master
 from salt_box_core.jobs.exceptions import (
     JobCreateException,
     JobDoesNotExistsException,
@@ -18,6 +20,7 @@ from salt_box_core.jobs.exceptions import (
     JobServiceException,
     JobServiceInvalidArgsException,
 )
+from salt_box_core.jobs.schemas.event_bus_schemas import NewJobMessage
 from salt_box_core.jobs.schemas.job_schemas import Job, JobCreate, JobResult
 from salt_box_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
 from salt_box_core.utilities.jid import JID, JidError
@@ -70,16 +73,9 @@ class JobService:
             )
             await self.rdb.expire(name=create_job_hash_name, time=60 * 10)
 
-            await self.rdb.publish(
-                channel='salt-service',
-                message=json.dumps(
-                    {
-                        'command': f'job/run/{job_data.salt_master}' if job_data.salt_master else 'job/run',
-                        'payload': {
-                            'hash_name': create_job_hash_name,
-                        },
-                    }
-                ),
+            await send_message_to_master(
+                message=NewJobMessage(hash_name=create_job_hash_name, master=job_data.salt_master),
+                message_tag='run_job',
             )
         except redis_exceptions.RedisError as error:
             raise JobCreateException(error) from error
@@ -133,10 +129,10 @@ class JobService:
         return job
 
     async def get_jobs(
-        self, start_datetime: pydantic.PastDatetime, end_datetime: datetime.datetime | None = None
+        self, start_datetime: Annotated[datetime, PastDatetime], end_datetime: datetime | None = None
     ) -> list[Job]:
         if end_datetime is None:
-            end_datetime = datetime.datetime.now(datetime.UTC) + datetime.timedelta(hours=1)
+            end_datetime = datetime.now(UTC) + timedelta(hours=1)
 
         try:
             start = JID.from_datetime(start_datetime).to_timestamp()
@@ -153,8 +149,8 @@ class JobService:
     async def get_job_returns(
         self,
         jid: JID,
-        count: Annotated[int, pydantic.Field(gt=0, lt=SETTINGS.max_count)] = 10,
-        cursor: pydantic.NonNegativeInt = 0,
+        count: Annotated[int, Field(gt=0, lt=SETTINGS.max_count)] = 10,
+        cursor: NonNegativeInt = 0,
     ) -> tuple[list[JobResult], int]:
         try:
             next_cur, records = await self.rdb.hscan(name=f'job:{jid}:return', cursor=cursor, count=count)
@@ -167,7 +163,7 @@ class JobService:
 
             try:
                 res.append(JobResult(**data))
-            except pydantic.ValidationError as e:
+            except PydanticValidationError as e:
                 raise JobServiceException(e.errors()) from e
 
         return res, next_cur
@@ -184,7 +180,7 @@ class JobService:
 
             try:
                 res.append(JobResult(**data))
-            except pydantic.ValidationError as e:
+            except PydanticValidationError as e:
                 raise JobServiceException(e.errors()) from e
 
         return res

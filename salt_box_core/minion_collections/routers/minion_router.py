@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
@@ -6,9 +7,15 @@ from fastapi.responses import FileResponse
 
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
-from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId
+from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId, User
+from salt_box_core.db.redis import RedisDependency
+from salt_box_core.dependencies import get_current_user_from_jwt
+from salt_box_core.event_bus.masters_bus import send_message_to_master
+from salt_box_core.masters.services.master_service import MasterService, get_master_service
+from salt_box_core.minion_collections.schemas.event_bus_schemas import GatherMinionsByTargeting
 from salt_box_core.minion_collections.schemas.minion_schemas import (
     MinionDetailSchema,
+    MinionGatherResponseSchema,
     MinionListBody,
     MinionShortSchema,
 )
@@ -114,6 +121,31 @@ async def minions_export(
     except Exception as e:
         logger.error('Error: %s', e)
         raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
+
+
+@router.get('/gather')
+async def gather_minions(
+    tgt: str,
+    tgt_type: str,
+    master: str,
+    rdb: RedisDependency,
+    master_service: Annotated[MasterService, Depends(get_master_service)],
+    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
+) -> list[MinionGatherResponseSchema] | None:
+    master_key: str = await master_service.get_master_key(master)
+    minions_form_cache = await rdb.hget('minions-cache', f'{master_key}__{tgt}__{tgt_type}')
+
+    if not minions_form_cache:
+        await send_message_to_master(
+            message=GatherMinionsByTargeting(master=master_key, tgt=tgt, tgt_type=tgt_type),
+            message_tag='gather_minions',
+        )
+        return None
+
+    return [
+        MinionGatherResponseSchema(minion_id=minion_id, master=master_key)
+        for minion_id in json.loads(minions_form_cache)
+    ]
 
 
 @router.get('/{mid}')

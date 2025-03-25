@@ -4,11 +4,16 @@ from fastapi import Depends
 from pymongo.asynchronous.database import AsyncDatabase
 
 from salt_box_core.db.mongo.config import get_mongo
-from salt_box_core.db.mongo.repository_base import BaseMongoRepository
+from salt_box_core.db.mongo.repository_base import BaseMongoRepository, ProjectionModel
 from salt_box_core.masters.schemas.master_schemas import MasterModel
 
 
 class MasterRepository(BaseMongoRepository[MasterModel]):
+    async def get_by_name_or_alias(
+        self, value: str, projection_model: type[ProjectionModel] | None = None
+    ) -> ProjectionModel:
+        return await self.get(query={'$or': [{'name': value}, {'alias': value}]}, projection_model=projection_model)
+
     class Meta:
         collection_name = 'master'
         auto_now_add_fields: ClassVar[list[str]] = ['created']

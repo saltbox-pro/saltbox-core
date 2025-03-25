@@ -170,6 +170,11 @@ class MinionIDs(BaseModel, IDMixin):
     pass
 
 
+class MinionGatherResponseSchema(BaseModel):
+    minion_id: str = Field(title='Minion ID')
+    master: str = Field(title='Master')
+
+
 class MinionListBody(SkipLimitParams):
     collection_slug: str
     query: MongoQuery = Field(

@@ -82,7 +82,7 @@ class JobCreate(BaseModel):
     data: JobData | None = None
     jid: str | None = None
     jid_postfix: str | None = None
-    salt_master: str | None = None
+    salt_master: str
 
 
 class JobResult(BaseModel):

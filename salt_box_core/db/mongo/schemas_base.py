@@ -138,11 +138,6 @@ class PyObjectId(ObjectId):
         return json_schema
 
 
-# Deprecated, use IDMixin instead
-class BaseDBSchema(BaseModel):
-    id: PyObjectId = Field(title='ID', alias='_id', serialization_alias='id')
-
-
 class IDMixin:
     id: PyObjectId = Field(title='ID', alias='_id', serialization_alias='id')
 
