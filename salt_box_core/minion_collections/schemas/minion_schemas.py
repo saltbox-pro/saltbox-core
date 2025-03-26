@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Any, Generic, TypeVar
+from typing import Annotated, Any, Generic, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt, computed_field
 
 from salt_box_core.db.mongo.schemas_base import CreatedModifiedMixin, IDMixin, MongoQuery, SkipLimitParams
 
@@ -170,9 +170,14 @@ class MinionIDs(BaseModel, IDMixin):
     pass
 
 
-class MinionGatherResponseSchema(BaseModel):
+class MinionGatherMinionSchema(BaseModel):
     minion_id: str = Field(title='Minion ID')
     master: str = Field(title='Master')
+
+
+class MinionGatherResponseSchema(BaseModel):
+    count: Annotated[int, PositiveInt] = Field(title='Minion count', default=0)
+    minions: list[MinionGatherMinionSchema] = Field(title='Minion list (max 100)', default=[])
 
 
 class MinionListBody(SkipLimitParams):

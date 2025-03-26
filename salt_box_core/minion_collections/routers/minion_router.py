@@ -1,4 +1,5 @@
 import json
+from asyncio import sleep
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
@@ -131,7 +132,7 @@ async def gather_minions(
     rdb: RedisDependency,
     master_service: Annotated[MasterService, Depends(get_master_service)],
     user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
-) -> list[MinionGatherResponseSchema] | None:
+) -> MinionGatherResponseSchema:
     master_key: str = await master_service.get_master_key(master)
     minions_form_cache = await rdb.hget('minions-cache', f'{master_key}__{tgt}__{tgt_type}')
 
@@ -140,12 +141,17 @@ async def gather_minions(
             message=GatherMinionsByTargeting(master=master_key, tgt=tgt, tgt_type=tgt_type),
             message_tag='gather_minions',
         )
-        return None
 
-    return [
-        MinionGatherResponseSchema(minion_id=minion_id, master=master_key)
-        for minion_id in json.loads(minions_form_cache)
-    ]
+    counter = 0
+    while minions_form_cache is None and counter < 100:
+        minions_form_cache = await rdb.hget('minions-cache', f'{master_key}__{tgt}__{tgt_type}')
+        counter += 1
+        await sleep(0.1)
+
+    if not minions_form_cache:
+        raise HTTPException(status_code=404, detail='No data found')
+
+    return MinionGatherResponseSchema.model_validate({**json.loads(minions_form_cache)})
 
 
 @router.get('/{mid}')
