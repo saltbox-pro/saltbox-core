@@ -1,10 +1,11 @@
 import json
 import re
 import shutil
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from git import Repo
-from redis import Redis
+from redis.asyncio import Redis
 
 from salt_box_core.config import SETTINGS, logger
 
@@ -21,21 +22,21 @@ class RepositoryLocker:
         self.redis = redis_client
         self.lock_timeout = lock_timeout
 
-    def acquire_lock(self, repo_id: str) -> bool:
+    async def acquire_lock(self, repo_id: str) -> bool:
         """Acquiring a lock"""
         lock_key = f'repo_lock:{repo_id}'
-        locked = self.redis.set(lock_key, '1', ex=self.lock_timeout, nx=True)
+        locked = await self.redis.set(lock_key, '1', ex=self.lock_timeout, nx=True)
         return bool(locked)
 
-    def release_lock(self, repo_id: str) -> None:
+    async def release_lock(self, repo_id: str) -> None:
         """Releasing a lock"""
         lock_key = f'repo_lock:{repo_id}'
-        self.redis.delete(lock_key)
+        await self.redis.delete(lock_key)
 
-    def is_locked(self, repo_id: str) -> bool:
+    async def is_locked(self, repo_id: str) -> bool:
         """Checking if a lock is active"""
         lock_key = f'repo_lock:{repo_id}'
-        return bool(self.redis.get(lock_key))
+        return bool(await self.redis.get(lock_key))
 
     # def __enter__(self) -> None:
     #     """Context manager entry"""
@@ -199,3 +200,27 @@ class GitRepoService:
         errors = [result[1] for result in tasks if result[1] is not None]
 
         return schemas, errors
+
+
+class MultipleRepoSyncError(Exception):
+    pass
+
+
+@asynccontextmanager
+async def repository_lock(redis: Redis, repo_url: str):  # type: ignore[no-untyped-def]
+    """Контекстный менеджер для блокировки репозитория во время синхронизации."""
+    locker = RepositoryLocker(redis)
+
+    if await locker.is_locked(repo_url):
+        msg = 'Another task is running for the same repo'
+        logger.debug(msg)
+        raise MultipleRepoSyncError(msg)
+
+    await locker.acquire_lock(repo_url)
+    logger.debug('Repo locked')
+
+    try:
+        yield
+    finally:
+        await locker.release_lock(repo_url)
+        logger.debug('Repo unlocked')
