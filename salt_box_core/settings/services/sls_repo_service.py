@@ -76,9 +76,9 @@ class SettingsSlsRepoService(
         await self.delete(sid)
 
     async def sync(self, sid: PyObjectId) -> str:
-        task = sync_sls_repo_task.delay(str(sid))
+        task = await sync_sls_repo_task.kiq(str(sid))
 
-        return task.id
+        return task.task_id
 
 
 def get_sls_repo_service(

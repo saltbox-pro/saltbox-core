@@ -1,16 +1,15 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from taskiq import TaskiqResult
 
-from salt_box_core.celery import celery
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import DuplicateKeyError, ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import (
-    CeleryTaskIdResponse,
-    CeleryTaskStatus,
     PaginatedResponse,
     PyObjectId,
     SkipLimitParams,
+    TaskiqTaskIdResponse,
 )
 from salt_box_core.settings.schemas.sls_repos_schemas import (
     SettingsSlsRepoCreateSchema,
@@ -20,6 +19,7 @@ from salt_box_core.settings.schemas.sls_repos_schemas import (
 )
 from salt_box_core.settings.services.sls_repo_service import SettingsSlsRepoService, get_sls_repo_service
 from salt_box_core.tasks.services.tasks_templates import TaskTemplateService, get_task_template_service
+from salt_box_core.tkq import broker
 
 router = APIRouter(prefix='/sls-repos', tags=['Settings'])
 
@@ -54,16 +54,36 @@ async def sls_repo_settings_sync_all(
 
 
 @router.get('/sync-status/{task_id}')
-async def get_sync_status(task_id: str) -> CeleryTaskStatus:
-    task_result = celery.AsyncResult(task_id)
-
-    return CeleryTaskStatus(
-        task_id=task_result.id,
-        status=task_result.status,
-        result=str(task_result.result),
-        date_done=task_result.date_done,
-        children=[str(child) for child in task_result.children] if task_result.children else [],
-    )
+async def get_sync_status(task_id: str) -> TaskiqResult:
+    """
+    Get task status by task_id.
+    """
+    is_ready = await broker.result_backend.is_result_ready(task_id)
+    logger.debug('is_redy: %s', is_ready)
+    if is_ready:
+        result = await broker.result_backend.get_result(task_id)
+        logger.debug('Task result: %s', result)
+        return TaskiqResult(
+            task_id=task_id,
+            return_value=result.return_value,
+            is_err=result.is_err,
+            execution_time=result.execution_time,
+            log=result.log,
+            error=result.error,
+            labels=result.labels,
+        )
+    else:
+        progress = await broker.result_backend.get_progress(task_id)
+        logger.debug('Task progress: %s', progress)
+        return TaskiqResult(
+            task_id=task_id,
+            return_value=None,
+            is_err=False,
+            execution_time=0,
+            log='',
+            error=None,
+            labels={},
+        )
 
 
 @router.get('/{sid}')
@@ -128,10 +148,10 @@ async def sls_repo_settings_delete(
 async def sls_repo_settings_sync(
     sid: PyObjectId,
     service: Annotated[SettingsSlsRepoService, Depends(get_sls_repo_service)],
-) -> CeleryTaskIdResponse:
+) -> TaskiqTaskIdResponse:
     try:
         res = await service.sync(sid)
-        return CeleryTaskIdResponse(task_id=res)
+        return TaskiqTaskIdResponse(task_id=res)
     except Exception as e:
         logger.error('Error: %s', e)
         raise HTTPException(
