@@ -193,13 +193,5 @@ class UserShort(BaseModel):
     email: str
 
 
-class CeleryTaskIdResponse(BaseModel):
-    task_id: str = Field(title='Celery Task ID')
-
-
-class CeleryTaskStatus(BaseModel):
-    task_id: str = Field(title='Celery Task ID')
-    status: str = Field(title='Task status')
-    result: dict | str | None = Field(title='Task result')
-    date_done: datetime | None = Field(title='Task completion date')
-    children: list[str] | None = Field(title='Task children')
+class TaskiqTaskIdResponse(BaseModel):
+    task_id: str = Field(title='Taskiq task ID')
