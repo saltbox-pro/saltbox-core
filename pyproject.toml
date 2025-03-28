@@ -22,8 +22,8 @@ dev = [
     'python-lsp-server[all]',
     'types-PyYAML',
     'types-requests',
-    'celery-types',
     'ruff',
+    'taskiq[reload]',
 ]
 
 [project.scripts]

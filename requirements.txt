@@ -1,5 +1,4 @@
 # TODO Make compliant with ALT Linux p11
-celery[gevent]~=5.3
 fastapi_offline~=1.7.2
 fastapi~=0.115.4
 faststream[redis]==0.5.34
@@ -15,3 +14,7 @@ aiocache~=0.12.3
 gitpython~=3.1.43
 jsonschema~=4.22.0
 types-jsonschema~=4.22.0
+taskiq[reload]~=0.11.14
+taskiq-redis~=1.0.3
+taskiq-aio-pika~=0.4.1
+taskiq-fastapi~=0.3.4
