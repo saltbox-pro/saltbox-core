@@ -18,14 +18,19 @@ from salt_box_core.settings.routers.sls_repos_router import router as settings_s
 from salt_box_core.tasks.routers.tasks_router import router as task_router
 from salt_box_core.tasks.routers.tasks_router import ws_router as task_ws_router
 from salt_box_core.tasks.routers.template_router import router as template_router
+from salt_box_core.tkq import broker
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator:
     await init_mongo_db()
+    if not broker.is_worker_process:
+        await broker.startup()
 
     yield
     await POOL.aclose()  # type: ignore[attr-defined]
+    if not broker.is_worker_process:
+        await broker.shutdown()
 
 
 def _get_app() -> FastAPI:
