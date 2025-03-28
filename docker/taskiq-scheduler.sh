@@ -10,7 +10,7 @@
 # cmd="taskiq scheduler -tp **/tasksq.py salt_box_core.tkq_sched:scheduler salt_box_core.async_tasks.tasksq" # good
 
 # cmd="taskiq scheduler salt_box_core.tkq_sched:scheduler salt_box_core.async_tasks" # bad
-cmd="taskiq scheduler salt_box_core.tkq_sched:scheduler salt_box_core.async_tasks.tasks" # good
+cmd="taskiq scheduler salt_box_core.tkq_sched:scheduler salt_box_core.jobs.tasks" # good
 
 # cmd="taskiq scheduler -fsd -tp **/tasksq.py salt_box_core.tkq_sched:scheduler" # good
 
