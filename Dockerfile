@@ -12,7 +12,6 @@ EXPOSE 8000
 #mkdir --parents /var/cache/apt/archives/partial/ /var/lib/apt/lists/partial/
 #apt-get update
 #apt-get install -y \
-#  python3-module-celery \
 #  python3-module-fastapi \
 #  python3-module-httpx \
 #  python3-module-motor \
@@ -49,20 +48,20 @@ RUN --mount=type=cache,target=/root/.cache/pip/ pip3 install pipdeptree==2.23.1
 
 COPY --chmod=644 docker/shell_init.sh /etc/
 COPY --chmod=755 \
-  docker/celery-beat.sh \
-  docker/celery-worker.sh \
   docker/entrypoint.sh \
   docker/uvicorn.sh \
+  docker/taskiq-worker.sh \
+  docker/taskiq-scheduler.sh \
   /usr/local/bin/
 
 ENV BASE_URL_ROOT_PATH=/
 ENV TIMEOUT_GRACEFUL_SHUTDOWN=5
 
-ENV REDIS_CELERY_PASSWORD_SECRET=/run/secrets/redis_celery_password
-ENV REDIS_CELERY_USERNAME=
-ENV REDIS_CELERY_HOST=redis
-ENV REDIS_CELERY_PORT=6379
-ENV REDIS_CELERY_DB=0
+ENV REDIS_TASKIQ_PASSWORD_SECRET=/run/secrets/redis_taskiq_password
+ENV REDIS_TASKIQ_USERNAME=
+ENV REDIS_TASKIQ_HOST=
+ENV REDIS_TASKIQ_PORT=6379
+ENV REDIS_TASKIQ_DB=0
 
 WORKDIR /
 ENTRYPOINT ["/usr/local/bin/uvicorn.sh"]
@@ -81,7 +80,7 @@ WORKDIR /mnt/salt_box_core/
 VOLUME /mnt/salt_box_core/
 RUN \
   --mount=type=bind,target=/mnt/salt_box_core/,readwrite \
-  pip3 install --no-deps --editable .
+  pip3 install --no-deps --editable .[dev]
 CMD ["dev"]
 
 

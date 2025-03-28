@@ -8,8 +8,7 @@ APP_NAME = 'Salt.box Core'
 
 
 class Settings(BaseSettings):
-    celery_broker_url: str | None = None
-    celery_beat_schedule_filename: str = '/var/fastms-core/beat_schedule'
+    taskiq_broker_url: str
     debug: bool = False
     max_count: int = Field(default=1000, description='Max array length to request')
     mongo_db: str
@@ -32,6 +31,7 @@ class Settings(BaseSettings):
     salt_func_repo_url: str = 'https://dev.altlab.su/a.baikov/salt-func-schemas.git'
     salt_func_local_repo_name: str = 'salt-func-schemas'
     local_repos_path: str = 'repos'
+    rabbitmq_url: str = 'amqp://guest:guest@rabbitmq:5672'
 
     model_config = SettingsConfigDict(env_file='.env')
 
@@ -66,6 +66,10 @@ class Settings(BaseSettings):
                 'ssl_ca_certs': self.redis_ca_cert,
             }
         return result
+
+    @property
+    def taskiq_redis_url(self) -> str:
+        return self.taskiq_broker_url
 
 
 SETTINGS = Settings()

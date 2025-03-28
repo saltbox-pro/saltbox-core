@@ -25,3 +25,7 @@ async def get_redis() -> AsyncGenerator[Redis, None]:
 
 
 RedisDependency = Annotated[Redis, Depends(get_redis)]
+
+
+def get_redis_dep(redis: RedisDependency) -> Redis:
+    return redis

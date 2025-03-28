@@ -1,106 +1,83 @@
-from datetime import UTC, datetime
 from typing import Any
 
-from redis import Redis
+from redis.asyncio import Redis
+from taskiq import TaskiqDepends
 
-from celery.exceptions import SoftTimeLimitExceeded
-from salt_box_core.celery import celery
 from salt_box_core.config import SETTINGS, logger
-from salt_box_core.db.mongo.config import get_sync_mongo_db
+from salt_box_core.db.exceptions import ObjectNotFoundError
+from salt_box_core.db.redis import get_redis_dep
+from salt_box_core.jobs.repositories.job_sc_repository import JobSchemaRepository, get_job_schema_repository
 from salt_box_core.jobs.schemas.job_sc_schemas import JobSchemaCreateSchema, JobSchemaUpdateSchema
-from salt_box_core.settings.tasks import git_operations_task
-from salt_box_core.utilities.git_repo_helper import GitRepoService, RepositoryLocker
+from salt_box_core.tkq import broker
+from salt_box_core.utilities.git_repo_helper import GitRepoService, MultipleRepoSyncError, repository_lock
 
 
-# TODO (a.baikov): Refactor this task later
-@celery.task(
-    bind=True,
-    name='sync_schemas_repo_task',
-    time_limit=60,
-    soft_time_limit=30,
-    autoretry_for=(Exception,),
-    retry_kwargs={'max_retries': 3, 'countdown': 5},
-)
-def sync_schemas_repo_task(self: Any, repo_url: str) -> dict:
-    db = None
-    locker = None
+async def sync_schemas(
+    repo: JobSchemaRepository, schemas: list[dict[str, Any]], parsed_schema_names: list[str]
+) -> tuple[list[str], list[str], int]:
+    """Synchronizes schemas with the database."""
+    removed_count = await repo.delete_many({'name': {'$nin': parsed_schema_names}})
+    created = []
+    updated = []
 
+    for schema in schemas:
+        try:
+            existing_schema = await repo.get({'name': schema['name']})
+        except ObjectNotFoundError:
+            existing_schema = None
+
+        if not existing_schema:
+            logger.debug('Try create: %s', schema['name'])
+            schema_create_obj = JobSchemaCreateSchema(**schema)
+            await repo.create(schema_create_obj)
+            created.append(schema_create_obj.name)
+        elif existing_schema.commit_hash != schema['commit_hash']:
+            logger.debug('Try update: %s', schema['name'])
+            schema_update_obj = JobSchemaUpdateSchema(**schema)
+            await repo.update(
+                {'name': schema['name']},
+                schema_update_obj,
+            )
+            updated.append(schema_update_obj.name)
+
+    return created, updated, removed_count
+
+
+# TODO (a.baikov): Deal with retries
+@broker.task(timeout=30, retry_on_error=True, _retries=3)
+async def job_schemas_sync_task(
+    repo_url: str,
+    repo: JobSchemaRepository = TaskiqDepends(get_job_schema_repository),
+    redis: Redis = TaskiqDepends(get_redis_dep),
+) -> dict:
+    """Task for synchronizing job schemas from a Git repository."""
     try:
-        db = get_sync_mongo_db()
-        collection = db.get_collection('job_schemas')
-        logger.debug('sync_schemas_repo_task')
+        async with repository_lock(redis, repo_url):
+            git_repo = GitRepoService(repo_url=repo_url, local_name=SETTINGS.salt_func_local_repo_name)
+            git_repo.clone_or_pull()
+            logger.debug('Repo cloned or pulled')
 
-        # lock reo
-        redis = Redis.from_url(SETTINGS.redis_url, **SETTINGS.redis_connection_kwargs)
-        locker = RepositoryLocker(redis)
-        if locker.is_locked(repo_url):
-            msg = 'Another task is running for the same repo'
-            logger.debug(msg)
-            raise Exception(msg)
+            logger.debug('Try to parse schemas')
+            schemas, errors = git_repo.parse_schemas()
+            parsed_schema_names = [schema['name'] for schema in schemas]
 
-        locker.acquire_lock(repo_url)
-        logger.debug('Repo locked')
+            created, updated, removed_count = await sync_schemas(repo, schemas, parsed_schema_names)
 
-        git_result = git_operations_task.apply_async(
-            kwargs={
-                'repo_url': repo_url,
-                'local_name': SETTINGS.salt_func_local_repo_name,
-            },
-            expires=20,
-        ).get(timeout=20)
+            return {
+                'created': created,
+                'updated': updated,
+                'removed_count': removed_count,
+                'errors': errors,
+            }
 
-        if not git_result['status'] == 'success':
-            msg = 'Git operation failed'
-            raise Exception(msg)
-
-        repo = GitRepoService(
-            repo_url=repo_url,
-            local_name=SETTINGS.salt_func_local_repo_name,
-        )
-
-        logger.debug('Try to parse schemas')
-        schemas, errors = repo.parse_schemas()
-
-        parsed_schema_names = [schema['name'] for schema in schemas]
-        removed_count = collection.delete_many({'name': {'$nin': parsed_schema_names}})
-
-        created = []
-        updated = []
-        for schema in schemas:
-            existing_schema = collection.find_one({'name': schema['name']})
-
-            if not existing_schema:
-                logger.debug('Try create: %s', schema['name'])
-                schema_create_obj = JobSchemaCreateSchema(**schema)
-                collection.insert_one(
-                    {**schema_create_obj.model_dump(), 'created': datetime.now(UTC), 'modified': datetime.now(UTC)}
-                )
-                created.append(schema_create_obj.name)
-            elif existing_schema['commit_hash'] != schema['commit_hash']:
-                logger.debug('Try update: %s', schema['name'])
-                schema_update_obj = JobSchemaUpdateSchema(**schema)
-                collection.update_one(
-                    {'name': schema['name']},
-                    {'$set': {**schema_update_obj.model_dump(), 'modified': datetime.now(UTC)}},
-                )
-                updated.append(schema_update_obj.name)
-
+    except MultipleRepoSyncError as e:
+        msg = f'Multiple repo sync error: {e!s}'
+        logger.debug(msg)
         return {
-            'created': created,
-            'updated': updated,
-            'removed_count': removed_count.deleted_count,
-            'errors': errors,
+            'status': 'error',
+            'message': msg,
         }
-    except SoftTimeLimitExceeded:
-        logger.error('Task exceeded time limit')
-        raise
-
     except Exception as e:
         msg = f'Error during task execution: {e!s}'
         logger.error(msg)
         raise
-
-    finally:
-        if locker:
-            locker.release_lock(repo_url)
-            logger.debug('Repo unlocked')

@@ -43,6 +43,12 @@ ignore = [
 fixable = ['ALL']
 unfixable = ['F401', 'F841', 'UP035']
 
+[lint.flake8-bugbear]
+extend-immutable-calls = [
+    "taskiq_dependencies.Depends",
+    "taskiq.TaskiqDepends",
+]
+
 [lint.flake8-quotes]
 docstring-quotes = 'single'
 inline-quotes = 'single'
