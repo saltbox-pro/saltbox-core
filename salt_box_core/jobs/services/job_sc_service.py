@@ -13,7 +13,7 @@ from salt_box_core.jobs.schemas.job_sc_schemas import (
     JobSchemaModel,
     JobSchemaUpdateSchema,
 )
-from salt_box_core.jobs.tasks import sync_schemas_repo_task
+from salt_box_core.jobs.tasks import job_schemas_sync_task
 from salt_box_core.utilities.git_repo_helper import GitRepoService
 from salt_box_core.utilities.json_schema import Draft4ValidatorWithDefaults
 from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService
@@ -48,9 +48,9 @@ class JobSchemaService(
 
     async def sync(self) -> str:
         logger.debug('Start task: %s', SETTINGS.salt_func_repo_url)
-        task = sync_schemas_repo_task.delay(SETTINGS.salt_func_repo_url)
+        task = await job_schemas_sync_task.kiq(repo_url=SETTINGS.salt_func_repo_url)
         logger.debug('task: %s', task)
-        return task.id
+        return task.task_id
 
     async def sync_old(self) -> dict:
         git_repo = GitRepoService(SETTINGS.salt_func_repo_url)
