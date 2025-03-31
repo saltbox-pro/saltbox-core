@@ -31,6 +31,8 @@ async def grains_handler(
     minion_id = grains['id']
     master = grains['master']
 
+    logger.info('!!!!! grains: %s', grains)
+
     if master != message.master:
         return
 
