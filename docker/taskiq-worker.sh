@@ -8,10 +8,11 @@
 # -w - number of workers
 # --max-fails - max number of failed tasks before stopping the worker
 
-if [ -f "$DEBUG" ]; then
+# TODO (a.baikov): make it work with DEBUG
+if [ "$DEBUG" = "True" ] || [ "$DEBUG" = "true" ] || [ "$DEBUG" = "1" ]; then
   cmd="taskiq worker -r salt_box_core.tkq:broker salt_box_core.jobs salt_box_core.settings -w 1 --max-fails 1"
 else
-  cmd="taskiq worker salt_box_core.tkq:broker salt_box_core.jobs.tasks salt_box_core.settings.tasks -w 1 --max-fails 1"
+  cmd="taskiq worker salt_box_core.tkq:broker salt_box_core.jobs salt_box_core.settings -w 1 --max-fails 1"
 fi
 
 echo "$ ${cmd}"
