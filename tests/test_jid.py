@@ -1,6 +1,6 @@
-import pytest
-
 from datetime import datetime
+
+import pytest
 
 from salt_box_core.utilities.jid import JID, JidError
 

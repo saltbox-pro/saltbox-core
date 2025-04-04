@@ -58,7 +58,7 @@ multiline-quotes = 'single'
 convention = 'google'
 
 [lint.per-file-ignores]
-'tests/**/*.*' = ['S101', 'DTZ']
+'tests/**/*.*' = ['S101', 'DTZ', 'EM101', 'RUF012', 'E712']
 # '*/models.py' = ['UP007']
 # '*/schemas.py' = ['UP007']
 

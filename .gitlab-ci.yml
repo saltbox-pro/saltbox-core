@@ -1,11 +1,17 @@
 ---
 
+stages:
+  - lint
+  - test
+  - build
+
 include:
   - project: 'salt.box/ci-lib'
     file: 'build-image.yml'
 
 
 Build core image for tag:
+  stage: build
   extends: .build-image
   variables:
     TARGET: main
@@ -15,6 +21,7 @@ Build core image for tag:
 
 
 Build core image for branch:
+  stage: build
   extends: .build-image
   variables:
     TARGET: main
@@ -24,6 +31,7 @@ Build core image for branch:
 
 
 Build autotests image for tag:
+  stage: build
   extends: .build-image
   variables:
     CONTEXT_PATH: autotests/
@@ -34,6 +42,7 @@ Build autotests image for tag:
 
 
 Build autotests image for branch:
+  stage: build
   extends: .build-image
   variables:
     CONTEXT_PATH: autotests/
@@ -42,20 +51,8 @@ Build autotests image for branch:
   rules:
     - if: '$CI_COMMIT_BRANCH'
 
-
-# Flake8:
-#   variables:
-#     PIP_CACHE_DIR: '$CI_PROJECT_DIR/.cache/pip'
-#   image: python:3.12-alpine
-#   before_script:
-#     pip3 install -e .[dev]
-#   script:
-#     flake8 salt_box_core
-#   cache:
-#     paths:
-#       - '.cache/pip/'
-
-Ruff:
+ruff:
+  stage: lint
   variables:
     PIP_CACHE_DIR: '$CI_PROJECT_DIR/.cache/pip'
   image: python:3.12-alpine
@@ -67,7 +64,8 @@ Ruff:
     paths:
       - '.cache/pip/'
 
-Mypy:
+mypy:
+  stage: lint
   variables:
     PIP_CACHE_DIR: '$CI_PROJECT_DIR/.cache/pip'
   image: python:3.12-alpine
@@ -75,6 +73,20 @@ Mypy:
     pip3 install -e .[dev]
   script:
     mypy salt_box_core
+  cache:
+    paths:
+      - '.cache/pip/'
+
+pytest:
+  stage: test
+  variables:
+    PIP_CACHE_DIR: '$CI_PROJECT_DIR/.cache/pip'
+  image: python:3.12-alpine
+  before_script:
+    pip3 install -e .[dev]
+  script:
+    pytest
+  coverage: '/^TOTAL.+?(\d+\%)$/'
   cache:
     paths:
       - '.cache/pip/'
