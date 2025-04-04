@@ -43,7 +43,7 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
         if 'id' not in self.default_model.model_fields:
             msg = 'Document class should have `id` field'
             raise Exception(msg)
-        if not self.Meta.collection_name:
+        if not hasattr(self.Meta, 'collection_name') or not self.Meta.collection_name:
             msg = 'Meta should contain `collection_name`'
             raise Exception(msg)
         if hasattr(self.Meta, 'auto_now_add_fields') and self.Meta.auto_now_add_fields:
@@ -54,7 +54,7 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
         if hasattr(self.Meta, 'auto_now_fields') and self.Meta.auto_now_fields:
             for field in self.Meta.auto_now_fields:
                 if field not in self.default_model.model_fields:
-                    msg = f'Meta `auto_now_add_fields` `{field}` should be in model fields'
+                    msg = f'Meta `auto_now_fields` `{field}` should be in model fields'
                     raise Exception(msg.format(field, self.Meta.collection_name))
 
     @staticmethod
