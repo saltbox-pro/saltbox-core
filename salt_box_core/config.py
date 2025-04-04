@@ -8,26 +8,26 @@ APP_NAME = 'Salt.box Core'
 
 
 class Settings(BaseSettings):
-    taskiq_broker_url: str
+    taskiq_broker_url: str = ''
     debug: bool = False
     max_count: int = Field(default=1000, description='Max array length to request')
-    mongo_db: str
-    mongo_password: str
+    mongo_db: str = ''
+    mongo_password: str | None = None
     mongo_port: int = 27017
-    mongo_user: str
+    mongo_user: str = ''
     origins: list[str] = Field(['*'], description='CORS allowed resources')
     redis_ca_cert: str | None = Field(None, description='Path to file of concatenated PEM certs')
     redis_password: str | None = None
     redis_tls_verification: Literal['none', 'optional', 'required'] = 'required'
-    redis_url: str
+    redis_url: str = ''
     redis_username: str | None = None
-    keycloak_server_url: str
-    keycloak_front_url: str
-    keycloak_realm: str
+    keycloak_server_url: str = ''
+    keycloak_front_url: str = ''
+    keycloak_realm: str = ''
     keycloak_audience: str = 'account'
     keycloak_algorithm: str = 'RS256'
-    keycloak_client: str
-    opa_url: str
+    keycloak_client: str = ''
+    opa_url: str = ''
     salt_func_repo_url: str = 'https://dev.altlab.su/a.baikov/salt-func-schemas.git'
     salt_func_local_repo_name: str = 'salt-func-schemas'
     local_repos_path: str = 'repos'
