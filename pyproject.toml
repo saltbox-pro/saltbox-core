@@ -15,7 +15,7 @@ dev = [
     'flake8',
     'flake8-logging',
     'ipython',
-    'mypy',
+    'mypy>=1.15.0',
     'pre-commit',
     'pylint',
     'types-redis',
@@ -24,6 +24,13 @@ dev = [
     'types-requests',
     'ruff',
     'taskiq[reload]',
+    "coverage[toml]>=7.6.11",
+    "pytest>=8.3.4",
+    "pytest-asyncio>=0.25.3",
+    "pytest-cov>=6.0.0",
+    "pytest-mock>=3.14.0",
+    "pytest-sugar>=1.0.0",
+    "mongomock>=4.3.0",
 ]
 
 [project.scripts]
@@ -69,3 +76,32 @@ show_error_codes = true
 warn_return_any = true
 warn_unreachable = true
 warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+asyncio_default_fixture_loop_scope = 'function'
+minversion = "8.0"
+addopts = [
+    "--cov=salt_box_core",
+    "--cov-report=term-missing",
+    "--durations=5",
+    # "--maxfail=1",
+    # "--disable-warnings -q",
+]
+testpaths = ["tests"]
+# env_files = [".env.example"]
+
+[tool.coverage.run]
+# concurrency = ["gevent"]
+# branch = true
+source = ["salt_box_core"]
+omit = ["main.py", "config.py", "tests/*", "venv/*", ".venv/*", "autotests/*", "**/__init__.py"]
+
+[tool.coverage.report]
+show_missing = true
+# fail_under = 60
+exclude_lines = [
+  'if TYPE_CHECKING:',
+  'pragma: no cover',
+  "if __name__ == '__main__':",
+]
+# skip_covered = true
