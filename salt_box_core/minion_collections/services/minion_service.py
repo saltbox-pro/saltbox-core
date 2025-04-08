@@ -49,6 +49,12 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
             msg = f'Error during pipeline execution: {e}'
             raise PiplineBuilderError(msg) from e
 
+    async def get_pipline_total(self, pipeline: list[dict]) -> int:
+        full_pipeline = [stage for stage in pipeline if '$skip' not in stage and '$limit' not in stage]
+        logger.debug('full_pipeline: %s', full_pipeline)
+        result = await self.minion_pipeline(full_pipeline)
+        return len(result)
+
     async def export_to_csv(self, query: dict[str, Any], skip: int = 0, limit: int = 0) -> str:
         data = await self.get_list(query, skip=skip, limit=limit)
         if not data:

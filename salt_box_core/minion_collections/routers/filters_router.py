@@ -53,16 +53,17 @@ async def unique_field_values(
 
     query = {'$and': [collection.query, body.query]}
 
-    pipline_builder = MongoPiplineBuilder(body.field, recursive_replace_dates(query))
+    pipline_builder = MongoPiplineBuilder(body.field, recursive_replace_dates(query), body.skip, body.limit)
     pipline = pipline_builder.build()
 
     try:
+        total = await minion_service.get_pipline_total(pipline)
         result = await minion_service.minion_pipeline(pipline)
     except PiplineBuilderError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
 
     response = UniqueGrainValuesResponse(
-        total=len(result),
+        total=total,
         data=result,
     )
 

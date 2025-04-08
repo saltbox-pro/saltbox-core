@@ -27,6 +27,8 @@ class MinionFilterValuesBody(BaseModel):
         examples=['grains.os', 'grains.cpu_model', 'grains.mem_total'],
         json_schema_extra={'example': 'grains.os'},
     )
+    skip: int = 0
+    limit: int | None = 100
 
     model_config: ClassVar[ConfigDict] = {'extra': 'forbid'}
 
