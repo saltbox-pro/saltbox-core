@@ -1,5 +1,4 @@
 import logging.config
-from datetime import datetime
 from enum import Enum
 from typing import Any, ClassVar
 
@@ -11,6 +10,7 @@ from salt_box_core.db.mongo.schemas_base import (
     IDMixin,
     PyObjectId,
     SkipLimitParams,
+    TimezoneAwareDatetime,
     UserShort,
 )
 from salt_box_core.utilities.helpers import utc_now
@@ -57,8 +57,8 @@ class TaskJob(BaseModel):
     minions_by_targeting: list[str] = Field(title='List of minions ids by targeting')
     minions_from_salt: list[str] | None = Field(title='Computed minions by salt', default=None)
 
-    created_dt: datetime = Field(title='Created stamp', default_factory=utc_now)
-    finished_dt: datetime | None = Field(title='Finished stamp', default=None)
+    created_dt: TimezoneAwareDatetime = Field(title='Created stamp', default_factory=utc_now)
+    finished_dt: TimezoneAwareDatetime | None = Field(title='Finished stamp', default=None)
 
 
 # Task minion
@@ -92,8 +92,8 @@ class TaskMinion(BaseModel):
 
     jobs: dict[str, TaskMinionJobStatus] = Field(title='Jobs', default={})
 
-    start_last_dt: datetime | None = Field(title='Last job start dt', default=None)
-    finished_dt: datetime | None = Field(title='Processing finished dt', default=None)
+    start_last_dt: TimezoneAwareDatetime | None = Field(title='Last job start dt', default=None)
+    finished_dt: TimezoneAwareDatetime | None = Field(title='Processing finished dt', default=None)
 
     @computed_field(title='Count job runs')
     def count_runs(self) -> int:
@@ -126,7 +126,7 @@ class TaskPostProcessingCreate(BaseModel):
 
 class TaskPostProcessing(TaskPostProcessingCreate):
     task_create_id: PyObjectId | None = Field(title='Task ID', default=None)
-    notify_dt: datetime | None = Field(title='Notify dt', default=None)
+    notify_dt: TimezoneAwareDatetime | None = Field(title='Notify dt', default=None)
 
 
 # Task
@@ -183,10 +183,10 @@ class TaskReadOnlyFieldsMixin:
 class TaskEditableFieldsMixin:
     status: TaskStatus = Field(title='Status', default=TaskStatus.created)
 
-    run_dt: datetime | None = Field(title='Run datetime', default=None)
-    stopped_dt: datetime | None = Field(title='Stopped datetime', default=None)
-    postprocessing_dt: datetime | None = Field(title='Postprocessing datetime', default=None)
-    finished_dt: datetime | None = Field(title='Finished datetime', default=None)
+    run_dt: TimezoneAwareDatetime | None = Field(title='Run datetime', default=None)
+    stopped_dt: TimezoneAwareDatetime | None = Field(title='Stopped datetime', default=None)
+    postprocessing_dt: TimezoneAwareDatetime | None = Field(title='Postprocessing datetime', default=None)
+    finished_dt: TimezoneAwareDatetime | None = Field(title='Finished datetime', default=None)
 
     jobs: dict[str, TaskJob] = Field(title='Jobs', default={})
     minions: dict[str, TaskMinion] = Field(title='Minions failed', default={})

@@ -7,7 +7,7 @@ from uuid import UUID
 from pydantic import BaseModel
 
 # from salt_box_core.config import logger
-from salt_box_core.db.mongo.schemas_base import PyObjectId
+from salt_box_core.db.mongo.schemas_base import PyObjectId, TimezoneAwareDatetime
 
 
 class UnsupportedSchemaType(Exception):
@@ -90,6 +90,7 @@ schema_lookups_map = {
     bool: ['='],
     list: ['in', 'notIn'],
     datetime: schema_datetime_lookups,
+    TimezoneAwareDatetime: schema_datetime_lookups,
     PyObjectId: schema_text_lookups,
     UUID: schema_text_lookups,
 }
@@ -103,6 +104,7 @@ schema_input_type_map = {
     UUID: 'text',
     # datetime: 'datetime-local',
     datetime: 'date',
+    TimezoneAwareDatetime: 'date',
 }
 
 

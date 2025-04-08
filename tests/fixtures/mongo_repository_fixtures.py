@@ -1,24 +1,22 @@
-from datetime import datetime
-
 from pydantic import BaseModel
 
 from salt_box_core.db.mongo.repository_base import BaseMongoRepository
-from salt_box_core.db.mongo.schemas_base import IDMixin
+from salt_box_core.db.mongo.schemas_base import IDMixin, TimezoneAwareDatetime
 
 
 class ModelWithoutId(BaseModel):
     name: str
     description: str | None = None
-    created: datetime
-    modified: datetime
+    created: TimezoneAwareDatetime
+    modified: TimezoneAwareDatetime
 
 
 # Тестовая модель данных
 class SampleModel(BaseModel, IDMixin):
     name: str
     description: str | None = None
-    created: datetime
-    modified: datetime
+    created: TimezoneAwareDatetime
+    modified: TimezoneAwareDatetime
 
 
 # Проекция модели для тестирования projection

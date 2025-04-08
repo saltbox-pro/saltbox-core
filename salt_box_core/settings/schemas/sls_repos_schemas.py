@@ -1,4 +1,3 @@
-from datetime import datetime
 from typing import Self
 
 from pydantic import (
@@ -12,13 +11,13 @@ from pydantic import (
     model_validator,
 )
 
-from salt_box_core.db.mongo.schemas_base import CreatedModifiedMixin, IDMixin
+from salt_box_core.db.mongo.schemas_base import CreatedModifiedMixin, IDMixin, TimezoneAwareDatetime
 
 
 class ReadOnlyFieldsShortMixin:
     repo_url: AnyUrl = Field(max_length=255)
     local_path: str = Field(max_length=50, default='', pattern='(^[a-z0-9_-]+$|^$)')
-    last_synced: datetime | None = None
+    last_synced: TimezoneAwareDatetime | None = None
     is_last_sync_successful: StrictBool = False
 
 

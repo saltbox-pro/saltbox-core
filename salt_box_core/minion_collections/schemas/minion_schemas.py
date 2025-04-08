@@ -1,9 +1,14 @@
-from datetime import datetime
 from typing import Annotated, Any, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt, computed_field
 
-from salt_box_core.db.mongo.schemas_base import CreatedModifiedMixin, IDMixin, MongoQuery, SkipLimitParams
+from salt_box_core.db.mongo.schemas_base import (
+    CreatedModifiedMixin,
+    IDMixin,
+    MongoQuery,
+    SkipLimitParams,
+    TimezoneAwareDatetime,
+)
 
 T = TypeVar('T')
 
@@ -132,7 +137,7 @@ class MinionEditableFieldsMixin(BaseModel, Generic[T]):
     minion_id: str = Field(title='Minion ID')
     master: str = Field(title='Master')
     grains: T = Field(title='Grains')
-    last_activity: datetime | None = Field(title='Last activity', default=None)
+    last_activity: TimezoneAwareDatetime | None = Field(title='Last activity', default=None)
 
 
 class MinionCreateSchema(MinionEditableFieldsMixin[GrainsSchema]):
