@@ -26,8 +26,10 @@ LIST_TO_STR_FIELDS = ['grains.pythonversion', 'grains.saltversioninfo']
 class MongoPiplineBuilder:
     """MongoDB aggregation pipeline builder"""
 
-    def __init__(self, field_name: str, query: dict | None = None):
+    def __init__(self, field_name: str, query: dict | None = None, skip: int = 0, limit: int | None = 100) -> None:
         self.field_name = field_name
+        self.limit = limit
+        self.skip = skip
         self.field_type = self._detect_field_type()
         self.pipeline: list[dict[str, Any]] = (
             [
@@ -167,4 +169,8 @@ class MongoPiplineBuilder:
 
     def build(self) -> list:
         self._build_pipeline()
+        if self.skip:
+            self.pipeline.extend([{'$skip': self.skip}])
+        if self.limit:
+            self.pipeline.extend([{'$limit': self.limit}])
         return self.pipeline

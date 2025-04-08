@@ -10,6 +10,7 @@ from pydantic import (
     Field,
     GetCoreSchemaHandler,
     GetJsonSchemaHandler,
+    PlainSerializer,
     computed_field,
 )
 from pydantic.json_schema import JsonSchemaValue
@@ -21,6 +22,7 @@ from pydantic_core.core_schema import (
 )
 
 from salt_box_core.config import SETTINGS
+from salt_box_core.utilities.helpers import format_iso8601_z
 
 IS_PYDANTIC_V2_10 = int(pydantic.VERSION.split('.')[0]) >= 2 and int(pydantic.VERSION.split('.')[1]) >= 10
 ALLOWED_MONGO_QUERY_KEYS = [
@@ -79,6 +81,7 @@ def validate_mongo_query(value: dict[str, Any]) -> dict[str, Any]:
 
 
 MongoQuery = Annotated[dict[str, Any], AfterValidator(validate_mongo_query)]
+TimezoneAwareDatetime = Annotated[datetime, PlainSerializer(format_iso8601_z, when_used='json')]
 
 
 class PyObjectId(ObjectId):
@@ -143,8 +146,8 @@ class IDMixin:
 
 
 class CreatedModifiedMixin:
-    created: datetime = Field(title='Created')
-    modified: datetime = Field(title='Modified')
+    created: TimezoneAwareDatetime = Field(title='Created')
+    modified: TimezoneAwareDatetime = Field(title='Modified')
 
 
 class PaginatedResponse(BaseModel, Generic[SchemaType]):
