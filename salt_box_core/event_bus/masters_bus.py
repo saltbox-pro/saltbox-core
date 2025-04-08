@@ -4,7 +4,7 @@ from typing import Any
 
 from faststream import BaseMiddleware
 from faststream.broker.message import StreamMessage
-from faststream.redis import RedisBroker
+from faststream.redis import RedisBroker, RedisMessage
 from pydantic import BaseModel, ConfigDict
 
 from salt_box_core.config import logger
@@ -123,7 +123,7 @@ class MastersAuthMiddleware(BaseMiddleware):
             master: MasterModel = await self.master_service.get_by_name_or_alias(message.master)
 
             if master.status == MasterStatus.accepted:
-                await super().consume_scope(call_next, msg)
+                return await super().consume_scope(call_next, msg)
             else:
                 logger.info(f'Master are not accepted: {master.name} - {master.status}')
         else:
@@ -142,3 +142,22 @@ async def send_message_to_master(
         await message.fill_checksum()
 
         await br.publish(message=message, channel=f'master_{message_tag}')
+
+
+async def send_message_and_wait_response_to_master(
+    message: BusMasterMessage, message_tag: str, response_timeout: float = 3.0, broker: RedisBroker | None = None
+) -> Any:
+    from salt_box_core.event_bus.faststream_redis import get_faststream_broker
+
+    if not broker:
+        broker = get_faststream_broker()
+
+    async with broker as br:
+        await message.fill_checksum()
+
+        response: RedisMessage = await br.request(  # type: ignore
+            message,
+            channel=f'master_{message_tag}',
+            timeout=response_timeout,
+        )
+        return await response.decode()

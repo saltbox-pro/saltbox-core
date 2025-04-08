@@ -1,5 +1,3 @@
-import json
-from asyncio import sleep
 from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
@@ -9,9 +7,8 @@ from fastapi.responses import FileResponse
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId, User
-from salt_box_core.db.redis import RedisDependency
 from salt_box_core.dependencies import get_current_user_from_jwt
-from salt_box_core.event_bus.masters_bus import send_message_to_master
+from salt_box_core.event_bus.masters_bus import send_message_and_wait_response_to_master
 from salt_box_core.masters.services.master_service import MasterService, get_master_service
 from salt_box_core.minion_collections.schemas.event_bus_schemas import GatherMinionsByTargeting
 from salt_box_core.minion_collections.schemas.minion_schemas import (
@@ -129,29 +126,18 @@ async def gather_minions(
     tgt: str,
     tgt_type: str,
     master: str,
-    rdb: RedisDependency,
     master_service: Annotated[MasterService, Depends(get_master_service)],
     user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> MinionGatherResponseSchema:
     master_key: str = await master_service.get_master_key(master)
-    minions_form_cache = await rdb.hget('minions-cache', f'{master_key}__{tgt}__{tgt_type}')
 
-    if not minions_form_cache:
-        await send_message_to_master(
-            message=GatherMinionsByTargeting(master=master_key, tgt=tgt, tgt_type=tgt_type),
-            message_tag='gather_minions',
-        )
+    minions = await send_message_and_wait_response_to_master(
+        message=GatherMinionsByTargeting(master=master_key, tgt=tgt, tgt_type=tgt_type),
+        message_tag='gather_minions',
+        response_timeout=10.0,
+    )
 
-    counter = 0
-    while minions_form_cache is None and counter < 100:
-        minions_form_cache = await rdb.hget('minions-cache', f'{master_key}__{tgt}__{tgt_type}')
-        counter += 1
-        await sleep(0.1)
-
-    if not minions_form_cache:
-        raise HTTPException(status_code=404, detail='No data found')
-
-    return MinionGatherResponseSchema.model_validate({**json.loads(minions_form_cache)})
+    return MinionGatherResponseSchema.model_validate(minions)
 
 
 @router.get('/{mid}')
