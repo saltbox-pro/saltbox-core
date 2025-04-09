@@ -23,7 +23,7 @@ LIST_HANDLER_FIELDS = [
 LIST_TO_STR_FIELDS = ['grains.pythonversion', 'grains.saltversioninfo']
 
 
-class MongoPiplineBuilder:
+class MongoPipelineBuilder:
     """MongoDB aggregation pipeline builder"""
 
     def __init__(self, field_name: str, query: dict | None = None, skip: int = 0, limit: int | None = 100) -> None:

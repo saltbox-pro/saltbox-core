@@ -4,11 +4,10 @@ from pathlib import Path
 from typing import Annotated, Any, overload
 
 from fastapi import Depends
-from pymongo.errors import OperationFailure
 
 from salt_box_core.config import logger
-from salt_box_core.db.exceptions import PiplineBuilderError
 from salt_box_core.minion_collections.repositories.minion_repository import MinionRepository, get_minion_repository
+from salt_box_core.minion_collections.schemas.filter_schemas import UniqueGrainValuesResponse
 from salt_box_core.minion_collections.schemas.minion_schemas import (
     GrainsSchema,
     MinionCreateSchema,
@@ -16,6 +15,7 @@ from salt_box_core.minion_collections.schemas.minion_schemas import (
     MinionModel,
     MinionUpdateSchema,
 )
+from salt_box_core.minion_collections.services.pipeline_builder import MongoPipelineBuilder
 from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService, ProjectionModel
 
 
@@ -41,19 +41,18 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
     async def get_ids_by_query(self, query: dict[str, Any]) -> list[MinionIDs]:
         return await self.repo.get_list(query, skip=0, limit=0, projection_model=MinionIDs)
 
-    async def minion_pipeline(self, pipeline: list[dict]) -> list:
-        try:
-            cursor = await self.repo.collection.aggregate(pipeline)
-            return await cursor.to_list()
-        except OperationFailure as e:
-            msg = f'Error during pipeline execution: {e}'
-            raise PiplineBuilderError(msg) from e
-
-    async def get_pipline_total(self, pipeline: list[dict]) -> int:
+    async def get_unique_grain_values_by_field(
+        self, field: str, query: dict[str, Any], skip: int = 0, limit: int | None = None
+    ) -> UniqueGrainValuesResponse:
+        query = self.repo.__prepare_query__(query)
+        logger.debug('query: %s', query)
+        pipeline_builder = MongoPipelineBuilder(field, query, skip, limit)
+        pipeline = pipeline_builder.build()
         full_pipeline = [stage for stage in pipeline if '$skip' not in stage and '$limit' not in stage]
-        logger.debug('full_pipeline: %s', full_pipeline)
-        result = await self.minion_pipeline(full_pipeline)
-        return len(result)
+        logger.debug('pipeline: %s', pipeline)
+        data = await self.repo.aggregate(pipeline)
+        full_data = await self.repo.aggregate(full_pipeline)
+        return UniqueGrainValuesResponse(total=len(full_data), data=data)
 
     async def export_to_csv(self, query: dict[str, Any], skip: int = 0, limit: int = 0) -> str:
         data = await self.get_list(query, skip=skip, limit=limit)

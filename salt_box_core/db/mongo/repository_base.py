@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from pymongo.asynchronous.collection import AsyncCollection
 from pymongo.asynchronous.database import AsyncDatabase
 from pymongo.errors import DuplicateKeyError as MongoDuplicateKeyError
+from pymongo.errors import OperationFailure
 
 # from salt_box_core.config import logger
 from salt_box_core.db.abc_repository import AbstractRepository
@@ -15,6 +16,7 @@ from salt_box_core.db.exceptions import (
     ObjectCreateError,
     ObjectNotFoundError,
     ObjectUpdateError,
+    PipelineBuilderError,
 )
 from salt_box_core.db.mongo.schemas_base import PyObjectId
 from salt_box_core.utilities.helpers import recursive_replace_dates
@@ -240,3 +242,11 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
         query = self.__prepare_query__(query)
         result = await self.collection.delete_many(query)
         return result.deleted_count
+
+    async def aggregate(self, pipeline: list[dict]) -> list:
+        try:
+            cursor = await self.collection.aggregate(pipeline)
+            return await cursor.to_list()
+        except OperationFailure as e:
+            msg = f'Error during pipeline execution: {e}'
+            raise PipelineBuilderError(msg) from e
