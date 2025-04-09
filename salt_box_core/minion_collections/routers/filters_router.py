@@ -12,7 +12,6 @@ from salt_box_core.minion_collections.schemas.minion_schemas import MinionModel
 from salt_box_core.minion_collections.services.authz import MinionCollectionAuthzService, get_authz_service
 from salt_box_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from salt_box_core.minion_collections.services.minion_service import MinionService, get_minion_service
-from salt_box_core.utilities.helpers import recursive_replace_dates
 from salt_box_core.utilities.model_schema import get_model_schema
 
 router = APIRouter(prefix='/filters', tags=['Filters'])
@@ -54,7 +53,7 @@ async def unique_field_values(
 
     result = await minion_service.get_unique_grain_values_by_field(
         field=body.field,
-        query=recursive_replace_dates(query),
+        query=query,
         skip=body.skip,
         limit=body.limit,
     )
