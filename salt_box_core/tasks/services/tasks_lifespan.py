@@ -33,7 +33,7 @@ from salt_box_core.tasks.schemas.task_schemas import (
 )
 from salt_box_core.tasks.services.tasks import TaskService, get_task_service
 from salt_box_core.utilities.exceptions import ServiceError
-from salt_box_core.utilities.helpers import recursive_replace_dates, utc_now
+from salt_box_core.utilities.helpers import utc_now
 from salt_box_core.utilities.jid import JID
 from salt_box_core.utilities.mongo_query_to_salt_tgt_converter import MongoQueryToSaltTgtConverter
 
@@ -202,7 +202,7 @@ class TaskLifespanService:
     async def __get__targeting_query(self) -> dict:
         task: TaskModel = await self.get_task()
         collection: CollectionModel = await self.collection_service.get(task.target_collection.id)
-        sub_queries: list[dict] = [collection.query]
+        sub_queries: list[dict] = [collection.query] if collection.query else []
 
         if task.target_query:
             sub_queries.append(task.target_query)
@@ -220,8 +220,6 @@ class TaskLifespanService:
             query = {'$and': sub_queries}
         else:
             query = sub_queries[0]
-
-        query = recursive_replace_dates(query)
 
         return query
 

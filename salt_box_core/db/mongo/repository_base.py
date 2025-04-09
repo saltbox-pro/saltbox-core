@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 from inspect import isclass
-from typing import Any, Generic, TypeVar, overload
+from typing import Any, Generic, TypeVar, cast, overload
 
 from pydantic import BaseModel
 from pymongo.asynchronous.collection import AsyncCollection
@@ -17,6 +17,7 @@ from salt_box_core.db.exceptions import (
     ObjectUpdateError,
 )
 from salt_box_core.db.mongo.schemas_base import PyObjectId
+from salt_box_core.utilities.helpers import recursive_replace_dates
 
 T = TypeVar('T', bound=BaseModel)
 ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
@@ -34,6 +35,15 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
         self.__database: AsyncDatabase = database
         self.default_model: type[T] = self.__orig_bases__[0].__args__[0]  # type: ignore
         self.__validate()
+
+    def __prepare_query__(self, query: PyObjectId | dict[str, Any] | None) -> dict[str, Any]:
+        if isinstance(query, PyObjectId):
+            query = {'_id': query}
+
+        if query is None:
+            query = {}
+
+        return cast(dict[str, Any], recursive_replace_dates(query))
 
     @property
     def collection(self) -> AsyncCollection:
@@ -83,9 +93,7 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
     ) -> ProjectionModel | T:
         projection = self._get_projection_from_model(projection_model) if projection_model else None
 
-        if isinstance(query, PyObjectId):
-            query = {'_id': query}
-
+        query = self.__prepare_query__(query)
         result = await self.collection.find(filter=query, projection=projection).to_list()
 
         if len(result) == 0:
@@ -120,7 +128,9 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
         projection_model: type[ProjectionModel] | None = None,
     ) -> list[T] | list[ProjectionModel]:
         projection = self._get_projection_from_model(projection_model) if projection_model else None
+        query = self.__prepare_query__(query)
         result = self.collection.find(filter=query, projection=projection, limit=limit, skip=skip)
+
         if projection_model:
             return [projection_model.model_validate(doc) for doc in await result.to_list()]
             # return [projection_model.model_validate(doc) async for doc in result]
@@ -128,10 +138,11 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
             return [self.default_model.model_validate(doc) for doc in await result.to_list()]
 
     async def count(self, query: dict[str, Any] | None = None) -> int:
-        query = query or {}
+        query = self.__prepare_query__(query)
         return await self.collection.count_documents(query)
 
     async def exists(self, query: dict[str, Any]) -> bool:
+        query = self.__prepare_query__(query)
         return await self.collection.count_documents(query, limit=1) == 1
 
     @overload
@@ -195,8 +206,7 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
         exclude_unset: bool = True,
         projection_model: type[ProjectionModel] | None = None,
     ) -> T | ProjectionModel:
-        if isinstance(query, PyObjectId):
-            query = {'_id': query}
+        query = self.__prepare_query__(query)
 
         if isinstance(data, BaseModel):
             data = data.model_dump(exclude={'id'}, exclude_unset=exclude_unset)
@@ -215,9 +225,7 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
             return await self.get(query)
 
     async def delete(self, query: PyObjectId | dict[str, Any]) -> int:
-        if isinstance(query, PyObjectId):
-            query = {'_id': query}
-
+        query = self.__prepare_query__(query)
         count = await self.count(query)
 
         if count == 0:
@@ -229,5 +237,6 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
         return result.deleted_count
 
     async def delete_many(self, query: dict[str, Any]) -> int:
+        query = self.__prepare_query__(query)
         result = await self.collection.delete_many(query)
         return result.deleted_count

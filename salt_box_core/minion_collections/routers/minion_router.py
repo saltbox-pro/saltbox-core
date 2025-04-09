@@ -1,4 +1,3 @@
-from datetime import UTC, datetime, timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException
@@ -20,7 +19,6 @@ from salt_box_core.minion_collections.schemas.minion_schemas import (
 from salt_box_core.minion_collections.services.authz import MinionCollectionAuthzService, get_authz_service
 from salt_box_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from salt_box_core.minion_collections.services.minion_service import MinionService, get_minion_service
-from salt_box_core.utilities.helpers import recursive_replace_dates
 
 router = APIRouter(prefix='/minions', tags=['Minions'])
 
@@ -44,28 +42,14 @@ async def minions_list(
         raise HTTPException(status_code=403, detail='Not enough permissions')
 
     search = body.query
-    last_activity_seconds = search.pop('last_activity_seconds', None)
-    if last_activity_seconds:
-        if type(last_activity_seconds) is dict:
-            lookup, value = last_activity_seconds.popitem()
-
-            if lookup in ['$in', '$nin']:
-                search['last_activity'] = {
-                    lookup: [datetime.now(UTC) - timedelta(seconds=float(item_val)) for item_val in value]
-                }
-            else:
-                lookup = {'$lt': '$gt', '$lte': '$gte', '$gt': '$lt', '$gte': '$lte'}.get(lookup, lookup)
-                search['last_activity'] = {lookup: datetime.now(UTC) - timedelta(seconds=float(value))}
-        else:
-            search['last_activity'] = datetime.now(UTC) - timedelta(seconds=float(last_activity_seconds))
 
     try:
         collection = await collection_service.get_by_slug(body.collection_slug)
 
         if collection.query and search:
-            query = {'$and': [recursive_replace_dates(collection.query), recursive_replace_dates(search)]}
+            query = {'$and': [collection.query, search]}
         else:
-            query = recursive_replace_dates(collection.query) if collection.query else recursive_replace_dates(search)
+            query = collection.query if collection.query else search
 
         logger.debug('query: %s', query)
 
@@ -102,11 +86,9 @@ async def minions_export(
         collection = await collection_service.get_by_slug(body.collection_slug)
 
         if collection.query and body.query:
-            query = {'$and': [recursive_replace_dates(collection.query), recursive_replace_dates(body.query)]}
+            query = {'$and': [collection.query, body.query]}
         else:
-            query = (
-                recursive_replace_dates(collection.query) if collection.query else recursive_replace_dates(body.query)
-            )
+            query = collection.query if collection.query else body.query
 
         logger.debug('query: %s', query)
         file_path = await minion_service.export_to_csv(query=query, skip=body.skip, limit=body.limit)
@@ -172,7 +154,7 @@ async def minion_retrieve(
         logger.error('Error: %s', e)
         raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
 
-    ids = await minion_service.get_ids_by_query(query=recursive_replace_dates(collection.query))
+    ids = await minion_service.get_ids_by_query(query=collection.query)
     if mid not in [i.id for i in ids]:
         raise HTTPException(status_code=404, detail='Minion not found')
 
