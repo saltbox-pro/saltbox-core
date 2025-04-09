@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from datetime import UTC, datetime
 from inspect import isclass
 from typing import Any, Generic, TypeVar, cast, overload
@@ -31,6 +32,7 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
         collection_name: str
         auto_now_add_fields: list[str]
         auto_now_fields: list[str]
+        query_overrides: dict[str, str]
 
     def __init__(self, database: AsyncDatabase):
         super().__init__()
@@ -38,12 +40,45 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
         self.default_model: type[T] = self.__orig_bases__[0].__args__[0]  # type: ignore
         self.__validate()
 
+    @property
+    def __query_overrides__(self) -> dict[str, Callable]:
+        query_overrides = {}
+
+        if hasattr(self.Meta, 'query_overrides') and self.Meta.query_overrides:
+            for override_name, override_callback_name in self.Meta.query_overrides.items():
+                query_overrides[override_name] = getattr(self, override_callback_name)
+
+        return query_overrides
+
     def __prepare_query__(self, query: PyObjectId | dict[str, Any] | None) -> dict[str, Any]:
         if isinstance(query, PyObjectId):
-            query = {'_id': query}
+            return {'_id': query}
 
         if query is None:
-            query = {}
+            return {}
+
+        query_overrides = self.__query_overrides__
+
+        def recursive_override(data: dict[str, Any]) -> dict[str, Any]:
+            _query: dict[str, Any] = {}
+
+            for data_key, data_value in data.items():
+                if data_key in query_overrides.keys():
+                    override_key, override_value = query_overrides[data_key](data_key, data_value)
+                    if override_value is not None:
+                        _query[override_key] = override_value
+                else:
+                    if isinstance(data_value, dict):
+                        _query[data_key] = recursive_override(data_value)
+                    elif isinstance(data_value, list):
+                        _query[data_key] = [recursive_override(item_value) for item_value in data_value]
+                    else:
+                        _query[data_key] = data_value
+
+            return _query
+
+        if query_overrides:
+            query = recursive_override(query)
 
         return cast(dict[str, Any], recursive_replace_dates(query))
 
