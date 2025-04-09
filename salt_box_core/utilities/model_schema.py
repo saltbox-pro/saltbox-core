@@ -5,6 +5,7 @@ from typing import Any, get_args
 from uuid import UUID
 
 from pydantic import BaseModel
+from pydantic.fields import ComputedFieldInfo, FieldInfo
 
 # from salt_box_core.config import logger
 from salt_box_core.db.mongo.schemas_base import PyObjectId, TimezoneAwareDatetime
@@ -110,8 +111,12 @@ schema_input_type_map = {
 
 def get_model_schema(model: type[BaseModel], pre_path: str | None = None) -> list[dict[str, Any]]:
     schema = []
+    fields: dict[str, FieldInfo | ComputedFieldInfo] = {}
 
-    for field_name, field in model.model_fields.items():
+    fields.update(model.model_fields)
+    fields.update(model.model_computed_fields)
+
+    for field_name, field in fields.items():
         if field_name in TEMP_EXCLUDE_FIELDS_LIST:
             continue
         full_field_name = f'{pre_path}.{field_name}' if pre_path else field_name
@@ -126,13 +131,18 @@ def get_model_schema(model: type[BaseModel], pre_path: str | None = None) -> lis
     return schema
 
 
-def analyze_field(field: Any) -> tuple[type[BaseModel] | None, bool, Any]:
+def analyze_field(field: Any) -> tuple[type[BaseModel] | None, bool, Any]:  # noqa: C901
     sub_model: type[BaseModel] | None = None
     nullable_field: bool = False
     computed_field_class = None
 
     try:
-        field_annotations = get_args(field.annotation)
+        if type(field) is FieldInfo:
+            field_annotations = get_args(field.annotation)
+        elif type(field) is ComputedFieldInfo:
+            field_annotations = get_args(field.return_type)
+        else:
+            raise UnsupportedSchemaType
         field_annotations = (field.annotation,) if not field_annotations else field_annotations
 
         for field_class in field_annotations:

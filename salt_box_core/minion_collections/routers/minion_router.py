@@ -43,16 +43,21 @@ async def minions_list(
     if not authz_result.allow:
         raise HTTPException(status_code=403, detail='Not enough permissions')
 
-    # HOTFIX for last_activity
     search = body.query
-    for field_name in ['last_activity']:
-        if field_name in search.keys():
-            vals = search[field_name]
-            for k, v in vals.items():
-                if v == '$$FIVE_MINUTES_AGO':
-                    vals[k] = datetime.now(UTC) - timedelta(minutes=5)
-                else:
-                    vals[k] = datetime.fromisoformat(v)
+    last_activity_seconds = search.pop('last_activity_seconds')
+    if last_activity_seconds:
+        if type(last_activity_seconds) is dict:
+            lookup, value = last_activity_seconds.popitem()
+
+            if lookup in ['$in', '$nin']:
+                search['last_activity'] = {
+                    lookup: [datetime.now(UTC) - timedelta(seconds=float(item_val)) for item_val in value]
+                }
+            else:
+                lookup = {'$lt': '$gt', '$lte': '$gte', '$gt': '$lt', '$gte': '$lte'}.get(lookup, lookup)
+                search['last_activity'] = {lookup: datetime.now(UTC) - timedelta(seconds=float(value))}
+        else:
+            search['last_activity'] = datetime.now(UTC) - timedelta(seconds=float(last_activity_seconds))
 
     try:
         collection = await collection_service.get_by_slug(body.collection_slug)

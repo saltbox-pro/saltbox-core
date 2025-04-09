@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Annotated, Any, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt, computed_field
@@ -140,6 +141,16 @@ class MinionEditableFieldsMixin(BaseModel, Generic[T]):
     last_activity: TimezoneAwareDatetime | None = Field(title='Last activity', default=None)
 
 
+class MinionReadonlyFieldsMixin(BaseModel):
+    @computed_field(title='Seconds from last activity')  # type: ignore
+    @property
+    def last_activity_seconds(self) -> float | None:
+        if not self.last_activity:  # type: ignore
+            return None
+
+        return (datetime.now(self.last_activity.tzinfo) - self.last_activity).total_seconds()  # type: ignore
+
+
 class MinionCreateSchema(MinionEditableFieldsMixin[GrainsSchema]):
     pass
 
@@ -150,7 +161,7 @@ class MinionUpdateSchema(MinionEditableFieldsMixin[GrainsSchema]):
     )
 
 
-class MinionModel(CreatedModifiedMixin, MinionEditableFieldsMixin[GrainsSchema], IDMixin):
+class MinionModel(CreatedModifiedMixin, MinionReadonlyFieldsMixin, MinionEditableFieldsMixin[GrainsSchema], IDMixin):
     pass
 
 
@@ -167,7 +178,9 @@ class MinionDetailSchema(MinionModel):
         return additional_grains
 
 
-class MinionShortSchema(CreatedModifiedMixin, MinionEditableFieldsMixin[GrainsShortSchema], IDMixin):
+class MinionShortSchema(
+    CreatedModifiedMixin, MinionReadonlyFieldsMixin, MinionEditableFieldsMixin[GrainsShortSchema], IDMixin
+):
     pass
 
 
