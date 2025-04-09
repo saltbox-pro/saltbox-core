@@ -44,7 +44,7 @@ async def minions_list(
         raise HTTPException(status_code=403, detail='Not enough permissions')
 
     search = body.query
-    last_activity_seconds = search.pop('last_activity_seconds')
+    last_activity_seconds = search.pop('last_activity_seconds', None)
     if last_activity_seconds:
         if type(last_activity_seconds) is dict:
             lookup, value = last_activity_seconds.popitem()
