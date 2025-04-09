@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from salt_box_core.db.exceptions import ObjectNotFoundError, PiplineBuilderError
+from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.minion_collections.schemas.filter_schemas import (
     MinionFilterSchema,
     MinionFilterValuesBody,
@@ -12,7 +12,6 @@ from salt_box_core.minion_collections.schemas.minion_schemas import MinionModel
 from salt_box_core.minion_collections.services.authz import MinionCollectionAuthzService, get_authz_service
 from salt_box_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from salt_box_core.minion_collections.services.minion_service import MinionService, get_minion_service
-from salt_box_core.minion_collections.services.pipeline_builder import MongoPiplineBuilder
 from salt_box_core.utilities.helpers import recursive_replace_dates
 from salt_box_core.utilities.model_schema import get_model_schema
 
@@ -53,18 +52,11 @@ async def unique_field_values(
 
     query = {'$and': [collection.query, body.query]}
 
-    pipline_builder = MongoPiplineBuilder(body.field, recursive_replace_dates(query), body.skip, body.limit)
-    pipline = pipline_builder.build()
-
-    try:
-        total = await minion_service.get_pipline_total(pipline)
-        result = await minion_service.minion_pipeline(pipline)
-    except PiplineBuilderError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
-
-    response = UniqueGrainValuesResponse(
-        total=total,
-        data=result,
+    result = await minion_service.get_unique_grain_values_by_field(
+        field=body.field,
+        query=recursive_replace_dates(query),
+        skip=body.skip,
+        limit=body.limit,
     )
 
-    return response
+    return result
