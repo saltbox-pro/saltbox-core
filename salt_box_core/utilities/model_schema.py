@@ -82,7 +82,7 @@ schema_text_lookups = [
     'in',
     'notIn',
 ]
-schema_datetime_lookups = ['<', '>', '<=', '>=', 'between', 'notBetween']
+schema_datetime_lookups = ['<', '>', '<=', '>=']
 schema_nullable_lookups = ['null', 'notNull']
 schema_lookups_map = {
     int: schema_number_lookups,
