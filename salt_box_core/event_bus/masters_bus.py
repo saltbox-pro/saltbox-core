@@ -63,6 +63,8 @@ class _BusMasterMessage(BaseModel):
     async def check_checksum(self) -> bool:
         try:
             return self.checksum == await self._get_checksum()
+        except ObjectNotFoundError:
+            return False
         except MasterSecretIsEmptyError:
             return False
 

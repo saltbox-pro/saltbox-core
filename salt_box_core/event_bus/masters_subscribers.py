@@ -31,8 +31,6 @@ async def grains_handler(
     minion_id = grains['id']
     master = grains['master']
 
-    logger.info('!!!!! grains: %s', grains)
-
     if master != message.master:
         return
 
@@ -55,7 +53,6 @@ async def presence_handler(
     message: MinionPresenceMessage,
     minion_service: MinionService = Context(),  # noqa: B008
 ) -> None:
-    logger.info('presence')
     last_activity_dt = datetime.fromtimestamp(message.stamp, tz=UTC)
 
     for minion_id in message.minions:
@@ -64,4 +61,4 @@ async def presence_handler(
             minion.last_activity = last_activity_dt
             await minion_service.update(minion.id, MinionUpdateSchema(**minion.model_dump()))
         except ObjectNotFoundError:
-            logger.info(f'{minion_id} not found')
+            logger.info(f'{minion_id} from presence not found in the DB')
