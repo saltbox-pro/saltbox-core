@@ -14,6 +14,7 @@ from pydantic import (
 )
 from pydantic.functional_validators import AfterValidator
 
+from salt_box_core.jobs.schemas.event_bus_schemas import JobReturn
 from salt_box_core.utilities.jid import JID, JidError
 from salt_box_core.utilities.salt import fill_salt_kwarg_from_arg
 
@@ -148,6 +149,16 @@ class CreateJobRequest(BaseModel):
     fun: str = 'test.ping'
     salt_master: str = 'salt-master'
     data: JobData | None = None
+
+
+class JobSyncResponse(BaseModel):
+    jid: str
+    tgt: str
+    tgt_type: str
+    fun: str
+    arg: list
+    kwarg: dict
+    returns: dict[str, JobReturn]
 
 
 class GetJobReturnResponse(BaseModel):

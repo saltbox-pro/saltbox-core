@@ -2,18 +2,22 @@ import logging.config
 from typing import Annotated
 
 import pydantic
-from fastapi import APIRouter, Query, WebSocket
+from fastapi import APIRouter, Depends, Query, WebSocket
 from pydantic import Field, ValidationError
 
 from salt_box_core import http_errors
 from salt_box_core.config import LOG_CONFIG, SETTINGS
+from salt_box_core.db.mongo.schemas_base import User
 from salt_box_core.db.redis import RedisDependency
+from salt_box_core.dependencies import get_current_user_from_jwt
+from salt_box_core.event_bus.masters_bus import send_message_and_wait_response_to_master
 from salt_box_core.jobs.exceptions import (
     JobCreateException,
     JobDoesNotExistsException,
     JobServiceException,
     JobServiceInvalidArgsException,
 )
+from salt_box_core.jobs.schemas.event_bus_schemas import CreateJobMessage, JobSyncMessage
 from salt_box_core.jobs.schemas.job_schemas import (
     CreateJobRequest,
     CreateJobResponse,
@@ -23,6 +27,7 @@ from salt_box_core.jobs.schemas.job_schemas import (
     JobCreate,
     JobResult,
     JobsListRequest,
+    JobSyncResponse,
 )
 from salt_box_core.jobs.services.job_services import JobServiceDependency
 from salt_box_core.utilities.jid import JID
@@ -45,6 +50,7 @@ ws_router = APIRouter(prefix='/jobs')
 async def jobs_list(
     request: Annotated[JobsListRequest, Query()],
     job_service: JobServiceDependency,
+    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> list[Job]:
     try:
         jobs: list[Job] = await job_service.get_jobs(
@@ -58,7 +64,11 @@ async def jobs_list(
 
 
 @router.get('/{jid}', operation_id='job_retrieve')
-async def job_retrieve(jid: IntJid, job_service: JobServiceDependency) -> Job:
+async def job_retrieve(
+    jid: IntJid,
+    job_service: JobServiceDependency,
+    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
+) -> Job:
     _jid = JID(jid)
 
     try:
@@ -71,7 +81,11 @@ async def job_retrieve(jid: IntJid, job_service: JobServiceDependency) -> Job:
 
 
 @router.post('', operation_id='job_create')
-async def job_create(item: CreateJobRequest, job_service: JobServiceDependency) -> CreateJobResponse:
+async def job_create(
+    item: CreateJobRequest,
+    job_service: JobServiceDependency,
+    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
+) -> CreateJobResponse:
     try:
         jid: JID = await job_service.create_job(
             JobCreate.model_validate(
@@ -86,8 +100,38 @@ async def job_create(item: CreateJobRequest, job_service: JobServiceDependency) 
         raise http_errors.BadGateway(detail=str(error)) from error
 
 
+@router.post('/sync_run', operation_id='job_create_sync')
+async def job_create_sync(
+    item: CreateJobRequest,
+    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
+) -> JobSyncResponse:
+    try:
+        job_res: JobSyncMessage = JobSyncMessage(
+            **await send_message_and_wait_response_to_master(
+                message=CreateJobMessage(
+                    tgt=item.tgt,
+                    tgt_type=item.tgt_type,
+                    fun=item.fun,
+                    master=item.salt_master,
+                    arg=item.data.data_args or [] if item.data else [],
+                    kwarg=item.data.data_kwargs or {} if item.data else {},
+                ),
+                message_tag='run_job_sync',
+                response_timeout=10.0,
+            )
+        )
+
+        return JobSyncResponse(**job_res.model_dump())
+    except JobCreateException as error:
+        raise http_errors.BadGateway(detail=str(error)) from error
+
+
 @router.get('/{jid}/returns-count', operation_id='job_returns_count')
-async def job_returns_count(jid: IntJid, job_service: JobServiceDependency) -> Annotated[int, Field(ge=0)]:
+async def job_returns_count(
+    jid: IntJid,
+    job_service: JobServiceDependency,
+    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
+) -> Annotated[int, Field(ge=0)]:
     """
     How many return data records for job at the moment.
 
@@ -100,6 +144,7 @@ async def job_returns_count(jid: IntJid, job_service: JobServiceDependency) -> A
 async def job_returns_list(
     jid: IntJid,
     job_service: JobServiceDependency,
+    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
     count: Annotated[int, Field(gt=0, lt=SETTINGS.max_count)] = 10,
     cursor: pydantic.NonNegativeInt = 0,
 ) -> GetJobReturnResponse:

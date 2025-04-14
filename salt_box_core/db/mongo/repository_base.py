@@ -9,7 +9,7 @@ from pymongo.asynchronous.database import AsyncDatabase
 from pymongo.errors import DuplicateKeyError as MongoDuplicateKeyError
 from pymongo.errors import OperationFailure
 
-from salt_box_core.config import logger
+# from salt_box_core.config import logger
 from salt_box_core.db.abc_repository import AbstractRepository
 from salt_box_core.db.exceptions import (
     DuplicateKeyError,
@@ -63,7 +63,6 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
             _query: dict[str, Any] = {}
 
             for data_key, data_value in data.items():
-                logger.debug(f'Key: {data_key}, Value: {data_value}')
                 if data_key in query_overrides.keys():
                     override_key, override_value = query_overrides[data_key](data_key, data_value)
                     if override_value is not None:
