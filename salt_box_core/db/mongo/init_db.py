@@ -100,15 +100,6 @@ async def init_masters() -> None:
         )
         logger.debug('Index created: %s', result)
 
-    # Create unique index for alias if not exists
-    if 'alias_unique_index_asc' not in indexes:
-        result = await masters_repo.collection.create_index(
-            [('alias', pymongo.ASCENDING)], name='alias_unique_index_asc', unique=True
-        )
-        logger.debug('Index created: %s', result)
-
-    logger.debug('Indexes: %s', indexes)
-
     # Create unique index for name and alias if not exists
     if 'name_alias_unique_index_asc' not in indexes:
         result = await masters_repo.collection.create_index(
