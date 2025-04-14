@@ -5,7 +5,7 @@ from fastapi import Depends
 from redis.asyncio import Redis
 
 from salt_box_core.config import LOG_CONFIG
-from salt_box_core.db.exceptions import ObjectNotFoundError
+from salt_box_core.db.exceptions import MultipleObjectsFoundError, ObjectNotFoundError
 from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.db.mongo.schemas_base import PyObjectId
 from salt_box_core.db.redis import RedisDependency
@@ -233,6 +233,7 @@ class TaskLifespanService:
         for minion in minions:
             if minion.master in task.target_masters or not len(task.target_masters):
                 task.minions[self.__get_minion_key(minion.master, minion.minion_id)] = TaskMinion(
+                    id=minion.id,
                     master=minion.master,
                     minion_id=minion.minion_id,
                 )
@@ -354,8 +355,19 @@ class TaskLifespanService:
             task_job.returns_statuses.setdefault(minion_id, TaskJobReturnStatus.waiting)
             minion_key: str = self.__get_minion_key(master=task_job.target.master, minion_id=minion_id)
 
+            try:
+                minion_obj: MinionModel | None = await self.minion_service.get(
+                    {'minion_id': minion_id, 'master': task_job.target.master}
+                )
+            except ObjectNotFoundError:
+                minion_obj = None
+            except MultipleObjectsFoundError:
+                logger.error('Multiple minion objects returned')
+                continue
+
             if minion_key not in task.minions.keys():
                 task.minions[minion_key] = TaskMinion(
+                    id=minion_obj.id if minion_obj else None,
                     minion_id=minion_id,
                     master=task_job.target.master,
                     jobs={task_job.jid: TaskMinionJobStatus.created},

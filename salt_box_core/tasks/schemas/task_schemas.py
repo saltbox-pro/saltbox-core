@@ -85,6 +85,7 @@ class TaskMinionJobStatus(str, Enum):
 
 
 class TaskMinion(BaseModel):
+    id: PyObjectId | None = Field(title='Minion id', default=None)
     minion_id: str
     master: str
 
