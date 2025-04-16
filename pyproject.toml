@@ -1,6 +1,6 @@
 [project]
 dynamic = [ 'dependencies', 'version' ]
-name = 'fastms-core'
+name = 'saltbox-core'
 requires-python = '>=3.10'
 license = { 'text' = 'N/A' }  # FIXME
 description = ''
@@ -38,7 +38,7 @@ salt-box-faststream-redis = 'salt_box_core.event_bus.faststream_redis:main'
 salt-box-tasks-watcher = 'salt_box_core.tasks.tasks_watcher:main'
 
 [metadata]
-url = 'https://gitlab.com/fastms'
+url = 'https://gitlab.com/saltbox/saltbox-core'
 version = 'attr: package.__version__'
 
 [build-system]

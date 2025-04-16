@@ -20,11 +20,11 @@ After deploying dev enivronment install pre-commit hooks with
 To build the Core image:
 
 ```bash
-sudo docker build --target=main --tag fastms-core .
+sudo docker build --target=main --tag salt-box-core:dev .
 ```
 
 Additional settings need to be passed as environment variables to start. Check
-[fastms\_core/config.py](salt_box_core/config.py).
+[`salt_box_core/config.py`](salt\_box\_core/config.py).
 
-Use [salt.box compose](https://gitlab.com/salt.box/salt-box-compose) repo to run
+Use [Salt.Box Compose](https://gitlab.com/salt.box/salt-box-compose) repo to run
 whole system.

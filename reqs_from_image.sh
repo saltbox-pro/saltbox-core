@@ -7,7 +7,7 @@
 
 set -e
 
-image_tag='registry.altlab.su/salt.box/salt-box-core:master'
+image_tag='registry.saltbox.pro/saltbox/saltbox-core:master'
 
 packages=()
 

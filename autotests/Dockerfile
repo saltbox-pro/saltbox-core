@@ -1,5 +1,5 @@
 FROM registry.altlinux.org/alt/alt:p11
-LABEL version='0.1' name='SaltBox tests'
+LABEL version='0.2' name='SaltBox tests'
 # Change release to trigger build
 LABEL release='0'
 
@@ -48,7 +48,7 @@ ENV REDIS_PASSWORD_FILE=
 ENV USER_NAME=user
 ENV USER_PASSWORD_FILE=
 ENV CLIENT_SECRET_FILE=
-ENV GET_TOKEN_ENDPOINT=http://proxy/auth/keycloak/realms/fastms/protocol/openid-connect/token
+ENV GET_TOKEN_ENDPOINT=
 
 
 ENTRYPOINT ["entrypoint.sh", "pytest3"]
