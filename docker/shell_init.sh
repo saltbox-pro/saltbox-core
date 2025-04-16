@@ -1,4 +1,4 @@
-# This file is a part of salt.box core Docker image.
+# This file is a part of Salt.Box Core Docker image.
 #
 # This file supposed to be sourced with a shell.
 #

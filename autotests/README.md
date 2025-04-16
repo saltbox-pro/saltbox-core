@@ -1,4 +1,4 @@
-# Autotests for salt.box core
+# Autotests for Salt.Box Core
 
 ## Environment
 
@@ -24,7 +24,7 @@ In order to solve the following issue:
 ModuleNotFoundError: No module named 'salt_box_core'
 ```
 
-install the salt.box core as adviced in `README.md` or extend the `PYTHONPATH`:
+install the Salt.Box Core as adviced in `README.md` or extend the `PYTHONPATH`:
 
 ```bash
 export PYTHONPATH="$PYTHONPATH:/path/to/salt-box-core/"

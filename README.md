@@ -1,4 +1,4 @@
-# salt.box core
+# Salt.Box Core
 
 ## Developement
 
@@ -20,11 +20,11 @@ After deploying dev enivronment install pre-commit hooks with
 To build the Core image:
 
 ```bash
-sudo docker build --target=main --tag salt-box-core:dev .
+sudo docker build --target=main --tag saltbox-core:dev .
 ```
 
 Additional settings need to be passed as environment variables to start. Check
 [`salt_box_core/config.py`](salt\_box\_core/config.py).
 
-Use [Salt.Box Compose](https://gitlab.com/salt.box/salt-box-compose) repo to run
+Use [Salt.Box Compose](https://gitlab.com/saltbox/saltbox-compose) repo to run
 whole system.

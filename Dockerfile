@@ -74,7 +74,7 @@ ENTRYPOINT ["/usr/local/bin/uvicorn.sh"]
 ## Mount Core repository dir to /mnt/salt_box_core to serve with the container.
 
 FROM base AS dev
-LABEL name='salt-box-core-dev' version='1.1'
+LABEL name='saltbox-core-dev' version='1.1'
 # Install Core as editable package
 WORKDIR /mnt/salt_box_core/
 VOLUME /mnt/salt_box_core/
@@ -89,7 +89,7 @@ CMD ["dev"]
 ################
 
 FROM base AS main
-LABEL name='salt-box-core' version='1.1'
+LABEL name='saltbox-core' version='1.1'
 # Install Core as usual package
 RUN \
   --mount=type=bind,target=/mnt/salt_box_core/,readwrite \
