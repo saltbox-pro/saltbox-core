@@ -34,8 +34,8 @@ dev = [
 ]
 
 [project.scripts]
-salt-box-faststream-redis = 'salt_box_core.event_bus.faststream_redis:main'
-salt-box-tasks-watcher = 'salt_box_core.tasks.tasks_watcher:main'
+saltbox-faststream-redis = 'salt_box_core.event_bus.faststream_redis:main'
+saltbox-tasks-watcher = 'salt_box_core.tasks.tasks_watcher:main'
 
 [metadata]
 url = 'https://gitlab.com/saltbox/saltbox-core'
