@@ -1,7 +1,8 @@
 from pydantic import BaseModel
 
 from salt_box_core.db.mongo.repository_base import BaseMongoRepository
-from salt_box_core.db.mongo.schemas_base import IDMixin, TimezoneAwareDatetime
+from salt_box_core.db.mongo.schemas_base import IDMixin
+from salt_box_core.db.schemas_base import TimezoneAwareDatetime
 
 
 class ModelWithoutId(BaseModel):
