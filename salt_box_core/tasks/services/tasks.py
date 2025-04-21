@@ -9,7 +9,7 @@ from redis.asyncio import Redis
 # from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import PyObjectId
-from salt_box_core.db.redis import RedisDependency
+from salt_box_core.db.redis.config import RedisDependency
 from salt_box_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from salt_box_core.tasks.repositories.task_repository import TaskRepository, get_task_repository
 from salt_box_core.tasks.schemas.task_schemas import (

@@ -5,7 +5,7 @@ from fastapi import Depends, Request
 from pydantic import BaseModel, ConfigDict
 
 from salt_box_core.config import SETTINGS, logger
-from salt_box_core.db.mongo.schemas_base import User
+from salt_box_core.db.schemas_base import User
 from salt_box_core.dependencies import get_current_user_from_jwt
 
 

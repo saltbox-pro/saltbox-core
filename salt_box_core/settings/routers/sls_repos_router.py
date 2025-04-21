@@ -5,12 +5,8 @@ from taskiq import TaskiqResult
 
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import DuplicateKeyError, ObjectNotFoundError
-from salt_box_core.db.mongo.schemas_base import (
-    PaginatedResponse,
-    PyObjectId,
-    SkipLimitParams,
-    TaskiqTaskIdResponse,
-)
+from salt_box_core.db.mongo.schemas_base import PyObjectId
+from salt_box_core.db.schemas_base import PaginatedResponse, SkipLimitParams, TaskiqTaskIdResponse
 from salt_box_core.settings.schemas.sls_repos_schemas import (
     SettingsSlsRepoCreateSchema,
     SettingsSlsRepoModel,

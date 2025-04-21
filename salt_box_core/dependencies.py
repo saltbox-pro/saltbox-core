@@ -9,7 +9,7 @@ from fastapi.security import OAuth2PasswordBearer
 from pydantic import ValidationError
 
 from salt_box_core.config import SETTINGS, logger
-from salt_box_core.db.mongo.schemas_base import User
+from salt_box_core.db.schemas_base import User
 
 # TODO (a.baikov): use redis cache
 # user_cache = Cache.from_url(f'{SETTINGS.redis_url}?namespace=user&ttl=180', **SETTINGS.redis_connection_kwargs)

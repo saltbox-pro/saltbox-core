@@ -7,7 +7,7 @@ from taskiq import TaskiqDepends
 
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
-from salt_box_core.db.redis import get_redis_dep
+from salt_box_core.db.redis.config import get_redis_dep
 from salt_box_core.settings.repository import SettingsSlsRepoRepository, get_sls_repo_repository
 from salt_box_core.tasks.repositories.task_template_repository import (
     TaskTemplateRepository,

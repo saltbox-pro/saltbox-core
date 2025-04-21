@@ -5,14 +5,8 @@ from typing import Any, ClassVar
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from salt_box_core.config import LOG_CONFIG
-from salt_box_core.db.mongo.schemas_base import (
-    CreatedModifiedMixin,
-    IDMixin,
-    PyObjectId,
-    SkipLimitParams,
-    TimezoneAwareDatetime,
-    UserShort,
-)
+from salt_box_core.db.mongo.schemas_base import IDMixin, PyObjectId
+from salt_box_core.db.schemas_base import CreatedModifiedMixin, SkipLimitParams, TimezoneAwareDatetime, UserShort
 from salt_box_core.utilities.helpers import utc_now
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())

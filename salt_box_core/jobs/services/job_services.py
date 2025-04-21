@@ -11,7 +11,7 @@ from pydantic import ValidationError as PydanticValidationError
 from redis import exceptions as redis_exceptions
 
 from salt_box_core.config import LOG_CONFIG, SETTINGS
-from salt_box_core.db.redis import RedisDependency
+from salt_box_core.db.redis.config import RedisDependency
 from salt_box_core.event_bus.masters_bus import send_message_to_master
 from salt_box_core.jobs.exceptions import (
     JobCreateException,

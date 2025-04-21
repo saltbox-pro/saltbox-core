@@ -5,7 +5,8 @@ from fastapi import APIRouter, Depends, Query, status
 
 from salt_box_core.config import LOG_CONFIG
 from salt_box_core.db.exceptions import ObjectNotFoundError
-from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId, User
+from salt_box_core.db.mongo.schemas_base import PyObjectId
+from salt_box_core.db.schemas_base import PaginatedResponse, User
 from salt_box_core.dependencies import get_current_user_from_jwt
 from salt_box_core.http_errors import NotFound
 from salt_box_core.masters.schemas.master_schemas import MasterModel, MasterQueryParams, MasterViewSchema

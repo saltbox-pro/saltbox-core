@@ -1,0 +1,64 @@
+from datetime import datetime
+from typing import Annotated, Generic, TypeVar
+
+from pydantic import (
+    BaseModel,
+    Field,
+    PlainSerializer,
+    computed_field,
+)
+
+from salt_box_core.config import SETTINGS
+from salt_box_core.utilities.helpers import format_iso8601_z
+
+TimezoneAwareDatetime = Annotated[datetime, PlainSerializer(format_iso8601_z, when_used='json')]
+SchemaType = TypeVar('SchemaType', bound=BaseModel)
+
+
+class CreatedModifiedMixin:
+    created: TimezoneAwareDatetime = Field(title='Created')
+    modified: TimezoneAwareDatetime = Field(title='Modified')
+
+
+class PaginatedResponse(BaseModel, Generic[SchemaType]):
+    total: int = Field(description='Total number of items', ge=0)
+    data: list[SchemaType] = Field(description='Items list')
+
+
+class SkipLimitParams(BaseModel):
+    skip: int = Field(default=0, ge=0)
+    limit: int = Field(default=0, ge=0)
+
+
+class AccessModel(BaseModel):
+    roles: list[str] = Field(default=[])
+
+
+class User(BaseModel):
+    sub: str  # = Field(serialization_alias='id')
+    resource_access: dict[str, AccessModel] | None = Field(default=None, exclude=True)
+    email_verified: bool
+    name: str
+    email: str
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def roles(self) -> list[str]:
+        client_roles: list[str] = []
+        if self.resource_access:
+            try:
+                client_roles = self.resource_access[SETTINGS.keycloak_client].roles
+            except KeyError:
+                pass
+
+        return client_roles
+
+
+class UserShort(BaseModel):
+    sub: str
+    name: str
+    email: str
+
+
+class TaskiqTaskIdResponse(BaseModel):
+    task_id: str = Field(title='Taskiq task ID')

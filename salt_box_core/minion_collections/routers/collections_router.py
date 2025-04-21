@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import DuplicateKeyError, ObjectCreateError, ObjectNotFoundError, ObjectUpdateError
-from salt_box_core.db.mongo.schemas_base import PaginatedResponse, SkipLimitParams
+from salt_box_core.db.schemas_base import PaginatedResponse, SkipLimitParams
 from salt_box_core.minion_collections.schemas.collection_schemas import (
     CollectionCreateSchema,
     CollectionDetailSchema,

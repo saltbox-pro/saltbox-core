@@ -3,12 +3,8 @@ from typing import ClassVar
 from pydantic import BaseModel, ConfigDict, Field
 
 # from salt_box_core.config import logger
-from salt_box_core.db.mongo.schemas_base import (
-    CreatedModifiedMixin,
-    IDMixin,
-    PyObjectId,
-    SkipLimitParams,
-)
+from salt_box_core.db.mongo.schemas_base import IDMixin, PyObjectId
+from salt_box_core.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
 
 
 class ReadOnlyFieldsShortMixin:

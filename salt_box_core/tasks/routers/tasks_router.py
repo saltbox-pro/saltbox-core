@@ -6,8 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, status
 from salt_box_core import http_errors
 from salt_box_core.config import LOG_CONFIG
 from salt_box_core.db.exceptions import ObjectNotFoundError
-from salt_box_core.db.mongo.schemas_base import PaginatedResponse, PyObjectId, User
-from salt_box_core.db.redis import RedisDependency
+from salt_box_core.db.mongo.schemas_base import PyObjectId
+from salt_box_core.db.redis.config import RedisDependency
+from salt_box_core.db.schemas_base import PaginatedResponse, User
 from salt_box_core.dependencies import get_current_user_from_jwt
 from salt_box_core.jobs.exceptions import JobDoesNotExistsException
 from salt_box_core.jobs.schemas.job_schemas import Job, JobResult

@@ -2,33 +2,30 @@ from typing import Any, Generic, TypeVar, overload
 
 from pydantic import BaseModel
 
-from salt_box_core.db.mongo.repository_base import BaseMongoRepository
-from salt_box_core.db.mongo.schemas_base import PyObjectId
+from salt_box_core.db.redis.repository_sortedset_base import SortedsetRedisRepository
+from salt_box_core.db.redis.schemas_base import SortedSetId
 from salt_box_core.db.schemas_base import PaginatedResponse
 from salt_box_core.utilities.serivces.abc_service import AbstractService
 
-Repository = TypeVar('Repository', bound=BaseMongoRepository)
+Repository = TypeVar('Repository', bound=SortedsetRedisRepository)
 ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
 ModelType = TypeVar('ModelType', bound=BaseModel)
 CreateSchema = TypeVar('CreateSchema', bound=BaseModel)
 UpdateSchema = TypeVar('UpdateSchema', bound=BaseModel)
 
 
-class MongoBaseService(AbstractService[Repository], Generic[Repository, ModelType, CreateSchema, UpdateSchema]):
+class RedisSortedsetBaseService(
+    AbstractService[Repository], Generic[Repository, ModelType, CreateSchema, UpdateSchema]
+):
     @overload
-    async def get(self, query: dict[str, Any] | PyObjectId) -> ModelType: ...
+    async def get(self, query: SortedSetId) -> ModelType: ...
 
     @overload
-    async def get(
-        self, query: dict[str, Any] | PyObjectId, projection_model: type[ProjectionModel]
-    ) -> ProjectionModel: ...
+    async def get(self, query: SortedSetId, projection_model: type[ProjectionModel]) -> ProjectionModel: ...
 
     async def get(
-        self, query: dict[str, Any] | PyObjectId, projection_model: type[ProjectionModel] | None = None
+        self, query: SortedSetId, projection_model: type[ProjectionModel] | None = None
     ) -> ModelType | ProjectionModel:
-        if isinstance(query, PyObjectId):
-            query = {'_id': query}
-
         if projection_model:
             result = await self.repo.get(query=query, projection_model=projection_model)
         else:
@@ -37,20 +34,20 @@ class MongoBaseService(AbstractService[Repository], Generic[Repository, ModelTyp
         return result
 
     @overload
-    async def get_list(self, query: Any, limit: int, skip: int) -> list[ModelType]: ...
+    async def get_list(self, limit: int, skip: int) -> list[ModelType]: ...
 
     @overload
     async def get_list(
-        self, query: Any, limit: int, skip: int, projection_model: type[ProjectionModel]
+        self, limit: int, skip: int, projection_model: type[ProjectionModel]
     ) -> list[ProjectionModel]: ...
 
     async def get_list(
-        self, query: Any, limit: int = 0, skip: int = 0, projection_model: type[ProjectionModel] | None = None
+        self, limit: int | None = None, skip: int = 0, projection_model: type[ProjectionModel] | None = None
     ) -> list[ModelType] | list[ProjectionModel]:
         if projection_model:
-            return await self.repo.get_list(query=query, limit=limit, skip=skip, projection_model=projection_model)
+            return await self.repo.get_list(limit=limit, skip=skip, projection_model=projection_model)
 
-        return await self.repo.get_list(query=query, limit=limit, skip=skip)
+        return await self.repo.get_list(limit=limit, skip=skip)
 
     @overload
     async def create(self, data: CreateSchema) -> ModelType: ...
@@ -69,14 +66,11 @@ class MongoBaseService(AbstractService[Repository], Generic[Repository, ModelTyp
         return result
 
     @overload
-    async def get_list_paginated(
-        self, query: dict[str, Any] | None, limit: int, skip: int
-    ) -> PaginatedResponse[ModelType]: ...
+    async def get_list_paginated(self, limit: int, skip: int) -> PaginatedResponse[ModelType]: ...
 
     @overload
     async def get_list_paginated(
         self,
-        query: dict[str, Any] | None,
         limit: int,
         skip: int,
         projection_model: type[ProjectionModel],
@@ -84,30 +78,29 @@ class MongoBaseService(AbstractService[Repository], Generic[Repository, ModelTyp
 
     async def get_list_paginated(
         self,
-        query: dict[str, Any] | None = None,
-        limit: int = 0,
+        limit: int | None = None,
         skip: int = 0,
         projection_model: type[ProjectionModel] | None = None,
     ) -> PaginatedResponse[ModelType] | PaginatedResponse[ProjectionModel]:
-        total = await self.repo.count(query)
+        total = await self.repo.count()
 
         if projection_model:
-            data = await self.repo.get_list(query, limit=limit, skip=skip, projection_model=projection_model)
+            data = await self.repo.get_list(limit=limit, skip=skip, projection_model=projection_model)
             return PaginatedResponse[ProjectionModel](total=total, data=data)
         else:
-            data = await self.repo.get_list(query, limit=limit, skip=skip)
+            data = await self.repo.get_list(limit=limit, skip=skip)
             return PaginatedResponse[ModelType](total=total, data=data)
 
-    async def count(self, query: dict[str, Any] | None = None) -> int:
-        return await self.repo.count(query)
+    async def count(self, start_id: SortedSetId | None, end_id: SortedSetId | None) -> int:
+        return await self.repo.count(start_id=start_id, end_id=end_id)
 
-    async def exists(self, query: dict[str, Any]) -> bool:
+    async def exists(self, query: SortedSetId) -> bool:
         return await self.repo.exists(query)
 
     @overload
     async def update(
         self,
-        query: dict[str, Any] | PyObjectId,
+        query: SortedSetId,
         data: UpdateSchema | dict[str, Any],
         exclude_unset: bool = True,
     ) -> ModelType: ...
@@ -115,7 +108,7 @@ class MongoBaseService(AbstractService[Repository], Generic[Repository, ModelTyp
     @overload
     async def update(
         self,
-        query: dict[str, Any] | PyObjectId,
+        query: SortedSetId,
         data: UpdateSchema | dict[str, Any],
         exclude_unset: bool = True,
         *,
@@ -124,15 +117,12 @@ class MongoBaseService(AbstractService[Repository], Generic[Repository, ModelTyp
 
     async def update(
         self,
-        query: dict[str, Any] | PyObjectId,
+        query: SortedSetId,
         data: UpdateSchema | dict[str, Any],
         exclude_unset: bool = True,
         *,
         projection_model: type[ProjectionModel] | None = None,
     ) -> ModelType | ProjectionModel:
-        if isinstance(query, PyObjectId):
-            query = {'_id': query}
-
         if projection_model:
             result = await self.repo.update(
                 query=query, data=data, projection_model=projection_model, exclude_unset=exclude_unset
@@ -142,11 +132,5 @@ class MongoBaseService(AbstractService[Repository], Generic[Repository, ModelTyp
 
         return result
 
-    async def delete(self, query: dict[str, Any] | PyObjectId) -> int:
-        if isinstance(query, PyObjectId):
-            query = {'_id': query}
-
+    async def delete(self, query: SortedSetId) -> int:
         return await self.repo.delete(query)
-
-    async def delete_many(self, query: dict[str, Any]) -> int:
-        return await self.repo.delete_many(query=query)

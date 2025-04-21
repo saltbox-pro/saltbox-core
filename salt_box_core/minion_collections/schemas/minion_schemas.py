@@ -3,13 +3,8 @@ from typing import Annotated, Any, Generic, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, PositiveInt, computed_field
 
-from salt_box_core.db.mongo.schemas_base import (
-    CreatedModifiedMixin,
-    IDMixin,
-    MongoQuery,
-    SkipLimitParams,
-    TimezoneAwareDatetime,
-)
+from salt_box_core.db.mongo.schemas_base import IDMixin, MongoQuery
+from salt_box_core.db.schemas_base import CreatedModifiedMixin, SkipLimitParams, TimezoneAwareDatetime
 
 T = TypeVar('T')
 

@@ -11,7 +11,8 @@ from pydantic import (
     model_validator,
 )
 
-from salt_box_core.db.mongo.schemas_base import CreatedModifiedMixin, IDMixin, TimezoneAwareDatetime
+from salt_box_core.db.mongo.schemas_base import IDMixin
+from salt_box_core.db.schemas_base import CreatedModifiedMixin, TimezoneAwareDatetime
 
 
 class ReadOnlyFieldsShortMixin:

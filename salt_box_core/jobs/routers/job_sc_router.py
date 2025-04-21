@@ -5,7 +5,7 @@ from taskiq import TaskiqResult
 
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import DuplicateKeyError, ObjectNotFoundError
-from salt_box_core.db.mongo.schemas_base import PaginatedResponse, SkipLimitParams, TaskiqTaskIdResponse
+from salt_box_core.db.schemas_base import PaginatedResponse, SkipLimitParams, TaskiqTaskIdResponse
 from salt_box_core.jobs.schemas.job_sc_schemas import JobSchemaModel, JobSchemaShortSchema
 from salt_box_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
 from salt_box_core.tkq import broker

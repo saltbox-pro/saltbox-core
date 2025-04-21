@@ -1,10 +1,7 @@
 from pydantic import BaseModel, ConfigDict, Field
 
-from salt_box_core.db.mongo.schemas_base import (
-    CreatedModifiedMixin,
-    IDMixin,
-    MongoQuery,
-)
+from salt_box_core.db.mongo.schemas_base import IDMixin, MongoQuery
+from salt_box_core.db.schemas_base import CreatedModifiedMixin
 
 
 class CollectionReadOnlyFieldsMixin:

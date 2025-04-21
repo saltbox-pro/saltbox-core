@@ -2,7 +2,8 @@ from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from salt_box_core.db.mongo.schemas_base import CreatedModifiedMixin, IDMixin, SkipLimitParams
+from salt_box_core.db.mongo.schemas_base import IDMixin
+from salt_box_core.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
 
 
 class MasterStatus(str, Enum):
@@ -12,7 +13,7 @@ class MasterStatus(str, Enum):
 
 
 class MasterReadOnlyFieldsMixin:
-    name: str = Field(title='Slug')
+    name: str = Field(title='Name', min_length=3)
 
 
 class MasterSecretsMixin:
@@ -20,7 +21,7 @@ class MasterSecretsMixin:
 
 
 class MasterEditableFieldsMixin:
-    title: str = Field(title='Title', min_length=3, max_length=50)
+    title: str = Field(title='Title', min_length=3)
 
     status: MasterStatus = Field(title='Status', default=MasterStatus.new)
     alias: str | None = Field(title='Alias', default=None)

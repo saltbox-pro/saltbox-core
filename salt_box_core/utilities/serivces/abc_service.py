@@ -4,7 +4,7 @@ from typing import Any, Generic, TypeVar
 from pydantic import BaseModel
 
 from salt_box_core.db.abc_repository import AbstractRepository
-from salt_box_core.db.mongo.schemas_base import PaginatedResponse
+from salt_box_core.db.schemas_base import PaginatedResponse
 
 Repository = TypeVar('Repository', bound=AbstractRepository)
 ModelType = TypeVar('ModelType', bound=BaseModel)
