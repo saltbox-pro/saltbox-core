@@ -1,3 +1,11 @@
+# Copyright 2025 Alexey Baikov, Anton Karmanov
+
+# Licensed under the Apache License, Version 2.0.
+# See LICENSE.txt file in the project root for license information.
+
+# This file is a part of Salt.Box system.
+
+
 FROM registry.altlinux.org/alt/alt:p11 AS base
 LABEL version='1.0'
 EXPOSE 8000
