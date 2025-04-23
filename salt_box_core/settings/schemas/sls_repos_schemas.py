@@ -54,7 +54,7 @@ class SettingsSlsRepoCreateSchema(
     @model_validator(mode='after')
     def validate_local_path(self) -> Self:
         if not self.local_path:
-            self.local_path = self.repo_url.unicode_string().rstrip('/').split('/')[-1].replace('.git', '')
+            self.local_path = self.repo_url.unicode_string().rstrip('/').split('/')[-1].replace('.git', '').lower()
         return self
 
 
