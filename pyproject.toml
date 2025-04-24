@@ -1,71 +1,66 @@
 [project]
-dynamic = [ 'dependencies', 'version' ]
-name = 'saltbox-core'
-requires-python = '>=3.10'
-license = 'Apache-2.0'
-description = ''
-readme = 'README.md'
+dynamic = ["dependencies", "version"]
+name = "saltbox-core"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+description = ""
+readme = "README.md"
 classifiers = [
-  'Topic :: System :: Systems Administration',
+  "Topic :: System :: Systems Administration",
 ]
+
+[project.urls]
+Homepage = "https://saltbox.pro"
+Documentation = "https://saltbox.pro"
+Repository = "https://gitlab.com/saltbox/saltbox-core"
 
 [project.optional-dependencies]
 dev = [
-    'Flake8-pyproject',
-    'flake8',
-    'flake8-logging',
-    'ipython',
-    'mypy>=1.15.0',
-    'pre-commit',
-    'pylint',
-    'types-redis',
-    'python-lsp-server[all]',
-    'types-PyYAML',
-    'types-requests',
-    'ruff',
-    'taskiq[reload]',
-    "coverage[toml]>=7.6.11",
-    "pytest>=8.3.4",
-    "pytest-asyncio>=0.25.3",
-    "pytest-cov>=6.0.0",
-    "pytest-mock>=3.14.0",
-    "pytest-sugar>=1.0.0",
-    "mongomock>=4.3.0",
+  "mypy>=1.15.0",
+  "pre-commit",
+  "types-redis",
+  "python-lsp-server[all]",
+  "types-PyYAML",
+  "ruff",
+  "taskiq[reload]",
+  "coverage[toml]>=7.6.11",
+  "pytest>=8.3.4",
+  "pytest-asyncio>=0.25.3",
+  "pytest-cov>=6.0.0",
+  "pytest-mock>=3.14.0",
+  "pytest-sugar>=1.0.0",
+  "mongomock>=4.3.0",
 ]
 
 [project.scripts]
-saltbox-faststream-redis = 'salt_box_core.event_bus.faststream_redis:main'
-saltbox-tasks-watcher = 'salt_box_core.tasks.tasks_watcher:main'
+saltbox-faststream-redis = "salt_box_core.event_bus.faststream_redis:main"
+saltbox-tasks-watcher = "salt_box_core.tasks.tasks_watcher:main"
 
-[metadata]
-url = 'https://gitlab.com/saltbox/saltbox-core'
-version = 'attr: package.__version__'
+# [metadata]
+# url = 'https://gitlab.com/saltbox/saltbox-core'
+# version = 'attr: package.__version__'
 
 [build-system]
-requires = ['setuptools>=57.4.0', 'setuptools-scm']
-build-backend = 'setuptools.build_meta'
+requires = ["setuptools>=75.1.0", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 # Explicit package dir for flat-layout
-include = ['salt_box_core', 'salt_box_core.*']
+include = ["salt_box_core", "salt_box_core.*"]
 
 [tool.setuptools.dynamic]
-dependencies = { file = ['requirements.txt'] }
-version = { attr = 'salt_box_core.__version__' }
-
-[tool.flake8]
-max-line-length = 120
-extend-ignore = [ ]
+dependencies = { file = ["requirements.txt"] }
+version = { attr = "salt_box_core.__version__" }
 
 [tool.mypy]
 check_untyped_defs = true
-plugins = [ 'pydantic.mypy' ]
-python_version = '3.12'
+plugins = ["pydantic.mypy"]
+python_version = "3.12"
 ignore_missing_imports = false
 color_output = true
 warn_redundant_casts = true
 warn_unused_configs = true
-exclude = ['venv/', '.venv/', 'autotests/*', 'tests/*']
+exclude = ["venv/", ".venv/", "tests/*"]
 strict = true
 disallow_any_generics = false
 disallow_incomplete_defs = true
@@ -78,14 +73,14 @@ warn_unreachable = true
 warn_unused_ignores = true
 
 [tool.pytest.ini_options]
-asyncio_default_fixture_loop_scope = 'function'
+asyncio_default_fixture_loop_scope = "function"
 minversion = "8.0"
 addopts = [
-    "--cov=salt_box_core",
-    "--cov-report=term-missing",
-    "--durations=5",
-    # "--maxfail=1",
-    # "--disable-warnings -q",
+  "--cov=salt_box_core",
+  "--cov-report=term-missing",
+  "--durations=5",
+  # "--maxfail=1",
+  # "--disable-warnings -q",
 ]
 testpaths = ["tests"]
 # env_files = [".env.example"]
@@ -94,14 +89,21 @@ testpaths = ["tests"]
 # concurrency = ["gevent"]
 # branch = true
 source = ["salt_box_core"]
-omit = ["main.py", "config.py", "tests/*", "venv/*", ".venv/*", "autotests/*", "**/__init__.py"]
+omit = [
+  "main.py",
+  "config.py",
+  "tests/*",
+  "venv/*",
+  ".venv/*",
+  "**/__init__.py",
+]
 
 [tool.coverage.report]
 show_missing = true
 # fail_under = 60
 exclude_lines = [
-  'if TYPE_CHECKING:',
-  'pragma: no cover',
+  "if TYPE_CHECKING:",
+  "pragma: no cover",
   "if __name__ == '__main__':",
 ]
 # skip_covered = true
