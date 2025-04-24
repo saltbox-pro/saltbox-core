@@ -1,103 +1,95 @@
-from __future__ import annotations
-
-import abc
 from typing import Any
 
-from fastapi import HTTPException, WebSocketException
-from starlette import status
+from fastapi import HTTPException, WebSocketException, status
 
 
-class BaseHttpError(abc.ABC, HTTPException):
-    @property
-    @abc.abstractmethod
-    def CODE(self) -> int: ...  # noqa: N802
+class BaseHttpError(HTTPException):
+    _code: int
 
     def __init__(self, detail: Any, headers: dict[str, str] | None = None):
-        super().__init__(status_code=self.CODE, detail=detail, headers=headers)
+        super().__init__(status_code=self._code, detail=detail, headers=headers)
 
 
 class BadRequest(BaseHttpError):
     """Bad client data, e.g. on POST data validation error"""
 
-    CODE = status.HTTP_400_BAD_REQUEST
+    _code = status.HTTP_400_BAD_REQUEST
 
 
 class Unauthorized(BaseHttpError):
     """Failed to authorize"""
 
-    CODE = status.HTTP_401_UNAUTHORIZED
+    _code = status.HTTP_401_UNAUTHORIZED
 
 
 class Forbidden(BaseHttpError):
     """Access denied"""
 
-    CODE = status.HTTP_403_FORBIDDEN
+    _code = status.HTTP_403_FORBIDDEN
 
 
 class NotFound(BaseHttpError):
     """Resource is missing"""
 
-    CODE = status.HTTP_404_NOT_FOUND
+    _code = status.HTTP_404_NOT_FOUND
 
 
 class MethodNotAllowed(BaseHttpError):
     """Bad request type, e.g. POST on exclusively GET endpoint"""
 
-    CODE = status.HTTP_405_METHOD_NOT_ALLOWED
+    _code = status.HTTP_405_METHOD_NOT_ALLOWED
 
 
 class ImATeapot(BaseHttpError):
     """Teapot requested to make coffee"""
 
-    CODE = 418
+    _code = 418
 
 
 class UnprocessableEntity(BaseHttpError):
     """Server cannot process the request due to invalid data"""
 
-    CODE = status.HTTP_422_UNPROCESSABLE_ENTITY
+    _code = status.HTTP_422_UNPROCESSABLE_ENTITY
 
 
 class InternalServerError(BaseHttpError):
     """Generic server-side error"""
 
-    CODE = 500
+    _code = 500
 
 
 class NotImplemented(BaseHttpError):
     """Such request can not be processed yet"""
 
-    CODE = 501
+    _code = 501
 
 
 class BadGateway(BaseHttpError):
     """Invalid response from an upstream server"""
 
-    CODE = 502
+    _code = 502
 
 
 class ServiceUnavalable(BaseHttpError):
     """Server not able to handle the request now"""
 
-    CODE = 503
+    _code = 503
 
 
-class WebSocketError(abc.ABC, WebSocketException):
-    @property
-    @abc.abstractmethod
-    def CODE(self) -> int: ...  # noqa: N802
+class WebSocketError(WebSocketException):
+    _code: int
 
     def __init__(self, reason: str | None = None) -> None:
-        super().__init__(code=self.CODE, reason=reason)
+        super().__init__(code=self._code, reason=reason)
 
 
 class WebSocketPolicyViolation(WebSocketError):
     """Generic error means message violates policy of socket"""
 
-    CODE = status.WS_1008_POLICY_VIOLATION
+    _code = status.WS_1008_POLICY_VIOLATION
 
 
 class WebSocketServerError(WebSocketError):
     """Unexpected conditions prevents from fulfilling a request"""
 
-    CODE = status.WS_1011_INTERNAL_ERROR
+    _code = status.WS_1011_INTERNAL_ERROR

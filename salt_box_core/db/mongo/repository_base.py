@@ -9,7 +9,6 @@ from pymongo.asynchronous.database import AsyncDatabase
 from pymongo.errors import DuplicateKeyError as MongoDuplicateKeyError
 from pymongo.errors import OperationFailure
 
-# from salt_box_core.config import logger
 from salt_box_core.db.abc_repository import AbstractRepository
 from salt_box_core.db.exceptions import (
     DuplicateKeyError,
@@ -17,9 +16,9 @@ from salt_box_core.db.exceptions import (
     ObjectCreateError,
     ObjectNotFoundError,
     ObjectUpdateError,
-    PipelineBuilderError,
 )
 from salt_box_core.db.mongo.schemas_base import PyObjectId
+from salt_box_core.http_errors import BadRequest
 from salt_box_core.utilities.helpers import recursive_replace_dates
 
 T = TypeVar('T', bound=BaseModel)
@@ -284,5 +283,5 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
             cursor = await self.collection.aggregate(pipeline)
             return await cursor.to_list()
         except OperationFailure as e:
-            msg = f'Error during pipeline execution: {e}'
-            raise PipelineBuilderError(msg) from e
+            msg = f'Error during pipeline execution in aggregate: {e}'
+            raise BadRequest(detail=msg) from None

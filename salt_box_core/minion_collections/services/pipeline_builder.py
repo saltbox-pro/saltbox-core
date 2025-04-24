@@ -2,9 +2,8 @@ from collections.abc import Callable
 from types import UnionType
 from typing import Any, Union, get_args, get_origin
 
-from fastapi import HTTPException, status
-
 from salt_box_core.config import logger
+from salt_box_core.http_errors import BadRequest
 from salt_box_core.minion_collections.schemas.minion_schemas import GrainsSchema, MinionModel
 
 LIST_HANDLER_FIELDS = [
@@ -31,11 +30,12 @@ class MongoPipelineBuilder:
         self.limit = limit
         self.skip = skip
         self.field_type = self._detect_field_type()
+        self.query = query
         self.pipeline: list[dict[str, Any]] = (
             [
-                {'$match': query},
+                {'$match': self.query},
             ]
-            if query
+            if self.query
             else []
         )
 
@@ -164,8 +164,7 @@ class MongoPipelineBuilder:
             logger.debug('Apply str handler')
             self._str_int_handler()
             return
-        msg = f'Unsupported field: {self.field_name}'
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=msg)
+        raise BadRequest(detail=f'Unsupported field: {self.field_name}') from None
 
     def build(self) -> list:
         self._build_pipeline()
