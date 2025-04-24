@@ -2,7 +2,7 @@
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: 'v4.6.0'
+    rev: 'v5.0.0'
     hooks:
       - id: check-added-large-files
         args:
@@ -15,12 +15,10 @@ repos:
       - id: mixed-line-ending
       - id: trailing-whitespace
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.4
+    rev: v0.11.6
     hooks:
       - id: ruff
-        files: "^salt_box_core/"
-      - id: ruff
-        args: ["check", "--select", "I", "--fix"]
+        args: ["check", "--select", "I", "--fix"]  # fixes only I (import) errors
         files: "^salt_box_core/"
       - id: ruff-format
         files: "^salt_box_core/"
