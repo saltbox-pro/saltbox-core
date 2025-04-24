@@ -34,4 +34,3 @@ def delete_created_data(jid):
 def delete_created_collection(api, response):
     collection_id = response.json().get('id')
     del_collection_cid(api, collection_id)
-
