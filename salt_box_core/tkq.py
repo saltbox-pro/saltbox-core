@@ -9,4 +9,4 @@ from salt_box_core.config import SETTINGS
 broker = AioPikaBroker(SETTINGS.rabbitmq_url).with_result_backend(RedisAsyncResultBackend(SETTINGS.taskiq_redis_url))
 
 
-taskiq_fastapi.init(broker, 'salt_box_core.main:APP')
+taskiq_fastapi.init(broker, 'salt_box_core.main:app')

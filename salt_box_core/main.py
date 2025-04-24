@@ -1,7 +1,8 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.middleware.cors import CORSMiddleware
 
 from salt_box_core.config import APP_NAME, SETTINGS, logger
@@ -47,10 +48,10 @@ def _get_app() -> FastAPI:
     return app_t
 
 
-APP = _get_app()
+app = _get_app()
 
 
-APP.add_middleware(
+app.add_middleware(
     CORSMiddleware,
     allow_origins=SETTINGS.origins,
     allow_credentials=True,
@@ -58,15 +59,23 @@ APP.add_middleware(
     allow_headers=['*'],
 )
 
-APP.include_router(filters_router)
-APP.include_router(jobs_router)
-APP.include_router(job_schemas_router)
-APP.include_router(jobs_ws_router)
-APP.include_router(template_router)
-APP.include_router(task_router)
-APP.include_router(task_ws_router)
-APP.include_router(collections_router)
-APP.include_router(minions_router)
-APP.include_router(masters_router)
-APP.include_router(pillars_router)
-APP.include_router(router=settings_sls_router, prefix='/settings', tags=['Settings'])
+
+@app.exception_handler(HTTPException)
+async def logged_http_exception_handler(request: Request, exc: HTTPException) -> Response:
+    """Custom exception handler for HTTP exceptions with logging"""
+    logger.error(f'HTTP Exception: {request.url.path}: {exc}', exc_info=True)
+    return await http_exception_handler(request, exc)
+
+
+app.include_router(filters_router)
+app.include_router(jobs_router)
+app.include_router(job_schemas_router)
+app.include_router(jobs_ws_router)
+app.include_router(template_router)
+app.include_router(task_router)
+app.include_router(task_ws_router)
+app.include_router(collections_router)
+app.include_router(minions_router)
+app.include_router(masters_router)
+app.include_router(pillars_router)
+app.include_router(router=settings_sls_router, prefix='/settings', tags=['Settings'])
