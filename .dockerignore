@@ -2,4 +2,3 @@
 .dockerignore
 Dockerfile
 build
-autotests

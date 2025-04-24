@@ -1,6 +1,0 @@
-{
-  "query": {
-    "grains.os": "Ubuntu"
-  },
-  "title": "Update Collection"
-}

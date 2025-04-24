@@ -1,6 +1,0 @@
-{
-  "tgt": "*",
-  "tgt_type": "glob",
-  "fun": "test.sleep",
-  "arg": ["2"]
-}

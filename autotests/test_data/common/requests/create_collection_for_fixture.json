@@ -1,6 +1,0 @@
-{
-  "query": {
-    "grains.os": "Alpine"
-  },
-  "title": "Test Collection"
-}

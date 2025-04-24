@@ -1,5 +1,0 @@
-{
-  "tgt": "*",
-  "tgt_type": "glob",
-  "fun": "test.ping"
-}
