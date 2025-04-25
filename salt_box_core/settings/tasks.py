@@ -114,4 +114,12 @@ async def sync_sls_repo_task(
     except Exception as e:
         msg = f'Error during task execution: {e!s}'
         logger.error(msg)
+        await sls_repo.update(
+            {'_id': ObjectId(repo_id)},
+            {
+                'last_synced': datetime.now(UTC),
+                'last_sync_error': msg,
+                'is_last_sync_successful': False,
+            },
+        )
         raise

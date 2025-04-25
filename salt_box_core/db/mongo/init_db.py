@@ -41,6 +41,14 @@ async def init_sls_repos_settings() -> None:
         logger.debug('Index created: %s', result)
         logger.debug('Indexes: %s', indexes)
 
+    # Create unique index for local_path if not exists
+    if 'local_path_unique_index_asc' not in indexes:
+        result = await sls_settings_repo.collection.create_index(
+            [('local_path', pymongo.ASCENDING)], name='local_path_unique_index_asc', unique=True
+        )
+        logger.debug('Index created: %s', result)
+        logger.debug('Indexes: %s', indexes)
+
 
 async def init_job_schemas() -> None:
     db = get_mongo_db()
