@@ -52,7 +52,9 @@ async def collection_default(
             'action': 'retrieve',
         }
     )
-    if not authz_result.allow and authz_result.allowed_slugs:
+    if not authz_result.allow:
+        if not authz_result.allowed_slugs:
+            raise HTTPException(status_code=403, detail='You does not have access to any collection')
         slug = authz_result.allowed_slugs[0]
         authz_result = await authz_service.check_access(
             input={
@@ -62,8 +64,6 @@ async def collection_default(
                 'action': 'retrieve',
             }
         )
-    else:
-        raise HTTPException(status_code=403, detail='You does not have access to any collection')
 
     try:
         response = await collection_service.get_by_slug(slug)
