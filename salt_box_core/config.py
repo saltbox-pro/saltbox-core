@@ -1,10 +1,10 @@
 import logging.config
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, DirectoryPath, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-APP_NAME = 'Salt.box Core'
+APP_NAME = 'Salt.Box Core'
 
 
 class Settings(BaseSettings):
@@ -30,7 +30,7 @@ class Settings(BaseSettings):
     opa_url: str = ''
     salt_func_repo_url: str = 'https://dev.saltbox.pro/a.baikov/salt-func-schemas.git'
     salt_func_local_repo_name: str = 'salt-func-schemas'
-    local_repos_path: str = 'repos'
+    local_repos_path: DirectoryPath = '/srv/repos'
     rabbitmq_url: str = 'amqp://guest:guest@rabbitmq:5672'
 
     model_config = SettingsConfigDict(env_file='.env')

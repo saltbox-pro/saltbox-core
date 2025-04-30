@@ -64,6 +64,7 @@ async def sync_schemas(
 
 
 # TODO (a.baikov): Deal with retries
+# FIXME (a.karmanov): Timeout is too small
 @broker.task(timeout=30, retry_on_error=True, _retries=3)
 async def sync_sls_repo_task(
     repo_id: str,

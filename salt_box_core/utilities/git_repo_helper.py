@@ -56,12 +56,13 @@ class GitRepoService:
         self.repo_url = repo_url
         self.login = login
         self.token = token
+        # TODO HTTP, SSH links
         if self.login and self.token and self.repo_url.startswith('https://'):
             parts = self.repo_url.split('https://')
             self.repo_url = f'https://{self.login}:{self.token}@{parts[1]}'
 
         self.local_name = local_name or self.repo_url.rstrip('/').split('/')[-1].replace('.git', '')
-        self.local_path = './' / Path(SETTINGS.local_repos_path) / self.local_name
+        self.local_path = Path(SETTINGS.local_repos_path) / self.local_name
 
     @property
     def repo(self) -> Repo | None:
