@@ -91,7 +91,6 @@ async def minions_export(
         else:
             query = collection.query if collection.query else body.query
 
-        logger.debug('query: %s', query)
         file_path = await minion_service.export_to_csv(query=query, skip=body.skip, limit=body.limit)
         if not file_path:
             raise HTTPException(status_code=404, detail='No data found')

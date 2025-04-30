@@ -45,7 +45,6 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
         self, field: str, query: dict[str, Any], skip: int = 0, limit: int | None = None
     ) -> UniqueGrainValuesResponse:
         query = self.repo.__prepare_query__(query)
-        logger.debug('query: %s', query)
         pipeline_builder = MongoPipelineBuilder(field, query, skip, limit)
         pipeline = pipeline_builder.build()
         full_pipeline = [stage for stage in pipeline if '$skip' not in stage and '$limit' not in stage]
@@ -67,13 +66,12 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
         grains_keys = GrainsSchema.model_fields
 
         keys = [key for key in minion_keys.keys() if key != 'grains'] + [f'grains.{key}' for key in grains_keys.keys()]
-        logger.debug('keys: %s', keys)
 
         with Path(file_path).open(mode='w', newline='') as file:  # noqa: ASYNC230
             writer = csv.DictWriter(file, fieldnames=keys)
             writer.writeheader()
             for item in data:
-                row = item.model_dump(exclude={'grains'})
+                row = item.model_dump(exclude={'grains', 'last_activity_seconds'})
                 row.update({f'grains.{key}': item.grains.model_dump()[key] for key in grains_keys.keys()})
                 writer.writerow(row)
 
