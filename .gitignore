@@ -1,13 +1,15 @@
 # Python
 *.egg-info
 *.pyc
-/build/
-__pycache__
-.pytest_cache/
 .coverage
-htmlcov/
-.ruff_cache/
+.flake8
 .mypy_cache/
+.pytest_cache/
+.ruff_cache/
+/build/
+/uv.lock
+__pycache__
+htmlcov/
 
 # Virtual environments
 */.venv
@@ -17,3 +19,6 @@ htmlcov/
 # Editors
 /.vscode
 /.idea
+
+# Other
+/_*
