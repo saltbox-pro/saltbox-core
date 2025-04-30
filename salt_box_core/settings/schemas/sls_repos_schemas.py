@@ -35,9 +35,6 @@ class ReadOnlyFieldsShortMixin:
         if not self.repo_url.path or self.repo_url.path == '/':
             msg = 'Invalid repo_url: `path` part of url is required'
             raise ValueError(msg)
-        if not self.repo_url.path.endswith('.git'):
-            msg = 'Invalid repo_url: path part of url must end with `.git`'
-            raise ValueError(msg)
         return self
 
 
