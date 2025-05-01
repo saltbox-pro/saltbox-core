@@ -1,4 +1,5 @@
 import logging.config
+from pathlib import Path
 from typing import Any, Literal
 
 from pydantic import BaseModel, DirectoryPath, Field
@@ -30,7 +31,7 @@ class Settings(BaseSettings):
     opa_url: str = ''
     salt_func_repo_url: str = 'https://dev.saltbox.pro/a.baikov/salt-func-schemas.git'
     salt_func_local_repo_name: str = 'salt-func-schemas'
-    local_repos_path: DirectoryPath = '/srv/repos'
+    local_repos_path: DirectoryPath = Path('/srv/repos')
     rabbitmq_url: str = 'amqp://guest:guest@rabbitmq:5672'
 
     model_config = SettingsConfigDict(env_file='.env')
