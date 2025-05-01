@@ -59,9 +59,11 @@ pytest:
   stage: test
   variables:
     PIP_CACHE_DIR: '$CI_PROJECT_DIR/.cache/pip'
+    LOCAL_REPOS_PATH: '/tmp/sb_repos/'
   image: python:3.12-alpine
   before_script:
-    pip3 install -e .[dev]
+    - mkdir -p "$LOCAL_REPOS_PATH"
+    - pip3 install -e .[dev]
   script:
     pytest
   coverage: '/^TOTAL.+?(\d+\%)$/'
