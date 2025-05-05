@@ -152,7 +152,7 @@ class GitRepoService:
             path_parts = ()
         logger.debug('parts_after_salt_find_sls: %s', path_parts)
 
-        name = '.'.join(path_parts) + '.' + file.stem
+        name = file.stem if not path_parts else '.'.join(path_parts) + '.' + file.stem
 
         pattern = re.compile(r'{#start_schema(.*?)end_schema#}', re.DOTALL)
         match = pattern.search(content)
