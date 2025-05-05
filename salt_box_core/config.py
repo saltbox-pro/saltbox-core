@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     salt_func_repo_url: str = 'https://dev.saltbox.pro/a.baikov/salt-func-schemas.git'
     salt_func_local_repo_name: str = 'salt-func-schemas'
     local_repos_path: DirectoryPath = Path('/srv/repos')
+    local_repo_sync_timeout_sec: int = 600
     rabbitmq_url: str = 'amqp://guest:guest@rabbitmq:5672'
 
     model_config = SettingsConfigDict(env_file='.env')

@@ -5,7 +5,7 @@ from bson import ObjectId
 from redis.asyncio import Redis
 from taskiq import TaskiqDepends
 
-from salt_box_core.config import logger
+from salt_box_core.config import Settings, logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.redis.config import get_redis_dep
 from salt_box_core.settings.repository import SettingsSlsRepoRepository, get_sls_repo_repository
@@ -20,6 +20,8 @@ from salt_box_core.utilities.git_repo_helper import (
     MultipleRepoSyncError,
     repository_lock,
 )
+
+SETTINGS = Settings()
 
 
 async def sync_schemas(
@@ -64,8 +66,7 @@ async def sync_schemas(
 
 
 # TODO (a.baikov): Deal with retries
-# FIXME (a.karmanov): Timeout is too small
-@broker.task(timeout=30, retry_on_error=True, _retries=3)
+@broker.task(timeout=SETTINGS.local_repo_sync_timeout_sec, retry_on_error=True, _retries=3)
 async def sync_sls_repo_task(
     repo_id: str,
     repo: TaskTemplateRepository = TaskiqDepends(get_task_template_repository),
