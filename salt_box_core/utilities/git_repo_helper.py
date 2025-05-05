@@ -77,10 +77,10 @@ class GitRepoService:
     def clone_or_pull(self) -> None:
         logger.debug('Try to clon repo %s', self.repo_url)
         if self.repo:
-            logger.debug('Local path exists and is a directory, fetching latest changes')
+            logger.debug('Local path exists and is a directory, pulling latest changes')
             try:
-                origin = self.repo.remotes.origin
-                origin.fetch()
+                origin = self.repo.remote(name='origin')
+                origin.pull()
             except Exception as e:
                 logger.error('Failed to pull repo: %s', str(e))
                 if Path(self.local_path).exists():
@@ -90,7 +90,7 @@ class GitRepoService:
         else:
             try:
                 logger.debug('Local path does not exist, cloning repo')
-                Repo.clone_from(self.repo_url, self.local_path, mirror=True)
+                Repo.clone_from(self.repo_url, self.local_path)
                 logger.debug('Repo cloned successfully')
             except Exception as e:
                 logger.error('Failed to clone repo: %s', str(e))
