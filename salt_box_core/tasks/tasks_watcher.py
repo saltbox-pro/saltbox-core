@@ -10,6 +10,8 @@ from salt_box_core.jobs.repositories.job_repository import JobRepository
 from salt_box_core.jobs.repositories.job_sc_repository import JobSchemaRepository
 from salt_box_core.jobs.services.job_sc_service import JobSchemaService
 from salt_box_core.jobs.services.job_services import JobService
+from salt_box_core.masters.repositories.master_repository import MasterRepository
+from salt_box_core.masters.services.master_service import MasterService
 from salt_box_core.minion_collections.repositories.collection_repository import CollectionRepository
 from salt_box_core.minion_collections.repositories.minion_repository import MinionRepository
 from salt_box_core.minion_collections.services.collection_service import CollectionService
@@ -32,6 +34,7 @@ class TasksWatcher:
         self.db = get_mongo_db()
 
         self.job_schema_repository = JobSchemaRepository(self.db)
+        self.master_repository = MasterRepository(self.db)
         self.collections_repository: CollectionRepository = CollectionRepository(self.db)
         self.minions_repository: MinionRepository = MinionRepository(self.db)
         self.task_repository: TaskRepository = TaskRepository(self.db)
@@ -50,8 +53,12 @@ class TasksWatcher:
 
         job_repository = JobRepository(redis)
         job_schema_service: JobSchemaService = JobSchemaService(repo=self.job_schema_repository)
+        master_service: MasterService = MasterService(repo=self.master_repository)
         job_service: JobService = JobService(
-            rdb=redis, job_repository=job_repository, job_schema_service=job_schema_service
+            rdb=redis,
+            job_repository=job_repository,
+            job_schema_service=job_schema_service,
+            master_service=master_service,
         )
         minion_service: MinionService = MinionService(repo=self.minions_repository)
         collection_service: CollectionService = CollectionService(repo=self.collections_repository)

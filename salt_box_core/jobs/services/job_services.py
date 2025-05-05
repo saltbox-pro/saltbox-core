@@ -11,6 +11,7 @@ from pydantic import ValidationError as PydanticValidationError
 from redis import exceptions as redis_exceptions
 
 from salt_box_core.config import LOG_CONFIG, SETTINGS
+from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.redis.config import RedisDependency
 from salt_box_core.db.redis.repository_sortedset_base import ProjectionModel
 from salt_box_core.db.schemas_base import PaginatedResponse
@@ -26,6 +27,8 @@ from salt_box_core.jobs.repositories.job_repository import JobRepository, get_jo
 from salt_box_core.jobs.schemas.event_bus_schemas import NewJobMessage
 from salt_box_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel, JobResult, JobUpdateSchema
 from salt_box_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
+from salt_box_core.masters.schemas.master_schemas import MasterModel, MasterStatus
+from salt_box_core.masters.services.master_service import MasterService, get_master_service
 from salt_box_core.utilities.jid import JID, JidError
 from salt_box_core.utilities.serivces.redis_sortedset_base_service import RedisSortedsetBaseService
 
@@ -37,9 +40,16 @@ JOB_CREATE_HASH_NAME: str = 'job_create:{jid}'
 
 
 class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSchema, JobUpdateSchema]):
-    def __init__(self, rdb: RedisDependency, job_repository: JobRepository, job_schema_service: JobSchemaService):
+    def __init__(
+        self,
+        rdb: RedisDependency,
+        job_repository: JobRepository,
+        job_schema_service: JobSchemaService,
+        master_service: MasterService,
+    ):
         self.rdb = rdb
         self.job_schema_service = job_schema_service
+        self.master_service = master_service
         super().__init__(job_repository)
 
     @overload
@@ -67,6 +77,15 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
             raise JobCreateException(err) from err
 
         try:
+            master: MasterModel = await self.master_service.get_by_name(data.salt_master)
+        except ObjectNotFoundError as e:
+            raise JobCreateException(str(e)) from e
+
+        if master.status != MasterStatus.accepted:
+            msg = 'Master is not accepted'
+            raise JobCreateException(msg)
+
+        try:
             _data: dict[str, str] = {
                 'jid': f'{jid}-{data.jid_postfix}' if data.jid_postfix else jid,
                 'fun': data.fun,
@@ -87,7 +106,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
             await self.rdb.expire(name=create_job_hash_name, time=60 * 10)
 
             await send_message_to_master(
-                message=NewJobMessage(hash_name=create_job_hash_name, master=data.salt_master),
+                message=NewJobMessage(hash_name=create_job_hash_name, master=master.name),
                 message_tag='run_job',
             )
         except redis_exceptions.RedisError as error:
@@ -250,8 +269,11 @@ async def get_job_service(
     rdb: RedisDependency,
     job_repository: Annotated[JobRepository, Depends(get_job_repository)],
     job_schema_service: Annotated[JobSchemaService, Depends(get_job_schema_service)],
+    master_service: Annotated[MasterService, Depends(get_master_service)],
 ) -> AsyncGenerator[JobService, None]:
-    job_service = JobService(rdb=rdb, job_repository=job_repository, job_schema_service=job_schema_service)
+    job_service = JobService(
+        rdb=rdb, job_repository=job_repository, job_schema_service=job_schema_service, master_service=master_service
+    )
     yield job_service
 
 
