@@ -81,23 +81,22 @@ class GitRepoService:
             try:
                 origin = self.repo.remote(name='origin')
                 origin.pull()
-            except Exception as e:
-                logger.error('Failed to pull repo: %s', str(e))
-                if Path(self.local_path).exists():
-                    logger.debug('Removing local path after failed pull')
-                    shutil.rmtree(self.local_path)
+            except Exception:
+                self.purge()
                 raise
         else:
+            logger.debug('Local path does not exist, cloning repo')
             try:
-                logger.debug('Local path does not exist, cloning repo')
                 Repo.clone_from(self.repo_url, self.local_path)
                 logger.debug('Repo cloned successfully')
-            except Exception as e:
-                logger.error('Failed to clone repo: %s', str(e))
-                if Path(self.local_path).exists():
-                    logger.debug('Removing local path after failed clone')
-                    shutil.rmtree(self.local_path)
+            except Exception:
+                self.purge()
                 raise
+
+    def purge(self) -> None:
+        if Path(self.local_path).exists():
+            logger.debug('Removing repository %s', self.local_path)
+            shutil.rmtree(self.local_path)
 
     def get_latest_commit_hash(self, file: Path) -> str:
         file_str = str(file).replace(f'{self.local_path}/', '')
