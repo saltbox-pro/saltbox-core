@@ -6,6 +6,7 @@ from redis import asyncio as aioredis
 from salt_box_core.config import LOG_CONFIG, SETTINGS
 from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.db.mongo.init_db import init_mongo_db
+from salt_box_core.jobs.repositories.job_repository import JobRepository
 from salt_box_core.jobs.repositories.job_sc_repository import JobSchemaRepository
 from salt_box_core.jobs.services.job_sc_service import JobSchemaService
 from salt_box_core.jobs.services.job_services import JobService
@@ -30,7 +31,7 @@ class TasksWatcher:
         self.redis: aioredis.Redis | None = None
         self.db = get_mongo_db()
 
-        self.json_schema_repository = JobSchemaRepository(self.db)
+        self.job_schema_repository = JobSchemaRepository(self.db)
         self.collections_repository: CollectionRepository = CollectionRepository(self.db)
         self.minions_repository: MinionRepository = MinionRepository(self.db)
         self.task_repository: TaskRepository = TaskRepository(self.db)
@@ -47,8 +48,11 @@ class TasksWatcher:
     async def process(self) -> None:
         redis: aioredis.Redis = await self.get_redis()
 
-        json_schema_service: JobSchemaService = JobSchemaService(repo=self.json_schema_repository)
-        job_service: JobService = JobService(rdb=redis, json_schema_service=json_schema_service)
+        job_repository = JobRepository(redis)
+        job_schema_service: JobSchemaService = JobSchemaService(repo=self.job_schema_repository)
+        job_service: JobService = JobService(
+            rdb=redis, job_repository=job_repository, job_schema_service=job_schema_service
+        )
         minion_service: MinionService = MinionService(repo=self.minions_repository)
         collection_service: CollectionService = CollectionService(repo=self.collections_repository)
         task_template_service: TaskTemplateService = TaskTemplateService(repo=self.task_template_repository)

@@ -22,18 +22,19 @@ ModelType = TypeVar('ModelType', bound=BaseModel)
 class SortedsetRedisRepository(AbstractRepository[T], Generic[T]):
     class Meta:
         collection_name: str
+        id_field_name: str = 'id'
         auto_now_add_fields: list[str]
         auto_now_fields: list[str]
         query_overrides: dict[str, str]
 
     def __init__(self, database: Redis):
         super().__init__()
-        self.__database: Redis = database
+        self._database: Redis = database
         self.default_model: type[T] = self.__orig_bases__[0].__args__[0]  # type: ignore
         self.__validate()
 
     def __validate(self) -> None:
-        if 'id' not in self.default_model.model_fields:
+        if self.Meta.id_field_name not in self.default_model.model_fields:
             msg = 'Document class should have `id` field'
             raise Exception(msg)
         if not hasattr(self.Meta, 'collection_name') or not self.Meta.collection_name:
@@ -55,20 +56,25 @@ class SortedsetRedisRepository(AbstractRepository[T], Generic[T]):
         return datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')
 
     @overload
-    async def get(self, query: SortedSetId) -> T: ...
+    async def get(self, query: SortedSetId | int | float) -> T: ...
 
     @overload
-    async def get(self, query: SortedSetId, projection_model: type[ProjectionModel]) -> ProjectionModel: ...
+    async def get(
+        self, query: SortedSetId | int | float, projection_model: type[ProjectionModel]
+    ) -> ProjectionModel: ...
 
     async def get(
-        self, query: SortedSetId, projection_model: type[ProjectionModel] | None = None
+        self, query: SortedSetId | int | float, projection_model: type[ProjectionModel] | None = None
     ) -> ProjectionModel | T:
-        result = await self.__database.zrange(
+        result = await self._database.zrange(
             name=self.Meta.collection_name,
             start=int(query),
             end=int(query),
             byscore=True,
         )
+
+        if type(query) in [int, float]:
+            query = str(query)
 
         if len(result) == 0:
             raise ObjectNotFoundError(obj_type=self.Meta.collection_name, query={'id': query})
@@ -84,46 +90,49 @@ class SortedsetRedisRepository(AbstractRepository[T], Generic[T]):
             return self.default_model.model_validate(data)
 
     @overload
-    async def get_list(self, limit: int | None, skip: int) -> list[T]: ...
+    async def get_list(self, start: int, end: int | None, limit: int | None, skip: int) -> list[T]: ...
 
     @overload
     async def get_list(
-        self, limit: int | None, skip: int, projection_model: type[ProjectionModel]
+        self, start: int, end: int | None, limit: int | None, skip: int, projection_model: type[ProjectionModel]
     ) -> list[ProjectionModel]: ...
 
     async def get_list(
         self,
+        start: int = 0,
+        end: int | None = None,
         limit: int | None = None,
         skip: int = 0,
         projection_model: type[ProjectionModel] | None = None,
     ) -> list[T] | list[ProjectionModel]:
-        result = await self.__database.zrange(
+        _result = await self._database.zrange(
             name=self.Meta.collection_name,
-            start=skip,
-            end=-1 if limit is None else skip + limit - 1,
+            start=start,
+            end=-1 if end is None else end,
+            offset=skip,
+            num=limit,
             withscores=True,
+            byscore=True,
         )
 
-        if projection_model:
-            return [
-                projection_model.model_validate({**json.loads(obj[0].decode()), 'id': str(int(obj[1]))})
-                for obj in result
-            ]
-        else:
-            return [
-                self.default_model.model_validate({**json.loads(obj[0].decode()), 'id': str(int(obj[1]))})
-                for obj in result
-            ]
+        result = [{'id': str(int(obj[1])), **json.loads(obj[0].decode())} for obj in _result]
 
-    async def count(self, start_id: SortedSetId | None = None, end_id: SortedSetId | None = None) -> int:
-        return await self.__database.zcount(
+        if projection_model:
+            return [projection_model.model_validate(obj) for obj in result]
+        else:
+            return [self.default_model.model_validate(obj) for obj in result]
+
+    async def count(
+        self, start: SortedSetId | int | float | None = None, end: SortedSetId | int | float | None = None
+    ) -> int:
+        return await self._database.zcount(
             name=self.Meta.collection_name,
-            min=int(start_id) if start_id else float('-inf'),
-            max=int(end_id) if end_id else float('inf'),
+            min=start if start else float('-inf'),
+            max=end if end else float('inf'),
         )
 
     async def exists(self, query: SortedSetId) -> bool:
-        return await self.__database.zcount(name=self.Meta.collection_name, min=int(query), max=int(query)) == 1
+        return await self._database.zcount(name=self.Meta.collection_name, min=int(query), max=int(query)) == 1
 
     @overload
     async def create(self, data: ModelType | dict[str, Any]) -> T: ...
@@ -153,7 +162,7 @@ class SortedsetRedisRepository(AbstractRepository[T], Generic[T]):
             for field in self.Meta.auto_now_fields:
                 data[field] = datetime.now(UTC).timestamp()
 
-        await self.__database.zadd(
+        await self._database.zadd(
             name=self.Meta.collection_name,
             mapping={json.dumps(data): int(obj_id)},
         )
@@ -198,7 +207,7 @@ class SortedsetRedisRepository(AbstractRepository[T], Generic[T]):
         await self.get(query=query)
         await self.delete(query=query)
 
-        updated_count = await self.__database.zadd(
+        updated_count = await self._database.zadd(
             name=self.Meta.collection_name,
             mapping={json.dumps(data): int(query)},
         )
@@ -213,6 +222,6 @@ class SortedsetRedisRepository(AbstractRepository[T], Generic[T]):
 
     async def delete(self, query: SortedSetId) -> int:
         await self.get(query=query)
-        await self.__database.zrem(self.Meta.collection_name, query)
+        await self._database.zrem(self.Meta.collection_name, query)
 
         return 1

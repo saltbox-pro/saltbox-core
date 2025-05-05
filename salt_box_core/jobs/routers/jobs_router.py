@@ -8,7 +8,7 @@ from pydantic import Field, ValidationError
 from salt_box_core import http_errors
 from salt_box_core.config import LOG_CONFIG, SETTINGS
 from salt_box_core.db.redis.config import RedisDependency
-from salt_box_core.db.schemas_base import User
+from salt_box_core.db.schemas_base import PaginatedResponse, User
 from salt_box_core.dependencies import get_current_user_from_jwt
 from salt_box_core.event_bus.masters_bus import send_message_and_wait_response_to_master
 from salt_box_core.jobs.exceptions import (
@@ -20,11 +20,10 @@ from salt_box_core.jobs.exceptions import (
 from salt_box_core.jobs.schemas.event_bus_schemas import CreateJobMessage, JobSyncMessage
 from salt_box_core.jobs.schemas.job_schemas import (
     CreateJobRequest,
-    CreateJobResponse,
     GetJobReturnResponse,
     IntJid,
-    Job,
-    JobCreate,
+    JobCreateSchema,
+    JobModel,
     JobResult,
     JobsListRequest,
     JobSyncResponse,
@@ -51,10 +50,13 @@ async def jobs_list(
     request: Annotated[JobsListRequest, Query()],
     job_service: JobServiceDependency,
     user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
-) -> list[Job]:
+) -> PaginatedResponse[JobModel]:
     try:
-        jobs: list[Job] = await job_service.get_jobs(
-            start_datetime=request.start_datetime, end_datetime=request.end_datetime
+        jobs: PaginatedResponse[JobModel] = await job_service.get_list_by_dt_paginated(
+            start_datetime=request.start_datetime,
+            end_datetime=request.end_datetime,
+            skip=request.skip,
+            limit=request.limit,
         )
         return jobs
     except ValidationError as err:
@@ -68,11 +70,11 @@ async def job_retrieve(
     jid: IntJid,
     job_service: JobServiceDependency,
     user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
-) -> Job:
+) -> JobModel:
     _jid = JID(jid)
 
     try:
-        job: Job = await job_service.get_job(_jid)
+        job: JobModel = await job_service.get_job(_jid)
         return job
     except ValidationError as e:
         raise http_errors.InternalServerError(detail=e.errors()) from e
@@ -85,17 +87,15 @@ async def job_create(
     item: CreateJobRequest,
     job_service: JobServiceDependency,
     user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
-) -> CreateJobResponse:
+) -> JobModel:
     try:
-        jid: JID = await job_service.create_job(
-            JobCreate.model_validate(
+        return await job_service.create(
+            JobCreateSchema.model_validate(
                 {
                     **item.model_dump(by_alias=True),
                 }
             )
         )
-
-        return CreateJobResponse.model_validate({'jid': str(jid)})
     except JobCreateException as error:
         raise http_errors.BadGateway(detail=str(error)) from error
 
@@ -165,7 +165,7 @@ async def job_returns_list(
 @ws_router.websocket('')
 async def jobs_rets_websocket(websocket: WebSocket, rdb: RedisDependency) -> None:
     def job_new_handler(data: dict) -> str:
-        return Job(**{'status': Job.JobStatus.started, **data}).model_dump_json(by_alias=True)
+        return JobModel(**{'status': JobModel.JobStatus.started, **data}).model_dump_json(by_alias=True)
 
     secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
     await secure_websocket.handle_pubsub({'job:*:new': job_new_handler})

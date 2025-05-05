@@ -2,7 +2,7 @@ import json
 import logging.config
 from collections.abc import AsyncGenerator
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Any, overload
 
 from fastapi import Depends
 from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
@@ -12,6 +12,8 @@ from redis import exceptions as redis_exceptions
 
 from salt_box_core.config import LOG_CONFIG, SETTINGS
 from salt_box_core.db.redis.config import RedisDependency
+from salt_box_core.db.redis.repository_sortedset_base import ProjectionModel
+from salt_box_core.db.schemas_base import PaginatedResponse
 from salt_box_core.event_bus.masters_bus import send_message_to_master
 from salt_box_core.jobs.exceptions import (
     JobCreateException,
@@ -20,10 +22,12 @@ from salt_box_core.jobs.exceptions import (
     JobServiceException,
     JobServiceInvalidArgsException,
 )
+from salt_box_core.jobs.repositories.job_repository import JobRepository, get_job_repository
 from salt_box_core.jobs.schemas.event_bus_schemas import NewJobMessage
-from salt_box_core.jobs.schemas.job_schemas import Job, JobCreate, JobResult
+from salt_box_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel, JobResult, JobUpdateSchema
 from salt_box_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
 from salt_box_core.utilities.jid import JID, JidError
+from salt_box_core.utilities.serivces.redis_sortedset_base_service import RedisSortedsetBaseService
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
@@ -32,33 +36,42 @@ logger = logging.getLogger(__name__)
 JOB_CREATE_HASH_NAME: str = 'job_create:{jid}'
 
 
-class JobService:
-    def __init__(self, rdb: RedisDependency, json_schema_service: JobSchemaService):
+class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSchema, JobUpdateSchema]):
+    def __init__(self, rdb: RedisDependency, job_repository: JobRepository, job_schema_service: JobSchemaService):
         self.rdb = rdb
-        self.json_schema_service = json_schema_service
+        self.job_schema_service = job_schema_service
+        super().__init__(job_repository)
 
-    async def create_job(self, job_data: JobCreate) -> JID:
-        if not job_data.jid:
+    @overload
+    async def create(self, data: JobCreateSchema) -> JobModel: ...
+
+    @overload
+    async def create(self, data: JobCreateSchema, projection_model: type[ProjectionModel]) -> ProjectionModel: ...
+
+    async def create(
+        self, data: JobCreateSchema, projection_model: type[ProjectionModel] | None = None
+    ) -> JobModel | ProjectionModel:
+        if not data.jid:
             jid = str(JID.generate())
         else:
-            jid = job_data.jid
+            jid = data.jid
 
         create_job_hash_name: str = JOB_CREATE_HASH_NAME.format(jid=jid)
 
         try:
-            validated_data: dict = await self.json_schema_service.get_validated_data(
-                name=job_data.fun,
-                data=job_data.data.model_dump(exclude_none=True, by_alias=True) if job_data.data else {},
+            validated_data: dict = await self.job_schema_service.get_validated_data(
+                name=data.fun,
+                data=data.data.model_dump(exclude_none=True, by_alias=True) if data.data else {},
             )
         except JsonSchemaValidationError as err:
             raise JobCreateException(err) from err
 
         try:
             _data: dict[str, str] = {
-                'jid': f'{jid}-{job_data.jid_postfix}' if job_data.jid_postfix else jid,
-                'fun': job_data.fun,
-                'tgt': job_data.tgt,
-                'tgt_type': job_data.tgt_type,
+                'jid': f'{jid}-{data.jid_postfix}' if data.jid_postfix else jid,
+                'fun': data.fun,
+                'tgt': data.tgt,
+                'tgt_type': data.tgt_type,
             }
 
             if 'args' in validated_data:
@@ -74,17 +87,20 @@ class JobService:
             await self.rdb.expire(name=create_job_hash_name, time=60 * 10)
 
             await send_message_to_master(
-                message=NewJobMessage(hash_name=create_job_hash_name, master=job_data.salt_master),
+                message=NewJobMessage(hash_name=create_job_hash_name, master=data.salt_master),
                 message_tag='run_job',
             )
         except redis_exceptions.RedisError as error:
             raise JobCreateException(error) from error
 
-        return JID(jid)
+        if projection_model:
+            return await self.get_job(jid=JID(jid), projection_model=projection_model)
+        else:
+            return await self.get_job(jid=JID(jid))
 
     async def stop_job(self, jid: JID) -> None: ...  # TODO (i.moshkov): stop jobs
 
-    async def _get_job_from_store(self, jid: JID) -> Job | None:
+    async def _get_job_data_from_store(self, jid: JID) -> dict[str, Any] | None:
         ts = jid.to_timestamp()
         job_data = await self.rdb.zrange('jobs', start=ts, end=ts, byscore=True)  # type: ignore[call-overload]
 
@@ -93,44 +109,49 @@ class JobService:
                 msg = f'Multiple jobs for JID {jid}'
                 raise JobMultipleReturnsException(msg)
 
-            res = json.loads(job_data[0])
-            res['status'] = Job.JobStatus.started
+            res: dict[str, Any] = json.loads(job_data[0])
+            res['status'] = JobModel.JobStatus.started
 
-            return Job(**res)
+            return res
+
         return None
 
-    async def _get_job_data_from_queue(self, job_hash_name: str) -> Job | None:
+    async def _get_job_data_from_queue(self, job_hash_name: str) -> dict[str, Any] | None:
         job_data: dict[bytes, bytes] = await self.rdb.hgetall(job_hash_name)
 
         if job_data:
-            return Job(
-                **{
-                    'jid': job_data[b'jid'].decode()[:20],
-                    'tgt': job_data[b'tgt'].decode(),
-                    'tgt_type': job_data[b'tgt_type'].decode(),
-                    'fun': job_data[b'fun'].decode(),
-                    'arg': json.loads(job_data[b'arg']) if b'arg' in job_data else None,
-                    'kwarg': json.loads(job_data[b'kwarg']) if b'kwarg' in job_data else None,
-                    'status': Job.JobStatus.in_queue,
-                }
-            )
+            return {
+                'jid': job_data[b'jid'].decode()[:20],
+                'tgt': job_data[b'tgt'].decode(),
+                'tgt_type': job_data[b'tgt_type'].decode(),
+                'fun': job_data[b'fun'].decode(),
+                'arg': json.loads(job_data[b'arg']) if b'arg' in job_data else None,
+                'kwarg': json.loads(job_data[b'kwarg']) if b'kwarg' in job_data else None,
+                'status': JobModel.JobStatus.in_queue,
+            }
         return None
 
-    async def get_job(self, jid: JID) -> Job:
-        job = await self._get_job_from_store(jid)
+    async def get_job(
+        self, jid: JID, projection_model: type[ProjectionModel] | None = None
+    ) -> JobModel | ProjectionModel:
+        job_data = await self._get_job_data_from_store(jid)
 
-        if not job:
-            job = await self._get_job_data_from_queue(JOB_CREATE_HASH_NAME.format(jid=str(jid)))
+        if not job_data:
+            job_data = await self._get_job_data_from_queue(JOB_CREATE_HASH_NAME.format(jid=str(jid)))
 
-        if not job:
+        if not job_data:
             msg = 'Job not found'
             raise JobDoesNotExistsException(msg)
 
-        return job
+        if projection_model:
+            return projection_model(**job_data)
+        else:
+            return JobModel(**job_data)
 
-    async def get_jobs(
-        self, start_datetime: Annotated[datetime, PastDatetime], end_datetime: datetime | None = None
-    ) -> list[Job]:
+    @staticmethod
+    def __get_start_end_from_dt(
+        start_datetime: Annotated[datetime, PastDatetime], end_datetime: datetime | None = None
+    ) -> tuple[float, float]:
         if end_datetime is None:
             end_datetime = datetime.now(UTC) + timedelta(hours=1)
 
@@ -141,10 +162,41 @@ class JobService:
             msg = f'Invalid range: {err}'
             raise JobServiceInvalidArgsException(msg) from err
 
-        res_ = await self.rdb.zrange('jobs', start=end, end=start, desc=True, byscore=True)  # type: ignore[call-overload]
-        res = [{'status': Job.JobStatus.started, **json.loads(i)} for i in res_]
+        return start, end
 
-        return [Job(**i) for i in res]
+    async def get_list_by_dt(
+        self,
+        start_datetime: Annotated[datetime, PastDatetime],
+        end_datetime: datetime | None = None,
+        limit: int | None = None,
+        skip: int = 0,
+        projection_model: type[ProjectionModel] | None = None,
+    ) -> list[JobModel] | list[ProjectionModel]:
+        start, end = self.__get_start_end_from_dt(start_datetime, end_datetime)
+
+        if projection_model:
+            return await super().get_list(
+                start=int(start), end=int(end), limit=limit, skip=skip, projection_model=projection_model
+            )
+        else:
+            return await super().get_list(start=int(start), end=int(end), limit=limit, skip=skip)
+
+    async def get_list_by_dt_paginated(
+        self,
+        start_datetime: Annotated[datetime, PastDatetime],
+        end_datetime: datetime | None = None,
+        limit: int | None = None,
+        skip: int = 0,
+        projection_model: type[ProjectionModel] | None = None,
+    ) -> PaginatedResponse[JobModel] | PaginatedResponse[ProjectionModel]:
+        start, end = self.__get_start_end_from_dt(start_datetime, end_datetime)
+
+        if projection_model:
+            return await super().get_list_paginated(
+                start=int(start), end=int(end), limit=limit, skip=skip, projection_model=projection_model
+            )
+        else:
+            return await super().get_list_paginated(start=int(start), end=int(end), limit=limit, skip=skip)
 
     async def get_job_returns(
         self,
@@ -193,19 +245,13 @@ class JobService:
 
         return returns_count
 
-    async def is_job_exists(self, jid: JID) -> bool:
-        try:
-            job = await self.get_job(jid)
-
-            return True if job else False
-        except JobDoesNotExistsException:
-            return False
-
 
 async def get_job_service(
-    rdb: RedisDependency, json_schema_service: Annotated[JobSchemaService, Depends(get_job_schema_service)]
+    rdb: RedisDependency,
+    job_repository: Annotated[JobRepository, Depends(get_job_repository)],
+    job_schema_service: Annotated[JobSchemaService, Depends(get_job_schema_service)],
 ) -> AsyncGenerator[JobService, None]:
-    job_service = JobService(rdb=rdb, json_schema_service=json_schema_service)
+    job_service = JobService(rdb=rdb, job_repository=job_repository, job_schema_service=job_schema_service)
     yield job_service
 
 

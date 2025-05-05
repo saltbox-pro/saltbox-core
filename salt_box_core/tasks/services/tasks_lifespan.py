@@ -10,7 +10,7 @@ from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.db.mongo.schemas_base import PyObjectId
 from salt_box_core.db.redis.config import RedisDependency
 from salt_box_core.jobs.exceptions import JobCreateException, JobDoesNotExistsException
-from salt_box_core.jobs.schemas.job_schemas import Job, JobCreate, JobResult
+from salt_box_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel, JobResult
 from salt_box_core.jobs.services.job_services import JobService, get_job_service
 from salt_box_core.minion_collections.schemas.collection_schemas import CollectionModel
 from salt_box_core.minion_collections.schemas.minion_schemas import MinionModel
@@ -257,8 +257,8 @@ class TaskLifespanService:
         tgt: str = compound if compound else ','.join(minions)
         tgt_type: TaskJobTargetType = TaskJobTargetType.compound if compound else TaskJobTargetType.list
 
-        jid: JID = await self.job_service.create_job(
-            JobCreate.model_validate(
+        job: JobModel = await self.job_service.create(
+            JobCreateSchema.model_validate(
                 {
                     'jid_postfix': f't{task.id}',
                     'tgt': tgt,
@@ -273,16 +273,18 @@ class TaskLifespanService:
             )
         )
 
-        task.jobs[str(jid)] = TaskJob(
-            jid=str(jid), target=TaskJobTarget(tgt=tgt, tgt_type=tgt_type, master=master), minions_by_targeting=minions
+        task.jobs[str(job.jid)] = TaskJob(
+            jid=str(job.jid),
+            target=TaskJobTarget(tgt=tgt, tgt_type=tgt_type, master=master),
+            minions_by_targeting=minions,
         )
 
         for minion_id in minions:
             minion = task.minions[self.__get_minion_key(master=master, minion_id=minion_id)]
 
             minion.status = TaskMinionStatus.in_work
-            minion.jobs[str(jid)] = TaskMinionJobStatus.created
-            minion.start_last_dt = task.jobs[str(jid)].created_dt
+            minion.jobs[str(job.jid)] = TaskMinionJobStatus.created
+            minion.start_last_dt = task.jobs[str(job.jid)].created_dt
 
     async def __create_jobs(self, ignore_limits: bool = True) -> None:
         task: TaskModel = await self.get_task()
@@ -319,13 +321,13 @@ class TaskLifespanService:
                 continue
 
             try:
-                job_data: Job = await self.job_service.get_job(JID(task_job.jid))
+                job_data: JobModel = await self.job_service.get_job(JID(task_job.jid))
 
             except JobDoesNotExistsException:
                 task_job.status = TaskJobStatus.failed
                 continue
 
-            if job_data.status == Job.JobStatus.in_queue:
+            if job_data.status == JobModel.JobStatus.in_queue:
                 continue
 
             if not task_job.minions_from_salt:
@@ -335,7 +337,7 @@ class TaskLifespanService:
             await self.__check_job_returns(task_job=task_job, jid=JID(task_job.jid))
             await self.__update_task_job_status(task_job=task_job)
 
-    async def __check_minions_in_job(self, task_job: TaskJob, job_data: Job) -> None:
+    async def __check_minions_in_job(self, task_job: TaskJob, job_data: JobModel) -> None:
         task: TaskModel = await self.get_task()
 
         for minion_id in task_job.minions_by_targeting:

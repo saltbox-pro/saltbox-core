@@ -14,6 +14,7 @@ from pydantic import (
 )
 from pydantic.functional_validators import AfterValidator
 
+from salt_box_core.db.schemas_base import SkipLimitParams
 from salt_box_core.jobs.schemas.event_bus_schemas import JobReturn
 from salt_box_core.utilities.jid import JID, JidError
 from salt_box_core.utilities.salt import fill_salt_kwarg_from_arg
@@ -34,16 +35,12 @@ IntJid = Annotated[int, AfterValidator(jidable)]
 StrJid = Annotated[str, AfterValidator(jidable)]
 
 
-class NullObj(BaseModel):
-    model_config = ConfigDict(extra='forbid')
-
-
 class JobData(BaseModel):  # type: ignore[no-redef]
     data_args: list | None = Field(alias='args', default=None)
     data_kwargs: dict | None = Field(alias='kwargs', default=None)
 
 
-class Job(BaseModel):
+class JobModel(BaseModel):
     class JobStatus(str, Enum):
         in_queue = 'in_queue'
         started = 'started'
@@ -58,7 +55,7 @@ class Job(BaseModel):
     minions: list[str] = []
     missing: list[str] = []
     stamp: str | None = Field(alias='_stamp', default=None)
-    status: JobStatus
+    status: JobStatus = JobStatus.started
 
     @computed_field(title='Timestamp decoded from JID')
     def fms_jid_timestamp(self) -> Annotated[datetime, PastDatetime]:
@@ -76,7 +73,7 @@ class Job(BaseModel):
         return cast(T, data)
 
 
-class JobCreate(BaseModel):
+class JobCreateSchema(BaseModel):
     tgt: str
     tgt_type: str
     fun: str
@@ -84,6 +81,9 @@ class JobCreate(BaseModel):
     jid: str | None = None
     jid_postfix: str | None = None
     salt_master: str
+
+
+class JobUpdateSchema(BaseModel): ...
 
 
 class JobResult(BaseModel):
@@ -126,7 +126,7 @@ class PubData(BaseModel):
     minions: list[str] = Field(min_length=1)
 
 
-class JobsListRequest(BaseModel):
+class JobsListRequest(SkipLimitParams):
     start_datetime: Annotated[datetime, PastDatetime]
     end_datetime: datetime | None = None
 
@@ -137,10 +137,6 @@ class JobsListRequest(BaseModel):
             raise ValueError(msg)
 
         return self
-
-
-class CreateJobResponse(BaseModel):
-    jid: StrJid
 
 
 class CreateJobRequest(BaseModel):

@@ -18,13 +18,15 @@ class RedisSortedsetBaseService(
     AbstractService[Repository], Generic[Repository, ModelType, CreateSchema, UpdateSchema]
 ):
     @overload
-    async def get(self, query: SortedSetId) -> ModelType: ...
+    async def get(self, query: SortedSetId | int | float) -> ModelType: ...
 
     @overload
-    async def get(self, query: SortedSetId, projection_model: type[ProjectionModel]) -> ProjectionModel: ...
+    async def get(
+        self, query: SortedSetId | int | float, projection_model: type[ProjectionModel]
+    ) -> ProjectionModel: ...
 
     async def get(
-        self, query: SortedSetId, projection_model: type[ProjectionModel] | None = None
+        self, query: SortedSetId | int | float, projection_model: type[ProjectionModel] | None = None
     ) -> ModelType | ProjectionModel:
         if projection_model:
             result = await self.repo.get(query=query, projection_model=projection_model)
@@ -34,20 +36,27 @@ class RedisSortedsetBaseService(
         return result
 
     @overload
-    async def get_list(self, limit: int, skip: int) -> list[ModelType]: ...
+    async def get_list(self, start: int, end: int | None, limit: int | None, skip: int) -> list[ModelType]: ...
 
     @overload
     async def get_list(
-        self, limit: int, skip: int, projection_model: type[ProjectionModel]
+        self, start: int, end: int | None, limit: int | None, skip: int, projection_model: type[ProjectionModel]
     ) -> list[ProjectionModel]: ...
 
     async def get_list(
-        self, limit: int | None = None, skip: int = 0, projection_model: type[ProjectionModel] | None = None
+        self,
+        start: int = 0,
+        end: int | None = None,
+        limit: int | None = None,
+        skip: int = 0,
+        projection_model: type[ProjectionModel] | None = None,
     ) -> list[ModelType] | list[ProjectionModel]:
         if projection_model:
-            return await self.repo.get_list(limit=limit, skip=skip, projection_model=projection_model)
+            return await self.repo.get_list(
+                start=start, end=end, limit=limit, skip=skip, projection_model=projection_model
+            )
 
-        return await self.repo.get_list(limit=limit, skip=skip)
+        return await self.repo.get_list(start=start, end=end, limit=limit, skip=skip)
 
     @overload
     async def create(self, data: CreateSchema) -> ModelType: ...
@@ -66,33 +75,41 @@ class RedisSortedsetBaseService(
         return result
 
     @overload
-    async def get_list_paginated(self, limit: int, skip: int) -> PaginatedResponse[ModelType]: ...
+    async def get_list_paginated(
+        self, start: int, end: int, limit: int | None, skip: int
+    ) -> PaginatedResponse[ModelType]: ...
 
     @overload
     async def get_list_paginated(
         self,
-        limit: int,
+        start: int,
+        end: int | None,
+        limit: int | None,
         skip: int,
         projection_model: type[ProjectionModel],
     ) -> PaginatedResponse[ProjectionModel]: ...
 
     async def get_list_paginated(
         self,
+        start: int = 0,
+        end: int | None = None,
         limit: int | None = None,
         skip: int = 0,
         projection_model: type[ProjectionModel] | None = None,
     ) -> PaginatedResponse[ModelType] | PaginatedResponse[ProjectionModel]:
-        total = await self.repo.count()
+        total = await self.repo.count(start=start, end=end)
 
         if projection_model:
-            data = await self.repo.get_list(limit=limit, skip=skip, projection_model=projection_model)
-            return PaginatedResponse[ProjectionModel](total=total, data=data)
+            data = await self.repo.get_list(
+                start=start, end=end, limit=limit, skip=skip, projection_model=projection_model
+            )
         else:
-            data = await self.repo.get_list(limit=limit, skip=skip)
-            return PaginatedResponse[ModelType](total=total, data=data)
+            data = await self.repo.get_list(start=start, end=end, limit=limit, skip=skip)
 
-    async def count(self, start_id: SortedSetId | None, end_id: SortedSetId | None) -> int:
-        return await self.repo.count(start_id=start_id, end_id=end_id)
+        return PaginatedResponse(total=total, data=data)
+
+    async def count(self, start_id: SortedSetId | int | float | None, end_id: SortedSetId | int | float | None) -> int:
+        return await self.repo.count(start=start_id, end=end_id)
 
     async def exists(self, query: SortedSetId) -> bool:
         return await self.repo.exists(query)

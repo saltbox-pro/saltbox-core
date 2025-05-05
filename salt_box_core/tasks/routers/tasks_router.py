@@ -11,7 +11,7 @@ from salt_box_core.db.redis.config import RedisDependency
 from salt_box_core.db.schemas_base import PaginatedResponse, User
 from salt_box_core.dependencies import get_current_user_from_jwt
 from salt_box_core.jobs.exceptions import JobDoesNotExistsException
-from salt_box_core.jobs.schemas.job_schemas import Job, JobResult
+from salt_box_core.jobs.schemas.job_schemas import JobModel, JobResult
 from salt_box_core.jobs.services.job_services import JobServiceDependency
 from salt_box_core.minion_collections.schemas.collection_schemas import CollectionModel
 from salt_box_core.minion_collections.services.collection_service import CollectionService, get_collection_service
@@ -108,8 +108,8 @@ async def task_jobs(
     task_service: Annotated[TaskService, Depends(get_task_service)],
     job_service: JobServiceDependency,
     user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
-) -> list[Job]:
-    result: list[Job] = []
+) -> list[JobModel]:
+    result: list[JobModel] = []
 
     try:
         task: TaskModel = await task_service.get(query=tid)
@@ -237,7 +237,7 @@ async def task_websocket(
         raise http_errors.WebSocketPolicyViolation(msg)
 
     def job_new_handler(data: dict) -> str:
-        return Job(**{'status': Job.JobStatus.started, **data}).model_dump_json(by_alias=True)
+        return JobModel(**{'status': JobModel.JobStatus.started, **data}).model_dump_json(by_alias=True)
 
     secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
     await secure_websocket.handle_pubsub(
