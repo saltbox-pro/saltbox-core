@@ -218,6 +218,8 @@ class TaskLifespanService:
 
         if len(sub_queries) > 1:
             query = {'$and': sub_queries}
+        elif len(sub_queries) == 0:
+            query = {}
         else:
             query = sub_queries[0]
 
