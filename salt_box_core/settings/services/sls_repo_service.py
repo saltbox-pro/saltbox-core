@@ -17,9 +17,27 @@ from salt_box_core.settings.schemas.sls_repos_schemas import (
     SettingsSlsRepoModel,
     SettingsSlsRepoUpdateSchema,
 )
+from salt_box_core.masters.repositories.master_repository import MasterRepository
+from salt_box_core.event_bus.masters_bus import send_message_to_master
+from salt_box_core.db.mongo.config import get_mongo_db
+from salt_box_core.masters.services.master_service import MasterService
+from salt_box_core.settings.schemas.event_bus_schemas import ListSlsReposMessage, MasterMessageSlsRepoModel
 from salt_box_core.settings.tasks import sync_sls_repo_task
 from salt_box_core.tasks.services.tasks_templates import TaskTemplateService
 from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService, ProjectionModel
+
+
+# TODO Make generic send_message_to_every_master() in masters_bus
+async def notify_masters() -> None:
+    mongo_db = get_mongo_db()
+    master_repo = MasterRepository(mongo_db)
+    sls_repo_repo = SettingsSlsRepoRepository(mongo_db)
+    masters = await MasterService(master_repo).get_list(query={}, skip=0, limit=0)
+    active_repos = await SettingsSlsRepoService(sls_repo_repo).get_list(query={'is_active': True}, skip=0, limit=0)
+    msg_repos = list(map(lambda x: MasterMessageSlsRepoModel(**x.dict()), active_repos))
+    for m_obj in masters:
+        msg = ListSlsReposMessage(repos=msg_repos, master=m_obj.name)
+        await send_message_to_master(msg, 'sync_repos')
 
 
 class SettingsSlsRepoService(
@@ -98,7 +116,6 @@ class SettingsSlsRepoService(
 
     async def sync(self, sid: PyObjectId) -> str:
         task = await sync_sls_repo_task.kiq(str(sid))
-
         return task.task_id
 
 
