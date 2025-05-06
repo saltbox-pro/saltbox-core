@@ -97,7 +97,7 @@ async def job_create(
             )
         )
     except JobCreateException as error:
-        raise http_errors.BadGateway(detail=str(error)) from error
+        raise http_errors.BadRequest(detail=str(error)) from error
 
 
 @router.post('/sync_run', operation_id='job_create_sync')
@@ -123,7 +123,7 @@ async def job_create_sync(
 
         return JobSyncResponse(**job_res.model_dump())
     except JobCreateException as error:
-        raise http_errors.BadGateway(detail=str(error)) from error
+        raise http_errors.BadRequest(detail=str(error)) from error
 
 
 @router.get('/{jid}/returns-count', operation_id='job_returns_count')
