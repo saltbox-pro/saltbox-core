@@ -29,20 +29,16 @@ async def grains_handler(
 ) -> None:
     grains = message.grains
     minion_id = grains['id']
-    master = grains['master']
-
-    if master != message.master:
-        return
 
     if grains:
         try:
-            minion: MinionModel = await minion_service.get_by_master_and_id(master=master, minion_id=minion_id)
+            minion: MinionModel = await minion_service.get_by_master_and_id(master=message.master, minion_id=minion_id)
             minion.grains = GrainsSchema(**grains)
             await minion_service.update(minion.id, MinionUpdateSchema(**minion.model_dump()))
         except ObjectNotFoundError:
             minion_obj = {
                 'minion_id': minion_id,
-                'master': master,
+                'master': message.master,
                 'grains': grains,
             }
             await minion_service.create(MinionCreateSchema(**minion_obj))
