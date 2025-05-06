@@ -7,21 +7,21 @@ from typing import Annotated, overload, override
 from fastapi import Depends
 
 from salt_box_core.config import SETTINGS, logger
+from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.db.mongo.schemas_base import PyObjectId
+from salt_box_core.event_bus.masters_bus import send_message_to_master
+from salt_box_core.masters.repositories.master_repository import MasterRepository
+from salt_box_core.masters.services.master_service import MasterService
 from salt_box_core.settings.repository import (
     SettingsSlsRepoRepository,
     get_sls_repo_repository,
 )
+from salt_box_core.settings.schemas.event_bus_schemas import ListSlsReposMessage, MasterMessageSlsRepoModel
 from salt_box_core.settings.schemas.sls_repos_schemas import (
     SettingsSlsRepoCreateSchema,
     SettingsSlsRepoModel,
     SettingsSlsRepoUpdateSchema,
 )
-from salt_box_core.masters.repositories.master_repository import MasterRepository
-from salt_box_core.event_bus.masters_bus import send_message_to_master
-from salt_box_core.db.mongo.config import get_mongo_db
-from salt_box_core.masters.services.master_service import MasterService
-from salt_box_core.settings.schemas.event_bus_schemas import ListSlsReposMessage, MasterMessageSlsRepoModel
 from salt_box_core.settings.tasks import sync_sls_repo_task
 from salt_box_core.tasks.services.tasks_templates import TaskTemplateService
 from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService, ProjectionModel
@@ -34,7 +34,7 @@ async def notify_masters() -> None:
     sls_repo_repo = SettingsSlsRepoRepository(mongo_db)
     masters = await MasterService(master_repo).get_list(query={}, skip=0, limit=0)
     active_repos = await SettingsSlsRepoService(sls_repo_repo).get_list(query={'is_active': True}, skip=0, limit=0)
-    msg_repos = list(map(lambda x: MasterMessageSlsRepoModel(**x.dict()), active_repos))
+    msg_repos = [MasterMessageSlsRepoModel(**repo.dict()) for repo in active_repos]
     for m_obj in masters:
         msg = ListSlsReposMessage(repos=msg_repos, master=m_obj.name)
         await send_message_to_master(msg, 'sync_repos')
