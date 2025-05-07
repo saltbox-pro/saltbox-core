@@ -47,8 +47,8 @@ router = APIRouter(
 ws_router = APIRouter(prefix='/jobs')
 
 
-@router.get('/cursored_list', operation_id='jobs_list_cursor')
-async def jobs_list_cursor(
+@router.get('', operation_id='jobs_list')
+async def jobs_list(
     request: Annotated[JobsListCursorRequest, Query()],
     job_service: JobServiceDependency,
     user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
@@ -69,26 +69,6 @@ async def jobs_list_cursor(
         match='*' + '*'.join(matches) + '*',
         projection_model=JobsListResponse,
     )
-
-
-@router.get('', operation_id='jobs_list')
-async def jobs_list(
-    request: Annotated[JobsListRequest, Query()],
-    job_service: JobServiceDependency,
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
-) -> PaginatedResponse[JobModel]:
-    try:
-        jobs: PaginatedResponse[JobModel] = await job_service.get_list_by_dt_paginated(
-            start_datetime=request.start_datetime,
-            end_datetime=request.end_datetime,
-            skip=request.skip,
-            limit=request.limit,
-        )
-        return jobs
-    except ValidationError as err:
-        raise http_errors.InternalServerError(detail=err.errors()) from err
-    except JobServiceInvalidArgsException as err:
-        raise http_errors.BadRequest(str(err)) from err
 
 
 @router.get('/{jid}', operation_id='job_retrieve')
