@@ -162,7 +162,10 @@ class JobsListResponse(BaseModel):
     tgt_type: str
     fun: str
     user: str | None = None
-    stamp: str = Field(alias='_stamp')
+
+    @computed_field(title='Timestamp decoded from JID')
+    def fms_jid_timestamp(self) -> Annotated[datetime, PastDatetime]:
+        return JID(self.jid).to_datetime()
 
 
 class CreateJobRequest(BaseModel):
