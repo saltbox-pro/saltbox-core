@@ -89,6 +89,11 @@ class SortedsetRedisRepository(AbstractRepository[T], Generic[T]):
         else:
             return self.default_model.model_validate(data)
 
+    async def zscan(
+        self, cursor: int = 0, match: str | None = None, count: int | None = None
+    ) -> tuple[int, list[tuple[str, float]]]:
+        return await self._database.zscan(name=self.Meta.collection_name, cursor=cursor, match=match, count=count)
+
     @overload
     async def get_list(self, start: int, end: int | None, limit: int | None, skip: int) -> list[T]: ...
 

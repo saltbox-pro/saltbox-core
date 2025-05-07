@@ -139,6 +139,32 @@ class JobsListRequest(SkipLimitParams):
         return self
 
 
+class JobsListCursorRequest(BaseModel):
+    start_datetime: Annotated[datetime, PastDatetime]
+    end_datetime: datetime | None = None
+    cursor: int | None = None
+    count: int = 100
+    fun: str | None = None
+    minion: str | None = None
+
+    @model_validator(mode='after')
+    def dt_validate(self) -> Self:
+        if self.end_datetime and self.start_datetime > self.end_datetime:
+            msg = '`end_datetime` must be before `start_datetime`'
+            raise ValueError(msg)
+
+        return self
+
+
+class JobsListResponse(BaseModel):
+    jid: str
+    tgt: str
+    tgt_type: str
+    fun: str
+    user: str | None = None
+    stamp: str = Field(alias='_stamp')
+
+
 class CreateJobRequest(BaseModel):
     tgt: str = '*'
     tgt_type: str = 'glob'

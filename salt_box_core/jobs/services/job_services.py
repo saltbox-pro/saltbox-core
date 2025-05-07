@@ -14,7 +14,7 @@ from salt_box_core.config import LOG_CONFIG, SETTINGS
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.redis.config import RedisDependency
 from salt_box_core.db.redis.repository_sortedset_base import ProjectionModel
-from salt_box_core.db.schemas_base import PaginatedResponse
+from salt_box_core.db.schemas_base import CursoredResponse, PaginatedResponse
 from salt_box_core.event_bus.masters_bus import send_message_to_master
 from salt_box_core.jobs.exceptions import (
     JobCreateException,
@@ -182,6 +182,42 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
             raise JobServiceInvalidArgsException(msg) from err
 
         return start, end
+
+    @overload
+    async def get_list_cursored_by_dt(
+        self,
+        start_datetime: Annotated[datetime, PastDatetime],
+        end_datetime: datetime | None,
+        cursor: int,
+        count: int,
+        match: str | None,
+    ) -> CursoredResponse[JobModel]: ...
+
+    @overload
+    async def get_list_cursored_by_dt(
+        self,
+        start_datetime: Annotated[datetime, PastDatetime],
+        end_datetime: datetime | None,
+        cursor: int,
+        count: int,
+        match: str | None,
+        projection_model: type[ProjectionModel],
+    ) -> CursoredResponse[ProjectionModel]: ...
+
+    async def get_list_cursored_by_dt(
+        self,
+        start_datetime: Annotated[datetime, PastDatetime],
+        end_datetime: datetime | None = None,
+        cursor: int = 0,
+        count: int = 100,
+        match: str | None = None,
+        projection_model: type[ProjectionModel] | None = None,
+    ) -> CursoredResponse[JobModel] | CursoredResponse[ProjectionModel]:
+        start, end = self.__get_start_end_from_dt(start_datetime, end_datetime)
+
+        return await self.get_list_cursored(
+            start=start, end=end, cursor=cursor, count=count, match=match, projection_model=projection_model
+        )
 
     async def get_list_by_dt(
         self,

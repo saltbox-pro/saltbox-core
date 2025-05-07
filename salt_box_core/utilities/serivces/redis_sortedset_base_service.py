@@ -1,10 +1,11 @@
+import json
 from typing import Any, Generic, TypeVar, overload
 
 from pydantic import BaseModel
 
 from salt_box_core.db.redis.repository_sortedset_base import SortedsetRedisRepository
 from salt_box_core.db.redis.schemas_base import SortedSetId
-from salt_box_core.db.schemas_base import PaginatedResponse
+from salt_box_core.db.schemas_base import CursoredResponse, PaginatedResponse
 from salt_box_core.utilities.serivces.abc_service import AbstractService
 
 Repository = TypeVar('Repository', bound=SortedsetRedisRepository)
@@ -107,6 +108,40 @@ class RedisSortedsetBaseService(
             data = await self.repo.get_list(start=start, end=end, limit=limit, skip=skip)
 
         return PaginatedResponse(total=total, data=data)
+
+    async def get_list_cursored(
+        self,
+        start: int | float,
+        end: int | float | None = None,
+        cursor: int = 0,
+        count: int = 100,
+        match: str | None = None,
+        projection_model: type[ProjectionModel] | None = None,
+    ) -> CursoredResponse[ModelType] | CursoredResponse[ProjectionModel]:
+        data = []
+
+        async def load_data() -> int:
+            raw_data = await self.repo.zscan(cursor=cursor, match=match, count=count)
+
+            for raw_obj_data in raw_data[1]:
+                score = raw_obj_data[1]
+
+                if (end and start < score < end) or (end is None and start < score):
+                    obj_data = json.loads(raw_obj_data[0])
+                    if projection_model:
+                        data.append(projection_model.model_validate(obj_data))
+                    else:
+                        data.append(self.repo.default_model.model_validate(obj_data))
+
+            return raw_data[0]
+
+        while len(data) < count:
+            cursor = await load_data()
+
+            if cursor == 0:
+                break
+
+        return CursoredResponse(next_cursor=cursor, data=data)
 
     async def count(self, start_id: SortedSetId | int | float | None, end_id: SortedSetId | int | float | None) -> int:
         return await self.repo.count(start=start_id, end=end_id)

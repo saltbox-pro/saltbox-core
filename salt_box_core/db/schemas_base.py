@@ -25,6 +25,11 @@ class PaginatedResponse(BaseModel, Generic[SchemaType]):
     data: list[SchemaType] = Field(description='Items list')
 
 
+class CursoredResponse(BaseModel, Generic[SchemaType]):
+    next_cursor: int = Field(description='Pointer to get next portion of data, 0 when no more data', ge=0)
+    data: list[SchemaType] = Field(description='Items list')
+
+
 class SkipLimitParams(BaseModel):
     skip: int = Field(default=0, ge=0)
     limit: int = Field(default=0, ge=0)

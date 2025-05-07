@@ -8,7 +8,7 @@ from pydantic import Field, ValidationError
 from salt_box_core import http_errors
 from salt_box_core.config import LOG_CONFIG, SETTINGS
 from salt_box_core.db.redis.config import RedisDependency
-from salt_box_core.db.schemas_base import PaginatedResponse, User
+from salt_box_core.db.schemas_base import CursoredResponse, PaginatedResponse, User
 from salt_box_core.dependencies import get_current_user_from_jwt
 from salt_box_core.event_bus.masters_bus import send_message_and_wait_response_to_master
 from salt_box_core.jobs.exceptions import (
@@ -25,7 +25,9 @@ from salt_box_core.jobs.schemas.job_schemas import (
     JobCreateSchema,
     JobModel,
     JobResult,
+    JobsListCursorRequest,
     JobsListRequest,
+    JobsListResponse,
     JobSyncResponse,
 )
 from salt_box_core.jobs.services.job_services import JobServiceDependency
@@ -43,6 +45,30 @@ router = APIRouter(
 )
 
 ws_router = APIRouter(prefix='/jobs')
+
+
+@router.get('/cursored_list', operation_id='jobs_list_cursor')
+async def jobs_list_cursor(
+    request: Annotated[JobsListCursorRequest, Query()],
+    job_service: JobServiceDependency,
+    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
+) -> CursoredResponse[JobsListResponse]:
+    matches = []
+
+    if request.fun:
+        matches.append(f'"fun": "{request.fun}"')
+
+    if request.minion:
+        matches.append(rf'"minions": \[*"{request.minion}"*\]')
+
+    return await job_service.get_list_cursored_by_dt(
+        start_datetime=request.start_datetime,
+        end_datetime=request.end_datetime,
+        cursor=request.cursor or 0,
+        count=request.count,
+        match='*' + '*'.join(matches) + '*',
+        projection_model=JobsListResponse,
+    )
 
 
 @router.get('', operation_id='jobs_list')
