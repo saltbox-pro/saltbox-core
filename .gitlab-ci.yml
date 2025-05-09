@@ -37,7 +37,7 @@ ruff:
   before_script:
     pip3 install -e .[dev]
   script:
-    ruff check --select I salt_box_core # --fix
+    ruff check salt_box_core # --select I --fix
   cache:
     paths:
       - '.cache/pip/'
