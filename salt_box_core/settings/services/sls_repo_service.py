@@ -27,7 +27,7 @@ from salt_box_core.tasks.services.tasks_templates import TaskTemplateService
 from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService, ProjectionModel
 
 
-# TODO Make generic send_message_to_every_master() in masters_bus
+# TODO (a.karmanov): Make generic send_message_to_every_master() in masters_bus
 async def notify_masters() -> None:
     mongo_db = get_mongo_db()
     master_repo = MasterRepository(mongo_db)

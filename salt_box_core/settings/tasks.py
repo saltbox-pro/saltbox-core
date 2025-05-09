@@ -74,7 +74,7 @@ async def sync_sls_repo_task(
     redis: Redis = TaskiqDepends(get_redis_dep),
 ) -> dict:
     """Task for synchronizing job schemas from a Git repository."""
-    # FIXME
+    # TODO (a.karmanov): Move import to top
     from salt_box_core.settings.services.sls_repo_service import notify_masters
 
     repo_obj = await sls_repo.get({'_id': ObjectId(repo_id)})
@@ -102,7 +102,7 @@ async def sync_sls_repo_task(
             }
             await sls_repo.update({'_id': ObjectId(repo_id)}, update_data)
 
-            # TODO Call upper in task owner/watcher class
+            # TODO (a.karmanov): Call upper in task owner/watcher class
             await notify_masters()
             return {
                 'created': created,

@@ -56,7 +56,7 @@ class GitRepoService:
         self.repo_url = repo_url
         self.login = login
         self.token = token
-        # TODO HTTP, SSH links
+        # TODO (a.karmanov): HTTP, SSH links
         if self.login and self.token and self.repo_url.startswith('https://'):
             parts = self.repo_url.split('https://')
             self.repo_url = f'https://{self.login}:{self.token}@{parts[1]}'
