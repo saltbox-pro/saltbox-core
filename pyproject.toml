@@ -37,8 +37,8 @@ saltbox-faststream-redis = "salt_box_core.event_bus.faststream_redis:main"
 saltbox-tasks-watcher = "salt_box_core.tasks.tasks_watcher:main"
 
 # [metadata]
-# url = 'https://gitlab.com/saltbox/saltbox-core'
-# version = 'attr: package.__version__'
+# url = "https://gitlab.com/saltbox/saltbox-core"
+# version = "attr: package.__version__"
 
 [build-system]
 requires = ["setuptools>=75.1.0", "setuptools-scm"]
@@ -51,6 +51,80 @@ include = ["salt_box_core", "salt_box_core.*"]
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements.txt"] }
 version = { attr = "salt_box_core.__version__" }
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+src = ["salt_box_core", "tests"]
+extend-exclude = ["docs", "env", "__pycache__", "*.egg", "htmlcov"]
+respect-gitignore = true
+unsafe-fixes = false
+
+[tool.ruff.format]
+quote-style = "single"
+docstring-code-format = true
+
+[tool.ruff.lint]
+select = [
+  "B",     # flake8-bugbear
+  "C90",   # mccabe
+  "C4",    # flake8-comprehensions
+  "DTZ",   # flake8-datetimez https://docs.astral.sh/ruff/rules/#flake8-datetimez-dtz
+  "EM",    # flake8-errmsg
+  "UP",    # pyupgrade
+  "FA",    # flake8-future-annotations
+  "LOG",   # flake8-logging
+  "PTH",   # flake8-use-pathlib
+  "ASYNC", #flake8-async
+  "G",     # flake8-logging-format
+  "E",     # pycodestyle errors
+  "F",     # pyflakes
+  "I",     # isort
+  "S",     # flake8-bandit
+  "W",     # pycodestyle warnings
+  "N",     # pep8-naming
+  "RUF",   # ruff checks
+  "TD",    # flake8-todo
+]
+ignore = [
+  # "E402",   # module level import not at top of file
+  "E722", # do not use bare except
+  "ERA",  # do not autoremove commented out code
+  "N818", # error-suffix-on-exception-name
+  "UP040", # type instead of TypeAlias PEP 695"
+  "TD003", # Found TODO in code
+  # "G004", # Logging statement uses string formatting
+]
+fixable = ["ALL"]
+unfixable = ["F401", "F841", "UP035"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+    "taskiq_dependencies.Depends",
+    "taskiq.TaskiqDepends",
+]
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "single"
+inline-quotes = "single"
+multiline-quotes = "single"
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.*" = ["S101", "DTZ", "EM101", "RUF012", "E712"]
+# "*/models.py" = ["UP007"]
+# "*/schemas.py" = ["UP007"]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+    "salt_box_core",
+    "tests",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
 
 [tool.mypy]
 check_untyped_defs = true
