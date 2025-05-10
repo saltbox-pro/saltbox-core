@@ -36,7 +36,6 @@ class Settings(BaseSettings):
     salt_func_repo_url: str = 'https://dev.saltbox.pro/a.baikov/salt-func-schemas.git'
     salt_func_local_repo_name: str = 'salt-func-schemas'
     local_repos_path: DirectoryPath = Path('/srv/repos')
-    sshfs_path: DirectoryPath = Path('/srv/sshfs/')
     local_repo_sync_timeout_sec: int = 600
     rabbitmq_url: str = 'amqp://guest:guest@rabbitmq:5672'
 
@@ -103,7 +102,11 @@ class LogConfig(BaseModel):
         },
     }
     loggers: dict = {
-        'salt_box_core': {'handlers': ['default'], 'level': LOG_LEVEL},
+        'salt_box_core': {
+            'handlers': ['default'],
+            'level': LOG_LEVEL,
+            'propagate': False,
+        },
     }
 
 
@@ -111,4 +114,4 @@ LOG_CONFIG = LogConfig()
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('salt_box_core')
