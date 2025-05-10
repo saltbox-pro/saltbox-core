@@ -3,11 +3,90 @@ import re
 import shutil
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Annotated, Literal
 
+import httpx
 from git import Repo
 from redis.asyncio import Redis
+from pydantic import AfterValidator, BaseModel, Extra, HttpUrl, ValidationError
+from ruamel.yaml import YAML
+from ruamel.yaml.scanner import ScannerError
 
 from salt_box_core.config import SETTINGS, logger
+
+yaml = YAML()
+
+
+class GitRepoError(RuntimeError): ...
+class MultipleRepoSyncError(GitRepoError): ...
+class GitRepoManifestError(GitRepoError): ...
+class GitRepoSshfsFileSyncError(GitRepoError): ...
+
+
+def is_not_abs(value: Path) -> Path:
+    if value.is_absolute():
+        raise ValueError()
+    return value
+
+
+class ManifestSshfsFilesSchema(BaseModel):
+    url: HttpUrl
+    checksum: str
+    token: str | None = None
+
+    class Config:
+        extra = Extra.forbid
+
+
+NotAbsolutePath = Annotated[Path, AfterValidator(is_not_abs)]
+
+
+class ManifestSchema(BaseModel):
+    root: NotAbsolutePath = Path('')
+    sshfs_files: dict[NotAbsolutePath, ManifestSshfsFilesSchema] = {}
+
+    class Config:
+        extra = Extra.forbid
+
+
+def checksum(file: Path, digest: str = 'sha256') -> str:
+    ...
+
+
+# FIXME (a.karmanov): DOUBLED LOG
+async def sync_sshfs_file(file_path: Path, file_entry: ManifestSshfsFilesSchema) -> None:
+    dest_path = SETTINGS.sshfs_path / file_path
+    try:
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as err:
+        raise GitRepoSshfsFileSyncError(err)
+
+    # TODO checksum
+    if dest_path.exists() and dest_path.is_file():
+        ...
+
+    headers: dict[str, str] = {}
+    if file_entry.token:
+        headers['private-token'] = file_entry.token
+
+    try:
+        async with (
+            httpx.AsyncClient() as client,
+            client.stream('GET', str(file_entry.url), headers=headers) as response
+        ):
+            response.raise_for_status()
+            with open(dest_path, 'wb') as file:
+                async for chunk in response.aiter_bytes():
+                    file.write(chunk)
+    except (httpx.HTTPError, OSError) as err:
+        raise GitRepoSshfsFileSyncError(err)
+    except httpx.HTTPStatusError as err:
+        raise GitRepoSshfsFileSyncError(f'Response {err.response.status_code} for {err.request.url!r}')
+
+    logger.info('Wrote %s', dest_path)
+
+    # TODO Check statwith 'attachment'
+    logger.info('>>> %s', response.headers.get('content-disposition', 'N/A'))
 
 
 def is_ssh_repo_url(repo_url: str) -> bool:
@@ -50,6 +129,8 @@ class RepositoryLocker:
 
 
 class GitRepoService:
+    MANIFEST_FILE_ALLOWED_NAMES = ('manifest.yaml', 'manifest.yml')
+
     def __init__(
         self, repo_url: str, local_name: str | None = None, login: str | None = None, token: str | None = None
     ) -> None:
@@ -201,9 +282,29 @@ class GitRepoService:
 
         return schemas, errors
 
+    def get_manifest_file(self) -> Path | None:
+        for name in self.MANIFEST_FILE_ALLOWED_NAMES:
+            path = Path(self.local_path) / name
+            if path.is_file():
+                return path
+        return None
 
-class MultipleRepoSyncError(Exception):
-    pass
+    def parse_manifest(self) -> ManifestSchema:
+        path = self.get_manifest_file()
+        if path is None:
+            logger.warning('Not found manifest file in repo %s, using defaults', self.local_path)
+            return ManifestSchema()
+
+        try:
+            with open(path, 'r') as m_file:
+                manifest_data = yaml.load(m_file)
+        except (OSError, ScannerError) as err:
+            raise GitRepoManifestError(err)
+
+        try:
+            return ManifestSchema.parse_obj(manifest_data)
+        except ValidationError as err:
+            raise GitRepoManifestError(err)
 
 
 @asynccontextmanager
