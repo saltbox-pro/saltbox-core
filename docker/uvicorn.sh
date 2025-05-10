@@ -10,10 +10,10 @@ case $1 in
   *) echo "unknown command \"$1\"" && exit 1 ;;
 esac
 
-cmd='uvicorn salt_box_core.main:app'
+cmd='/usr/bin/uvicorn salt_box_core.main:app'
 cmd="$cmd --host=0.0.0.0 --port=8000"
-cmd="$cmd --timeout-graceful-shutdown='${TIMEOUT_GRACEFUL_SHUTDOWN}'"
+cmd="$cmd --timeout-graceful-shutdown=${TIMEOUT_GRACEFUL_SHUTDOWN}"
 cmd="$cmd $extra_args"
 
 echo "$ ${cmd}"
-eval "$cmd"
+exec $cmd
