@@ -10,10 +10,18 @@ from typing import Annotated
 
 import httpx
 from git import Repo
-from pydantic import AfterValidator, BaseModel, Extra, HttpUrl, ValidationError
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    Extra,
+    HttpUrl,
+    ValidationError,
+    model_validator,
+)
 from redis.asyncio import Redis
 from ruamel.yaml import YAML
 from ruamel.yaml.scanner import ScannerError
+from typing_extensions import Self
 
 from salt_box_core.config import SETTINGS, logger
 
@@ -26,6 +34,15 @@ class GitRepoManifestError(GitRepoError): ...
 class GitRepoSshfsFileSyncError(GitRepoError): ...
 
 
+class Digest(str, Enum):
+    MD5 = 'md5'
+    SHA256 = 'sha256'
+    SHA512 = 'sha512'
+
+
+DEFAULT_DIGEST = Digest.SHA256
+
+
 def validate_is_not_abs(value: Path) -> Path:
     if value.is_absolute():
         raise ValueError()
@@ -36,35 +53,34 @@ def validate_digest(value: str) -> str:
     return Digest(value).value
 
 
-def _default_digest(value: ...) -> Path:
-    return value
-
-
-class Digest(str, Enum):
-    MD5 = 'md5'
-    SHA256 = 'sha256'
-    SHA512 = 'sha512'
+NotAbsolutePath = Annotated[Path, AfterValidator(validate_is_not_abs)]
+DigestStr = Annotated[str, AfterValidator(validate_digest)]
 
 
 class ManifestSshfsFilesSchema(BaseModel):
     url: HttpUrl
     checksum: str
-    checksum_type: Annotated[str, AfterValidator(validate_digest)] = Digest.SHA256.value
+    checksum_type: DigestStr = ''
     token: str | None = None
 
     class Config:
         extra = Extra.forbid
 
 
-NotAbsolutePath = Annotated[Path, AfterValidator(validate_is_not_abs)]
-
-
 class ManifestSchema(BaseModel):
     root: NotAbsolutePath = Path()
     sshfs_files: dict[NotAbsolutePath, ManifestSshfsFilesSchema] = {}
+    sshfs_files_checksum_type: DigestStr = DEFAULT_DIGEST.value
 
     class Config:
         extra = Extra.forbid
+
+    @model_validator(mode='after')
+    def _set_digest(self) -> Self:
+        for file_entry in self.sshfs_files.values():
+            if file_entry.checksum_type == '':
+                file_entry.checksum_type = self.sshfs_files_checksum_type
+        return self
 
 
 class SshfsFileSyncer():
