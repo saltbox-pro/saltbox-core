@@ -6,8 +6,7 @@ from contextlib import asynccontextmanager
 from email.message import Message
 from enum import Enum
 from pathlib import Path
-from typing import Annotated
-
+from typing import Annotated, Any
 import httpx
 from git import Repo
 from pydantic import (
@@ -41,6 +40,7 @@ class Digest(str, Enum):
 
 
 DEFAULT_DIGEST = Digest.SHA256
+FIELD_SENTINEL: Any = object()
 
 
 def validate_is_not_abs(value: Path) -> Path:
@@ -60,8 +60,8 @@ DigestStr = Annotated[str, AfterValidator(validate_digest)]
 class ManifestSshfsFilesSchema(BaseModel):
     url: HttpUrl
     checksum: str
-    checksum_type: DigestStr = ''
-    token: str | None = None
+    checksum_type: DigestStr = FIELD_SENTINEL
+    token: str | None = FIELD_SENTINEL
 
     class Config:
         extra = Extra.forbid
@@ -71,15 +71,18 @@ class ManifestSchema(BaseModel):
     root: NotAbsolutePath = Path()
     sshfs_files: dict[NotAbsolutePath, ManifestSshfsFilesSchema] = {}
     sshfs_files_checksum_type: DigestStr = DEFAULT_DIGEST.value
+    sshfs_files_token: str | None = None
 
     class Config:
         extra = Extra.forbid
 
     @model_validator(mode='after')
-    def _set_digest(self) -> Self:
+    def _set_global_values(self) -> Self:
         for file_entry in self.sshfs_files.values():
-            if file_entry.checksum_type == '':
+            if file_entry.checksum_type is FIELD_SENTINEL:
                 file_entry.checksum_type = self.sshfs_files_checksum_type
+            if file_entry.token is FIELD_SENTINEL:
+                file_entry.token = self.sshfs_files_token
         return self
 
 
