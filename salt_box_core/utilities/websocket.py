@@ -7,17 +7,16 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager
 from inspect import isclass
 from types import TracebackType
-from typing import Any, TypedDict
+from typing import Any, TypedDict, cast
 
 from fastapi import WebSocket, WebSocketDisconnect
 from fastapi.websockets import WebSocketState
-from jwt import InvalidTokenError, PyJWKClientError
 from pydantic import BaseModel, ValidationError
 from redis.asyncio import Redis
 from redis.asyncio.client import PubSub
 
 from salt_box_core.config import LOG_CONFIG
-from salt_box_core.dependencies import decode_jwt
+from salt_box_core.utilities.keycloak_oidc import KeycloakOIDCError, KeycloakOIDCFactory
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
@@ -109,6 +108,7 @@ class AuthenticatedWebSocket:
         self.websocket = websocket
         self.token_expiration: datetime.datetime | None = None
         self._subtasks: set[asyncio.Task] = set()
+        self._oidc = KeycloakOIDCFactory.get_instance()
 
     @property
     def _already_closed(self) -> bool:
@@ -123,14 +123,17 @@ class AuthenticatedWebSocket:
     async def _obtain_token_msg(self) -> None:
         LOGGER.debug('Await token message')
         message = await self.websocket.receive_text()
+        # TODO (a.baikov): temporary solution until we get full token from client
+        message = 'Bearer ' + message
         await self._process_token_message(message)
 
     async def _process_token_message(self, token: str) -> None:
         LOGGER.debug('Processing token message')
         try:
-            payload = await decode_jwt(token)
-            self.token_expiration = datetime.datetime.fromtimestamp(payload['exp'], datetime.UTC)
-        except (InvalidTokenError, ValidationError, IndexError, PyJWKClientError) as e:
+            payload = await self._oidc.decode_jwt(token)
+            exp = cast(float, payload.get('exp'))
+            self.token_expiration = datetime.datetime.fromtimestamp(exp, datetime.UTC)
+        except KeycloakOIDCError as e:
             LOGGER.error('Error processing token message %s', e)
             await self.close(f'Invalid token message: {e!s}')
 

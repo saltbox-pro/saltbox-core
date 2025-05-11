@@ -6,8 +6,7 @@ from fastapi.responses import FileResponse
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import PyObjectId
-from salt_box_core.db.schemas_base import PaginatedResponse, User
-from salt_box_core.dependencies import get_current_user_from_jwt
+from salt_box_core.db.schemas_base import PaginatedResponse
 from salt_box_core.event_bus.masters_bus import send_message_and_wait_response_to_master
 from salt_box_core.masters.services.master_service import MasterService, get_master_service
 from salt_box_core.minion_collections.schemas.event_bus_schemas import GatherMinionsByTargeting
@@ -114,7 +113,6 @@ async def gather_minions(
     tgt_type: str,
     master: str,
     master_service: Annotated[MasterService, Depends(get_master_service)],
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> MinionGatherResponseSchema:
     master_key: str = await master_service.get_master_key(master)
 

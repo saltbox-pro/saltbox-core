@@ -5,8 +5,6 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 
 from salt_box_core.config import LOG_CONFIG
 from salt_box_core.db.exceptions import ObjectCreateError, ObjectNotFoundError
-from salt_box_core.db.schemas_base import User
-from salt_box_core.dependencies import get_current_user_from_jwt
 from salt_box_core.pillars.schemas.pillar_schemas import (
     PillarImportResultSchema,
     PillarImportSchema,
@@ -32,7 +30,6 @@ router = APIRouter(
 async def pillars_list(
     params: Annotated[PillarListQueryParams, Query()],
     pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> list[PillarModel]:
     return await pillar_service.get_list(
         master_id=params.master_id, minion_id=params.minion_id, only_for_minion=params.only_for_minion
@@ -43,7 +40,6 @@ async def pillars_list(
 async def pillar_create(
     item: PillarModel,
     pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
-    user: Annotated[User, Depends(get_current_user_from_jwt)],
 ) -> PillarModel:
     try:
         pillar: PillarModel = await pillar_service.create(
@@ -59,7 +55,6 @@ async def pillar_create(
 async def pillar_update(
     item: PillarModel,
     pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
-    user: Annotated[User, Depends(get_current_user_from_jwt)],
 ) -> PillarModel:
     try:
         pillar: PillarModel = await pillar_service.update(
@@ -75,7 +70,6 @@ async def pillar_update(
 async def pillar_delete(
     item: PillarSelector,
     pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> None:
     try:
         await pillar_service.delete(master_id=item.master_id, minion_id=item.minion_id, name=item.name)
@@ -88,7 +82,6 @@ async def pillar_parse_csv(
     master_id: str,
     pillars_csv: UploadFile,
     pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> list:
     return await pillar_service.parse_csv(master_id=master_id, file=pillars_csv.file)
 
@@ -97,6 +90,5 @@ async def pillar_parse_csv(
 async def pillar_import(
     data: PillarImportSchema,
     pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> PillarImportResultSchema:
     return await pillar_service.import_pillar(items=data.items, update_existing=data.update_existing)

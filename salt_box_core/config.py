@@ -6,11 +6,14 @@ from pydantic import BaseModel, DirectoryPath, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 APP_NAME = 'Salt.Box Core'
+APP_DESC = 'Salt.Box Core API'
 
 
 class Settings(BaseSettings):
     taskiq_broker_url: str = ''
     debug: bool = False
+    show_docs: bool = False
+    base_url_root_path: str = '/'
     max_count: int = Field(default=1000, description='Max array length to request')
     mongo_db: str = ''
     mongo_password: str | None = None
@@ -22,12 +25,10 @@ class Settings(BaseSettings):
     redis_tls_verification: Literal['none', 'optional', 'required'] = 'required'
     redis_url: str = ''
     redis_username: str | None = None
-    keycloak_server_url: str = ''
     keycloak_front_url: str = ''
     keycloak_realm: str = ''
-    keycloak_audience: str = 'account'
-    keycloak_algorithm: str = 'RS256'
     keycloak_client: str = ''
+    keycloak_client_secret: str = ''
     opa_url: str = ''
     salt_func_repo_url: str = 'https://dev.saltbox.pro/a.baikov/salt-func-schemas.git'
     salt_func_local_repo_name: str = 'salt-func-schemas'
@@ -38,16 +39,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file='.env')
 
     @property
-    def keycloak_jwks_uri(self) -> str:
-        return f'{self.keycloak_server_url}/realms/{self.keycloak_realm}/protocol/openid-connect/certs'
-
-    @property
-    def keycloak_userinfo_url(self) -> str:
-        return f'{self.keycloak_front_url}/realms/{self.keycloak_realm}/protocol/openid-connect/userinfo'
-
-    @property
-    def keycloak_token_url(self) -> str:
-        return f'{self.keycloak_front_url}/realms/{self.keycloak_realm}/protocol/openid-connect/token'
+    def keycloak_oidc_url(self) -> str:
+        return f'{self.keycloak_front_url}/realms/{self.keycloak_realm}/.well-known/openid-configuration'
 
     @property
     def mongo_url(self) -> str:
@@ -78,7 +71,7 @@ SETTINGS = Settings()
 
 
 class LogConfig(BaseModel):
-    LOG_FORMAT: str = '%(levelprefix)s [%(filename)s] %(message)s'
+    LOG_FORMAT: str = '%(levelprefix)s [%(filename)s:%(lineno)d] %(message)s'
     LOG_LEVEL: str = 'DEBUG' if SETTINGS.debug else 'INFO'
 
     version: int = 1

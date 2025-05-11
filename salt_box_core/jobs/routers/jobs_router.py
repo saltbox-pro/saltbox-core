@@ -2,14 +2,13 @@ import logging.config
 from typing import Annotated
 
 import pydantic
-from fastapi import APIRouter, Depends, Query, WebSocket
+from fastapi import APIRouter, Query, WebSocket
 from pydantic import Field, ValidationError
 
 from salt_box_core import http_errors
 from salt_box_core.config import LOG_CONFIG, SETTINGS
 from salt_box_core.db.redis.config import RedisDependency
-from salt_box_core.db.schemas_base import CursoredResponse, User
-from salt_box_core.dependencies import get_current_user_from_jwt
+from salt_box_core.db.schemas_base import CursoredResponse
 from salt_box_core.event_bus.masters_bus import send_message_and_wait_response_to_master
 from salt_box_core.jobs.exceptions import (
     JobCreateException,
@@ -49,7 +48,6 @@ ws_router = APIRouter(prefix='/jobs')
 async def jobs_list(
     request: Annotated[JobsListCursorRequest, Query()],
     job_service: JobServiceDependency,
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> CursoredResponse[JobsListResponse]:
     matches = []
 
@@ -73,7 +71,6 @@ async def jobs_list(
 async def job_retrieve(
     jid: IntJid,
     job_service: JobServiceDependency,
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> JobModel:
     _jid = JID(jid)
 
@@ -90,7 +87,6 @@ async def job_retrieve(
 async def job_create(
     item: CreateJobRequest,
     job_service: JobServiceDependency,
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> JobModel:
     try:
         return await job_service.create(
@@ -107,7 +103,6 @@ async def job_create(
 @router.post('/sync_run', operation_id='job_create_sync')
 async def job_create_sync(
     item: CreateJobRequest,
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> JobSyncResponse:
     try:
         job_res: JobSyncMessage = JobSyncMessage(
@@ -134,7 +129,6 @@ async def job_create_sync(
 async def job_returns_count(
     jid: IntJid,
     job_service: JobServiceDependency,
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> Annotated[int, Field(ge=0)]:
     """
     How many return data records for job at the moment.
@@ -148,7 +142,6 @@ async def job_returns_count(
 async def job_returns_list(
     jid: IntJid,
     job_service: JobServiceDependency,
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
     count: Annotated[int, Field(gt=0, lt=SETTINGS.max_count)] = 10,
     cursor: pydantic.NonNegativeInt = 0,
 ) -> GetJobReturnResponse:
