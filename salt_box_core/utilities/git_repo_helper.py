@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 import shutil
@@ -37,6 +38,7 @@ def _default_digest(value: ...) -> Path:
 class ManifestSshfsFilesSchema(BaseModel):
     url: HttpUrl
     checksum: str
+    checksum_type: str = 'sha256'
     token: str | None = None
 
     class Config:
@@ -55,7 +57,9 @@ class ManifestSchema(BaseModel):
 
 
 def checksum(file: Path, digest: str = 'sha256') -> str:
-    ...
+    with open(file, 'rb') as file_stream:
+        digest_obj = hashlib.file_digest(file_stream, digest)
+    return digest_obj.hexdigest()
 
 
 async def sync_sshfs_file(file_path: Path, file_entry: ManifestSshfsFilesSchema) -> None:
@@ -65,9 +69,18 @@ async def sync_sshfs_file(file_path: Path, file_entry: ManifestSshfsFilesSchema)
     except OSError as err:
         raise GitRepoSshfsFileSyncError(err)
 
-    # TODO checksum
-    if dest_path.exists() and dest_path.is_file():
-        ...
+    digest_path = dest_path.parent / f'{dest_path.name}.{file_entry.checksum_type}'
+    if digest_path.exists():
+        if dest_path.exists():
+            ...  # TODO Compare ctime
+        try:
+            with open(digest_path) as digest_file:
+                local_checksum = digest_file.read().strip()
+        except OSError as err:
+            raise GitRepoSshfsFileSyncError(err)
+        if local_checksum == file_entry.checksum:
+            logger.debug('Local file %s checksum matches the manifest, skipping donwloading', dest_path)
+            return
 
     headers: dict[str, str] = {}
     if file_entry.token:
@@ -88,16 +101,28 @@ async def sync_sshfs_file(file_path: Path, file_entry: ManifestSshfsFilesSchema)
         raise GitRepoSshfsFileSyncError(f'Response {err.response.status_code} for {err.request.url!r}')
 
     cont_disp_hdr = 'content-disposition'
+    header_ok = True
     if (content_dispos := response.headers.get(cont_disp_hdr)) is not None:
-        msg = Message()
-        msg[cont_disp_hdr] = content_dispos
-        if msg.get_content_disposition() == 'attachment':
-            logger.info('Donwloaded %s to %s', msg.get_filename(), dest_path)
+        message = Message()
+        message[cont_disp_hdr] = content_dispos
+        if message.get_content_disposition() == 'attachment':
+            logger.info('Donwloaded %s to %s', message.get_filename(), dest_path)
         else:
-            logger.warning('')  # TODO
+            header_ok = False
+            logger.warning('Content-Disposition header is not attachment for %s', response.url)
     else:
-        logger.warning('')  # TODO
+        header_ok = False
+        logger.warning('Missing Content-Disposition header for %s', response.url)
 
+    new_checksum = checksum(dest_path, file_entry.checksum_type)
+    with open(digest_path, 'w') as digest_file:
+        digest_file.write(new_checksum)
+
+    if new_checksum != file_entry.checksum:
+        msg = f'Checksum of downloaded {dest_path} mismatches the manifest'
+        if not header_ok:
+            msg += ', Content-Disposition header was unexpected'
+        raise GitRepoSshfsFileSyncError(msg)
 
 
 def is_ssh_repo_url(repo_url: str) -> bool:
