@@ -1,7 +1,7 @@
 import logging.config
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, status
 
 from salt_box_core import http_errors
 from salt_box_core.config import LOG_CONFIG
@@ -9,7 +9,6 @@ from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import PyObjectId
 from salt_box_core.db.redis.config import RedisDependency
 from salt_box_core.db.schemas_base import PaginatedResponse, User
-from salt_box_core.dependencies import get_current_user_from_jwt
 from salt_box_core.jobs.exceptions import JobDoesNotExistsException
 from salt_box_core.jobs.schemas.job_schemas import JobModel, JobResult
 from salt_box_core.jobs.services.job_services import JobServiceDependency
@@ -47,7 +46,6 @@ async def tasks_list(
     params: Annotated[TaskListQueryParams, Query()],
     task_service: Annotated[TaskService, Depends(get_task_service)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> PaginatedResponse[TaskListResponseSchema]:
     try:
         collection: CollectionModel = await collection_service.get_by_slug(params.collection_slug)
@@ -66,14 +64,15 @@ async def tasks_list(
 
 @router.post('', operation_id='task_create')
 async def task_create(
+    request: Request,
     item: TaskCreateRequestSchema,
     task_service: Annotated[TaskService, Depends(get_task_service)],
-    user: Annotated[User, Depends(get_current_user_from_jwt)],
 ) -> TaskModel:
     # TODO (i.moshkov): remove this
     if item.query == {'$and': [{'$expr': True}]}:
         item.query = {}
 
+    user = User(**request.state.user)
     create_data = TaskCreateFromTemplateSchema(**{'user': user.model_dump(), **item.model_dump(by_alias=True)})
 
     try:
@@ -92,7 +91,6 @@ async def task_create(
 async def task_retrieve(
     tid: PyObjectId,
     task_service: Annotated[TaskService, Depends(get_task_service)],
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> TaskModel:
     try:
         task: TaskModel = await task_service.get(query=tid)
@@ -107,7 +105,6 @@ async def task_jobs(
     tid: PyObjectId,
     task_service: Annotated[TaskService, Depends(get_task_service)],
     job_service: JobServiceDependency,
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> list[JobModel]:
     result: list[JobModel] = []
 
@@ -131,7 +128,6 @@ async def task_returns(
     tid: PyObjectId,
     task_service: Annotated[TaskService, Depends(get_task_service)],
     job_service: JobServiceDependency,
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> list[JobResult]:
     result: list[JobResult] = []
 
@@ -153,7 +149,6 @@ async def task_returns(
 @router.post('/{tid}/run', operation_id='task_run')
 async def task_run(
     task_lifespan_service: Annotated[TaskLifespanService, Depends(get_task_lifespan_service)],
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> TaskModel:
     try:
         task: TaskModel = await task_lifespan_service.get_task()
@@ -168,7 +163,6 @@ async def task_run(
 @router.post('/{tid}/stop', operation_id='task_stop')
 async def task_stop(
     task_lifespan_service: Annotated[TaskLifespanService, Depends(get_task_lifespan_service)],
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> TaskModel:
     try:
         task: TaskModel = await task_lifespan_service.get_task()
@@ -183,7 +177,6 @@ async def task_stop(
 @router.post('/{tid}/restart_failed', operation_id='restart_failed')
 async def restart_failed(
     task_lifespan_service: Annotated[TaskLifespanService, Depends(get_task_lifespan_service)],
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> TaskModel:
     try:
         task: TaskModel = await task_lifespan_service.get_task()
@@ -200,7 +193,6 @@ async def restart_failed_on_minion(
     master: str,
     minion_id: str,
     task_lifespan_service: Annotated[TaskLifespanService, Depends(get_task_lifespan_service)],
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> TaskModel:
     try:
         task: TaskModel = await task_lifespan_service.get_task()

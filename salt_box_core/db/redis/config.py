@@ -17,6 +17,10 @@ def _make_pool() -> ConnectionPool:
 POOL = _make_pool()
 
 
+def get_redis_now() -> Redis:
+    return Redis(connection_pool=POOL)
+
+
 async def get_redis() -> AsyncGenerator[Redis, None]:
     redis = Redis(connection_pool=POOL)
     yield redis

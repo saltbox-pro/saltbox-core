@@ -1,12 +1,11 @@
-from typing import Annotated, Literal, overload
+from typing import Literal, overload
 
 import httpx
-from fastapi import Depends, Request
+from fastapi import Request
 from pydantic import BaseModel, ConfigDict
 
 from salt_box_core.config import SETTINGS, logger
 from salt_box_core.db.schemas_base import User
-from salt_box_core.dependencies import get_current_user_from_jwt
 
 
 class OPAResult(BaseModel):
@@ -27,11 +26,10 @@ class AuthzResponse(BaseModel):
 class MinionCollectionAuthzService:
     def __init__(
         self,
-        user: User,
         request: Request,
     ) -> None:
         self.opa_url = f'{SETTINGS.opa_url}/v1/data/core/collections'
-        self.user = user
+        self.user: User = User(**request.state.user)
         self.request = request
 
     def _prepare_input(self, action: str) -> dict:
@@ -96,7 +94,5 @@ class MinionCollectionAuthzService:
         return authz_response.result
 
 
-async def get_authz_service(
-    request: Request, user: Annotated[User, Depends(get_current_user_from_jwt)]
-) -> MinionCollectionAuthzService:
-    return MinionCollectionAuthzService(user, request)
+async def get_authz_service(request: Request) -> MinionCollectionAuthzService:
+    return MinionCollectionAuthzService(request)

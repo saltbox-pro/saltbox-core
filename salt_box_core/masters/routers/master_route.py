@@ -6,8 +6,7 @@ from fastapi import APIRouter, Depends, Query, status
 from salt_box_core.config import LOG_CONFIG
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import PyObjectId
-from salt_box_core.db.schemas_base import PaginatedResponse, User
-from salt_box_core.dependencies import get_current_user_from_jwt
+from salt_box_core.db.schemas_base import PaginatedResponse
 from salt_box_core.http_errors import NotFound
 from salt_box_core.masters.schemas.master_schemas import MasterModel, MasterQueryParams, MasterViewSchema
 from salt_box_core.masters.services.master_service import MasterService, get_master_service
@@ -28,7 +27,6 @@ router = APIRouter(
 async def masters_list(
     params: Annotated[MasterQueryParams, Query()],
     master_service: Annotated[MasterService, Depends(get_master_service)],
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> PaginatedResponse[MasterViewSchema]:
     query = params.model_dump(exclude={'skip', 'limit'}, exclude_none=True, exclude_unset=True)
 
@@ -46,7 +44,6 @@ async def masters_list(
 async def master_accept(
     mid: PyObjectId,
     master_service: Annotated[MasterService, Depends(get_master_service)],
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> MasterViewSchema:
     try:
         master: MasterModel = await master_service.accept(mid)
@@ -61,7 +58,6 @@ async def master_accept(
 async def master_reject(
     mid: PyObjectId,
     master_service: Annotated[MasterService, Depends(get_master_service)],
-    user: Annotated[User, Depends(get_current_user_from_jwt)],  # type: ignore[unused-ignore]
 ) -> MasterViewSchema:
     try:
         master: MasterModel = await master_service.reject(mid)

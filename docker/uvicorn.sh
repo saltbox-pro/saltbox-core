@@ -11,7 +11,7 @@ case $1 in
 esac
 
 cmd='uvicorn salt_box_core.main:app'
-cmd="$cmd --host=0.0.0.0 --port=8000 --root-path='${BASE_URL_ROOT_PATH}'"
+cmd="$cmd --host=0.0.0.0 --port=8000"
 cmd="$cmd --timeout-graceful-shutdown='${TIMEOUT_GRACEFUL_SHUTDOWN}'"
 cmd="$cmd $extra_args"
 
