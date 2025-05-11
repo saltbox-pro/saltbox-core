@@ -4,8 +4,9 @@ import re
 import shutil
 from contextlib import asynccontextmanager
 from email.message import Message
+from enum import Enum
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated
 
 import httpx
 from git import Repo
@@ -25,27 +26,37 @@ class GitRepoManifestError(GitRepoError): ...
 class GitRepoSshfsFileSyncError(GitRepoError): ...
 
 
-def _is_not_abs(value: Path) -> Path:
+def validate_is_not_abs(value: Path) -> Path:
     if value.is_absolute():
         raise ValueError()
     return value
+
+
+def validate_digest(value: str) -> str:
+    return Digest(value).value
 
 
 def _default_digest(value: ...) -> Path:
     return value
 
 
+class Digest(str, Enum):
+    MD5 = 'md5'
+    SHA256 = 'sha256'
+    SHA512 = 'sha512'
+
+
 class ManifestSshfsFilesSchema(BaseModel):
     url: HttpUrl
     checksum: str
-    checksum_type: str = 'sha256'
+    checksum_type: Annotated[str, AfterValidator(validate_digest)] = Digest.SHA256.value
     token: str | None = None
 
     class Config:
         extra = Extra.forbid
 
 
-NotAbsolutePath = Annotated[Path, AfterValidator(_is_not_abs)]
+NotAbsolutePath = Annotated[Path, AfterValidator(validate_is_not_abs)]
 
 
 class ManifestSchema(BaseModel):
@@ -69,6 +80,15 @@ class SshfsFileSyncer():
         with open(self.digest_path, 'w') as digest_file:
             digest_file.write(new_checksum)
         return new_checksum
+
+    def purge_type_mismatched_checksums(self) -> None:
+        redundant_digests = {i.value for i in Digest}
+        redundant_digests.remove(self.file_entry.checksum_type)
+        for digest in redundant_digests:
+            path = self.digest_path.with_suffix(f'.{digest}')
+            if path.exists():
+                logger.info('Deleting mismatched type checksum file %s', path)
+                path.unlink()
 
     def update_required(self) -> bool:
         # Fix general inconsistent states
@@ -103,6 +123,8 @@ class SshfsFileSyncer():
         :raises OSError: on filesystem operations errors
         :raises SshfsFileSync:
         """
+        self.purge_type_mismatched_checksums()
+
         if not self.update_required():
             logger.debug('Local file %s needs no update', self.dest_path)
             return
@@ -217,7 +239,7 @@ class GitRepoService:
         return None
 
     def clone_or_pull(self) -> None:
-        logger.debug('Try to clon repo %s', self.repo_url)
+        logger.debug('Try to clone repo %s', self.repo_url)
         if self.repo:
             logger.debug('Local path exists and is a directory, pulling latest changes')
             try:
