@@ -13,6 +13,7 @@ from pydantic import (
     AfterValidator,
     BaseModel,
     Extra,
+    Field,
     HttpUrl,
     ValidationError,
     model_validator,
@@ -62,6 +63,9 @@ class ManifestSshfsFilesSchema(BaseModel):
     checksum: str
     checksum_type: DigestStr = FIELD_SENTINEL
     token: str | None = FIELD_SENTINEL
+    unpack: bool = Field(
+        default=False,
+        description='Unpack arhive rather than processing as a regular file')
 
     class Config:
         extra = Extra.forbid
@@ -135,6 +139,24 @@ class SshfsFileSyncer():
 
         return True
 
+    def get_origin_filename(self, response: httpx.Response) -> str:
+        cont_disp_hdr = 'content-disposition'
+        content_dispos = response.headers.get(cont_disp_hdr)
+        logger.debug('Content-Disposition header was %s for %s', content_dispos, response.url)
+        message = Message()
+        message[cont_disp_hdr] = content_dispos
+        if message.get_content_disposition() != 'attachment':
+            logger.warning('Content-Disposition header is not attachment for %s', response.url)
+        if (filename := message.get_filename()) is not None:
+            return filename
+        else:
+            msg = f'Failed to obtain origin filename from content-disposal header for {response.url}'
+            raise GitRepoSshfsFileSyncError(msg)
+
+    def process_archive(self) -> None:
+        if self.file_entry.unpack:
+            ...
+
     async def sync(self) -> None:
         """
         Update local file in sshfs location if required
@@ -160,6 +182,7 @@ class SshfsFileSyncer():
                 client.stream('GET', str(self.file_entry.url), headers=headers) as response
             ):
                 response.raise_for_status()
+                origin_filename = self.get_origin_filename(response)
                 with open(self.dest_path, 'wb') as file:
                     async for chunk in response.aiter_bytes():
                         file.write(chunk)
@@ -168,27 +191,15 @@ class SshfsFileSyncer():
         except httpx.HTTPStatusError as err:
             raise GitRepoSshfsFileSyncError(f'Response {err.response.status_code} for {err.request.url!r}')
 
-        cont_disp_hdr = 'content-disposition'
-        header_ok = True
-        if (content_dispos := response.headers.get(cont_disp_hdr)) is not None:
-            message = Message()
-            message[cont_disp_hdr] = content_dispos
-            if message.get_content_disposition() == 'attachment':
-                logger.info('Donwloaded %s to %s', message.get_filename(), self.dest_path)
-            else:
-                header_ok = False
-                logger.warning('Content-Disposition header is not attachment for %s', response.url)
-        else:
-            header_ok = False
-            logger.warning('Missing Content-Disposition header for %s', response.url)
+        logger.info('Downloaded %s to %s', origin_filename, self.dest_path)
 
         new_checksum = self.make_checksum()
 
         if new_checksum != self.file_entry.checksum:
             msg = f'Checksum of downloaded {self.dest_path} mismatches the manifest'
-            if not header_ok:
-                msg += ', Content-Disposition header was unexpected'
             raise GitRepoSshfsFileSyncError(msg)
+
+        self.process_archive()
 
 
 def is_ssh_repo_url(repo_url: str) -> bool:
