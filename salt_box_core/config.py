@@ -1,12 +1,24 @@
 import logging.config
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, DirectoryPath, Field
+from pydantic import AfterValidator, BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 APP_NAME = 'Salt.Box Core'
 APP_DESC = 'Salt.Box Core API'
+
+
+def validate_make_dir(value: Path) -> Path:
+    if value.exists():
+        if not value.is_dir():
+            raise ValueError(f'{value} exists and is not directory')
+    else:
+        value.mkdir(parents=True)
+    return value
+
+
+MakeDirectoryPath = Annotated[Path, AfterValidator(validate_make_dir)]
 
 
 class Settings(BaseSettings):
@@ -35,8 +47,9 @@ class Settings(BaseSettings):
     opa_url: str = ''
     salt_func_repo_url: str = 'https://dev.saltbox.pro/a.baikov/salt-func-schemas.git'
     salt_func_local_repo_name: str = 'salt-func-schemas'
-    local_repos_path: DirectoryPath = Path('/srv/repos')
-    sshfs_path: DirectoryPath = Path('/srv/sshfs/')
+    local_repos_path: MakeDirectoryPath = Path('/srv/repos')  # FIXME rename to _dir
+    sshfs_path: MakeDirectoryPath = Path('/srv/sshfs/')  # FIXME rename to _dir
+    cache_dir: MakeDirectoryPath = Path('/var/cache/saltbox-core/')
     local_repo_sync_timeout_sec: int = 600
     rabbitmq_url: str = 'amqp://guest:guest@rabbitmq:5672'
 

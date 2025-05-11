@@ -91,16 +91,24 @@ class ManifestSchema(BaseModel):
 
 
 class SshfsFileSyncer():
+    # TODO Cleanup
+    TMP_DIR = SETTINGS.cache_dir / 'sshfs'
+
     def __init__(self, file_path: Path, file_entry: ManifestSshfsFilesSchema) -> None:
+        self.TMP_DIR.mkdir(exist_ok=True)
         self.file_entry = file_entry
         self.dest_path = SETTINGS.sshfs_path / file_path
-        self.digest_path = self.dest_path.parent / f'{self.dest_path.name}.{self.file_entry.checksum_type}'
+        self.dest_digest_path = self.make_digest_path(self.dest_path)
 
-    def make_checksum(self) -> str:
-        with open(self.dest_path, 'rb') as file_stream:
+    def make_digest_path(self, path: Path) -> Path:
+        return path.parent / f'{path.name}.{self.file_entry.checksum_type}'
+
+    def make_checksum(self, file_path: Path) -> str:
+        with open(file_path, 'rb') as file_stream:
             digest_obj = hashlib.file_digest(file_stream, self.file_entry.checksum_type)
         new_checksum = digest_obj.hexdigest()
-        with open(self.digest_path, 'w') as digest_file:
+        digest_path = self.make_digest_path(file_path)
+        with open(digest_path, 'w') as digest_file:
             digest_file.write(new_checksum)
         return new_checksum
 
@@ -108,31 +116,31 @@ class SshfsFileSyncer():
         redundant_digests = {i.value for i in Digest}
         redundant_digests.remove(self.file_entry.checksum_type)
         for digest in redundant_digests:
-            path = self.digest_path.with_suffix(f'.{digest}')
+            path = self.dest_digest_path.with_suffix(f'.{digest}')
             if path.exists():
                 logger.info('Deleting mismatched type checksum file %s', path)
                 path.unlink()
 
     def update_required(self) -> bool:
         # Fix general inconsistent states
-        if self.digest_path.exists():
+        if self.dest_digest_path.exists():
             if self.dest_path.exists():
-                if self.dest_path.stat().st_ctime >= self.digest_path.stat().st_ctime:
+                if self.dest_path.stat().st_ctime >= self.dest_digest_path.stat().st_ctime:
                     logger.warning('File %s created later than checksum file, checksum will be updated')
-                    self.make_checksum()
+                    self.make_checksum(self.dest_path)
             else:
-                logger.warning('Deleting dangled checksum %s', self.digest_path)
-                self.digest_path.unlink()
+                logger.warning('Deleting dangled checksum %s', self.dest_digest_path)
+                self.dest_digest_path.unlink()
                 return True
         else:
             if self.dest_path.exists():
                 logger.warning('File %s exists but has no checksum file, will create now', self.dest_path)
-                self.make_checksum()
+                self.make_checksum(self.dest_path)
             else:
                 return True
 
         # Compare local checksum with manifest one
-        with open(self.digest_path) as digest_file:
+        with open(self.dest_digest_path) as digest_file:
             local_checksum = digest_file.read().strip()
         if local_checksum == self.file_entry.checksum:
             return False
@@ -153,9 +161,15 @@ class SshfsFileSyncer():
             msg = f'Failed to obtain origin filename from content-disposal header for {response.url}'
             raise GitRepoSshfsFileSyncError(msg)
 
-    def process_archive(self) -> None:
-        if self.file_entry.unpack:
-            ...
+    def move_to_destination(self, file_path: Path) -> None:
+        digest_path = self.make_digest_path(file_path)
+        shutil.move(file_path, self.dest_path)
+        shutil.move(digest_path, self.dest_digest_path)
+        logger.debug('Moved %s to %s', file_path, self.dest_path)
+        # TODO
+        # if self.file_entry.unpack:
+        #     ...
+            # shutil.unpack_archive(..., extract_dir=self.dest_path)
 
     async def sync(self) -> None:
         """
@@ -183,7 +197,8 @@ class SshfsFileSyncer():
             ):
                 response.raise_for_status()
                 origin_filename = self.get_origin_filename(response)
-                with open(self.dest_path, 'wb') as file:
+                download_path = self.TMP_DIR / origin_filename
+                with open(download_path, 'wb') as file:
                     async for chunk in response.aiter_bytes():
                         file.write(chunk)
         except httpx.HTTPError as err:
@@ -191,15 +206,17 @@ class SshfsFileSyncer():
         except httpx.HTTPStatusError as err:
             raise GitRepoSshfsFileSyncError(f'Response {err.response.status_code} for {err.request.url!r}')
 
-        logger.info('Downloaded %s to %s', origin_filename, self.dest_path)
+        logger.debug('Downloaded %s to %s', origin_filename, download_path)
 
-        new_checksum = self.make_checksum()
+        new_checksum = self.make_checksum(download_path)
 
         if new_checksum != self.file_entry.checksum:
             msg = f'Checksum of downloaded {self.dest_path} mismatches the manifest'
             raise GitRepoSshfsFileSyncError(msg)
 
-        self.process_archive()
+        self.move_to_destination(download_path)
+
+        logger.info('File has been synced: %s', self.dest_path)
 
 
 def is_ssh_repo_url(repo_url: str) -> bool:
