@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException, Response, status
 from fastapi.responses import FileResponse
 
 from salt_box_core.config import logger
@@ -164,3 +164,54 @@ async def minion_retrieve(
     minion = MinionDetailSchema(**minion.model_dump(exclude={'id'}), _id=minion.id)
 
     return minion
+
+
+@router.delete(
+    '/{slug}',
+    operation_id='minion_delete',
+    status_code=status.HTTP_204_NO_CONTENT,
+    responses={
+        status.HTTP_204_NO_CONTENT: {'description': 'No Content'},
+        status.HTTP_403_FORBIDDEN: {'description': 'Forbidden'},
+        status.HTTP_404_NOT_FOUND: {'description': 'Not Found'},
+        status.HTTP_422_UNPROCESSABLE_ENTITY: {'description': 'Unprocessable Entity'},
+    },
+)
+async def minion_delete(
+    collection_slug: str,
+    mid: PyObjectId,
+    authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
+    minion_service: Annotated[MinionService, Depends(get_minion_service)],
+    collection_service: Annotated[CollectionService, Depends(get_collection_service)],
+) -> Response:
+    authz_result = await authz_service.check_access(
+        input={
+            'user': authz_service.user.model_dump(),
+            'path': ['collections', collection_slug],
+            'method': 'GET',
+            'action': 'delete',
+        }
+    )
+    if not authz_result.allow:
+        raise HTTPException(status_code=403, detail='Not enough permissions')
+
+    try:
+        collection = await collection_service.get_by_slug(collection_slug)
+    except ObjectNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from None
+    except Exception as e:
+        logger.error('Error: %s', e)
+        raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
+
+    ids = await minion_service.get_ids_by_query(query=collection.query)
+    if mid not in [i.id for i in ids]:
+        raise HTTPException(status_code=404, detail='Minion not found')
+
+    try:
+        await minion_service.delete(mid)
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
+    except ObjectNotFoundError:
+        raise HTTPException(status_code=404, detail='Minion not found') from None
+    except Exception as e:
+        logger.error('Error: %s', e)
+        raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
