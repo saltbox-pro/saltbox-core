@@ -18,8 +18,8 @@ from salt_box_core.tkq import broker
 from salt_box_core.utilities.git_repo_helper import (
     GitRepoService,
     MultipleRepoSyncError,
-    repository_lock,
     SshfsFileSyncer,
+    repository_lock,
 )
 
 SETTINGS = Settings()
