@@ -10,29 +10,6 @@ FROM registry.altlinux.org/alt/alt:p11 AS base
 LABEL version='1.0'
 EXPOSE 8000
 
-## TODO
-## Requirements related packages
-#RUN \
-#  --mount=type=cache,target=/var/cache/apt,sharing=locked \
-#  --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
-#<<EOF
-#set -e
-#mkdir --parents /var/cache/apt/archives/partial/ /var/lib/apt/lists/partial/
-#apt-get update
-#apt-get install -y \
-#  python3-module-fastapi \
-#  python3-module-httpx \
-#  python3-module-motor \
-#  python3-module-pydantic \
-#  python3-module-pydantic-settings \
-#  python3-module-pyjwt \
-#  python3-module-python-multipart \
-#  python3-module-redis \
-#  python3-module-uvicorn \
-#  python3-module-websockets \
-#;
-#EOF
-
 RUN \
   --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
