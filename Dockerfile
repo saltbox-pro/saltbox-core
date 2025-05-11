@@ -82,13 +82,14 @@ ENTRYPOINT ["/usr/local/bin/uvicorn.sh"]
 ## Mount Core repository dir to /mnt/salt_box_core to serve with the container.
 
 FROM base AS dev
-LABEL name='saltbox-core-dev' version='1.1'
+LABEL name='saltbox-core-dev' version='1.2'
 # Install Core as editable package
 WORKDIR /mnt/salt_box_core/
 VOLUME /mnt/salt_box_core/
 RUN \
   --mount=type=bind,target=/mnt/salt_box_core/,readwrite \
   pip3 install --no-deps --editable .[dev]
+ENV TASKIQ_RELOAD=1
 CMD ["dev"]
 
 

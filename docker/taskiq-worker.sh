@@ -10,7 +10,7 @@
 
 cmd='/usr/bin/taskiq worker salt_box_core.tkq:broker salt_box_core.jobs salt_box_core.settings -w 1 --max-fails 1'
 
-if [ -n "$DEBUG" ] && [ "$DEBUG" != 0 ]; then
+if [ "$TASKIQ_RELOAD" = 1 ]; then
   cmd="$cmd --reload"
 fi
 
