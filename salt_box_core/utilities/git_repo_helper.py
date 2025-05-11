@@ -56,73 +56,98 @@ class ManifestSchema(BaseModel):
         extra = Extra.forbid
 
 
-def checksum(file: Path, digest: str = 'sha256') -> str:
-    with open(file, 'rb') as file_stream:
-        digest_obj = hashlib.file_digest(file_stream, digest)
-    return digest_obj.hexdigest()
+class SshfsFileSyncer():
+    def __init__(self, file_path: Path, file_entry: ManifestSshfsFilesSchema) -> None:
+        self.file_entry = file_entry
+        self.dest_path = SETTINGS.sshfs_path / file_path
+        self.digest_path = self.dest_path.parent / f'{self.dest_path.name}.{self.file_entry.checksum_type}'
 
+    def make_checksum(self) -> str:
+        with open(self.dest_path, 'rb') as file_stream:
+            digest_obj = hashlib.file_digest(file_stream, self.file_entry.checksum_type)
+        new_checksum = digest_obj.hexdigest()
+        with open(self.digest_path, 'w') as digest_file:
+            digest_file.write(new_checksum)
+        return new_checksum
 
-async def sync_sshfs_file(file_path: Path, file_entry: ManifestSshfsFilesSchema) -> None:
-    dest_path = SETTINGS.sshfs_path / file_path
-    try:
-        dest_path.parent.mkdir(parents=True, exist_ok=True)
-    except OSError as err:
-        raise GitRepoSshfsFileSyncError(err)
+    def update_required(self) -> bool:
+        # Fix general inconsistent states
+        if self.digest_path.exists():
+            if self.dest_path.exists():
+                if self.dest_path.stat().st_ctime >= self.digest_path.stat().st_ctime:
+                    logger.warning('File %s created later than checksum file, checksum will be updated')
+                    self.make_checksum()
+            else:
+                logger.warning('Deleting dangled checksum %s', self.digest_path)
+                self.digest_path.unlink()
+                return True
+        else:
+            if self.dest_path.exists():
+                logger.warning('File %s exists but has no checksum file, will create now', self.dest_path)
+                self.make_checksum()
+            else:
+                return True
 
-    digest_path = dest_path.parent / f'{dest_path.name}.{file_entry.checksum_type}'
-    if digest_path.exists():
-        if dest_path.exists():
-            ...  # TODO Compare ctime
-        try:
-            with open(digest_path) as digest_file:
-                local_checksum = digest_file.read().strip()
-        except OSError as err:
-            raise GitRepoSshfsFileSyncError(err)
-        if local_checksum == file_entry.checksum:
-            logger.debug('Local file %s checksum matches the manifest, skipping donwloading', dest_path)
+        # Compare local checksum with manifest one
+        with open(self.digest_path) as digest_file:
+            local_checksum = digest_file.read().strip()
+        if local_checksum == self.file_entry.checksum:
+            return False
+
+        return True
+
+    async def sync(self) -> None:
+        """
+        Update local file in sshfs location if required
+
+        :raises OSError: on filesystem operations errors
+        :raises SshfsFileSync:
+        """
+        if not self.update_required():
+            logger.debug('Local file %s needs no update', self.dest_path)
             return
 
-    headers: dict[str, str] = {}
-    if file_entry.token:
-        headers['private-token'] = file_entry.token
+        self.dest_path.parent.mkdir(parents=True, exist_ok=True)
 
-    try:
-        async with (
-            httpx.AsyncClient() as client,
-            client.stream('GET', str(file_entry.url), headers=headers) as response
-        ):
-            response.raise_for_status()
-            with open(dest_path, 'wb') as file:
-                async for chunk in response.aiter_bytes():
-                    file.write(chunk)
-    except (httpx.HTTPError, OSError) as err:
-        raise GitRepoSshfsFileSyncError(err)
-    except httpx.HTTPStatusError as err:
-        raise GitRepoSshfsFileSyncError(f'Response {err.response.status_code} for {err.request.url!r}')
+        headers: dict[str, str] = {}
+        if self.file_entry.token:
+            headers['private-token'] = self.file_entry.token
 
-    cont_disp_hdr = 'content-disposition'
-    header_ok = True
-    if (content_dispos := response.headers.get(cont_disp_hdr)) is not None:
-        message = Message()
-        message[cont_disp_hdr] = content_dispos
-        if message.get_content_disposition() == 'attachment':
-            logger.info('Donwloaded %s to %s', message.get_filename(), dest_path)
+        try:
+            async with (
+                httpx.AsyncClient() as client,
+                client.stream('GET', str(self.file_entry.url), headers=headers) as response
+            ):
+                response.raise_for_status()
+                with open(self.dest_path, 'wb') as file:
+                    async for chunk in response.aiter_bytes():
+                        file.write(chunk)
+        except httpx.HTTPError as err:
+            raise GitRepoSshfsFileSyncError(err)
+        except httpx.HTTPStatusError as err:
+            raise GitRepoSshfsFileSyncError(f'Response {err.response.status_code} for {err.request.url!r}')
+
+        cont_disp_hdr = 'content-disposition'
+        header_ok = True
+        if (content_dispos := response.headers.get(cont_disp_hdr)) is not None:
+            message = Message()
+            message[cont_disp_hdr] = content_dispos
+            if message.get_content_disposition() == 'attachment':
+                logger.info('Donwloaded %s to %s', message.get_filename(), self.dest_path)
+            else:
+                header_ok = False
+                logger.warning('Content-Disposition header is not attachment for %s', response.url)
         else:
             header_ok = False
-            logger.warning('Content-Disposition header is not attachment for %s', response.url)
-    else:
-        header_ok = False
-        logger.warning('Missing Content-Disposition header for %s', response.url)
+            logger.warning('Missing Content-Disposition header for %s', response.url)
 
-    new_checksum = checksum(dest_path, file_entry.checksum_type)
-    with open(digest_path, 'w') as digest_file:
-        digest_file.write(new_checksum)
+        new_checksum = self.make_checksum()
 
-    if new_checksum != file_entry.checksum:
-        msg = f'Checksum of downloaded {dest_path} mismatches the manifest'
-        if not header_ok:
-            msg += ', Content-Disposition header was unexpected'
-        raise GitRepoSshfsFileSyncError(msg)
+        if new_checksum != self.file_entry.checksum:
+            msg = f'Checksum of downloaded {self.dest_path} mismatches the manifest'
+            if not header_ok:
+                msg += ', Content-Disposition header was unexpected'
+            raise GitRepoSshfsFileSyncError(msg)
 
 
 def is_ssh_repo_url(repo_url: str) -> bool:
@@ -264,7 +289,7 @@ class GitRepoService:
         # take only path from `states` dir
         try:
             salt_find_sls_index = file.parts.index(self.local_name)
-            path_parts = file.parts[salt_find_sls_index + 1 : -1]
+            path_parts = file.parts[salt_find_sls_index + 1: -1]
         except ValueError:
             path_parts = ()
         logger.debug('parts_after_salt_find_sls: %s', path_parts)
@@ -326,16 +351,20 @@ class GitRepoService:
         return None
 
     def parse_manifest(self) -> ManifestSchema:
+        """
+        :raises OSError: on filesystem operations errors
+        :raises GitRepoManifestError:
+        """
         path = self.get_manifest_file()
         if path is None:
             logger.warning('Not found manifest file in repo %s, using defaults', self.local_path)
             return ManifestSchema()
 
-        try:
-            with open(path, 'r') as m_file:
+        with open(path, 'r') as m_file:
+            try:
                 manifest_data = yaml.load(m_file)
-        except (OSError, ScannerError) as err:
-            raise GitRepoManifestError(err)
+            except ScannerError as err:
+                raise GitRepoManifestError(err)
 
         try:
             return ManifestSchema.parse_obj(manifest_data)

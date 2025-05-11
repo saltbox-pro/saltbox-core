@@ -19,7 +19,7 @@ from salt_box_core.utilities.git_repo_helper import (
     GitRepoService,
     MultipleRepoSyncError,
     repository_lock,
-    sync_sshfs_file,
+    SshfsFileSyncer,
 )
 
 SETTINGS = Settings()
@@ -93,7 +93,7 @@ async def sync_sls_repo_task(
             # TODO Keep manifest.root in MasterModel
             manifest = git_repo.parse_manifest()
             for file_path, file_entry in manifest.sshfs_files.items():
-                await sync_sshfs_file(file_path, file_entry)
+                await SshfsFileSyncer(file_path, file_entry).sync()
 
             logger.debug('Try to parse schemas')
             schemas, errors = git_repo.extract_schema_from_sls()
