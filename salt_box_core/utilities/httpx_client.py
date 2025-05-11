@@ -1,8 +1,9 @@
 from collections.abc import AsyncGenerator
 
 import httpx
+from httpx import BasicAuth
 
-from salt_box_core.config import logger
+from salt_box_core.config import SETTINGS, logger
 
 
 class AsyncHttpxClientSingleton:
@@ -13,7 +14,10 @@ class AsyncHttpxClientSingleton:
     def __new__(cls) -> 'AsyncHttpxClientSingleton':
         if not hasattr(cls, 'instance'):
             cls.instance = super().__new__(cls)
-            cls.instance.httpx_client = httpx.AsyncClient()
+            auth = None
+            if SETTINGS.basic_auth_username and SETTINGS.basic_auth_password:
+                auth = BasicAuth(SETTINGS.basic_auth_username, SETTINGS.basic_auth_password)
+            cls.instance.httpx_client = httpx.AsyncClient(auth=auth)
             logger.debug('HTTPX AsyncClient initialized.')
         return cls.instance
 

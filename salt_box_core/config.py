@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     taskiq_broker_url: str = ''
     debug: bool = False
     show_docs: bool = False
+    basic_auth_username: str | None = None
+    basic_auth_password: str | None = None
     base_url_root_path: str = '/'
     max_count: int = Field(default=1000, description='Max array length to request')
     mongo_db: str = ''
