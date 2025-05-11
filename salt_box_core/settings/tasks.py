@@ -90,7 +90,6 @@ async def sync_sls_repo_task(
             git_repo.clone_or_pull()
             logger.debug('Repo cloned or pulled')
 
-            # TODO Keep manifest.root in MasterModel
             manifest = git_repo.parse_manifest()
             for file_path, file_entry in manifest.sshfs_files.items():
                 await SshfsFileSyncer(file_path, file_entry).sync()
@@ -102,6 +101,7 @@ async def sync_sls_repo_task(
             created, updated, removed_count = await sync_schemas(repo_obj.id, repo, schemas, parsed_schema_names)
 
             update_data = {
+                'root': str(manifest.root),
                 'last_synced': datetime.now(UTC),
                 'is_last_sync_successful': True,
                 'last_sync_error': '\n'.join(errors) if errors else '',
@@ -112,7 +112,6 @@ async def sync_sls_repo_task(
             await notify_masters()
 
             return {
-                # TODO root
                 'created': created,
                 'updated': updated,
                 'removed_count': removed_count,
