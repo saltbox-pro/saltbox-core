@@ -2,13 +2,14 @@ import json
 import re
 import shutil
 from contextlib import asynccontextmanager
+from email.message import Message
 from pathlib import Path
 from typing import Annotated, Literal
 
 import httpx
 from git import Repo
-from redis.asyncio import Redis
 from pydantic import AfterValidator, BaseModel, Extra, HttpUrl, ValidationError
+from redis.asyncio import Redis
 from ruamel.yaml import YAML
 from ruamel.yaml.scanner import ScannerError
 
@@ -23,9 +24,13 @@ class GitRepoManifestError(GitRepoError): ...
 class GitRepoSshfsFileSyncError(GitRepoError): ...
 
 
-def is_not_abs(value: Path) -> Path:
+def _is_not_abs(value: Path) -> Path:
     if value.is_absolute():
         raise ValueError()
+    return value
+
+
+def _default_digest(value: ...) -> Path:
     return value
 
 
@@ -38,11 +43,11 @@ class ManifestSshfsFilesSchema(BaseModel):
         extra = Extra.forbid
 
 
-NotAbsolutePath = Annotated[Path, AfterValidator(is_not_abs)]
+NotAbsolutePath = Annotated[Path, AfterValidator(_is_not_abs)]
 
 
 class ManifestSchema(BaseModel):
-    root: NotAbsolutePath = Path('')
+    root: NotAbsolutePath = Path()
     sshfs_files: dict[NotAbsolutePath, ManifestSshfsFilesSchema] = {}
 
     class Config:
@@ -53,7 +58,6 @@ def checksum(file: Path, digest: str = 'sha256') -> str:
     ...
 
 
-# FIXME (a.karmanov): DOUBLED LOG
 async def sync_sshfs_file(file_path: Path, file_entry: ManifestSshfsFilesSchema) -> None:
     dest_path = SETTINGS.sshfs_path / file_path
     try:
@@ -83,10 +87,17 @@ async def sync_sshfs_file(file_path: Path, file_entry: ManifestSshfsFilesSchema)
     except httpx.HTTPStatusError as err:
         raise GitRepoSshfsFileSyncError(f'Response {err.response.status_code} for {err.request.url!r}')
 
-    logger.info('Wrote %s', dest_path)
+    cont_disp_hdr = 'content-disposition'
+    if (content_dispos := response.headers.get(cont_disp_hdr)) is not None:
+        msg = Message()
+        msg[cont_disp_hdr] = content_dispos
+        if msg.get_content_disposition() == 'attachment':
+            logger.info('Donwloaded %s to %s', msg.get_filename(), dest_path)
+        else:
+            logger.warning('')  # TODO
+    else:
+        logger.warning('')  # TODO
 
-    # TODO Check statwith 'attachment'
-    logger.info('>>> %s', response.headers.get('content-disposition', 'N/A'))
 
 
 def is_ssh_repo_url(repo_url: str) -> bool:
