@@ -2,6 +2,7 @@ import hashlib
 import json
 import re
 import shutil
+from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from email.message import Message
 from enum import Enum
@@ -33,6 +34,27 @@ class GitRepoError(RuntimeError): ...
 class MultipleRepoSyncError(GitRepoError): ...
 class GitRepoManifestError(GitRepoError): ...
 class GitRepoSshfsFileSyncError(GitRepoError): ...
+
+
+def recusive_force_remove(path: Path) -> None:
+    """ Ultima ratio """
+    if path.is_file() or path.is_symlink():
+        path.unlink()
+    else:
+        shutil.rmtree(path)
+
+
+def get_latest_ctime(path: Path) -> float:
+    """ Get latest ctime in path recursively """
+    latest = path.stat().st_ctime
+    for root, dirs, files in path.walk():
+        if (root_ctime := root.stat().st_ctime) > latest:
+            latest = root_ctime
+        for file in files:
+            file_path = root / file
+            if (file_ctime := file_path.stat().st_ctime) > latest:
+                latest = file_ctime
+    return latest
 
 
 class Digest(str, Enum):
@@ -91,8 +113,7 @@ class ManifestSchema(BaseModel):
         return self
 
 
-class SshfsFileSyncer():
-    # TODO Cleanup
+class SshfsSyncBase(ABC):
     TMP_DIR = SETTINGS.cache_dir / 'sshfs'
 
     def __init__(self, file_path: Path, file_entry: ManifestSshfsFilesSchema) -> None:
@@ -101,8 +122,15 @@ class SshfsFileSyncer():
         self.dest_path = SETTINGS.sshfs_path / file_path
         self.dest_digest_path = self.make_digest_path(self.dest_path)
 
-    def make_digest_path(self, path: Path) -> Path:
-        return path.parent / f'{path.name}.{self.file_entry.checksum_type}'
+    @abstractmethod
+    def make_digest_path(self, file: Path) -> Path:
+        """ Retruns path to digest file for file """
+
+    def is_checksum_matches(self, digest_file: Path) -> bool:
+        """ Compare checksum from file with manifest one """
+        with open(digest_file) as fstream:
+            local_checksum = fstream.read().strip()
+        return local_checksum == self.file_entry.checksum
 
     def make_checksum(self, file_path: Path) -> str:
         with open(file_path, 'rb') as file_stream:
@@ -122,31 +150,17 @@ class SshfsFileSyncer():
                 logger.info('Deleting mismatched type checksum file %s', path)
                 path.unlink()
 
-    def update_required(self) -> bool:
-        # Fix general inconsistent states
-        if self.dest_digest_path.exists():
-            if self.dest_path.exists():
-                if self.dest_path.stat().st_ctime >= self.dest_digest_path.stat().st_ctime:
-                    logger.warning('File %s created later than checksum file, checksum will be updated')
-                    self.make_checksum(self.dest_path)
-            else:
-                logger.warning('Deleting dangled checksum %s', self.dest_digest_path)
-                self.dest_digest_path.unlink()
-                return True
-        else:
-            if self.dest_path.exists():
-                logger.warning('File %s exists but has no checksum file, will create now', self.dest_path)
-                self.make_checksum(self.dest_path)
-            else:
-                return True
+    @abstractmethod
+    def check_local_data(self) -> bool:
+        """
+        Method should sane files and check if updated required for four main states:
+         - No local digest and no local data
+         - Local digest and local data presented
+         - Local data presented with no local digest (possibly interrupted copying)
+         - Local digest presented with no loca data (digest is dangled)
 
-        # Compare local checksum with manifest one
-        with open(self.dest_digest_path) as digest_file:
-            local_checksum = digest_file.read().strip()
-        if local_checksum == self.file_entry.checksum:
-            return False
-
-        return True
+        :return bool: does donwnloading data required
+        """
 
     def get_origin_filename(self, response: httpx.Response) -> str:
         cont_disp_hdr = 'content-disposition'
@@ -162,15 +176,9 @@ class SshfsFileSyncer():
             msg = f'Failed to obtain origin filename from content-disposal header for {response.url}'
             raise GitRepoSshfsFileSyncError(msg)
 
+    @abstractmethod
     def move_to_destination(self, file_path: Path) -> None:
-        digest_path = self.make_digest_path(file_path)
-        shutil.move(file_path, self.dest_path)
-        shutil.move(digest_path, self.dest_digest_path)
-        logger.debug('Moved %s to %s', file_path, self.dest_path)
-        # TODO
-        # if self.file_entry.unpack:
-        #     ...
-            # shutil.unpack_archive(..., extract_dir=self.dest_path)
+        """ Handle donwnloaded file to put expected data to destination """
 
     async def sync(self) -> None:
         """
@@ -181,7 +189,7 @@ class SshfsFileSyncer():
         """
         self.purge_type_mismatched_checksums()
 
-        if not self.update_required():
+        if not self.check_local_data():
             logger.debug('Local file %s needs no update', self.dest_path)
             return
 
@@ -218,6 +226,90 @@ class SshfsFileSyncer():
         self.move_to_destination(download_path)
 
         logger.info('File has been synced: %s', self.dest_path)
+
+
+class SshfsSyncPlainFile(SshfsSyncBase):
+    def make_digest_path(self, file: Path) -> Path:
+        return file.parent / f'{file.name}.{self.file_entry.checksum_type}'
+
+    def check_local_data(self) -> bool:
+        # Fix general inconsistent states
+        if self.dest_path.exists() and not self.dest_path.is_file():
+            logger.warning('Is not a regular file and will be deleted: %s')
+            recusive_force_remove(self.dest_path)
+
+        if self.dest_path.exists():
+            if self.dest_digest_path.exists():
+                if self.dest_path.stat().st_ctime >= self.dest_digest_path.stat().st_ctime:
+                    logger.warning('File %s created later than checksum file, checksum will be updated', self.dest_path)
+                    self.make_checksum(self.dest_path)
+            else:
+                logger.warning('File %s exists but has no checksum file, will create now', self.dest_path)
+                self.make_checksum(self.dest_path)
+        else:
+            if self.dest_digest_path.exists():
+                logger.warning('Deleting dangled checksum %s', self.dest_digest_path)
+                self.dest_digest_path.unlink()
+                return True
+            else:
+                return True
+
+        if self.is_checksum_matches(self.dest_digest_path):
+            return False
+
+        return True
+
+    def move_to_destination(self, file_path: Path) -> None:
+        digest_path = self.make_digest_path(file_path)
+        shutil.move(file_path, self.dest_path)
+        shutil.move(digest_path, self.dest_digest_path)
+        logger.debug('Moved %s to %s', file_path, self.dest_path)
+
+
+class SshfsSyncArchive(SshfsSyncBase):
+    def make_digest_path(self, file: Path) -> Path:
+        return file.parent / f'{file.name}.archive.{self.file_entry.checksum_type}'
+
+    def check_local_data(self) -> bool:
+        if self.dest_path.exists() and not self.dest_path.is_dir():
+            logger.warning('Is not a directory and will be deleted to unpack archive: %s', self.dest_path)
+            recusive_force_remove(self.dest_path)
+
+        # Only no need to sync if:
+        # - Have both digest and directory
+        # - Digest matches with manifest
+        # - Digest is newer than all directory content
+        if (
+            self.dest_path.exists()
+            and self.dest_digest_path.exists()
+            and self.is_checksum_matches(self.dest_digest_path)
+        ):
+            digest_ctime = self.dest_digest_path.stat().st_ctime
+            latest_ctime = get_latest_ctime(self.dest_path)
+            if digest_ctime > latest_ctime:
+                return False
+
+        if self.dest_path.exists():
+            logger.warning('Will be deleted to unpack archive: %s', self.dest_path)
+            recusive_force_remove(self.dest_path)
+        if self.dest_digest_path.exists():
+            logger.warning('Dangled digest will be deleted: %s', self.dest_digest_path)
+            self.dest_digest_path.unlink()
+
+        return True
+
+    def move_to_destination(self, file_path: Path) -> None:
+        digest_path = self.make_digest_path(file_path)
+        shutil.unpack_archive(file_path, extract_dir=self.dest_path)
+        file_path.unlink()
+        shutil.move(digest_path, self.dest_digest_path)
+        logger.debug('Umpacked %s to %s', file_path, self.dest_path)
+
+
+def create_sshfs_sync(file_path: Path, file_entry: ManifestSshfsFilesSchema) -> SshfsSyncBase:
+    if file_entry.unpack:
+        return SshfsSyncArchive(file_path, file_entry)
+    return SshfsSyncPlainFile(file_path, file_entry)
 
 
 def is_ssh_repo_url(repo_url: str) -> bool:
