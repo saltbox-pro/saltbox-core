@@ -37,7 +37,7 @@ class JobSchemaService(
 
     async def remove_repo_data(self) -> None:
         try:
-            path = Path(SETTINGS.local_repos_path) / SETTINGS.salt_func_local_repo_name
+            path = Path(SETTINGS.local_repos_dir) / SETTINGS.salt_func_local_repo_name
             logger.debug('Remove folder: %s', path)
             if path.exists():
                 await asyncio.to_thread(shutil.rmtree, path)

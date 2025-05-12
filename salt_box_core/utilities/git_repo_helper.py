@@ -26,7 +26,7 @@ from ruamel.yaml.scanner import ScannerError
 from typing_extensions import Self
 
 from salt_box_core.config import SETTINGS, logger
-
+from salt_box_core.utilities.filesystem import get_latest_ctime, recursive_force_remove
 yaml = YAML()
 
 
@@ -34,27 +34,6 @@ class GitRepoError(RuntimeError): ...
 class MultipleRepoSyncError(GitRepoError): ...
 class GitRepoManifestError(GitRepoError): ...
 class GitRepoSshfsFileSyncError(GitRepoError): ...
-
-
-def recusive_force_remove(path: Path) -> None:
-    """ Ultima ratio """
-    if path.is_file() or path.is_symlink():
-        path.unlink()
-    else:
-        shutil.rmtree(path)
-
-
-def get_latest_ctime(path: Path) -> float:
-    """ Get latest ctime in path recursively """
-    latest = path.stat().st_ctime
-    for root, dirs, files in path.walk():
-        if (root_ctime := root.stat().st_ctime) > latest:
-            latest = root_ctime
-        for file in files:
-            file_path = root / file
-            if (file_ctime := file_path.stat().st_ctime) > latest:
-                latest = file_ctime
-    return latest
 
 
 class Digest(str, Enum):
@@ -114,12 +93,12 @@ class ManifestSchema(BaseModel):
 
 
 class SshfsSyncBase(ABC):
-    TMP_DIR = SETTINGS.cache_dir / 'sshfs'
+    TMP_DIR = SETTINGS.sshfs_tmp_dir
 
     def __init__(self, file_path: Path, file_entry: ManifestSshfsFilesSchema) -> None:
         self.TMP_DIR.mkdir(exist_ok=True)
         self.file_entry = file_entry
-        self.dest_path = SETTINGS.sshfs_path / file_path
+        self.dest_path = SETTINGS.sshfs_dir / file_path
         self.dest_digest_path = self.make_digest_path(self.dest_path)
 
     @abstractmethod
@@ -236,7 +215,7 @@ class SshfsSyncPlainFile(SshfsSyncBase):
         # Fix general inconsistent states
         if self.dest_path.exists() and not self.dest_path.is_file():
             logger.warning('Is not a regular file and will be deleted: %s')
-            recusive_force_remove(self.dest_path)
+            recursive_force_remove(self.dest_path)
 
         if self.dest_path.exists():
             if self.dest_digest_path.exists():
@@ -273,7 +252,7 @@ class SshfsSyncArchive(SshfsSyncBase):
     def check_local_data(self) -> bool:
         if self.dest_path.exists() and not self.dest_path.is_dir():
             logger.warning('Is not a directory and will be deleted to unpack archive: %s', self.dest_path)
-            recusive_force_remove(self.dest_path)
+            recursive_force_remove(self.dest_path)
 
         # Only no need to sync if:
         # - Have both digest and directory
@@ -291,7 +270,7 @@ class SshfsSyncArchive(SshfsSyncBase):
 
         if self.dest_path.exists():
             logger.warning('Will be deleted to unpack archive: %s', self.dest_path)
-            recusive_force_remove(self.dest_path)
+            recursive_force_remove(self.dest_path)
         if self.dest_digest_path.exists():
             logger.warning('Dangled digest will be deleted: %s', self.dest_digest_path)
             self.dest_digest_path.unlink()
@@ -366,7 +345,7 @@ class GitRepoService:
             self.repo_url = f'https://{self.login}:{self.token}@{parts[1]}'
 
         self.local_name = local_name or self.repo_url.rstrip('/').split('/')[-1].replace('.git', '')
-        self.local_path = Path(SETTINGS.local_repos_path) / self.local_name
+        self.local_path = Path(SETTINGS.local_repos_dir) / self.local_name
 
     @property
     def repo(self) -> Repo | None:

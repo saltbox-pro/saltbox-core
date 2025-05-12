@@ -103,7 +103,7 @@ class SettingsSlsRepoService(
             raise
 
         try:
-            path = Path(SETTINGS.local_repos_path) / repo_settings.local_path
+            path = Path(SETTINGS.local_repos_dir) / repo_settings.local_path
             logger.debug('Remove folder: %s', path)
             if path.exists():
                 await asyncio.to_thread(shutil.rmtree, path)

@@ -5,20 +5,37 @@ from typing import Annotated, Any, Literal
 from pydantic import AfterValidator, BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from salt_box_core.utilities.filesystem import get_latest_ctime, recursive_force_remove
+
 APP_NAME = 'Salt.Box Core'
 APP_DESC = 'Salt.Box Core API'
 
 
 def validate_make_dir(value: Path) -> Path:
+    """ Returns existsing directory """
     if value.exists():
         if not value.is_dir():
-            raise ValueError(f'{value} exists and is not directory')
+            msg = f'{value} exists and is not directory'
+            raise ValueError(msg)
     else:
         value.mkdir(parents=True)
     return value
 
 
+def validate_empty_dir(value: Path) -> Path:
+    """
+    Returns existsing empty directory
+
+    BE CAREFUL TO NOT TO LOSE DATA
+    """
+    created = validate_make_dir(value)
+    for path in created.glob('*'):
+        recursive_force_remove(path)
+    return created
+
+
 MakeDirectoryPath = Annotated[Path, AfterValidator(validate_make_dir)]
+EmptyDirectoryPath = Annotated[Path, AfterValidator(validate_empty_dir)]
 
 
 class Settings(BaseSettings):
@@ -47,9 +64,13 @@ class Settings(BaseSettings):
     opa_url: str = ''
     salt_func_repo_url: str = 'https://dev.saltbox.pro/a.baikov/salt-func-schemas.git'
     salt_func_local_repo_name: str = 'salt-func-schemas'
-    local_repos_path: MakeDirectoryPath = Path('/srv/repos')  # FIXME rename to _dir
-    sshfs_path: MakeDirectoryPath = Path('/srv/sshfs/')  # FIXME rename to _dir
+    local_repos_dir: MakeDirectoryPath = Path('/srv/repos')
+    sshfs_dir: MakeDirectoryPath = Field(
+        default=Path('/srv/sshfs/'),
+        description='Path to store of files served by sshfs',
+    )
     cache_dir: MakeDirectoryPath = Path('/var/cache/saltbox-core/')
+    sshfs_tmp_dir: EmptyDirectoryPath = cache_dir / 'sshfs'
     local_repo_sync_timeout_sec: int = 600
     rabbitmq_url: str = 'amqp://guest:guest@rabbitmq:5672'
 

@@ -59,12 +59,8 @@ pytest:
   stage: test
   variables:
     PIP_CACHE_DIR: '$CI_PROJECT_DIR/.cache/pip'
-    LOCAL_REPOS_PATH: '/tmp/sb_repos/'
-    SSHFS_PATH: '/tmp/ssfs/'
-    VAR_DIR: '/var/lib/saltbox-core/'
   image: python:3.12-alpine
   before_script:
-    - mkdir -p "$LOCAL_REPOS_PATH" "$SSHFS_PATH" "$VAR_DIR"
     - pip3 install -e .[dev]
   script:
     pytest
