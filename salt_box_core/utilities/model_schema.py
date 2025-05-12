@@ -1,7 +1,6 @@
 import types
 from datetime import datetime
 from inspect import isclass
-from pathlib import Path
 from typing import Any, get_args
 from uuid import UUID
 

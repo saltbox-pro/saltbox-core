@@ -17,7 +17,7 @@ def recursive_force_remove(path: Path) -> None:
 def get_latest_ctime(path: Path) -> float:
     """ Get latest ctime in path recursively """
     latest = path.stat().st_ctime
-    for root, dirs, files in path.walk():
+    for root, _dirs, files in path.walk():
         if (root_ctime := root.stat().st_ctime) > latest:
             latest = root_ctime
         for file in files:

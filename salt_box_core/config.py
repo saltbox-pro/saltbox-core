@@ -14,7 +14,8 @@ APP_DESC = 'Salt.Box Core API'
 def validate_path_is_absolute(value: Path) -> Path:
     """ value must not be a relative Path """
     if not value.is_absolute():
-        raise ValueError('Path must be absolute')
+        msg='Path must be absolute'
+        raise ValueError(msg)
     return value
 
 

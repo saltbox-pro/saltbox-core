@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from email.message import Message
 from enum import Enum
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Self
 
 import httpx
 from git import Repo
@@ -23,7 +23,6 @@ from pydantic import (
 from redis.asyncio import Redis
 from ruamel.yaml import YAML
 from ruamel.yaml.scanner import ScannerError
-from typing_extensions import Self
 
 from salt_box_core.config import SETTINGS, logger
 from salt_box_core.utilities.filesystem import get_latest_ctime, recursive_force_remove
@@ -50,7 +49,8 @@ FIELD_SENTINEL: Any = object()
 def validate_path_is_not_absolute(value: Path) -> Path:
     """ value must be a relative Path """
     if value.is_absolute():
-        raise ValueError('Path must be relative')
+        msg = 'Path must be relative'
+        raise ValueError(msg)
     return value
 
 
@@ -109,16 +109,16 @@ class SshfsSyncBase(ABC):
 
     def is_checksum_matches(self, digest_file: Path) -> bool:
         """ Compare checksum from file with manifest one """
-        with open(digest_file) as fstream:
+        with digest_file.open() as fstream:
             local_checksum = fstream.read().strip()
         return local_checksum == self.file_entry.checksum
 
     def make_checksum(self, file_path: Path) -> str:
-        with open(file_path, 'rb') as file_stream:
+        with file_path.open('rb') as file_stream:
             digest_obj = hashlib.file_digest(file_stream, self.file_entry.checksum_type)
         new_checksum = digest_obj.hexdigest()
         digest_path = self.make_digest_path(file_path)
-        with open(digest_path, 'w') as digest_file:
+        with digest_path.open('w') as digest_file:
             digest_file.write(new_checksum)
         return new_checksum
 
@@ -188,13 +188,14 @@ class SshfsSyncBase(ABC):
                 response.raise_for_status()
                 origin_filename = self.get_origin_filename(response)
                 download_path = self.TMP_DIR / origin_filename
-                with open(download_path, 'wb') as file:
+                with download_path.open('wb') as file:
                     async for chunk in response.aiter_bytes():
                         file.write(chunk)
         except httpx.HTTPError as err:
-            raise GitRepoSshfsFileSyncError(err)
+            raise GitRepoSshfsFileSyncError(err) from None
         except httpx.HTTPStatusError as err:
-            raise GitRepoSshfsFileSyncError(f'Response {err.response.status_code} for {err.request.url!r}')
+            msg = f'Response {err.response.status_code} for {err.request.url!r}'
+            raise GitRepoSshfsFileSyncError(msg) from None
 
         logger.debug('Downloaded %s to %s', origin_filename, download_path)
 
@@ -503,16 +504,16 @@ class GitRepoService:
             logger.warning('Not found manifest file in repo %s, using defaults', self.local_path)
             return ManifestSchema()
 
-        with open(path, 'r') as m_file:
+        with path.open() as m_file:
             try:
                 manifest_data = yaml.load(m_file)
             except ScannerError as err:
-                raise GitRepoManifestError(err)
+                raise GitRepoManifestError(err) from None
 
         try:
             return ManifestSchema.parse_obj(manifest_data)
         except ValidationError as err:
-            raise GitRepoManifestError(err)
+            raise GitRepoManifestError(err) from None
 
 
 @asynccontextmanager
