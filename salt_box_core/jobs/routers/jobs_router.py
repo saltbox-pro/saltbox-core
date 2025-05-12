@@ -73,13 +73,14 @@ async def jobs_list_cursor(
 async def jobs_list(
     request: Annotated[JobsListRequest, Query()],
     job_service: JobServiceDependency,
-) -> PaginatedResponse[JobModel]:
+) -> PaginatedResponse[JobsListResponse]:
     try:
-        jobs: PaginatedResponse[JobModel] = await job_service.get_list_by_dt_paginated(
+        jobs = await job_service.get_list_by_dt_paginated(
             start_datetime=request.start_datetime,
             end_datetime=request.end_datetime,
             skip=request.skip,
             limit=request.limit,
+            projection_model=JobsListResponse,
         )
         return jobs
     except ValidationError as err:

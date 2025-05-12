@@ -236,6 +236,26 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
         else:
             return await super().get_list(start=int(start), end=int(end), limit=limit, skip=skip)
 
+    @overload
+    async def get_list_by_dt_paginated(
+        self,
+        start_datetime: Annotated[datetime, PastDatetime],
+        end_datetime: datetime | None = None,
+        limit: int | None = None,
+        skip: int = 0,
+    ) -> PaginatedResponse[JobModel]: ...
+
+    @overload
+    async def get_list_by_dt_paginated(
+        self,
+        start_datetime: Annotated[datetime, PastDatetime],
+        end_datetime: datetime | None = None,
+        limit: int | None = None,
+        skip: int = 0,
+        *,
+        projection_model: type[ProjectionModel],
+    ) -> PaginatedResponse[ProjectionModel]: ...
+
     async def get_list_by_dt_paginated(
         self,
         start_datetime: Annotated[datetime, PastDatetime],
