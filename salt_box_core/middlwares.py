@@ -26,7 +26,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         logger.debug('Dispatching request: %s', request.url.path)
-        if request.url.path in self.excluded_paths:
+        if request.url.path in self.excluded_paths or request.method == 'OPTIONS':
             return await call_next(request)
 
         token = request.headers.get('Authorization')
