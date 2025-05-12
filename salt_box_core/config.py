@@ -5,10 +5,17 @@ from typing import Annotated, Any, Literal
 from pydantic import AfterValidator, BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from salt_box_core.utilities.filesystem import get_latest_ctime, recursive_force_remove
+from salt_box_core.utilities.filesystem import recursive_force_remove
 
 APP_NAME = 'Salt.Box Core'
 APP_DESC = 'Salt.Box Core API'
+
+
+def validate_path_is_absolute(value: Path) -> Path:
+    """ value must not be a relative Path """
+    if not value.is_absolute():
+        raise ValueError('Path must be absolute')
+    return value
 
 
 def validate_make_dir(value: Path) -> Path:
@@ -34,8 +41,8 @@ def validate_empty_dir(value: Path) -> Path:
     return created
 
 
-MakeDirectoryPath = Annotated[Path, AfterValidator(validate_make_dir)]
-EmptyDirectoryPath = Annotated[Path, AfterValidator(validate_empty_dir)]
+MakeDirectoryPath = Annotated[Path, AfterValidator(validate_path_is_absolute), AfterValidator(validate_make_dir)]
+EmptyDirectoryPath = Annotated[Path, AfterValidator(validate_path_is_absolute), AfterValidator(validate_empty_dir)]
 
 
 class Settings(BaseSettings):

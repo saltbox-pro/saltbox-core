@@ -27,6 +27,7 @@ from typing_extensions import Self
 
 from salt_box_core.config import SETTINGS, logger
 from salt_box_core.utilities.filesystem import get_latest_ctime, recursive_force_remove
+
 yaml = YAML()
 
 
@@ -46,9 +47,10 @@ DEFAULT_DIGEST = Digest.SHA256
 FIELD_SENTINEL: Any = object()
 
 
-def validate_is_not_abs(value: Path) -> Path:
+def validate_path_is_not_absolute(value: Path) -> Path:
+    """ value must be a relative Path """
     if value.is_absolute():
-        raise ValueError()
+        raise ValueError('Path must be relative')
     return value
 
 
@@ -56,7 +58,7 @@ def validate_digest(value: str) -> str:
     return Digest(value).value
 
 
-NotAbsolutePath = Annotated[Path, AfterValidator(validate_is_not_abs)]
+NotAbsolutePath = Annotated[Path, AfterValidator(validate_path_is_not_absolute)]
 DigestStr = Annotated[str, AfterValidator(validate_digest)]
 
 
