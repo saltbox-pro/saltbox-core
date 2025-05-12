@@ -59,6 +59,7 @@ class KeycloakOIDC:
 
         return self._token_url
 
+    # TODO (a.baikov): Deprecated
     async def init_config(self) -> None:
         logger.debug('Initializing KeycloakOIDC configuration.')
         oidc_config = await self._get_oidc_config()
@@ -103,6 +104,11 @@ class KeycloakOIDC:
             raise KeycloakOIDCError(
                 status.HTTP_503_SERVICE_UNAVAILABLE,
                 'Timeout error fetching OIDC config. Keycloak server is unavailable.',
+            ) from None
+        except Exception as e:
+            logger.exception('Unexpected error fetching OIDC config: %s', e)
+            raise KeycloakOIDCError(
+                status.HTTP_500_INTERNAL_SERVER_ERROR, 'Unexpected error fetching OIDC config'
             ) from None
 
     async def _get_key_by_kid(self, token_kid: str) -> jwt.PyJWK:

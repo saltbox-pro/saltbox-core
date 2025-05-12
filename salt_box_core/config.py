@@ -13,8 +13,8 @@ class Settings(BaseSettings):
     taskiq_broker_url: str = ''
     debug: bool = False
     show_docs: bool = False
-    basic_auth_username: str | None = None
-    basic_auth_password: str | None = None
+    basic_auth_username: str = ''
+    basic_auth_password: str = ''
     base_url_root_path: str = '/'
     max_count: int = Field(default=1000, description='Max array length to request')
     mongo_db: str = ''
@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     redis_tls_verification: Literal['none', 'optional', 'required'] = 'required'
     redis_url: str = ''
     redis_username: str | None = None
+    keycloak_server_url: str = ''
     keycloak_front_url: str = ''
     keycloak_realm: str = ''
     keycloak_client: str = ''
@@ -42,7 +43,15 @@ class Settings(BaseSettings):
 
     @property
     def keycloak_oidc_url(self) -> str:
-        return f'{self.keycloak_front_url}/realms/{self.keycloak_realm}/.well-known/openid-configuration'
+        return f'{self.keycloak_server_url}/realms/{self.keycloak_realm}/.well-known/openid-configuration'
+
+    @property
+    def keycloak_authorization_endpoint(self) -> str:
+        return f'{self.keycloak_front_url}/realms/{self.keycloak_realm}/protocol/openid-connect/auth'
+
+    @property
+    def keycloak_token_url(self) -> str:
+        return f'{self.keycloak_front_url}/realms/{self.keycloak_realm}/protocol/openid-connect/token'
 
     @property
     def mongo_url(self) -> str:

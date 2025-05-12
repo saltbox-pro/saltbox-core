@@ -15,7 +15,7 @@ class AsyncHttpxClientSingleton:
         if not hasattr(cls, 'instance'):
             cls.instance = super().__new__(cls)
             auth = None
-            if SETTINGS.basic_auth_username and SETTINGS.basic_auth_password:
+            if SETTINGS.basic_auth_username != '' and SETTINGS.basic_auth_password != '':
                 auth = BasicAuth(SETTINGS.basic_auth_username, SETTINGS.basic_auth_password)
             cls.instance.httpx_client = httpx.AsyncClient(auth=auth)
             logger.debug('HTTPX AsyncClient initialized.')

@@ -25,14 +25,11 @@ from salt_box_core.tasks.routers.tasks_router import ws_router as task_ws_router
 from salt_box_core.tasks.routers.template_router import router as template_router
 from salt_box_core.tkq import broker
 from salt_box_core.utilities.custom_openapi import get_custom_openapi_schema
-from salt_box_core.utilities.keycloak_oidc import KeycloakOIDCFactory
 from salt_box_core.utilities.redis_cache import CustomRedisCache
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator:
-    oidc = KeycloakOIDCFactory.get_instance()
-    await oidc.init_config()
     await init_mongo_db()
     if not broker.is_worker_process:
         await broker.startup()

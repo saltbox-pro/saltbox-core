@@ -2,8 +2,7 @@ from typing import Any
 
 from fastapi.openapi.utils import get_openapi
 
-from salt_box_core.config import logger
-from salt_box_core.utilities.keycloak_oidc import KeycloakOIDCFactory
+from salt_box_core.config import SETTINGS, logger
 
 
 def get_custom_openapi_schema(
@@ -25,13 +24,12 @@ def get_custom_openapi_schema(
     """
 
     logger.debug('KeycloakOIDC in get_custom_openapi_schema.')
-    oidc = KeycloakOIDCFactory.get_instance()
     oauth2_scheme = {
         'type': 'oauth2',
         'flows': {
             'authorizationCode': {
-                'authorizationUrl': oidc.authorization_endpoint,
-                'tokenUrl': oidc.token_url,
+                'authorizationUrl': SETTINGS.keycloak_authorization_endpoint,
+                'tokenUrl': SETTINGS.keycloak_token_url,
                 'scopes': {'openid': 'OpenID Connect scope'},
             }
         },
