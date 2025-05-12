@@ -165,7 +165,7 @@ async def minion_retrieve(
 
 
 @router.delete(
-    '/{slug}',
+    '/{mid}',
     operation_id='minion_delete',
     status_code=status.HTTP_204_NO_CONTENT,
     responses={
