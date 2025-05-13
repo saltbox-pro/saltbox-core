@@ -138,10 +138,13 @@ class SortedsetRedisRepository(AbstractRepository[T], Generic[T]):
     async def count(
         self, start: SortedSetId | int | float | None = None, end: SortedSetId | int | float | None = None
     ) -> int:
+        start = start or float('-inf')
+        end = end or float('inf')
+
         return await self._database.zcount(
             name=self.Meta.collection_name,
-            min=start if start else float('-inf'),
-            max=end if end else float('inf'),
+            min=min(start, end),
+            max=max(start, end),
         )
 
     async def exists(self, query: SortedSetId) -> bool:
