@@ -74,12 +74,15 @@ async def jobs_list(
     request: Annotated[JobsListRequest, Query()],
     job_service: JobServiceDependency,
 ) -> PaginatedResponse[JobsListResponse]:
+    start_datetime = request.start_datetime if not request.desc else request.end_datetime
+    end_datetime = request.end_datetime if not request.desc else request.start_datetime
     try:
         jobs = await job_service.get_list_by_dt_paginated(
-            start_datetime=request.start_datetime,
-            end_datetime=request.end_datetime,
+            start_datetime=start_datetime,
+            end_datetime=end_datetime,
             skip=request.skip,
             limit=request.limit,
+            desc=request.desc,
             projection_model=JobsListResponse,
         )
         return jobs

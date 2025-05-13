@@ -225,16 +225,17 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
         end_datetime: datetime | None = None,
         limit: int | None = None,
         skip: int = 0,
+        desc: bool = False,
         projection_model: type[ProjectionModel] | None = None,
     ) -> list[JobModel] | list[ProjectionModel]:
         start, end = self.__get_start_end_from_dt(start_datetime, end_datetime)
 
         if projection_model:
             return await super().get_list(
-                start=int(start), end=int(end), limit=limit, skip=skip, projection_model=projection_model
+                start=int(start), end=int(end), limit=limit, skip=skip, desc=desc, projection_model=projection_model
             )
         else:
-            return await super().get_list(start=int(start), end=int(end), limit=limit, skip=skip)
+            return await super().get_list(start=int(start), end=int(end), limit=limit, skip=skip, desc=desc)
 
     @overload
     async def get_list_by_dt_paginated(
@@ -243,6 +244,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
         end_datetime: datetime | None = None,
         limit: int | None = None,
         skip: int = 0,
+        desc: bool = False,
     ) -> PaginatedResponse[JobModel]: ...
 
     @overload
@@ -252,6 +254,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
         end_datetime: datetime | None = None,
         limit: int | None = None,
         skip: int = 0,
+        desc: bool = False,
         *,
         projection_model: type[ProjectionModel],
     ) -> PaginatedResponse[ProjectionModel]: ...
@@ -262,16 +265,17 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
         end_datetime: datetime | None = None,
         limit: int | None = None,
         skip: int = 0,
+        desc: bool = False,
         projection_model: type[ProjectionModel] | None = None,
     ) -> PaginatedResponse[JobModel] | PaginatedResponse[ProjectionModel]:
         start, end = self.__get_start_end_from_dt(start_datetime, end_datetime)
 
         if projection_model:
             return await super().get_list_paginated(
-                start=int(start), end=int(end), limit=limit, skip=skip, projection_model=projection_model
+                start=int(start), end=int(end), limit=limit, skip=skip, desc=desc, projection_model=projection_model
             )
         else:
-            return await super().get_list_paginated(start=int(start), end=int(end), limit=limit, skip=skip)
+            return await super().get_list_paginated(start=int(start), end=int(end), limit=limit, skip=skip, desc=desc)
 
     async def get_job_returns(
         self,

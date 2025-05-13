@@ -128,11 +128,12 @@ class PubData(BaseModel):
 
 class JobsListRequest(SkipLimitParams):
     start_datetime: Annotated[datetime, PastDatetime]
-    end_datetime: datetime | None = None
+    end_datetime: datetime
+    desc: bool = True
 
     @model_validator(mode='after')
     def dt_validate(self) -> Self:
-        if self.end_datetime and self.start_datetime > self.end_datetime:
+        if self.start_datetime > self.end_datetime:
             msg = '`end_datetime` must be before `start_datetime`'
             raise ValueError(msg)
 

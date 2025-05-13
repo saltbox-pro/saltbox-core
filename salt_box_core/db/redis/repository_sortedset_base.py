@@ -95,11 +95,17 @@ class SortedsetRedisRepository(AbstractRepository[T], Generic[T]):
         return await self._database.zscan(name=self.Meta.collection_name, cursor=cursor, match=match, count=count)
 
     @overload
-    async def get_list(self, start: int, end: int | None, limit: int | None, skip: int) -> list[T]: ...
+    async def get_list(self, start: int, end: int | None, limit: int | None, skip: int, desc: bool) -> list[T]: ...
 
     @overload
     async def get_list(
-        self, start: int, end: int | None, limit: int | None, skip: int, projection_model: type[ProjectionModel]
+        self,
+        start: int,
+        end: int | None,
+        limit: int | None,
+        skip: int,
+        desc: bool,
+        projection_model: type[ProjectionModel],
     ) -> list[ProjectionModel]: ...
 
     async def get_list(
@@ -108,12 +114,14 @@ class SortedsetRedisRepository(AbstractRepository[T], Generic[T]):
         end: int | None = None,
         limit: int | None = None,
         skip: int = 0,
+        desc: bool = False,
         projection_model: type[ProjectionModel] | None = None,
     ) -> list[T] | list[ProjectionModel]:
         _result = await self._database.zrange(
             name=self.Meta.collection_name,
             start=start,
             end=-1 if end is None else end,
+            desc=desc,
             offset=skip,
             num=limit,
             withscores=True,

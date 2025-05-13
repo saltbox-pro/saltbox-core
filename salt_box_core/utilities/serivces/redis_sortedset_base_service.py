@@ -37,11 +37,19 @@ class RedisSortedsetBaseService(
         return result
 
     @overload
-    async def get_list(self, start: int, end: int | None, limit: int | None, skip: int) -> list[ModelType]: ...
+    async def get_list(
+        self, start: int, end: int | None, limit: int | None, skip: int, desc: bool
+    ) -> list[ModelType]: ...
 
     @overload
     async def get_list(
-        self, start: int, end: int | None, limit: int | None, skip: int, projection_model: type[ProjectionModel]
+        self,
+        start: int,
+        end: int | None,
+        limit: int | None,
+        skip: int,
+        desc: bool,
+        projection_model: type[ProjectionModel],
     ) -> list[ProjectionModel]: ...
 
     async def get_list(
@@ -50,14 +58,15 @@ class RedisSortedsetBaseService(
         end: int | None = None,
         limit: int | None = None,
         skip: int = 0,
+        desc: bool = False,
         projection_model: type[ProjectionModel] | None = None,
     ) -> list[ModelType] | list[ProjectionModel]:
         if projection_model:
             return await self.repo.get_list(
-                start=start, end=end, limit=limit, skip=skip, projection_model=projection_model
+                start=start, end=end, limit=limit, skip=skip, desc=desc, projection_model=projection_model
             )
 
-        return await self.repo.get_list(start=start, end=end, limit=limit, skip=skip)
+        return await self.repo.get_list(start=start, end=end, limit=limit, skip=skip, desc=desc)
 
     @overload
     async def create(self, data: CreateSchema) -> ModelType: ...
@@ -77,7 +86,7 @@ class RedisSortedsetBaseService(
 
     @overload
     async def get_list_paginated(
-        self, start: int, end: int, limit: int | None, skip: int
+        self, start: int, end: int, limit: int | None, skip: int, desc: bool
     ) -> PaginatedResponse[ModelType]: ...
 
     @overload
@@ -87,6 +96,7 @@ class RedisSortedsetBaseService(
         end: int | None,
         limit: int | None,
         skip: int,
+        desc: bool,
         projection_model: type[ProjectionModel],
     ) -> PaginatedResponse[ProjectionModel]: ...
 
@@ -96,16 +106,17 @@ class RedisSortedsetBaseService(
         end: int | None = None,
         limit: int | None = None,
         skip: int = 0,
+        desc: bool = False,
         projection_model: type[ProjectionModel] | None = None,
     ) -> PaginatedResponse[ModelType] | PaginatedResponse[ProjectionModel]:
         total = await self.repo.count(start=start, end=end)
 
         if projection_model:
             data = await self.repo.get_list(
-                start=start, end=end, limit=limit, skip=skip, projection_model=projection_model
+                start=start, end=end, limit=limit, skip=skip, desc=desc, projection_model=projection_model
             )
         else:
-            data = await self.repo.get_list(start=start, end=end, limit=limit, skip=skip)
+            data = await self.repo.get_list(start=start, end=end, limit=limit, skip=skip, desc=desc)
 
         return PaginatedResponse(total=total, data=data)
 
