@@ -36,7 +36,7 @@ async def notify_masters() -> None:
     active_repos = await SettingsSlsRepoService(sls_repo_repo).get_list(query={'is_active': True}, skip=0, limit=0)
     msg_repos = [MasterMessageSlsRepoModel(**repo.dict()) for repo in active_repos]
     for m_obj in masters:
-        msg = ListSlsReposMessage(repos=msg_repos, master=m_obj.name)
+        msg = ListSlsReposMessage(repos=msg_repos, master=m_obj.master_id)
         await send_message_to_master(msg, 'sync_repos')
 
 

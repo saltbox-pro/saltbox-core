@@ -1,6 +1,6 @@
 from enum import Enum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from salt_box_core.db.mongo.schemas_base import IDMixin
 from salt_box_core.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
@@ -13,18 +13,17 @@ class MasterStatus(str, Enum):
 
 
 class MasterReadOnlyFieldsMixin:
-    name: str = Field(title='Name', min_length=3)
+    master_id: str = Field(title='Master ID', min_length=3)
 
 
 class MasterSecretsMixin:
-    secret: str | None = Field(title='Secret', default=None)  # TODO @: make encrypted
+    pubkey: str | None = Field(title='Public key', default=None)
 
 
 class MasterEditableFieldsMixin:
     title: str = Field(title='Title', min_length=3)
 
     status: MasterStatus = Field(title='Status', default=MasterStatus.new)
-    alias: str | None = Field(title='Alias', default=None)
 
 
 class MasterCreateSchema(BaseModel, MasterEditableFieldsMixin, MasterReadOnlyFieldsMixin, MasterSecretsMixin):
@@ -40,7 +39,10 @@ class MasterUpdateSchema(BaseModel, MasterEditableFieldsMixin, MasterSecretsMixi
 class MasterModel(
     BaseModel, CreatedModifiedMixin, MasterEditableFieldsMixin, MasterReadOnlyFieldsMixin, MasterSecretsMixin, IDMixin
 ):
-    pass
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def is_pubkey_set(self) -> bool:
+        return self.pubkey is not None
 
 
 class MasterViewSchema(BaseModel, CreatedModifiedMixin, MasterEditableFieldsMixin, MasterReadOnlyFieldsMixin, IDMixin):

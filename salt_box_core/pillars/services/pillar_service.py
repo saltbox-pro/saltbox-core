@@ -104,7 +104,7 @@ class PillarService:
         self, name: str, value: str, master_id: str, minion_id: str | None = None, update_pillar_cache: bool = True
     ) -> PillarModel:
         try:
-            await self.master_service.get_by_name_or_alias(value=master_id)
+            await self.master_service.get_by_master_id(master_id=master_id)
         except ObjectNotFoundError as e:
             msg = f'Master "{master_id}" does not exist'
             raise ValueError(msg) from e
@@ -196,7 +196,7 @@ class PillarService:
                 error_codes = []
 
                 try:
-                    await self.master_service.get_by_name_or_alias(value=master_id)
+                    await self.master_service.get_by_master_id(master_id=master_id)
                 except ObjectNotFoundError:
                     error_codes.append(PillarCSVParseResultErrorCode.master_does_not_exist)
 

@@ -5,19 +5,22 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from faststream import ContextRepo, FastStream
+from faststream.broker.types import BrokerMiddleware
 from faststream.redis import RedisBroker
-from faststream.redis.publisher.asyncapi import AsyncAPIPublisher
-from faststream.redis.subscriber.asyncapi import AsyncAPISubscriber
 from faststream.security import SASLPlaintext
 
 from salt_box_core.config import SETTINGS, logger
 from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.event_bus.masters_subscribers import router as masters_router
+from salt_box_core.event_bus.masters_subscribers import router_not_auth as masters_router_not_auth
+from salt_box_core.masters.repositories.master_repository import MasterRepository, get_master_repository
+from salt_box_core.masters.services.master_service import MasterService, get_master_service
 from salt_box_core.minion_collections.repositories.minion_repository import MinionRepository, get_minion_repository
 from salt_box_core.minion_collections.services.minion_service import MinionService, get_minion_service
+from salt_box_core.utilities.gpg import SaltBoxCrypt
 
 
-def get_faststream_broker() -> RedisBroker:
+def get_faststream_broker(middlewares: list[BrokerMiddleware] | None = None) -> RedisBroker:
     if SETTINGS.redis_username is None or SETTINGS.redis_password is None:
         msg = 'You must provide both `redis_username` and `redis_password`'
         raise ValueError(msg)
@@ -39,39 +42,40 @@ def get_faststream_broker() -> RedisBroker:
     else:
         security = SASLPlaintext(username=SETTINGS.redis_username, password=SETTINGS.redis_password)
 
+    if middlewares:
+        return RedisBroker(url=SETTINGS.redis_url, security=security, middlewares=middlewares)
+
     return RedisBroker(url=SETTINGS.redis_url, security=security)
-
-
-def get_faststream_subscriber(channel: str) -> AsyncAPISubscriber:
-    broker: RedisBroker = get_faststream_broker()
-
-    return broker.subscriber(channel)
-
-
-def get_faststream_publisher(channel: str) -> AsyncAPIPublisher:
-    broker: RedisBroker = get_faststream_broker()
-
-    return broker.publisher(channel)
 
 
 @asynccontextmanager
 async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
     mongo_db = get_mongo_db()
+    saltbox_crypt = SaltBoxCrypt()
+    master_repository: MasterRepository = get_master_repository(db=mongo_db)
+    master_service: MasterService = get_master_service(repo=master_repository)
     minion_repository: MinionRepository = get_minion_repository(db=mongo_db)
-    minion_service: MinionService = get_minion_service(minion_repository)
+    minion_service: MinionService = get_minion_service(repo=minion_repository)
 
+    context.set_global('master_service', master_service)
     context.set_global('minion_service', minion_service)
+    context.set_global('saltbox_crypt', saltbox_crypt)
 
     yield
 
     del minion_service
     del minion_repository
+    del master_service
+    del master_repository
+    del saltbox_crypt
 
 
 def get_faststream_app() -> FastStream:
+    # broker: RedisBroker = get_faststream_broker(middlewares=[MastersAuthMiddleware])
     broker: RedisBroker = get_faststream_broker()
 
     # Include your FastStream routers here
+    broker.include_router(masters_router_not_auth)
     broker.include_router(masters_router)
 
     return FastStream(broker, lifespan=lifespan)

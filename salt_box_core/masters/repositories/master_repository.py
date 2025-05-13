@@ -9,8 +9,8 @@ from salt_box_core.masters.schemas.master_schemas import MasterModel
 
 
 class MasterRepository(BaseMongoRepository[MasterModel]):
-    async def get_by_name_or_alias(self, value: str) -> MasterModel:
-        return await self.get(query={'$or': [{'name': value}, {'alias': value}]})
+    async def get_by_master_id(self, value: str) -> MasterModel:
+        return await self.get(query={'master_id': value})
 
     class Meta:
         collection_name = 'master'
