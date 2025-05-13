@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def recursive_force_remove(path: Path) -> None:
-    """ Ultima ratio: rm -rf incarnation """
+    """Ultima ratio: rm -rf incarnation"""
     if path.is_file() or path.is_symlink():
         path.unlink()
     else:
@@ -15,7 +15,7 @@ def recursive_force_remove(path: Path) -> None:
 
 
 def get_latest_ctime(path: Path) -> float:
-    """ Get latest ctime in path recursively """
+    """Get latest ctime in path recursively"""
     latest = path.stat().st_ctime
     for root, _dirs, files in path.walk():
         if (root_ctime := root.stat().st_ctime) > latest:

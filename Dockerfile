@@ -39,6 +39,8 @@ COPY --chmod=755 \
   docker/taskiq-scheduler.sh \
   /usr/local/bin/
 
+RUN mkdir --parents /var/lib/saltbox-core/
+
 ENV BASE_URL_ROOT_PATH=/
 ENV TIMEOUT_GRACEFUL_SHUTDOWN=5
 

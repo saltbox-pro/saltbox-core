@@ -8,6 +8,7 @@ from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import PyObjectId
 from salt_box_core.db.schemas_base import PaginatedResponse
 from salt_box_core.event_bus.masters_bus import send_message_and_wait_response_to_master
+from salt_box_core.masters.schemas.master_schemas import MasterModel, MasterStatus
 from salt_box_core.masters.services.master_service import MasterService, get_master_service
 from salt_box_core.minion_collections.schemas.event_bus_schemas import GatherMinionsByTargeting
 from salt_box_core.minion_collections.schemas.minion_schemas import (
@@ -114,13 +115,19 @@ async def gather_minions(
     master: str,
     master_service: Annotated[MasterService, Depends(get_master_service)],
 ) -> MinionGatherResponseSchema:
-    master_key: str = await master_service.get_master_key(master)
+    try:
+        master_obj: MasterModel = await master_service.get_by_master_id(master)
 
-    minions = await send_message_and_wait_response_to_master(
-        message=GatherMinionsByTargeting(master=master_key, tgt=tgt, tgt_type=tgt_type),
-        message_tag='gather_minions',
-        response_timeout=10.0,
-    )
+        if master_obj.status != MasterStatus.accepted:
+            raise HTTPException(status_code=403, detail='Master not accepted')
+
+        minions = await send_message_and_wait_response_to_master(
+            message=GatherMinionsByTargeting(master=master_obj.master_id, tgt=tgt, tgt_type=tgt_type),
+            message_tag='gather_minions',
+            response_timeout=10.0,
+        )
+    except ObjectNotFoundError as e:
+        raise HTTPException(status_code=404, detail=str(e)) from None
 
     return MinionGatherResponseSchema.model_validate(minions)
 

@@ -31,8 +31,14 @@ yaml = YAML()
 
 
 class GitRepoError(RuntimeError): ...
+
+
 class MultipleRepoSyncError(GitRepoError): ...
+
+
 class GitRepoManifestError(GitRepoError): ...
+
+
 class GitRepoSshfsFileSyncError(GitRepoError): ...
 
 
@@ -47,7 +53,7 @@ FIELD_SENTINEL: Any = object()
 
 
 def validate_path_is_not_absolute(value: Path) -> Path:
-    """ value must be a relative Path """
+    """value must be a relative Path"""
     if value.is_absolute():
         msg = 'Path must be relative'
         raise ValueError(msg)
@@ -67,9 +73,7 @@ class ManifestSshfsFilesSchema(BaseModel):
     checksum: str
     checksum_type: DigestStr = FIELD_SENTINEL
     token: str | None = FIELD_SENTINEL
-    unpack: bool = Field(
-        default=False,
-        description='Unpack arhive rather than processing as a regular file')
+    unpack: bool = Field(default=False, description='Unpack arhive rather than processing as a regular file')
 
     class Config:
         extra = Extra.forbid
@@ -105,10 +109,10 @@ class SshfsSyncBase(ABC):
 
     @abstractmethod
     def make_digest_path(self, file: Path) -> Path:
-        """ Retruns path to digest file for file """
+        """Retruns path to digest file for file"""
 
     def is_checksum_matches(self, digest_file: Path) -> bool:
-        """ Compare checksum from file with manifest one """
+        """Compare checksum from file with manifest one"""
         with digest_file.open() as fstream:
             local_checksum = fstream.read().strip()
         return local_checksum == self.file_entry.checksum
@@ -159,7 +163,7 @@ class SshfsSyncBase(ABC):
 
     @abstractmethod
     def move_to_destination(self, file_path: Path) -> None:
-        """ Handle donwnloaded file to put expected data to destination """
+        """Handle donwnloaded file to put expected data to destination"""
 
     async def sync(self) -> None:
         """
@@ -183,7 +187,7 @@ class SshfsSyncBase(ABC):
         try:
             async with (
                 httpx.AsyncClient() as client,
-                client.stream('GET', str(self.file_entry.url), headers=headers) as response
+                client.stream('GET', str(self.file_entry.url), headers=headers) as response,
             ):
                 response.raise_for_status()
                 origin_filename = self.get_origin_filename(response)
@@ -433,7 +437,7 @@ class GitRepoService:
         # take only path from `states` dir
         try:
             salt_find_sls_index = file.parts.index(self.local_name)
-            path_parts = file.parts[salt_find_sls_index + 1: -1]
+            path_parts = file.parts[salt_find_sls_index + 1 : -1]
         except ValueError:
             path_parts = ()
         logger.debug('parts_after_salt_find_sls: %s', path_parts)

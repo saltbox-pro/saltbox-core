@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 
-from salt_box_core.event_bus.masters_bus import BusMasterMessage
+from salt_box_core.event_bus.maater_bus_base_messages import BusMasterMessage
 
 
 class MasterMessageSlsRepoModel(BaseModel):

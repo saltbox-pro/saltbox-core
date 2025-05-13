@@ -101,19 +101,10 @@ async def init_masters() -> None:
     # Check existing indexes
     indexes = sorted(await masters_repo.collection.index_information())
 
-    # Create unique index for name if not exists
-    if 'name_unique_index_asc' not in indexes:
+    # Create unique index for master_id if not exists
+    if 'master_id_unique_index_asc' not in indexes:
         result = await masters_repo.collection.create_index(
-            [('name', pymongo.ASCENDING)], name='name_unique_index_asc', unique=True
-        )
-        logger.debug('Index created: %s', result)
-
-    # Create unique index for name and alias if not exists
-    if 'name_alias_unique_index_asc' not in indexes:
-        result = await masters_repo.collection.create_index(
-            keys=[('name', pymongo.ASCENDING), ('alias', pymongo.ASCENDING)],
-            name='name_alias_unique_index_asc',
-            unique=True,
+            [('master_id', pymongo.ASCENDING)], name='master_id_unique_index_asc', unique=True
         )
         logger.debug('Index created: %s', result)
 

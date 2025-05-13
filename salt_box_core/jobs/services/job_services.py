@@ -77,7 +77,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
             raise JobCreateException(err) from err
 
         try:
-            master: MasterModel = await self.master_service.get_by_name(data.salt_master)
+            master: MasterModel = await self.master_service.get_by_master_id(data.salt_master)
         except ObjectNotFoundError as e:
             raise JobCreateException(str(e)) from e
 
@@ -106,7 +106,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
             await self.rdb.expire(name=create_job_hash_name, time=60 * 10)
 
             await send_message_to_master(
-                message=NewJobMessage(hash_name=create_job_hash_name, master=master.name),
+                message=NewJobMessage(hash_name=create_job_hash_name, master=master.master_id),
                 message_tag='run_job',
             )
         except redis_exceptions.RedisError as error:

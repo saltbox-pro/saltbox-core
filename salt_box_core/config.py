@@ -12,15 +12,15 @@ APP_DESC = 'Salt.Box Core API'
 
 
 def validate_path_is_absolute(value: Path) -> Path:
-    """ value must not be a relative Path """
+    """value must not be a relative Path"""
     if not value.is_absolute():
-        msg='Path must be absolute'
+        msg = 'Path must be absolute'
         raise ValueError(msg)
     return value
 
 
 def validate_make_dir(value: Path) -> Path:
-    """ Returns existsing directory """
+    """Returns existsing directory"""
     if value.exists():
         if not value.is_dir():
             msg = f'{value} exists and is not directory'
@@ -47,6 +47,7 @@ EmptyDirectoryPath = Annotated[Path, AfterValidator(validate_path_is_absolute), 
 
 
 class Settings(BaseSettings):
+    var_dir: MakeDirectoryPath = Path('/var/lib/saltbox-core/')
     taskiq_broker_url: str = ''
     debug: bool = False
     show_docs: bool = False
@@ -81,6 +82,10 @@ class Settings(BaseSettings):
     sshfs_tmp_dir: EmptyDirectoryPath = cache_dir / 'sshfs'
     local_repo_sync_timeout_sec: int = 600
     rabbitmq_url: str = 'amqp://guest:guest@rabbitmq:5672'
+    gpg_key_length: int = 4096
+    gog_key_name_real: str = 'Saltbox'
+    gpg_key_email: str = 'gpg@saltbox.pro'
+    gpg_key_comment: str = 'This is a certificate for saltbox services'
 
     model_config = SettingsConfigDict(env_file='.env')
 
