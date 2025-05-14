@@ -2,7 +2,7 @@ from typing import Any
 
 from faststream.redis import RedisBroker, RedisMessage
 
-from salt_box_core.event_bus.maater_bus_base_messages import BusMasterMessage
+from salt_box_core.event_bus.master_bus_base_messages import BusMasterMessage
 from salt_box_core.event_bus.master_bus_middlewares import MastersAuthMiddleware
 
 

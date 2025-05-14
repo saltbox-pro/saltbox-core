@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.mongo.config import get_mongo_db
-from salt_box_core.event_bus.maater_bus_base_messages import _BusMasterMessage
+from salt_box_core.event_bus.master_bus_base_messages import _BusMasterMessage
 from salt_box_core.masters.repositories.master_repository import MasterRepository, get_master_repository
 from salt_box_core.masters.services.master_service import MasterService, get_master_service
 from salt_box_core.utilities.gpg import SaltBoxCrypt
