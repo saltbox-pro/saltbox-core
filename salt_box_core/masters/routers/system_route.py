@@ -3,8 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 
-from salt_box_core.config import LOG_CONFIG
-from salt_box_core.config import SETTINGS
+from salt_box_core.config import LOG_CONFIG, SETTINGS
 from salt_box_core.http_errors import BadRequest
 from salt_box_core.masters.services.master_service import MasterService, get_master_service
 
@@ -31,6 +30,7 @@ async def authorized_keys(
     elif user == SETTINGS.gitfs_user:
         attr = 'gitfs_pubkey'
     else:
-        raise BadRequest(f'Unknown user {user}')
+        msg = f'Unknown user {user}'
+        raise BadRequest(msg)
     keys = [str(getattr(master, attr)) for master in masters]
     return '\n'.join(keys)

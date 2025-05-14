@@ -9,13 +9,15 @@ from salt_box_core.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
 
 def validate_ssh_pubkey_token(value: str) -> str:
     if not value.isascii() or ' ' in value:
-        raise ValueError('Expected ASCII string with no space symbols')
+        msg = 'Expected ASCII string with no space symbols'
+        raise ValueError(msg)
     return value
 
 
 def validate_is_ascii(value: str) -> str:
     if not value.isascii():
-        raise ValueError('Expected ASCII string')
+        msg = 'Expected ASCII string'
+        raise ValueError(msg)
     return value
 
 
@@ -38,7 +40,8 @@ class SshPubKeyModel(BaseModel):
     def from_str(cls, value: str) -> Self:
         tokens = value.split(' ', maxsplit=2)
         if 2 > len(tokens) > 3:
-            raise ValueError('Unexpected OpenSSH public key string')
+            msg = 'Unexpected OpenSSH public key string'
+            raise ValueError(msg)
         try:
             comment = tokens[2]
         except IndexError:

@@ -6,7 +6,10 @@ from faststream.redis import RedisRouter
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.event_bus.master_bus_base_messages import (
-    AuthResponseMessage, AuthRequestMessage, BusMasterMessage, MasterStatusMessage
+    AuthRequestMessage,
+    AuthResponseMessage,
+    BusMasterMessage,
+    MasterStatusMessage,
 )
 from salt_box_core.event_bus.master_bus_middlewares import MastersAuthMiddleware
 from salt_box_core.masters.schemas.master_schemas import MasterCreateSchema, MasterModel, MasterStatus
