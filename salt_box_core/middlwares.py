@@ -1,3 +1,5 @@
+import re
+
 from collections.abc import Awaitable, Callable
 from contextvars import ContextVar
 
@@ -22,11 +24,15 @@ class AuthMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         logger.debug('Initializing AuthMiddleware.')
         self._oidc = KeycloakOIDCFactory.get_instance()
-        self.excluded_paths = excluded_paths or []
+
+        if excluded_paths is not None:
+            self.excluded_paths = [re.compile(f'^{path}$') for path in excluded_paths]
+        else:
+            self.excluded_paths = []
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         logger.debug('Dispatching request: %s', request.url.path)
-        if request.url.path in self.excluded_paths or request.method == 'OPTIONS':
+        if self.in_excludes(request.url.path) or request.method == 'OPTIONS':
             return await call_next(request)
 
         token = request.headers.get('Authorization')
@@ -39,3 +45,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
         request_context.set(request)
         response = await call_next(request)
         return response
+
+    def in_excludes(self, value: str) -> bool:
+        for pattern in self.excluded_paths:
+            if pattern.match(value):
+                return True
+        return False

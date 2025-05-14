@@ -1,11 +1,15 @@
 from pydantic import BaseModel, ConfigDict
 
-from salt_box_core.masters.schemas.master_schemas import MasterStatus
+from salt_box_core.masters.schemas.master_schemas import MasterStatus, MasterSshPubkeysMixin
 
 
-class AuthMessage(BaseModel):
+class AuthRequestMessage(BaseModel, MasterSshPubkeysMixin):
     master: str
-    pubkey: str
+    crypt_pubkey: str
+
+
+class AuthResponseMessage(BaseModel):
+    crypt_pubkey: str
 
 
 class MasterStatusMessage(BaseModel):

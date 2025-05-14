@@ -5,9 +5,11 @@ from faststream.redis import RedisRouter
 
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
-from salt_box_core.event_bus.master_bus_base_messages import AuthMessage, BusMasterMessage, MasterStatusMessage
+from salt_box_core.event_bus.master_bus_base_messages import (
+    AuthResponseMessage, AuthRequestMessage, BusMasterMessage, MasterStatusMessage
+)
 from salt_box_core.event_bus.master_bus_middlewares import MastersAuthMiddleware
-from salt_box_core.masters.schemas.master_schemas import MasterCreateSchema, MasterModel
+from salt_box_core.masters.schemas.master_schemas import MasterCreateSchema, MasterModel, MasterStatus
 from salt_box_core.masters.services.master_service import MasterService
 from salt_box_core.minion_collections.schemas.event_bus_schemas import MinionGrainsMessage, MinionPresenceMessage
 from salt_box_core.minion_collections.schemas.minion_schemas import (
@@ -25,22 +27,26 @@ router = RedisRouter(prefix='master_', middlewares=[MastersAuthMiddleware])
 
 @router_not_auth.subscriber('auth', middlewares=[])
 async def auth(
-    message: AuthMessage,
+    message: AuthRequestMessage,
     master_service: MasterService = Context(),  # noqa: B008
     saltbox_crypt: SaltBoxCrypt = Context(),  # noqa: B008
-) -> AuthMessage:
+) -> AuthResponseMessage:
     try:
         master: MasterModel = await master_service.get_by_master_id(message.master)
     except ObjectNotFoundError:
-        master = await master_service.create(
-            MasterCreateSchema.model_validate({'master_id': message.master, 'title': message.master})
-        )
+        master_dict = {
+            'master_id': message.master,
+            'title': message.master,
+            'gitfs_pubkey': message.gitfs_pubkey,
+            'sshfs_pubkey': message.sshfs_pubkey,
+        }
+        master = await master_service.create(MasterCreateSchema.model_validate(master_dict))
 
     if not master.pubkey:
-        master.pubkey = message.pubkey
+        master.pubkey = message.crypt_pubkey
         master = await master_service.update(query=master.id, data=master.model_dump())
 
-    return AuthMessage(**{'master': master.master_id, 'pubkey': saltbox_crypt.pubkey})
+    return AuthResponseMessage(crypt_pubkey=saltbox_crypt.pubkey)
 
 
 @router_not_auth.subscriber('status', middlewares=[])
@@ -51,9 +57,8 @@ async def status(
     try:
         master: MasterModel = await master_service.get_by_master_id(message.master)
     except ObjectNotFoundError:
-        master = await master_service.create(
-            MasterCreateSchema.model_validate({'master_id': message.master, 'title': message.master})
-        )
+        # TODO(a.karmanov): return error or special status (`unknown`)
+        return MasterStatusMessage(master=message.master, status=MasterStatus.rejected, is_pubkey_set=False)
 
     return MasterStatusMessage(master=master.master_id, status=master.status, is_pubkey_set=master.is_pubkey_set)
 

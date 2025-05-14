@@ -7,7 +7,7 @@
 
 
 FROM registry.altlinux.org/alt/alt:p11 AS base
-LABEL version='1.0'
+LABEL version='1.1'
 EXPOSE 8000
 
 RUN \
@@ -26,10 +26,6 @@ RUN \
   --mount=type=bind,source=requirements.txt,target=/mnt/requirements.txt\
   --mount=type=cache,target=/root/.cache/pip/ \
   pip3 install --requirement /mnt/requirements.txt
-
-## Uncomment to debug Python dependencies with pipdeptree
-# FIXME
-RUN --mount=type=cache,target=/root/.cache/pip/ pip3 install pipdeptree==2.23.1
 
 COPY --chmod=644 docker/shell_init.sh /etc/
 COPY --chmod=755 \

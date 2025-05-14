@@ -74,6 +74,8 @@ class Settings(BaseSettings):
     salt_func_repo_url: str = 'https://dev.saltbox.pro/a.baikov/salt-func-schemas.git'
     salt_func_local_repo_name: str = 'salt-func-schemas'
     local_repos_dir: MakeDirectoryPath = Path('/srv/repos')
+    sshfs_user: str = Field(default='saltbox', description='SSH user name to access files')
+    gitfs_user: str = Field(default='git', description='SSH user name to access Git repos')
     sshfs_dir: MakeDirectoryPath = Field(
         default=Path('/srv/sshfs/'),
         description='Path to store of files served by sshfs',

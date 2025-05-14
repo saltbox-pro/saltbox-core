@@ -14,6 +14,7 @@ from salt_box_core.jobs.routers.job_sc_router import router as job_schemas_route
 from salt_box_core.jobs.routers.jobs_router import router as jobs_router
 from salt_box_core.jobs.routers.jobs_router import ws_router as jobs_ws_router
 from salt_box_core.masters.routers.master_route import router as masters_router
+from salt_box_core.masters.routers.system_route import router as system_router
 from salt_box_core.middlwares import AuthMiddleware
 from salt_box_core.minion_collections.routers.collections_router import router as collections_router
 from salt_box_core.minion_collections.routers.filters_router import router as filters_router
@@ -83,10 +84,13 @@ app.add_middleware(
     allow_headers=['*'],
 )
 
+_NO_AUTH_PATHS = [uri for uri in [app.docs_url, app.openapi_url, app.swagger_ui_oauth2_redirect_url] if uri]
+_NO_AUTH_PATHS.append(r'/system/[\w-]+/authorized_keys')
+
 app.add_middleware(
     AuthMiddleware,
     # Need add SETTINGS.base_url_root_path.rstrip('/') + uri in some cases
-    excluded_paths=[uri for uri in [app.docs_url, app.openapi_url, app.swagger_ui_oauth2_redirect_url] if uri],
+    excluded_paths=_NO_AUTH_PATHS
 )
 
 
@@ -107,6 +111,7 @@ app.include_router(task_ws_router)
 app.include_router(collections_router)
 app.include_router(minions_router)
 app.include_router(masters_router)
+app.include_router(system_router)
 app.include_router(pillars_router)
 app.include_router(router=settings_sls_router, prefix='/settings', tags=['Settings'])
 
