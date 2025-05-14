@@ -7,6 +7,8 @@ from pydantic import (
     PlainSerializer,
     computed_field,
 )
+from taskiq import TaskiqResult
+from taskiq.depends.progress_tracker import TaskState
 
 from salt_box_core.config import SETTINGS
 from salt_box_core.utilities.helpers import format_iso8601_z
@@ -67,3 +69,9 @@ class UserShort(BaseModel):
 
 class TaskiqTaskIdResponse(BaseModel):
     task_id: str = Field(title='Taskiq task ID')
+
+
+class TaskiqTaskResult(TaskiqResult):
+    task_id: str = Field(title='Taskiq task ID')
+    progress: TaskState | None = Field(title='Task progress')
+    progress_meta: str | None = Field(title='Task progress meta')

@@ -1,6 +1,7 @@
-import uuid
+import os
 from typing import Annotated, Self
 
+from git.types import PathLike
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -24,19 +25,12 @@ GitRepoUrl = Annotated[
 
 
 class ReadOnlyFieldsShortMixin:
-    repo_url: GitRepoUrl
+    repo_url: PathLike
     local_path: str = Field(max_length=50, pattern='(^[a-z0-9_-]+$)')
     last_synced: TimezoneAwareDatetime | None = None
     is_last_sync_successful: StrictBool = False
     last_sync_error: str | None = None
     root: str = Field(default='', description='Path in repository supposed as Salt GitFS root')
-
-    @model_validator(mode='after')
-    def check_repo_url(self) -> Self:
-        if not self.repo_url.path or self.repo_url.path == '/':
-            msg = 'Invalid repo_url: `path` part of url is required'
-            raise ValueError(msg)
-        return self
 
 
 class ReadOnlyFieldsFullMixin(ReadOnlyFieldsShortMixin): ...
@@ -66,17 +60,15 @@ class SettingsSlsRepoCreateSchema(
     local_path: str = Field(max_length=50, default='', pattern='(^[a-z0-9_-]+$|^$)')
 
     @field_serializer('repo_url')
-    def serialize_url(self, url: GitRepoUrl) -> str:
-        return url.unicode_string()
+    def serialize_url(self, url: PathLike) -> str:
+        return url if isinstance(url, str) else os.fspath(url)
 
     @model_validator(mode='after')
     def validate_local_path(self) -> Self:
         if not self.local_path:
-            repo_path = self.repo_url.path.strip('/').split('/')[-1] if self.repo_url.path else None
-            repo_path = repo_path or str(uuid.uuid4())
-            self.local_path = slugify(
-                repo_path, lowercase=True, regex_pattern=r'[^a-z0-9_-]', separator='_', max_length=30
-            )
+            url = self.repo_url if isinstance(self.repo_url, str) else os.fspath(self.repo_url)
+            self.local_path = slugify(url, lowercase=True, regex_pattern=r'[^a-z0-9_-]', separator='_', max_length=30)
+
         return self
 
 

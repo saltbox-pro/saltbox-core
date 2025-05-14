@@ -1,7 +1,9 @@
+import asyncio
 from typing import Any
 
 from redis.asyncio import Redis
 from taskiq import TaskiqDepends
+from taskiq.depends.progress_tracker import ProgressTracker, TaskState
 
 from salt_box_core.config import SETTINGS, logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
@@ -9,7 +11,7 @@ from salt_box_core.db.redis.config import get_redis_dep
 from salt_box_core.jobs.repositories.job_sc_repository import JobSchemaRepository, get_job_schema_repository
 from salt_box_core.jobs.schemas.job_sc_schemas import JobSchemaCreateSchema, JobSchemaUpdateSchema
 from salt_box_core.tkq import broker
-from salt_box_core.utilities.git_repo_helper import GitRepoService, MultipleRepoSyncError, repository_lock
+from salt_box_core.utilities.git_repo_helper import GitRepoService, repository_lock
 
 
 async def sync_schemas(
@@ -47,14 +49,19 @@ async def sync_schemas(
 @broker.task(timeout=30, retry_on_error=True, _retries=3)
 async def job_schemas_sync_task(
     repo_url: str,
+    progress: ProgressTracker[Any] = TaskiqDepends(),
     repo: JobSchemaRepository = TaskiqDepends(get_job_schema_repository),
     redis: Redis = TaskiqDepends(get_redis_dep),
 ) -> dict:
     """Task for synchronizing job schemas from a Git repository."""
     try:
+        await progress.set_progress(TaskState.STARTED, 'Sync started')
         async with repository_lock(redis, repo_url):
             git_repo = GitRepoService(repo_url=repo_url, local_name=SETTINGS.salt_func_local_repo_name)
-            git_repo.clone_or_pull()
+            await asyncio.wait_for(
+                asyncio.to_thread(git_repo.clone_or_pull),
+                timeout=SETTINGS.local_repo_sync_timeout_sec,
+            )
             logger.debug('Repo cloned or pulled')
 
             logger.debug('Try to parse schemas')
@@ -62,6 +69,7 @@ async def job_schemas_sync_task(
             parsed_schema_names = [schema['name'] for schema in schemas]
 
             created, updated, removed_count = await sync_schemas(repo, schemas, parsed_schema_names)
+            await progress.set_progress(TaskState.SUCCESS, 'Sync successful')
 
             return {
                 'created': created,
@@ -69,15 +77,8 @@ async def job_schemas_sync_task(
                 'removed_count': removed_count,
                 'errors': errors,
             }
-
-    except MultipleRepoSyncError as e:
-        msg = f'Multiple repo sync error: {e!s}'
-        logger.debug(msg)
-        return {
-            'status': 'error',
-            'message': msg,
-        }
     except Exception as e:
         msg = f'Error during task execution: {e!s}'
         logger.error(msg)
+        await progress.set_progress(TaskState.FAILURE, msg)
         raise

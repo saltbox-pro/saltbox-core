@@ -1,9 +1,12 @@
+import asyncio
+import os
 from datetime import UTC, datetime
 from typing import Any
 
 from bson import ObjectId
 from redis.asyncio import Redis
 from taskiq import TaskiqDepends
+from taskiq.depends.progress_tracker import ProgressTracker, TaskState
 
 from salt_box_core.config import Settings, logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
@@ -17,7 +20,6 @@ from salt_box_core.tasks.schemas.task_template_schemas import TaskTemplateCreate
 from salt_box_core.tkq import broker
 from salt_box_core.utilities.git_repo_helper import (
     GitRepoService,
-    MultipleRepoSyncError,
     create_sshfs_sync,
     repository_lock,
 )
@@ -70,24 +72,32 @@ async def sync_schemas(
 @broker.task(timeout=SETTINGS.local_repo_sync_timeout_sec, retry_on_error=True, _retries=3)
 async def sync_sls_repo_task(
     repo_id: str,
+    progress: ProgressTracker[Any] = TaskiqDepends(),
     repo: TaskTemplateRepository = TaskiqDepends(get_task_template_repository),
     sls_repo: SettingsSlsRepoRepository = TaskiqDepends(get_sls_repo_repository),
     redis: Redis = TaskiqDepends(get_redis_dep),
 ) -> dict:
     """Task for synchronizing job schemas from a Git repository."""
     # TODO (a.karmanov): Move import to top
-    from salt_box_core.settings.services.sls_repo_service import notify_masters
-
-    repo_obj = await sls_repo.get({'_id': ObjectId(repo_id)})
     try:
-        async with repository_lock(redis, repo_obj.repo_url.unicode_string()):
+        from salt_box_core.settings.services.sls_repo_service import notify_masters
+
+        await progress.set_progress(TaskState.STARTED, 'Sync started')
+        repo_obj = await sls_repo.get({'_id': ObjectId(repo_id)})
+        url = repo_obj.repo_url if isinstance(repo_obj.repo_url, str) else os.fspath(repo_obj.repo_url)
+        async with repository_lock(redis, url):
             git_repo = GitRepoService(
-                repo_url=repo_obj.repo_url.unicode_string(),
+                repo_url=url,
                 local_name=repo_obj.local_path,
                 login=repo_obj.repo_user,
                 token=repo_obj.repo_pass.get_secret_value() if repo_obj.repo_pass else None,
             )
-            git_repo.clone_or_pull()
+            logger.debug('Try to clone or pull repo with to_thread: %s', url)
+            # git_repo.clone_or_pull()
+            await asyncio.wait_for(
+                asyncio.to_thread(git_repo.clone_or_pull),
+                timeout=SETTINGS.local_repo_sync_timeout_sec,
+            )
             logger.debug('Repo cloned or pulled')
 
             manifest = git_repo.parse_manifest()
@@ -110,6 +120,7 @@ async def sync_sls_repo_task(
 
             # TODO (a.karmanov): Call upper in task owner/watcher class
             await notify_masters()
+            await progress.set_progress(TaskState.SUCCESS, 'Sync successful')
 
             return {
                 'created': created,
@@ -117,14 +128,6 @@ async def sync_sls_repo_task(
                 'removed_count': removed_count,
                 'errors': errors,
             }
-
-    except MultipleRepoSyncError as e:
-        msg = f'Multiple repo sync error: {e!s}'
-        logger.debug(msg)
-        return {
-            'status': 'error',
-            'message': msg,
-        }
     except Exception as e:
         msg = f'Error during task execution: {e!s}'
         logger.error(msg)
@@ -136,4 +139,5 @@ async def sync_sls_repo_task(
                 'is_last_sync_successful': False,
             },
         )
+        await progress.set_progress(TaskState.FAILURE, msg)
         raise

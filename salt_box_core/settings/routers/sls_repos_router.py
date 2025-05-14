@@ -1,12 +1,11 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from taskiq import TaskiqResult
 
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import DuplicateKeyError, ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import PyObjectId
-from salt_box_core.db.schemas_base import PaginatedResponse, SkipLimitParams, TaskiqTaskIdResponse
+from salt_box_core.db.schemas_base import PaginatedResponse, SkipLimitParams, TaskiqTaskIdResponse, TaskiqTaskResult
 from salt_box_core.settings.schemas.sls_repos_schemas import (
     SettingsSlsRepoCreateSchema,
     SettingsSlsRepoModel,
@@ -50,36 +49,39 @@ async def sls_repo_settings_sync_all(
 
 
 @router.get('/sync-status/{task_id}')
-async def get_sync_status(task_id: str) -> TaskiqResult:
+async def get_sync_status(task_id: str) -> TaskiqTaskResult:
     """
     Get task status by task_id.
     """
+    progress = await broker.result_backend.get_progress(task_id)
+
+    logger.debug('Task progress: %s', progress)
     is_ready = await broker.result_backend.is_result_ready(task_id)
-    logger.debug('is_redy: %s', is_ready)
     if is_ready:
         result = await broker.result_backend.get_result(task_id)
-        logger.debug('Task result: %s', result)
-        return TaskiqResult(
+
+        response = TaskiqTaskResult(
             task_id=task_id,
+            progress=progress.state if progress else None,
+            progress_meta=progress.meta if progress else None,
             return_value=result.return_value,
             is_err=result.is_err,
             execution_time=result.execution_time,
             log=result.log,
             error=result.error,
-            labels=result.labels,
         )
     else:
-        progress = await broker.result_backend.get_progress(task_id)
-        logger.debug('Task progress: %s', progress)
-        return TaskiqResult(
+        response = TaskiqTaskResult(
             task_id=task_id,
+            progress=progress.state if progress else None,
+            progress_meta=progress.meta if progress else None,
             return_value=None,
             is_err=False,
             execution_time=0,
             log='',
             error=None,
-            labels={},
         )
+    return response
 
 
 @router.get('/{sid}')

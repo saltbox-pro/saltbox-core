@@ -306,7 +306,7 @@ def is_ssh_repo_url(repo_url: str) -> bool:
 class RepositoryLocker:
     """Class for managing repository synchronization locks"""
 
-    def __init__(self, redis_client: Redis, lock_timeout: int = 3600) -> None:
+    def __init__(self, redis_client: Redis, lock_timeout: int = SETTINGS.local_repo_sync_timeout_sec) -> None:
         self.redis = redis_client
         self.lock_timeout = lock_timeout
 
@@ -377,6 +377,7 @@ class GitRepoService:
         else:
             logger.debug('Local path does not exist, cloning repo')
             try:
+                # TODO (a.baikov): look for kill_after_timeout=SETTINGS.local_repo_sync_timeout_sec
                 Repo.clone_from(self.repo_url, self.local_path)
                 logger.debug('Repo cloned successfully')
             except Exception:
