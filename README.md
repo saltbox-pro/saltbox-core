@@ -1,5 +1,9 @@
 # Salt.Box Core
 
+This is Salt.Box backend repository.
+
+To consult SLS package format look at [`SLS_PACKAGE.md`](./SLS_PACKAGE.md).
+
 ## Developement
 
 This project uses the following tools.
