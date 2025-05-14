@@ -2,6 +2,7 @@ import logging.config
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
+from fastapi.responses import PlainTextResponse
 
 from salt_box_core.config import LOG_CONFIG, SETTINGS
 from salt_box_core.http_errors import BadRequest
@@ -19,7 +20,10 @@ router = APIRouter(
 )
 
 
-@router.get('/{user}/authorized_keys', operation_id='authorized_keys')
+@router.get(
+    '/{user}/authorized_keys',
+    operation_id='authorized_keys',
+    response_class=PlainTextResponse)
 async def authorized_keys(
     user: str,
     master_service: Annotated[MasterService, Depends(get_master_service)],
