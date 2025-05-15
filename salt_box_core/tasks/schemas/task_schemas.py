@@ -175,7 +175,7 @@ class TaskReadOnlyFieldsMixin:
     user: UserShort
 
 
-class TaskEditableFieldsMixin:
+class TaskEditableFieldsMixinPart:
     status: TaskStatus = Field(title='Status', default=TaskStatus.created)
 
     run_dt: TimezoneAwareDatetime | None = Field(title='Run datetime', default=None)
@@ -183,6 +183,8 @@ class TaskEditableFieldsMixin:
     postprocessing_dt: TimezoneAwareDatetime | None = Field(title='Postprocessing datetime', default=None)
     finished_dt: TimezoneAwareDatetime | None = Field(title='Finished datetime', default=None)
 
+
+class TaskEditableFieldsMixin(TaskEditableFieldsMixinPart):
     jobs: dict[str, TaskJob] = Field(title='Jobs', default={})
     minions: dict[str, TaskMinion] = Field(title='Minions failed', default={})
 
@@ -224,10 +226,10 @@ class TaskCreateFromTemplateSchema(TaskCreateRequestSchema):
     parent_task_id: PyObjectId | None = Field(title='Parent task id', default=None)
 
 
-class TaskListResponseSchema(TaskModel):
-    jobs: Any = Field(exclude=True)
-    minions: Any = Field(exclude=True)
-    postprocessing: Any = Field(exclude=True)
+class TaskListResponseSchema(
+    BaseModel, CreatedModifiedMixin, TaskEditableFieldsMixinPart, TaskReadOnlyFieldsMixin, IDMixin
+):
+    pass
 
 
 class TaskListQueryParams(SkipLimitParams):

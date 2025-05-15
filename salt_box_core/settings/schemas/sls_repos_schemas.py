@@ -26,7 +26,7 @@ GitRepoUrl = Annotated[
 
 class ReadOnlyFieldsShortMixin:
     repo_url: PathLike
-    local_path: str = Field(max_length=50, pattern='(^[a-z0-9_-]+$)')
+    local_path: str = Field(max_length=50, default='', pattern='(^[a-z0-9_-]+$|^$)')
     last_synced: TimezoneAwareDatetime | None = None
     is_last_sync_successful: StrictBool = False
     last_sync_error: str | None = None
@@ -57,8 +57,6 @@ class CreateUpdateSerializerMixin:
 class SettingsSlsRepoCreateSchema(
     BaseModel, CreateUpdateSerializerMixin, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin
 ):
-    local_path: str = Field(max_length=50, default='', pattern='(^[a-z0-9_-]+$|^$)')
-
     @field_serializer('repo_url')
     def serialize_url(self, url: PathLike) -> str:
         return url if isinstance(url, str) else os.fspath(url)
