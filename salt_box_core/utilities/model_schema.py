@@ -70,7 +70,7 @@ schema_all_lookups = [
     'between',
     'notBetween',
 ]
-schema_number_lookups = ['=', '!=', '<', '>', '<=', '>=', 'in', 'notIn']
+schema_number_lookups = ['=', '!=', '<', '>', '<=', '>=', 'between', 'notBetween']
 schema_text_lookups = [
     '=',
     '!=',
