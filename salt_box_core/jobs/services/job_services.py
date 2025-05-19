@@ -1,7 +1,7 @@
 import json
 import logging.config
 from collections.abc import AsyncGenerator
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 from typing import Annotated, Any, overload
 
 from fastapi import Depends
@@ -169,11 +169,8 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
 
     @staticmethod
     def __get_start_end_from_dt(
-        start_datetime: Annotated[datetime, PastDatetime], end_datetime: datetime | None = None
+        start_datetime: Annotated[datetime, PastDatetime], end_datetime: datetime
     ) -> tuple[float, float]:
-        if end_datetime is None:
-            end_datetime = datetime.now(UTC) + timedelta(hours=1)
-
         try:
             start = JID.from_datetime(start_datetime).to_timestamp()
             end = JID.from_datetime(end_datetime).to_timestamp()
@@ -187,7 +184,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
     async def get_list_cursored_by_dt(
         self,
         start_datetime: Annotated[datetime, PastDatetime],
-        end_datetime: datetime | None,
+        end_datetime: datetime,
         cursor: int,
         count: int,
         match: str | None,
@@ -197,7 +194,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
     async def get_list_cursored_by_dt(
         self,
         start_datetime: Annotated[datetime, PastDatetime],
-        end_datetime: datetime | None,
+        end_datetime: datetime,
         cursor: int,
         count: int,
         match: str | None,
@@ -207,7 +204,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
     async def get_list_cursored_by_dt(
         self,
         start_datetime: Annotated[datetime, PastDatetime],
-        end_datetime: datetime | None = None,
+        end_datetime: datetime,
         cursor: int = 0,
         count: int = 100,
         match: str | None = None,
@@ -222,7 +219,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
     async def get_list_by_dt(
         self,
         start_datetime: Annotated[datetime, PastDatetime],
-        end_datetime: datetime | None = None,
+        end_datetime: datetime,
         limit: int | None = None,
         skip: int = 0,
         desc: bool = False,
@@ -241,7 +238,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
     async def get_list_by_dt_paginated(
         self,
         start_datetime: Annotated[datetime, PastDatetime],
-        end_datetime: datetime | None = None,
+        end_datetime: datetime,
         limit: int | None = None,
         skip: int = 0,
         desc: bool = False,
@@ -251,7 +248,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
     async def get_list_by_dt_paginated(
         self,
         start_datetime: Annotated[datetime, PastDatetime],
-        end_datetime: datetime | None = None,
+        end_datetime: datetime,
         limit: int | None = None,
         skip: int = 0,
         desc: bool = False,
@@ -262,7 +259,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
     async def get_list_by_dt_paginated(
         self,
         start_datetime: Annotated[datetime, PastDatetime],
-        end_datetime: datetime | None = None,
+        end_datetime: datetime,
         limit: int | None = None,
         skip: int = 0,
         desc: bool = False,

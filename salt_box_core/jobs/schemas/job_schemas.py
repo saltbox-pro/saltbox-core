@@ -142,7 +142,7 @@ class JobsListRequest(SkipLimitParams):
 
 class JobsListCursorRequest(BaseModel):
     start_datetime: Annotated[datetime, PastDatetime]
-    end_datetime: datetime | None = None
+    end_datetime: datetime
     cursor: int | None = None
     count: int = 100
     fun: str | None = None
