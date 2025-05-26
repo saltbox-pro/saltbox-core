@@ -1,10 +1,8 @@
-import logging.config
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, status
 
 from salt_box_core import http_errors
-from salt_box_core.config import LOG_CONFIG
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import PyObjectId
 from salt_box_core.db.redis.config import RedisDependency
@@ -15,7 +13,7 @@ from salt_box_core.jobs.services.job_services import JobServiceDependency
 from salt_box_core.minion_collections.schemas.collection_schemas import CollectionModel
 from salt_box_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from salt_box_core.tasks.schemas.task_schemas import (
-    TaskCreateFromTemplateSchema,
+    TaskCreateInputSchema,
     TaskCreateRequestSchema,
     TaskListQueryParams,
     TaskListResponseSchema,
@@ -26,11 +24,6 @@ from salt_box_core.tasks.services.tasks_lifespan import TaskLifespanService, get
 from salt_box_core.utilities.exceptions import ServiceError
 from salt_box_core.utilities.jid import JID
 from salt_box_core.utilities.websocket import PubSubAuthenticatedWebSocket
-
-logging.config.dictConfig(LOG_CONFIG.model_dump())
-
-logger = logging.getLogger(__name__)
-
 
 router = APIRouter(
     prefix='/tasks',
@@ -73,7 +66,7 @@ async def task_create(
         item.query = {}
 
     user = User(**request.state.user)
-    create_data = TaskCreateFromTemplateSchema(**{'user': user.model_dump(), **item.model_dump(by_alias=True)})
+    create_data = TaskCreateInputSchema(**{'user': user.model_dump(), **item.model_dump(by_alias=True)})
 
     try:
         task: TaskModel = await task_service.create(data=create_data)

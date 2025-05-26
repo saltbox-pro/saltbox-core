@@ -1,10 +1,9 @@
-import logging.config
 from typing import Annotated, Any
 
 from fastapi import Depends
 from redis.asyncio import Redis
 
-from salt_box_core.config import LOG_CONFIG
+from salt_box_core.config import logger
 from salt_box_core.db.exceptions import MultipleObjectsFoundError, ObjectNotFoundError
 from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.db.mongo.schemas_base import PyObjectId
@@ -17,7 +16,7 @@ from salt_box_core.minion_collections.schemas.minion_schemas import MinionModel
 from salt_box_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from salt_box_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from salt_box_core.tasks.schemas.task_schemas import (
-    TaskCreateFromTemplateSchema,
+    TaskCreateInputSchema,
     TaskJob,
     TaskJobReturnStatus,
     TaskJobStatus,
@@ -36,10 +35,6 @@ from salt_box_core.utilities.exceptions import ServiceError
 from salt_box_core.utilities.helpers import utc_now
 from salt_box_core.utilities.jid import JID
 from salt_box_core.utilities.mongo_query_to_salt_tgt_converter import MongoQueryToSaltTgtConverter
-
-logging.config.dictConfig(LOG_CONFIG.model_dump())
-
-logger = logging.getLogger(__name__)
 
 
 class TaskLifespanService:
@@ -312,7 +307,9 @@ class TaskLifespanService:
 
                 try:
                     await self.__create_job(minions=tgt, master=master)
-                except JobCreateException:
+                except JobCreateException as e:
+                    msg = f'Creating job failed for task {task.id}:\n{e}'
+                    logger.info(msg)
                     continue
 
     async def __check_jobs(self) -> None:
@@ -466,7 +463,7 @@ class TaskLifespanService:
         if task.postprocessing.task_create_request:
             if not task.postprocessing.task_create_id:
                 created_task: TaskModel = await self.task_service.create(
-                    TaskCreateFromTemplateSchema.model_validate(
+                    TaskCreateInputSchema.model_validate(
                         {
                             **task.postprocessing.task_create_request.model_dump(by_alias=True),
                             'user': task.user,

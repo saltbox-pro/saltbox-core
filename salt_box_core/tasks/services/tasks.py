@@ -6,15 +6,15 @@ from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 from pydantic import BaseModel
 from redis.asyncio import Redis
 
-# from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import PyObjectId
 from salt_box_core.db.redis.config import RedisDependency
+from salt_box_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
 from salt_box_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from salt_box_core.tasks.repositories.task_repository import TaskRepository, get_task_repository
 from salt_box_core.tasks.schemas.task_schemas import (
     CollectionShort,
-    TaskCreateFromTemplateSchema,
+    TaskCreateInputSchema,
     TaskCreateSchema,
     TaskModel,
     TaskPostProcessing,
@@ -33,7 +33,7 @@ from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService
 ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
 
 
-class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateFromTemplateSchema, TaskUpdateSchema]):
+class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSchema, TaskUpdateSchema]):
     repository_class = TaskRepository
 
     def __init__(
@@ -41,59 +41,65 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateFromTemp
         repo: TaskRepository,
         rdb: Redis,
         task_template_service: TaskTemplateService,
+        job_schema_service: JobSchemaService,
         collections_service: CollectionService,
     ):
         super().__init__(repo=repo)
 
         self.task_template_service = task_template_service
+        self.job_schema_service = job_schema_service
         self.collections_service = collections_service
         self.rdb = rdb
 
-    @overload
-    async def create(
-        self,
-        data: TaskCreateFromTemplateSchema,
-        projection_model: None = None,
-        notify: bool = True,
-    ) -> TaskModel: ...
+    async def __parse_input_create_schema(self, data: TaskCreateInputSchema) -> TaskCreateSchema:
+        task_data: dict = data.data.model_dump(exclude_none=True, by_alias=True) if data.data else {}
+        validated_data: dict = {}
+        task_template: TaskTemplateModel | None = None
+        fun: str = ''
 
-    @overload
-    async def create(
-        self,
-        data: TaskCreateFromTemplateSchema,
-        projection_model: type[ProjectionModel],
-        notify: bool = True,
-    ) -> ProjectionModel: ...
+        if not data.task_template_id and not data.fun:
+            msg = 'One of `task_template_id` or `fun` is required'
+            raise ServiceError(msg)
 
-    async def create(
-        self,
-        data: TaskCreateFromTemplateSchema,
-        projection_model: type[ProjectionModel] | None = None,
-        notify: bool | None = None,
-    ) -> TaskModel | ProjectionModel:
-        task_template: TaskTemplateModel = await self.task_template_service.get(query=data.task_template_id)
+        elif data.task_template_id and data.fun:
+            msg = 'Only one of `task_template_id` or `fun` is set at same time'
+            raise ServiceError(msg)
+
+        elif data.task_template_id:
+            task_template = await self.task_template_service.get(query=data.task_template_id)
+            fun = task_template.fun
+
+            try:
+                validated_data = await self.task_template_service.get_validated_data(
+                    name=task_template.name, sid=task_template.repo_id, data=task_data
+                )
+            except JsonSchemaValidationError as err:
+                raise ServiceError(err) from err
+
+        elif data.fun:
+            fun = data.fun
+
+            try:
+                validated_data = await self.job_schema_service.get_validated_data(name=fun, data=task_data)
+            except JsonSchemaValidationError as err:
+                raise ServiceError(err) from err
+
         collection = await self.collections_service.get(query=data.collection_id)
 
-        try:
-            validated_data: dict = await self.task_template_service.get_validated_data(
-                name=task_template.name,
-                sid=task_template.repo_id,
-                data=data.data.model_dump(exclude_none=True, by_alias=True) if data.data else {},
-            )
-        except JsonSchemaValidationError as err:
-            raise ServiceError(err) from err
+        task_args = validated_data['args'] if 'args' in validated_data else None
+        task_kwargs = validated_data['kwargs'] if 'kwargs' in validated_data else None
 
-        task_args = validated_data['args'] if 'args' in validated_data else []
-        task_kwargs = validated_data['kwargs'] if 'kwargs' in validated_data else {}
+        if task_template and task_template.fun == 'state.apply':
+            task_kwargs = {} if not task_kwargs else task_kwargs
 
-        if task_template.fun == 'state.apply' and 'moods' not in task_kwargs:
-            task_kwargs['mods'] = task_template.name
+            if 'mods' not in task_kwargs:
+                task_kwargs['mods'] = task_template.name
 
-        creation_data = TaskCreateSchema.model_validate(
+        return TaskCreateSchema.model_validate(
             {
                 'parent_task_id': data.parent_task_id,
-                'task_template': TaskTemplateShort(**task_template.model_dump()),
-                'fun': task_template.fun,
+                'task_template': TaskTemplateShort(**task_template.model_dump()) if task_template else None,
+                'fun': fun,
                 'task_args': task_args,
                 'task_kwargs': task_kwargs,
                 'target_collection': CollectionShort(**collection.model_dump()),
@@ -103,9 +109,35 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateFromTemp
                 'target_masters': data.salt_masters if data.salt_masters else ['salt-master'],
                 'batch_size': data.batch_size,
                 'max_retries': data.max_retries,
+                'max_jobs_count_at_same_time': data.max_jobs_count_at_same_time,
                 'user': data.user,
             }
         )
+
+    @overload
+    async def create(
+        self,
+        data: TaskCreateInputSchema,
+        projection_model: None = None,
+        notify: bool = True,
+    ) -> TaskModel: ...
+
+    @overload
+    async def create(
+        self,
+        data: TaskCreateInputSchema,
+        projection_model: type[ProjectionModel],
+        notify: bool = True,
+    ) -> ProjectionModel: ...
+
+    async def create(
+        self,
+        data: TaskCreateInputSchema,
+        projection_model: type[ProjectionModel] | None = None,
+        notify: bool | None = None,
+    ) -> TaskModel | ProjectionModel:
+        creation_data: TaskCreateSchema = await self.__parse_input_create_schema(data=data)
+
         if data.postprocessing:
             creation_data.postprocessing = TaskPostProcessing.model_validate(data.postprocessing.model_dump())
 
@@ -205,8 +237,13 @@ async def get_task_service(
     repo: Annotated[TaskRepository, Depends(get_task_repository)],
     rdb: RedisDependency,
     task_template_service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
+    job_schema_service: Annotated[JobSchemaService, Depends(get_job_schema_service)],
     collections_service: Annotated[CollectionService, Depends(get_collection_service)],
 ) -> TaskService:
     return TaskService(
-        repo=repo, rdb=rdb, task_template_service=task_template_service, collections_service=collections_service
+        repo=repo,
+        rdb=rdb,
+        task_template_service=task_template_service,
+        job_schema_service=job_schema_service,
+        collections_service=collections_service,
     )

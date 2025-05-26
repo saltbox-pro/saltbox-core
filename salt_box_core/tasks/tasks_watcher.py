@@ -1,9 +1,8 @@
 import asyncio
-import logging.config
 
 from redis import asyncio as aioredis
 
-from salt_box_core.config import LOG_CONFIG, SETTINGS
+from salt_box_core.config import SETTINGS, logger
 from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.db.mongo.init_db import init_mongo_db
 from salt_box_core.jobs.repositories.job_repository import JobRepository
@@ -22,10 +21,6 @@ from salt_box_core.tasks.schemas.task_schemas import TaskModel, TaskStatus
 from salt_box_core.tasks.services.tasks import TaskService
 from salt_box_core.tasks.services.tasks_lifespan import TaskLifespanService
 from salt_box_core.tasks.services.tasks_templates import TaskTemplateService
-
-logging.config.dictConfig(LOG_CONFIG.model_dump())
-
-logger = logging.getLogger(__name__)
 
 
 class TasksWatcher:
@@ -67,6 +62,7 @@ class TasksWatcher:
             repo=self.task_repository,
             rdb=redis,
             task_template_service=task_template_service,
+            job_schema_service=job_schema_service,
             collections_service=collection_service,
         )
 

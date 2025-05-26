@@ -1,18 +1,11 @@
-import logging.config
 from enum import Enum
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Self
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
-from salt_box_core.config import LOG_CONFIG
 from salt_box_core.db.mongo.schemas_base import IDMixin, PyObjectId
 from salt_box_core.db.schemas_base import CreatedModifiedMixin, SkipLimitParams, TimezoneAwareDatetime, UserShort
 from salt_box_core.utilities.helpers import utc_now
-
-logging.config.dictConfig(LOG_CONFIG.model_dump())
-
-logger = logging.getLogger(__name__)
-
 
 # Task job
 
@@ -157,11 +150,11 @@ class CollectionShort(BaseModel):
 
 class TaskReadOnlyFieldsMixin:
     parent_task_id: PyObjectId | None = Field(title='Parent task id', default=None)
-    task_template: TaskTemplateShort = Field(title='Task template')
+    task_template: TaskTemplateShort | None = Field(title='Task template', default=None)
 
     fun: str = Field(title='Salt fun')
-    task_args: list[str] = Field(title='Args')
-    task_kwargs: dict[str, Any] = Field(title='Kwargs')
+    task_args: list[str] | None = Field(title='Args', default=None)
+    task_kwargs: dict[str, Any] | None = Field(title='Kwargs', default=None)
 
     target_collection: CollectionShort = Field(title='Target collection')
     target_query: dict[str, Any] = Field(title='Target query', default={})
@@ -206,11 +199,13 @@ class TaskModel(BaseModel, CreatedModifiedMixin, TaskEditableFieldsMixin, TaskRe
 
 
 class TaskCreateRequestSchema(BaseModel):
-    task_template_id: PyObjectId = Field(title='Task template id')
+    task_template_id: PyObjectId | None = Field(title='Task template id', default=None)
+    fun: str | None = Field(title='Salt fun', default=None)
+
     salt_masters: list[str] = ['salt-master']
     data: TaskData | None = None
 
-    collection_id: PyObjectId = Field(title='Collection')
+    collection_id: PyObjectId = Field(title='Collection id')
     query: dict = Field(title='Query', default={})
     minions: list[TaskTargetMinion] = Field(title='Minions', default=[])
 
@@ -220,8 +215,20 @@ class TaskCreateRequestSchema(BaseModel):
 
     postprocessing: TaskPostProcessingCreate | None = Field(title='Postprocessing', default=None)
 
+    @model_validator(mode='after')
+    def validate_local_path(self) -> Self:
+        if self.task_template_id is None and self.fun is None:
+            msg = 'One of `task_template` or `fun` must be set'
+            raise ValueError(msg)
 
-class TaskCreateFromTemplateSchema(TaskCreateRequestSchema):
+        if self.task_template_id is not None and self.fun is not None:
+            msg = 'Only one of `task_template` or `fun` can be set'
+            raise ValueError(msg)
+
+        return self
+
+
+class TaskCreateInputSchema(TaskCreateRequestSchema):
     user: UserShort
     parent_task_id: PyObjectId | None = Field(title='Parent task id', default=None)
 
