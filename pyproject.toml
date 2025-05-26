@@ -94,6 +94,7 @@ ignore = [
   "UP040", # type instead of TypeAlias PEP 695"
   "TD003", # Found TODO in code
   "TD002", # Author name in TODO
+  "UP017", # Use datetime.UTC alias (not available for 3.10)
   # "G004", # Logging statement uses string formatting
 ]
 fixable = ["ALL"]

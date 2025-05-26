@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Default value for `salt_func_repo_url` in config
 - `end_datetime` field is required in job schemas
 
+### Fixed
+
+- More straight init of `sshfs_tmp_dir`: respect `cache_dir` value and delete
+  only old files (currently older than 1 day).
+
 ### Removed
 
 ## [0.0.1] - 2025-05-16

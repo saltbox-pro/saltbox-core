@@ -1,14 +1,17 @@
 import logging.config
+from datetime import timedelta
+from functools import cached_property
 from pathlib import Path
 from typing import Annotated, Any, Literal
 
-from pydantic import AfterValidator, BaseModel, Field
+from pydantic import AfterValidator, BaseModel, DirectoryPath, Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from salt_box_core.utilities.filesystem import recursive_force_remove
+from salt_box_core.utilities.filesystem import remove_older_than
 
 APP_NAME = 'Salt.Box Core'
 APP_DESC = 'Salt.Box Core API'
+CACHE_LIFETIME = timedelta(days=1)
 
 
 def validate_path_is_absolute(value: Path) -> Path:
@@ -30,20 +33,7 @@ def validate_make_dir(value: Path) -> Path:
     return value
 
 
-def validate_empty_dir(value: Path) -> Path:
-    """
-    Returns existsing empty directory
-
-    BE CAREFUL TO NOT TO LOSE DATA
-    """
-    created = validate_make_dir(value)
-    for path in created.glob('*'):
-        recursive_force_remove(path)
-    return created
-
-
 MakeDirectoryPath = Annotated[Path, AfterValidator(validate_path_is_absolute), AfterValidator(validate_make_dir)]
-EmptyDirectoryPath = Annotated[Path, AfterValidator(validate_path_is_absolute), AfterValidator(validate_empty_dir)]
 
 
 class Settings(BaseSettings):
@@ -81,7 +71,6 @@ class Settings(BaseSettings):
         description='Path to store of files served by sshfs',
     )
     cache_dir: MakeDirectoryPath = Path('/var/cache/saltbox-core/')
-    sshfs_tmp_dir: EmptyDirectoryPath = cache_dir / 'sshfs'
     local_repo_sync_timeout_sec: int = 30
     rabbitmq_url: str = 'amqp://guest:guest@rabbitmq:5672'
     gpg_key_length: int = 4096
@@ -90,6 +79,17 @@ class Settings(BaseSettings):
     gpg_key_comment: str = 'This is a certificate for saltbox services'
 
     model_config = SettingsConfigDict(env_file='.env')
+
+    @computed_field  # type: ignore[prop-decorator]
+    @cached_property
+    def sshfs_tmp_dir(self) -> DirectoryPath:
+        path = self.cache_dir / 'sshfs'
+        if path.exists():
+            remove_older_than(path, CACHE_LIFETIME, logging.WARNING)
+        else:
+            path.mkdir(parents=True)
+        return path
+
 
     @property
     def keycloak_oidc_url(self) -> str:
