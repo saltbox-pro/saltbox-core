@@ -29,7 +29,7 @@ def remove_older_than(path: Path, age: timedelta, log_level: int=logging.INFO) -
 
     Does nothing, if path is not a directory
     """
-    for root, dirs, files in path.walk():
+    for root, dirs, files in path.walk(top_down=False):
         threshold = datetime.now(tz=UTC) - age
         for dir in dirs:
             dir_path = root/ dir
