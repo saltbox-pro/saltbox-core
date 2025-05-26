@@ -29,7 +29,7 @@ After deploying dev enivronment install pre-commit hooks with
 To verify that your setup is working, run the following commands:
 
 ```bash
-pytest
+SALTBOX_CORE_ENV_FILE=tests/test.env pytest
 ruff check
 mypy .
 pre-commit run --all-files
@@ -42,7 +42,7 @@ If any of the above processes fail, please reach out to the project maintainers 
 To run tests use:
 
 ```bash
-pytest
+SALTBOX_CORE_ENV_FILE=tests/test.env pytest
 ```
 
 ### Run

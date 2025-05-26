@@ -1,4 +1,5 @@
 import logging.config
+import os
 from datetime import timedelta
 from functools import cached_property
 from pathlib import Path
@@ -12,6 +13,7 @@ from salt_box_core.utilities.filesystem import remove_older_than
 APP_NAME = 'Salt.Box Core'
 APP_DESC = 'Salt.Box Core API'
 CACHE_LIFETIME = timedelta(days=1)
+ENV_FILE = Path(os.environ.get('SALTBOX_CORE_ENV_FILE', '.env'))
 
 
 def validate_path_is_absolute(value: Path) -> Path:
@@ -128,7 +130,7 @@ class Settings(BaseSettings):
         return self.taskiq_broker_url
 
 
-SETTINGS = Settings()
+SETTINGS = Settings(_env_file=ENV_FILE)
 
 
 class LogConfig(BaseModel):

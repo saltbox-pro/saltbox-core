@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `SALTBOX_CORE_ENV_FILE` environment variable support to override dotenv location.
+
 ### Changed
 
 - Default value for `salt_func_repo_url` in config
