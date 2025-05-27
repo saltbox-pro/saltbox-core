@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - More straight init of `sshfs_tmp_dir`: respect `cache_dir` value and delete
   only old files (currently older than 1 day).
+- Correct path normalization for GitFS root from manifest
 
 ### Removed
 

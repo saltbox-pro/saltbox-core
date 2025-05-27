@@ -10,6 +10,7 @@ Example of a manifest file:
 # The file is a Salt.Box package manifest file
 
 # GitFS root of the repository
+# Must be a relative path
 root: migration/states/
 
 # Hash function for sshfs_files

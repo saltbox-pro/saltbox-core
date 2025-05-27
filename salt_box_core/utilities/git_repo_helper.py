@@ -1,5 +1,6 @@
 import hashlib
 import json
+import os
 import re
 import shutil
 from abc import ABC, abstractmethod
@@ -60,11 +61,22 @@ def validate_path_is_not_absolute(value: Path) -> Path:
     return value
 
 
+def validate_gitfs_root(value: str) -> str:
+    value = os.path.normpath(value)
+    if value.startswith('../'):
+        raise ValueError()
+    path = validate_path_is_not_absolute(Path(value))
+    if path == Path():
+        return ''
+    return str(path)
+
+
 def validate_digest(value: str) -> str:
     return Digest(value).value
 
 
 NotAbsolutePath = Annotated[Path, AfterValidator(validate_path_is_not_absolute)]
+GitFSRoot = Annotated[str, AfterValidator(validate_gitfs_root)]
 DigestStr = Annotated[str, AfterValidator(validate_digest)]
 
 
@@ -80,7 +92,7 @@ class ManifestSshfsFilesSchema(BaseModel):
 
 
 class ManifestSchema(BaseModel):
-    root: NotAbsolutePath = Path()
+    root: GitFSRoot = ''
     sshfs_files: dict[NotAbsolutePath, ManifestSshfsFilesSchema] = {}
     sshfs_files_checksum_type: DigestStr = DEFAULT_DIGEST.value
     sshfs_files_token: str | None = None
