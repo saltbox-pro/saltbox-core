@@ -5,6 +5,10 @@ stages:
   - test
   - build
 
+variables:
+  # Set 0 to disable linting jobs
+  LINTING_ENABLED: true
+
 include:
   - project: 'saltbox/ci-lib'
     file: 'build-image.yml'
@@ -41,6 +45,8 @@ ruff:
   cache:
     paths:
       - '.cache/pip/'
+  rules:
+    - if: $LINTING_ENABLED == 'true'
 
 mypy:
   stage: lint
@@ -54,17 +60,23 @@ mypy:
   cache:
     paths:
       - '.cache/pip/'
+  rules:
+    - if: $LINTING_ENABLED == 'true'
 
 pytest:
   stage: test
   variables:
     PIP_CACHE_DIR: '$CI_PROJECT_DIR/.cache/pip'
+    APK_CACHE_DIR: '$CI_PROJECT_DIR/.cache/apk'
   image: python:3.12-alpine
   before_script:
+    - mkdir --parents "$APK_CACHE_DIR"
+    - apk add --cache-dir "$APK_CACHE_DIR" git
     - pip3 install -e .[dev]
   script:
-    pytest
+    - pytest
   coverage: '/^TOTAL.+?(\d+\%)$/'
   cache:
     paths:
-      - '.cache/pip/'
+      - '$PIP_CACHE_DIR'
+      - '$APK_CACHE_DIR'
