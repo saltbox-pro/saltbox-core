@@ -39,6 +39,7 @@ RUN mkdir --parents /var/lib/saltbox-core/
 
 ENV BASE_URL_ROOT_PATH=/
 ENV TIMEOUT_GRACEFUL_SHUTDOWN=5
+ENV KEYCLOAK_CLIENT_SECRET_FILE=/run/secrets/keycloak_client_saltbox_core_password
 
 ENV REDIS_TASKIQ_PASSWORD_SECRET=/run/secrets/redis_taskiq_password
 ENV REDIS_TASKIQ_USERNAME=

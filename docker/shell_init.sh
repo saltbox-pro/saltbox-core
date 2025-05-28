@@ -15,7 +15,7 @@ err() {
 
 REDIS_PASSWORD="$(cat /run/secrets/redis_salt_password)"
 MONGO_PASSWORD="$(cat /run/secrets/mongo_admin_password)"
-KEYCLOAK_CLIENT_SECRET="$(cat /run/secrets/keycloak_client_salt_box_core_password)"
+KEYCLOAK_CLIENT_SECRET="$(cat "$KEYCLOAK_CLIENT_SECRET_FILE")"
 
 TASKIQ_BROKER_URL="redis://${REDIS_TASKIQ_USERNAME}"
 if [ -f "$REDIS_TASKIQ_PASSWORD_SECRET" ]; then
