@@ -115,7 +115,7 @@ async def collection_create(
         raise HTTPException(status_code=403, detail='Not enough permissions')
 
     try:
-        return await collection_service.create(CollectionCreateSchema.model_validate(**collection.model_dump()))
+        return await collection_service.create(CollectionCreateSchema.model_validate(collection.model_dump()))
     except ObjectCreateError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except DuplicateKeyError as e:
