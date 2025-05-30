@@ -49,7 +49,7 @@ async def unique_field_values(
         msg = f"Collection '{body.collection_slug}' not found"
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=msg) from None
 
-    query = {'$and': [collection.query, body.query]}
+    query = {'$and': [collection.full_query, body.query]}
 
     result = await minion_service.get_unique_grain_values_by_field(
         field=body.field,

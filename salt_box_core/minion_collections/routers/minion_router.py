@@ -47,10 +47,10 @@ async def minions_list(
     try:
         collection = await collection_service.get_by_slug(body.collection_slug)
 
-        if collection.query and search:
-            query = {'$and': [collection.query, search]}
+        if collection.full_query and search:
+            query = {'$and': [collection.full_query, search]}
         else:
-            query = collection.query if collection.query else search
+            query = collection.full_query if collection.full_query else search
 
         logger.debug('query: %s', query)
 
@@ -86,10 +86,10 @@ async def minions_export(
     try:
         collection = await collection_service.get_by_slug(body.collection_slug)
 
-        if collection.query and body.query:
-            query = {'$and': [collection.query, body.query]}
+        if collection.full_query and body.query:
+            query = {'$and': [collection.full_query, body.query]}
         else:
-            query = collection.query if collection.query else body.query
+            query = collection.full_query if collection.full_query else body.query
 
         file_path = await minion_service.export_to_csv(query=query, skip=body.skip, limit=body.limit)
         if not file_path:
@@ -159,7 +159,7 @@ async def minion_retrieve(
         logger.error('Error: %s', e)
         raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
 
-    ids = await minion_service.get_ids_by_query(query=collection.query)
+    ids = await minion_service.get_ids_by_query(query=collection.full_query)
     if mid not in [i.id for i in ids]:
         raise HTTPException(status_code=404, detail='Minion not found')
 
@@ -208,7 +208,7 @@ async def minion_delete(
         logger.error('Error: %s', e)
         raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
 
-    ids = await minion_service.get_ids_by_query(query=collection.query)
+    ids = await minion_service.get_ids_by_query(query=collection.full_query)
     if mid not in [i.id for i in ids]:
         raise HTTPException(status_code=404, detail='Minion not found')
 

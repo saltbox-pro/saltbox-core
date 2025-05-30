@@ -1,7 +1,22 @@
 from pydantic import BaseModel, ConfigDict, Field
 
-from salt_box_core.db.mongo.schemas_base import IDMixin, MongoQuery
+from salt_box_core.db.mongo.schemas_base import BaseTreeModel, MongoQuery, PyObjectId, TreeMixin
 from salt_box_core.db.schemas_base import CreatedModifiedMixin
+
+MongoQueryField = Field(
+    default_factory=dict,
+    title='MongoDB Query',
+    description='A valid MongoDB query dictionary',
+    examples=[
+        {'grains.os': 'Ubuntu'},
+        {'grains.cpu_model': {'$regex': 'Intel'}},
+    ],
+    json_schema_extra={'example': {'grains.cpu_model': {'$not': {'$regex': 'Intel'}}}},
+)
+
+
+class CollectionComputedFieldsMixin:
+    full_query: MongoQuery = MongoQueryField
 
 
 class CollectionReadOnlyFieldsMixin:
@@ -10,36 +25,40 @@ class CollectionReadOnlyFieldsMixin:
 
 class CollectionEditableFieldsMixin:
     title: str = Field(title='Title', min_length=3, max_length=50)
-    query: MongoQuery = Field(
-        default_factory=dict,
-        title='MongoDB Query',
-        description='A valid MongoDB query dictionary',
-        examples=[
-            {'grains.os': 'Ubuntu'},
-            {'grains.cpu_model': {'$regex': 'Intel'}},
-        ],
-        json_schema_extra={'example': {'grains.cpu_model': {'$not': {'$regex': 'Intel'}}}},
-    )
+    query: MongoQuery = MongoQueryField
 
 
-class CollectionCreateSchema(BaseModel, CollectionEditableFieldsMixin, CollectionReadOnlyFieldsMixin):
+class CollectionCreateSchema(BaseModel, CollectionEditableFieldsMixin, CollectionReadOnlyFieldsMixin, TreeMixin):
     pass
 
 
-class CollectionUpdateSchema(BaseModel, CollectionEditableFieldsMixin):
+class CollectionCreateRequestSchema(BaseModel, CollectionEditableFieldsMixin, CollectionReadOnlyFieldsMixin):
+    parent_id: PyObjectId = Field(title='Parent ID')
+
+
+class CollectionUpdateSchema(BaseModel, CollectionEditableFieldsMixin, TreeMixin):
     model_config = ConfigDict(
         extra='forbid',
     )
 
 
 class CollectionModel(
-    BaseModel, CreatedModifiedMixin, CollectionEditableFieldsMixin, CollectionReadOnlyFieldsMixin, IDMixin
+    BaseTreeModel,
+    CreatedModifiedMixin,
+    CollectionEditableFieldsMixin,
+    CollectionReadOnlyFieldsMixin,
+    CollectionComputedFieldsMixin,
 ):
     pass
 
 
 class CollectionDetailSchema(CollectionModel):
     allowed_actions: list[str] = Field(title='Allowed actions')
+
+
+class CollectionBaseTreeModel(BaseTreeModel):
+    query: MongoQuery = MongoQueryField
+    full_query: MongoQuery = MongoQueryField
 
 
 # HINT: We can't create optional but not nullable field - https://github.com/pydantic/pydantic/issues/8394

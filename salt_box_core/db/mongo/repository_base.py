@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from datetime import UTC, datetime
 from inspect import isclass
-from typing import Any, Generic, TypeVar, cast, overload
+from typing import Any, ClassVar, Generic, TypeVar, cast, overload
 
 from pydantic import BaseModel
 from pymongo.asynchronous.collection import AsyncCollection
@@ -28,10 +28,10 @@ ModelType = TypeVar('ModelType', bound=BaseModel)
 
 class BaseMongoRepository(AbstractRepository[T], Generic[T]):
     class Meta:
-        collection_name: str
-        auto_now_add_fields: list[str]
-        auto_now_fields: list[str]
-        query_overrides: dict[str, str]
+        collection_name: ClassVar[str]
+        auto_now_add_fields: ClassVar[list[str]]
+        auto_now_fields: ClassVar[list[str]]
+        query_overrides: ClassVar[dict[str, str]]
 
     def __init__(self, database: AsyncDatabase):
         super().__init__()
@@ -81,6 +81,18 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
             query = recursive_override(query)
 
         return cast(dict[str, Any], recursive_replace_dates(query))
+
+    async def prepare_object_data(self, data: dict[str, Any]) -> dict[str, Any]:
+        return data
+
+    @overload
+    async def validate_object_data(self, data: ModelType) -> ModelType: ...
+
+    @overload
+    async def validate_object_data(self, data: dict[str, Any]) -> dict[str, Any]: ...
+
+    async def validate_object_data(self, data: ModelType | dict[str, Any]) -> ModelType | dict[str, Any]:
+        return data
 
     @property
     def collection(self) -> AsyncCollection:
@@ -138,7 +150,7 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
         elif len(result) > 1:
             raise MultipleObjectsFoundError
 
-        data = result[0]
+        data = await self.prepare_object_data(result[0])
 
         if projection_model is not None:
             return projection_model.model_validate(data)
@@ -169,10 +181,14 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
         result = self.collection.find(filter=query, projection=projection, limit=limit, skip=skip)
 
         if projection_model:
-            return [projection_model.model_validate(doc) for doc in await result.to_list()]
+            return [
+                projection_model.model_validate(await self.prepare_object_data(doc)) for doc in await result.to_list()
+            ]
             # return [projection_model.model_validate(doc) async for doc in result]
         else:
-            return [self.default_model.model_validate(doc) for doc in await result.to_list()]
+            return [
+                self.default_model.model_validate(await self.prepare_object_data(doc)) for doc in await result.to_list()
+            ]
 
     async def count(self, query: dict[str, Any] | None = None) -> int:
         query = self.__prepare_query__(query)
@@ -195,6 +211,11 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
         data: ModelType | dict[str, Any],
         projection_model: type[ProjectionModel] | None = None,
     ) -> T | ProjectionModel:
+        try:
+            data = await self.validate_object_data(data)
+        except ValueError as e:
+            raise ObjectCreateError(str(e)) from e
+
         if isinstance(data, BaseModel):
             data = data.model_dump(exclude={'id'})  # probably don't need to exclude id
 
@@ -243,6 +264,10 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
         exclude_unset: bool = True,
         projection_model: type[ProjectionModel] | None = None,
     ) -> T | ProjectionModel:
+        try:
+            data = await self.validate_object_data(data)
+        except ValueError as e:
+            raise ObjectCreateError(str(e)) from e
         query = self.__prepare_query__(query)
 
         if isinstance(data, BaseModel):

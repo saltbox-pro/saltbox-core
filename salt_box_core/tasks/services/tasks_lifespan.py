@@ -197,7 +197,7 @@ class TaskLifespanService:
     async def __get__targeting_query(self) -> dict:
         task: TaskModel = await self.get_task()
         collection: CollectionModel = await self.collection_service.get(task.target_collection.id)
-        sub_queries: list[dict] = [collection.query] if collection.query else []
+        sub_queries: list[dict] = [collection.full_query] if collection.full_query else []
 
         if task.target_query:
             sub_queries.append(task.target_query)

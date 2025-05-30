@@ -55,7 +55,7 @@ class MongoQueryToSaltTgtConverter:
 
     @classmethod
     def convert_from_minions_collection_obj(cls, minions_collection_obj: CollectionModel) -> str:
-        return cls.__convert_to_tgt(query_dict=minions_collection_obj.query)
+        return cls.__convert_to_tgt(query_dict=minions_collection_obj.full_query)
 
     @classmethod
     def convert_from_dict(cls, query_dict: dict) -> str:

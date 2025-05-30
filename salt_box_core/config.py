@@ -92,7 +92,6 @@ class Settings(BaseSettings):
             path.mkdir(parents=True)
         return path
 
-
     @property
     def keycloak_oidc_url(self) -> str:
         return f'{self.keycloak_server_url}/realms/{self.keycloak_realm}/.well-known/openid-configuration'

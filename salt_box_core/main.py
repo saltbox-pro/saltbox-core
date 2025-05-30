@@ -90,7 +90,7 @@ _NO_AUTH_PATHS.append(r'/system/[\w-]+/authorized_keys')
 app.add_middleware(
     AuthMiddleware,
     # Need add SETTINGS.base_url_root_path.rstrip('/') + uri in some cases
-    excluded_paths=_NO_AUTH_PATHS
+    excluded_paths=_NO_AUTH_PATHS,
 )
 
 

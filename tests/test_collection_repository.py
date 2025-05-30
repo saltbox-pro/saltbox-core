@@ -29,9 +29,14 @@ async def test_collection_repository_create(mocked_db):
     # Create repository instance with mocked database
     repo = CollectionRepository(mocked_db)
 
+    root_collection = CollectionCreateSchema(title='Root collection', slug='root', query={})
+    await repo.create(root_collection)
+
+    root_collection = await repo.get(query={'slug': 'root'})
+
     # Prepare test data
     collection_data = CollectionCreateSchema(
-        title='Тестовая коллекция', slug='test-collection', query={'grains.os': 'Ubuntu'}
+        title='Тестовая коллекция', slug='test-collection', query={'grains.os': 'Ubuntu'}, parent_id=root_collection.id
     )
 
     # Call create method

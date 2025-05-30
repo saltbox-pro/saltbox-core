@@ -83,6 +83,9 @@ class PyObjectId(ObjectId):
     def _validate(cls, v: Any) -> 'PyObjectId':
         if isinstance(v, bytes):
             v = v.decode('utf-8')
+        if not v:
+            msg = 'Invalid ObjectId value'
+            raise ValueError(msg)
         try:
             return PyObjectId(v)
         except (InvalidId, TypeError):
@@ -133,3 +136,10 @@ class PyObjectId(ObjectId):
 
 class IDMixin:
     id: PyObjectId = Field(title='ID', alias='_id', serialization_alias='id')
+
+
+class TreeMixin:
+    parent_id: PyObjectId | None = Field(title='Parent ID', default=None)
+
+
+class BaseTreeModel(pydantic.BaseModel, IDMixin, TreeMixin): ...

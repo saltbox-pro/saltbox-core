@@ -3,9 +3,16 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 
 from salt_box_core.config import logger
-from salt_box_core.db.exceptions import DuplicateKeyError, ObjectCreateError, ObjectNotFoundError, ObjectUpdateError
+from salt_box_core.db.exceptions import (
+    DuplicateKeyError,
+    ObjectCreateError,
+    ObjectDeleteError,
+    ObjectNotFoundError,
+    ObjectUpdateError,
+)
 from salt_box_core.db.schemas_base import PaginatedResponse, SkipLimitParams
 from salt_box_core.minion_collections.schemas.collection_schemas import (
+    CollectionCreateRequestSchema,
     CollectionCreateSchema,
     CollectionDetailSchema,
     CollectionModel,
@@ -99,7 +106,7 @@ async def collection_retrieve(
 
 @router.post('', operation_id='minion_collection_create')
 async def collection_create(
-    collection: CollectionCreateSchema,
+    collection: CollectionCreateRequestSchema,
     authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
 ) -> CollectionModel:
@@ -108,7 +115,7 @@ async def collection_create(
         raise HTTPException(status_code=403, detail='Not enough permissions')
 
     try:
-        return await collection_service.create(collection)
+        return await collection_service.create(CollectionCreateSchema.model_validate(**collection.model_dump()))
     except ObjectCreateError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except DuplicateKeyError as e:
@@ -165,8 +172,10 @@ async def collection_delete(
     try:
         await collection_service.delete_by_slug(slug)
         return Response(status_code=status.HTTP_204_NO_CONTENT)
-    except ObjectNotFoundError:
-        raise HTTPException(status_code=404, detail='Collection not found') from None
+    except ObjectNotFoundError as e:
+        raise HTTPException(status_code=404, detail='Collection not found') from e
+    except ObjectDeleteError as e:
+        raise HTTPException(status_code=400, detail=e.detail) from e
     except Exception as e:
         logger.error('Error: %s', e)
         raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e

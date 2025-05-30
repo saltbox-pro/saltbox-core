@@ -40,4 +40,10 @@ class ObjectUpdateError(RepositoryError):
         super().__init__(self.detail)
 
 
+class ObjectDeleteError(RepositoryError):
+    def __init__(self, detail: str = 'Object not deleted') -> None:
+        self.detail = detail
+        super().__init__(self.detail)
+
+
 class PipelineBuilderError(RepositoryError): ...

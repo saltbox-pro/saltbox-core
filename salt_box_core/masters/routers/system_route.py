@@ -20,10 +20,7 @@ router = APIRouter(
 )
 
 
-@router.get(
-    '/{user}/authorized_keys',
-    operation_id='authorized_keys',
-    response_class=PlainTextResponse)
+@router.get('/{user}/authorized_keys', operation_id='authorized_keys', response_class=PlainTextResponse)
 async def authorized_keys(
     user: str,
     master_service: Annotated[MasterService, Depends(get_master_service)],
