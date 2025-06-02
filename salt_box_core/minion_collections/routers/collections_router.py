@@ -114,8 +114,17 @@ async def collection_create(
     if not allow:
         raise HTTPException(status_code=403, detail='Not enough permissions')
 
+    creation_data = collection.model_dump()
+    parent_slug = creation_data.pop('parent_slug')
+
     try:
-        return await collection_service.create(CollectionCreateSchema.model_validate(collection.model_dump()))
+        parent_collection = await collection_service.get_by_slug(parent_slug)
+        creation_data['parent_id'] = parent_collection.id
+    except ObjectNotFoundError as e:
+        raise HTTPException(status_code=404, detail='Parent collection not found') from e
+
+    try:
+        return await collection_service.create(CollectionCreateSchema.model_validate(creation_data))
     except ObjectCreateError as e:
         raise HTTPException(status_code=400, detail=str(e)) from e
     except DuplicateKeyError as e:

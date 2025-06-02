@@ -33,7 +33,7 @@ class CollectionCreateSchema(BaseModel, CollectionEditableFieldsMixin, Collectio
 
 
 class CollectionCreateRequestSchema(BaseModel, CollectionEditableFieldsMixin, CollectionReadOnlyFieldsMixin):
-    parent_id: PyObjectId = Field(title='Parent ID')
+    parent_slug: str = Field(title='Slug', pattern=r'^[a-z0-9-]+$', min_length=3, max_length=30)
 
 
 class CollectionUpdateSchema(BaseModel, CollectionEditableFieldsMixin, TreeMixin):
