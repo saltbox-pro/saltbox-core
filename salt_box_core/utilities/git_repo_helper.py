@@ -27,6 +27,7 @@ from ruamel.yaml import YAML
 from ruamel.yaml.scanner import ScannerError
 
 from salt_box_core.config import SETTINGS, logger
+from salt_box_core.settings.schemas.sls_repos_schemas import SettingsSlsRepoModel
 from salt_box_core.utilities.filesystem import get_latest_ctime, recursive_force_remove
 
 yaml = YAML()
@@ -495,6 +496,7 @@ class GitRepoService:
 
         return schemas, errors
 
+    # TODO    :    Move to model
     def get_manifest_file(self) -> Path | None:
         for name in self.MANIFEST_FILE_ALLOWED_NAMES:
             path = Path(self.local_path) / name
@@ -522,6 +524,18 @@ class GitRepoService:
             return ManifestSchema.parse_obj(manifest_data)
         except ValidationError as err:
             raise GitRepoManifestError(err) from None
+
+
+class SaltModulesServeUpdater:
+    def __init__(self, repos: list[SettingsSlsRepoModel]) -> None:
+        self.repos = repos
+
+    def update(self) -> None:
+        # TODO : Lock
+        # TODO : Rsync
+        for repo in self.repos:
+            src_path = SETTINGS.local_repos_dir / repo.local_path
+            dst_path = ...
 
 
 @asynccontextmanager

@@ -20,6 +20,7 @@ from salt_box_core.tasks.schemas.task_template_schemas import TaskTemplateCreate
 from salt_box_core.tkq import broker
 from salt_box_core.utilities.git_repo_helper import (
     GitRepoService,
+    SaltModulesServeUpdater,
     create_sshfs_sync,
     repository_lock,
 )
@@ -117,6 +118,10 @@ async def sync_sls_repo_task(
                 'last_sync_error': '\n'.join(errors) if errors else '',
             }
             await sls_repo.update({'_id': ObjectId(repo_id)}, update_data)
+
+            active_repos = await sls_repo.get_list(query={'is_active': True}, skip=0, limit=0)
+            salt_modules_serve_updater = SaltModulesServeUpdater(active_repos)
+            salt_modules_serve_updater.update()
 
             # TODO (a.karmanov): Call upper in task owner/watcher class
             await notify_masters()
