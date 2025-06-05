@@ -2,6 +2,7 @@ import hashlib
 import json
 import re
 import shutil
+import subprocess
 import uuid
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
@@ -22,12 +23,9 @@ from salt_box_core.utilities.filesystem import get_latest_ctime, recursive_force
 
 
 class GitRepoError(RuntimeError): ...
-
-
 class MultipleRepoSyncError(GitRepoError): ...
-
-
 class GitRepoSshfsFileSyncError(GitRepoError): ...
+class SaltModulesServeError(GitRepoError): ...
 
 
 class SshfsSyncBase(ABC):
@@ -418,12 +416,46 @@ class SaltModulesServeUpdater:
     def __init__(self, repos: list[SettingsSlsRepoModel]) -> None:
         self.repos = repos
 
+    def _rsync(self, src_list: list[str], dst: str) -> None:
+        # TODO exclude .git README.md manifest.yaml
+        cmd = ['rsyn', '--archive', '--delete-after', '--delete-excluded']
+        cmd.extend(src_list)
+        cmd.append(dst)
+        try:
+            proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)  # noqa
+        except FileNotFoundError:
+            dosa = 'No rsync binary in $PATH'
+            raise SaltModulesServeError(dosa) from None
+        except subprocess.CalledProcessError as err:
+            logger.error('rsync exit code %i with output:\n%s', err.returncode, err.stdout)
+            raise SaltModulesServeError(err) from None
+        else:
+            msg = proc.stdout.decode()
+            if msg:
+                logger.info('rsync output:\n%s', msg)
+            else:
+                logger.info('rsync succeed with no output')
+
+    def _check_conflicts(self) -> None:
+        # TODO exclude .git README.md manifest.yaml
+        # TODO impl
+        ...
+
     def update(self) -> None:
         # TODO : Lock
-        # TODO : Rsync
+        dst = str(SETTINGS.salt_modules_serve_dir)
+        src_list: list[str] = []
         for repo in self.repos:
-            src_path = SETTINGS.local_repos_dir / repo.local_path
-            dst_path = SETTINGS.salt_modules_serve_dir
+            manifest = repo.parse_manifest()
+            src_path = repo.local_path_abs / manifest.root
+            if not src_path.exists():
+                # TODO (akraman) impl
+                ...
+            src_list.append(str(src_path) + '/')  # Trailing slash for rsync to sync content rather than dir
+        self._check_conflicts()
+        self._rsync(src_list, dst)
+        # TODO Empty if no active repos
+        # TODO (akraman) On SlsRepo delete hook
 
 
 @asynccontextmanager

@@ -102,7 +102,6 @@ async def sync_sls_repo_task(
             logger.debug('Repo cloned or pulled')
 
             manifest = repo_obj.parse_manifest()
-            logger.error(manifest)
             for file_path, file_entry in manifest.sshfs_files.items():
                 await create_sshfs_sync(file_path, file_entry).sync()
 

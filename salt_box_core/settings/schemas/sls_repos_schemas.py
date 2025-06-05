@@ -172,8 +172,8 @@ class SettingsSlsRepoModel(BaseModel, CreatedModifiedMixin, EditableFieldsFullMi
     @property
     def local_path_abs(self) -> Path:
         if not self.local_path:
-            dosa='Empty local_path, uninitialized?'
-            raise SlsRepoError()
+            dosa = 'Empty local_path, uninitialized?'
+            raise SlsRepoError(dosa)
         return Path(SETTINGS.local_repos_dir) / self.local_path
 
     def get_manifest_file(self) -> Path | None:
