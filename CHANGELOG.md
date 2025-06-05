@@ -18,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Default value for `salt_func_repo_url` in config
 - `end_datetime` field is required in job schemas
+- `LOG_LEVEL` setting instead of `DEBUG` flag
 
 ### Fixed
 

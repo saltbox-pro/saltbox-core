@@ -35,13 +35,20 @@ def validate_make_dir(value: Path) -> Path:
     return value
 
 
-MakeDirectoryPath = Annotated[Path, AfterValidator(validate_path_is_absolute), AfterValidator(validate_make_dir)]
+def validate_log_level(value: str) -> str:
+    value = value.upper()
+    if value not in {'DEBUG', 'INFO', 'WARN', 'WARNING', 'ERROR', 'CRITICAL'}:
+        dosa = f'Unexpected log level {value}'
+        raise ValueError(dosa)
+    return value
 
+MakeDirectoryPath = Annotated[Path, AfterValidator(validate_path_is_absolute), AfterValidator(validate_make_dir)]
+LogLevelStr = Annotated[str, AfterValidator(validate_log_level)]
 
 class Settings(BaseSettings):
     var_dir: MakeDirectoryPath = Path('/var/lib/saltbox-core/')
     taskiq_broker_url: str = ''
-    debug: bool = False
+    log_level: LogLevelStr  = 'info'
     show_docs: bool = False
     basic_auth_username: str = ''
     basic_auth_password: str = ''
@@ -138,7 +145,7 @@ SETTINGS = Settings(_env_file=ENV_FILE)
 
 class LogConfig(BaseModel):
     LOG_FORMAT: str = '%(levelprefix)s [%(filename)s:%(lineno)d] %(message)s'
-    LOG_LEVEL: str = 'DEBUG' if SETTINGS.debug else 'INFO'
+    LOG_LEVEL: str = SETTINGS.log_level.upper()
 
     version: int = 1
     disable_existing_loggers: bool = False
