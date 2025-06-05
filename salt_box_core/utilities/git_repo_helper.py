@@ -1,36 +1,24 @@
 import hashlib
 import json
-import os
 import re
 import shutil
 import uuid
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from email.message import Message
-from enum import Enum
 from pathlib import Path
-from typing import Annotated, Any, Self
 
 import httpx
 from git import Repo
-from pydantic import (
-    AfterValidator,
-    BaseModel,
-    Extra,
-    Field,
-    HttpUrl,
-    ValidationError,
-    model_validator,
-)
 from redis.asyncio import Redis
-from ruamel.yaml import YAML
-from ruamel.yaml.scanner import ScannerError
 
 from salt_box_core.config import SETTINGS, logger
-from salt_box_core.settings.schemas.sls_repos_schemas import SettingsSlsRepoModel
+from salt_box_core.settings.schemas.sls_repos_schemas import (
+    ManifestDigest,
+    ManifestSshfsFilesSchema,
+    SettingsSlsRepoModel,
+)
 from salt_box_core.utilities.filesystem import get_latest_ctime, recursive_force_remove
-
-yaml = YAML()
 
 
 class GitRepoError(RuntimeError): ...
@@ -39,77 +27,7 @@ class GitRepoError(RuntimeError): ...
 class MultipleRepoSyncError(GitRepoError): ...
 
 
-class GitRepoManifestError(GitRepoError): ...
-
-
 class GitRepoSshfsFileSyncError(GitRepoError): ...
-
-
-class Digest(str, Enum):
-    MD5 = 'md5'
-    SHA256 = 'sha256'
-    SHA512 = 'sha512'
-
-
-DEFAULT_DIGEST = Digest.SHA256
-FIELD_SENTINEL: Any = object()
-
-
-def validate_path_is_not_absolute(value: Path) -> Path:
-    """value must be a relative Path"""
-    if value.is_absolute():
-        msg = 'Path must be relative'
-        raise ValueError(msg)
-    return value
-
-
-def validate_gitfs_root(value: str) -> str:
-    value = os.path.normpath(value)
-    if value.startswith('../'):
-        raise ValueError()
-    path = validate_path_is_not_absolute(Path(value))
-    if path == Path():
-        return ''
-    return str(path)
-
-
-def validate_digest(value: str) -> str:
-    return Digest(value).value
-
-
-NotAbsolutePath = Annotated[Path, AfterValidator(validate_path_is_not_absolute)]
-GitFSRoot = Annotated[str, AfterValidator(validate_gitfs_root)]
-DigestStr = Annotated[str, AfterValidator(validate_digest)]
-
-
-class ManifestSshfsFilesSchema(BaseModel):
-    url: HttpUrl
-    checksum: str
-    checksum_type: DigestStr = FIELD_SENTINEL
-    token: str | None = FIELD_SENTINEL
-    unpack: bool = Field(default=False, description='Unpack arhive rather than processing as a regular file')
-
-    class Config:
-        extra = Extra.forbid
-
-
-class ManifestSchema(BaseModel):
-    root: GitFSRoot = ''
-    sshfs_files: dict[NotAbsolutePath, ManifestSshfsFilesSchema] = {}
-    sshfs_files_checksum_type: DigestStr = DEFAULT_DIGEST.value
-    sshfs_files_token: str | None = None
-
-    class Config:
-        extra = Extra.forbid
-
-    @model_validator(mode='after')
-    def _set_global_values(self) -> Self:
-        for file_entry in self.sshfs_files.values():
-            if file_entry.checksum_type is FIELD_SENTINEL:
-                file_entry.checksum_type = self.sshfs_files_checksum_type
-            if file_entry.token is FIELD_SENTINEL:
-                file_entry.token = self.sshfs_files_token
-        return self
 
 
 class SshfsSyncBase(ABC):
@@ -141,7 +59,7 @@ class SshfsSyncBase(ABC):
         return new_checksum
 
     def purge_type_mismatched_checksums(self) -> None:
-        redundant_digests = {i.value for i in Digest}
+        redundant_digests = {i.value for i in ManifestDigest}
         redundant_digests.remove(self.file_entry.checksum_type)
         for digest in redundant_digests:
             path = self.dest_digest_path.with_suffix(f'.{digest}')
@@ -342,8 +260,6 @@ class RepositoryLocker:
 
 
 class GitRepoService:
-    MANIFEST_FILE_ALLOWED_NAMES = ('manifest.yaml', 'manifest.yml')
-
     def __init__(
         self, repo_url: str, local_name: str | None = None, login: str | None = None, token: str | None = None
     ) -> None:
@@ -496,34 +412,6 @@ class GitRepoService:
 
         return schemas, errors
 
-    # TODO    :    Move to model
-    def get_manifest_file(self) -> Path | None:
-        for name in self.MANIFEST_FILE_ALLOWED_NAMES:
-            path = Path(self.local_path) / name
-            if path.is_file():
-                return path
-        return None
-
-    def parse_manifest(self) -> ManifestSchema:
-        """
-        :raises OSError: on filesystem operations errors
-        :raises GitRepoManifestError:
-        """
-        path = self.get_manifest_file()
-        if path is None:
-            logger.warning('Not found manifest file in repo %s, using defaults', self.local_path)
-            return ManifestSchema()
-
-        with path.open() as m_file:
-            try:
-                manifest_data = yaml.load(m_file)
-            except ScannerError as err:
-                raise GitRepoManifestError(err) from None
-
-        try:
-            return ManifestSchema.parse_obj(manifest_data)
-        except ValidationError as err:
-            raise GitRepoManifestError(err) from None
 
 
 class SaltModulesServeUpdater:
@@ -535,7 +423,7 @@ class SaltModulesServeUpdater:
         # TODO : Rsync
         for repo in self.repos:
             src_path = SETTINGS.local_repos_dir / repo.local_path
-            dst_path = ...
+            dst_path = SETTINGS.salt_modules_serve_dir
 
 
 @asynccontextmanager

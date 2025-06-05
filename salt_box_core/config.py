@@ -65,14 +65,17 @@ class Settings(BaseSettings):
     opa_url: str = ''
     salt_func_repo_url: str = 'https://dev.saltbox.pro/saltbox/salt-func-schemas.git'
     salt_func_local_repo_name: str = 'salt-func-schemas'
-    local_repos_dir: MakeDirectoryPath = Path('/var/lib/saltbox-core/repos/')
-    salt_modules_serve_dir: MakeDirectoryPath = Path('/srv/salt')
+    local_repos_dir: MakeDirectoryPath = Field(
+        Path('/var/lib/saltbox-core/repos/'),
+        description='Salt modules cloned repos location',)
+    salt_modules_serve_dir: MakeDirectoryPath = Field(
+        Path('/srv/salt'),
+        description='Ready-to-sync SLS files location',)
     sshfs_user: str = Field(default='saltbox', description='SSH user name to access files')
     gitfs_user: str = Field(default='git', description='SSH user name to access Git repos')
     sshfs_dir: MakeDirectoryPath = Field(
         default=Path('/srv/sshfs/'),
-        description='Path to store of files served by sshfs',
-    )
+        description='Path to store of files served by sshfs',)
     cache_dir: MakeDirectoryPath = Path('/var/cache/saltbox-core/')
     local_repo_sync_timeout_sec: int = 30
     rabbitmq_url: str = 'amqp://guest:guest@rabbitmq:5672'
