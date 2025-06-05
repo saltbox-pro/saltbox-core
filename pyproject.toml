@@ -92,8 +92,10 @@ ignore = [
   "ERA",  # do not autoremove commented out code
   "N818", # error-suffix-on-exception-name
   "UP040", # type instead of TypeAlias PEP 695"
-  "TD003", # Found TODO in code
+  "TD001", # Invalid TODO tag
   "TD002", # Author name in TODO
+  "TD003", # Found TODO in code
+  "TD004", # Missing colon in TODO
   "UP017", # Use datetime.UTC alias (not available for 3.10)
   # "G004", # Logging statement uses string formatting
 ]
