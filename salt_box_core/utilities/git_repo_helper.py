@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from email.message import Message
 from pathlib import Path
+from typing import ClassVar
 
 import httpx
 from git import Repo
@@ -15,6 +16,7 @@ from redis.asyncio import Redis
 
 from salt_box_core.config import SETTINGS, logger
 from salt_box_core.settings.schemas.sls_repos_schemas import (
+    MANIFEST_FILE_ALLOWED_NAMES,
     ManifestDigest,
     ManifestSshfsFilesSchema,
     SettingsSlsRepoModel,
@@ -413,7 +415,11 @@ class GitRepoService:
 
 
 class SaltModulesServeUpdater:
-    EXCLUDE_LIST = ['.git']
+    # TODO Unite lists
+    # Ignore path on conflict check if it is member of a subpass of member of CONFLICT_IGNORE_LIST
+    CONFLICT_IGNORE_LIST: ClassVar = [Path(p) for p in (*['.git', 'README.md'], *MANIFEST_FILE_ALLOWED_NAMES)]
+    # Rsync excludes to not to sync to serve location.
+    SYNC_EXCLUDE_LIST: ClassVar = ['.git']
 
     def __init__(self, repos: list[SettingsSlsRepoModel]) -> None:
         self.repos = repos
@@ -441,9 +447,21 @@ class SaltModulesServeUpdater:
             else:
                 logger.info('rsync succeed with no output')
 
-    @staticmethod
-    def _get_dir_content(path: Path) -> set:
-        return {cont.relative_to(path) for cont in path.rglob('*')}
+    @classmethod
+    def _is_ignored(cls, path: Path) -> bool:
+        for ignore in cls.CONFLICT_IGNORE_LIST:
+            if path == ignore or ignore in path.parents:
+                return True
+        return False
+
+    @classmethod
+    def _get_dir_content(cls, path: Path) -> set:
+        result: set[Path] = set()
+        for cont in path.rglob('*'):
+            rel_cont = cont.relative_to(path)
+            if not cls._is_ignored(rel_cont):
+                result.add(rel_cont)
+        return result
 
     def _check_conflicts(self, dirs: list[Path]) -> None:
         # TODO exclude .git README.md manifest.yaml
