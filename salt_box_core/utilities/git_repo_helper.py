@@ -413,12 +413,17 @@ class GitRepoService:
 
 
 class SaltModulesServeUpdater:
+    EXCLUDE_LIST = ['.git']
+
     def __init__(self, repos: list[SettingsSlsRepoModel]) -> None:
         self.repos = repos
 
     def _rsync(self, src_list: list[str], dst: str) -> None:
         # TODO exclude .git README.md manifest.yaml
-        cmd = ['rsyn', '--archive', '--delete-after', '--delete-excluded']
+        if not src_list:
+            # TODO Delete
+            ...
+        cmd = ['rsync', '--archive', '--delete-after', '--delete-excluded']
         cmd.extend(src_list)
         cmd.append(dst)
         try:
@@ -436,24 +441,39 @@ class SaltModulesServeUpdater:
             else:
                 logger.info('rsync succeed with no output')
 
-    def _check_conflicts(self) -> None:
+    @staticmethod
+    def _get_dir_content(path: Path) -> set:
+        return {cont.relative_to(path) for cont in path.rglob('*')}
+
+    def _check_conflicts(self, dirs: list[Path]) -> None:
         # TODO exclude .git README.md manifest.yaml
-        # TODO impl
-        ...
+        merge: set[Path] = set()
+        dups: set[Path] = set()
+        for d in dirs:
+            content = self._get_dir_content(d)
+            dups |= merge & content
+            merge |= content
+        if dups:
+            for dup in dups:
+                logger.error('Path exists in multiple Salt modules: %s', dup)
+            msg = 'Conflicting paths have been found in Salt modules, check log'
+            raise SaltModulesServeError(msg)
 
     def update(self) -> None:
         # TODO : Lock
-        dst = str(SETTINGS.salt_modules_serve_dir)
-        src_list: list[str] = []
+        dst = SETTINGS.salt_modules_serve_dir
+        src_list: list[Path] = []
         for repo in self.repos:
             manifest = repo.parse_manifest()
             src_path = repo.local_path_abs / manifest.root
-            if not src_path.exists():
+            if not src_path.is_dir():
                 # TODO (akraman) impl
                 ...
-            src_list.append(str(src_path) + '/')  # Trailing slash for rsync to sync content rather than dir
-        self._check_conflicts()
-        self._rsync(src_list, dst)
+            src_list.append(src_path)
+        self._check_conflicts(src_list)
+        # Trailing slash for rsync to sync content rather than dir
+        rsync_src_list = [str(p) + '/' for p in src_list]
+        self._rsync(rsync_src_list, str(dst))
         # TODO Empty if no active repos
         # TODO (akraman) On SlsRepo delete hook
 
