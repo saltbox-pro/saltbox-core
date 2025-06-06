@@ -413,25 +413,34 @@ class GitRepoService:
         return schemas, errors
 
 
-
 class SaltModulesServeUpdater:
-    # TODO Unite lists
-    # Ignore path on conflict check if it is member of a subpass of member of CONFLICT_IGNORE_LIST
-    CONFLICT_IGNORE_LIST: ClassVar = [Path(p) for p in (*['.git', 'README.md'], *MANIFEST_FILE_ALLOWED_NAMES)]
+    # Path will be ignored in conflict check and excluded from sync.
+    # DO NOT USE GLOBS:
+    #  - Items will be checked on being equal or being a subpass of a value on conlicts check.
+    #  - Items will be passed to rsync `--exclude` as is. Trailing `/` is significant.
     # Rsync excludes to not to sync to serve location.
-    SYNC_EXCLUDE_LIST: ClassVar = ['.git']
+    IGNORE_LIST: ClassVar = ('.git', '.gitignore', 'README.md', *MANIFEST_FILE_ALLOWED_NAMES)
 
     def __init__(self, repos: list[SettingsSlsRepoModel]) -> None:
         self.repos = repos
 
-    def _rsync(self, src_list: list[str], dst: str) -> None:
-        # TODO exclude .git README.md manifest.yaml
+    def _rsync(self, src_list: list[Path], dst: Path) -> None:
         if not src_list:
-            # TODO Delete
-            ...
+            for sp in dst.glob('*'):
+                recursive_force_remove(sp)
+            return
+
+        # Trailing slash for rsync to sync content rather than dir
+        rsync_src_list = [str(p) + '/' for p in src_list]
+        rsync_dst = str(dst)
+
         cmd = ['rsync', '--archive', '--delete-after', '--delete-excluded']
-        cmd.extend(src_list)
-        cmd.append(dst)
+        for i in self.IGNORE_LIST:
+            cmd.append('--exclude')
+            cmd.append(i)
+        cmd.extend(rsync_src_list)
+        cmd.append(rsync_dst)
+        logger.debug('Prepared command: %s', cmd)
         try:
             proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)  # noqa
         except FileNotFoundError:
@@ -449,7 +458,8 @@ class SaltModulesServeUpdater:
 
     @classmethod
     def _is_ignored(cls, path: Path) -> bool:
-        for ignore in cls.CONFLICT_IGNORE_LIST:
+        for ignore in cls.IGNORE_LIST:
+            ignore = Path(ignore)
             if path == ignore or ignore in path.parents:
                 return True
         return False
@@ -489,10 +499,7 @@ class SaltModulesServeUpdater:
                 ...
             src_list.append(src_path)
         self._check_conflicts(src_list)
-        # Trailing slash for rsync to sync content rather than dir
-        rsync_src_list = [str(p) + '/' for p in src_list]
-        self._rsync(rsync_src_list, str(dst))
-        # TODO Empty if no active repos
+        self._rsync(src_list, dst)
         # TODO (akraman) On SlsRepo delete hook
 
 
