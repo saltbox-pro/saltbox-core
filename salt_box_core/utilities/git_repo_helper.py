@@ -27,7 +27,7 @@ from salt_box_core.utilities.filesystem import get_latest_ctime, recursive_force
 class GitRepoError(RuntimeError): ...
 class MultipleRepoSyncError(GitRepoError): ...
 class GitRepoSshfsFileSyncError(GitRepoError): ...
-class SaltModulesServeError(GitRepoError): ...
+class SlsReposServeUpdaterError(GitRepoError): ...
 
 
 class SshfsSyncBase(ABC):
@@ -413,7 +413,7 @@ class GitRepoService:
         return schemas, errors
 
 
-class SaltModulesServeUpdater:
+class SlsReposServeUpdater:
     # Path will be ignored in conflict check and excluded from sync.
     # DO NOT USE GLOBS:
     #  - Items will be checked on being equal or being a subpass of a value on conlicts check.
@@ -445,10 +445,10 @@ class SaltModulesServeUpdater:
             proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)  # noqa
         except FileNotFoundError:
             dosa = 'No rsync binary in $PATH'
-            raise SaltModulesServeError(dosa) from None
+            raise SlsReposServeUpdaterError(dosa) from None
         except subprocess.CalledProcessError as err:
             logger.error('rsync exit code %i with output:\n%s', err.returncode, err.stdout)
-            raise SaltModulesServeError(err) from None
+            raise SlsReposServeUpdaterError(err) from None
         else:
             msg = proc.stdout.decode()
             if msg:
@@ -474,7 +474,6 @@ class SaltModulesServeUpdater:
         return result
 
     def _check_conflicts(self, dirs: list[Path]) -> None:
-        # TODO exclude .git README.md manifest.yaml
         merge: set[Path] = set()
         dups: set[Path] = set()
         for d in dirs:
@@ -485,7 +484,7 @@ class SaltModulesServeUpdater:
             for dup in dups:
                 logger.error('Path exists in multiple Salt modules: %s', dup)
             msg = 'Conflicting paths have been found in Salt modules, check log'
-            raise SaltModulesServeError(msg)
+            raise SlsReposServeUpdaterError(msg)
 
     def update(self) -> None:
         # TODO : Lock
@@ -493,14 +492,16 @@ class SaltModulesServeUpdater:
         src_list: list[Path] = []
         for repo in self.repos:
             manifest = repo.parse_manifest()
+            if not repo.local_path_abs.exists():
+                logger.info('Skipping local repo which is not yet exists: %s', repo.local_path)
+                continue
             src_path = repo.local_path_abs / manifest.root
             if not src_path.is_dir():
-                # TODO (akraman) impl
-                ...
+                msg = f'Path is not a regular directory: {src_path}'
+                raise SlsReposServeUpdaterError(msg)
             src_list.append(src_path)
         self._check_conflicts(src_list)
         self._rsync(src_list, dst)
-        # TODO (akraman) On SlsRepo delete hook
 
 
 @asynccontextmanager

@@ -11,6 +11,7 @@ from taskiq.depends.progress_tracker import ProgressTracker, TaskState
 from salt_box_core.config import Settings, logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.redis.config import get_redis_dep
+from salt_box_core.event_bus.masters_bus import notify_masters
 from salt_box_core.settings.repository import SettingsSlsRepoRepository, get_sls_repo_repository
 from salt_box_core.tasks.repositories.task_template_repository import (
     TaskTemplateRepository,
@@ -20,7 +21,6 @@ from salt_box_core.tasks.schemas.task_template_schemas import TaskTemplateCreate
 from salt_box_core.tkq import broker
 from salt_box_core.utilities.git_repo_helper import (
     GitRepoService,
-    SaltModulesServeUpdater,
     create_sshfs_sync,
     repository_lock,
 )
@@ -81,7 +81,7 @@ async def sync_sls_repo_task(
     """Task for synchronizing job schemas from a Git repository."""
     # TODO (a.karmanov): Move import to top
     try:
-        from salt_box_core.settings.services.sls_repo_service import notify_masters
+        from salt_box_core.settings.services.sls_repo_service import sync_sls_repos_to_serve_dir
 
         await progress.set_progress(TaskState.STARTED, 'Sync started')
         repo_obj = await sls_repo.get({'_id': ObjectId(repo_id)})
@@ -119,9 +119,7 @@ async def sync_sls_repo_task(
             }
             await sls_repo.update({'_id': ObjectId(repo_id)}, update_data)
 
-            active_repos = await sls_repo.get_list(query={'is_active': True}, skip=0, limit=0)
-            salt_modules_serve_updater = SaltModulesServeUpdater(active_repos)
-            salt_modules_serve_updater.update()
+            await sync_sls_repos_to_serve_dir()
 
             # TODO (a.karmanov): Call upper in task owner/watcher class
             await notify_masters()

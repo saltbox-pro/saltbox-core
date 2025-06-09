@@ -8,14 +8,10 @@ from fastapi import Depends
 from salt_box_core.config import SETTINGS, logger
 from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.db.mongo.schemas_base import PyObjectId
-from salt_box_core.event_bus.masters_bus import send_message_to_master
-from salt_box_core.masters.repositories.master_repository import MasterRepository
-from salt_box_core.masters.services.master_service import MasterService
 from salt_box_core.settings.repository import (
     SettingsSlsRepoRepository,
     get_sls_repo_repository,
 )
-from salt_box_core.settings.schemas.event_bus_schemas import ListSlsReposMessage, MasterMessageSlsRepoModel
 from salt_box_core.settings.schemas.sls_repos_schemas import (
     SettingsSlsRepoCreateSchema,
     SettingsSlsRepoModel,
@@ -23,20 +19,18 @@ from salt_box_core.settings.schemas.sls_repos_schemas import (
 )
 from salt_box_core.settings.tasks import sync_sls_repo_task
 from salt_box_core.tasks.services.tasks_templates import TaskTemplateService
-from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService
+from salt_box_core.utilities.git_repo_helper import SlsReposServeUpdater
+from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService, ProjectionModel
 
 
-# TODO (a.karmanov): Make generic send_message_to_every_master() in masters_bus
-async def notify_masters() -> None:
-    mongo_db = get_mongo_db()
-    master_repo = MasterRepository(mongo_db)
-    sls_repo_repo = SettingsSlsRepoRepository(mongo_db)
-    masters = await MasterService(master_repo).get_list(query={}, skip=0, limit=0)
-    active_repos = await SettingsSlsRepoService(sls_repo_repo).get_list(query={'is_active': True}, skip=0, limit=0)
-    msg_repos = [MasterMessageSlsRepoModel(**repo.dict()) for repo in active_repos]
-    for m_obj in masters:
-        msg = ListSlsReposMessage(repos=msg_repos, master=m_obj.master_id)
-        await send_message_to_master(msg, 'sync_repos')
+async def sync_sls_repos_to_serve_dir(data_repo: SettingsSlsRepoRepository | None = None) -> None:
+    if data_repo is None:
+        mongo_db = get_mongo_db()
+        data_repo = SettingsSlsRepoRepository(mongo_db)
+    active_repos = await data_repo.get_list(query={'is_active': True}, skip=0, limit=0)
+    salt_modules_serve_updater = SlsReposServeUpdater(active_repos)
+    salt_modules_serve_updater.update()
+    # TODO Notify masters here
 
 
 class SettingsSlsRepoService(
@@ -44,18 +38,19 @@ class SettingsSlsRepoService(
         SettingsSlsRepoRepository, SettingsSlsRepoModel, SettingsSlsRepoCreateSchema, SettingsSlsRepoUpdateSchema
     ]
 ):
-    async def activate(self, sid: PyObjectId) -> SettingsSlsRepoModel:
+    async def set_activity_state(self, sid: PyObjectId, state: bool) -> SettingsSlsRepoModel:
         document = await self.get(sid)
-        if document.is_active:
+        if document.is_active == state:
             return document
+        result = await self.update(query=sid, data={'is_active': state})
+        await self.sync_to_serve_dir()  # TODO Async in taskiq
+        return result
 
-        return await self.update(query=sid, data={'is_active': True})
+    async def activate(self, sid: PyObjectId) -> SettingsSlsRepoModel:
+        return await self.set_activity_state(sid=sid, state=True)
 
     async def deactivate(self, sid: PyObjectId) -> SettingsSlsRepoModel:
-        document = await self.get(sid)
-        if not document.is_active:
-            return document
-        return await self.update(query=sid, data={'is_active': False})
+        return await self.set_activity_state(sid=sid, state=False)
 
     async def sync_all(self) -> list[str]:
         active_repos = await self.get_list(query={'is_active': True}, skip=0, limit=0)
@@ -93,9 +88,16 @@ class SettingsSlsRepoService(
 
         await self.delete(sid)
 
+        # Delete from serve directory
+        await self.sync_to_serve_dir()
+
+
     async def sync(self, sid: PyObjectId) -> str:
         task = await sync_sls_repo_task.kiq(str(sid))
         return task.task_id
+
+    async def sync_to_serve_dir(self) -> None:
+        await sync_sls_repos_to_serve_dir(self.repo)
 
 
 def get_sls_repo_service(
