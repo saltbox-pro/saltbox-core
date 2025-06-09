@@ -30,6 +30,9 @@ class CollectionRepository(BaseTreeMongoRepository[CollectionModel]):
         else:
             data['full_query'] = query
 
+        data['parent_slug'] = parent.slug if parent else None
+        data['parent_title'] = parent.title if parent else None
+
         return data
 
     @overload

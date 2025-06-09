@@ -21,11 +21,20 @@ class CollectionComputedFieldsMixin:
 
 class CollectionReadOnlyFieldsMixin:
     slug: str = Field(title='Slug', pattern=r'^[a-z0-9-]+$', min_length=3, max_length=30)
+    parent_title: str | None = Field(title='Title', min_length=3, max_length=50, default=None)
 
 
 class CollectionEditableFieldsMixin:
     title: str = Field(title='Title', min_length=3, max_length=50)
     query: MongoQuery = MongoQueryField
+    parent_slug: str | None = Field(
+        title='Parent Slug',
+        pattern=r'^[a-z0-9-]+$',
+        min_length=3,
+        max_length=30,
+        default=None,
+        description='Slug of the parent collection, if any',
+    )
 
 
 class CollectionCreateSchema(BaseModel, CollectionEditableFieldsMixin, CollectionReadOnlyFieldsMixin, TreeMixin):
@@ -59,6 +68,8 @@ class CollectionDetailSchema(CollectionModel):
 class CollectionBaseTreeModel(BaseTreeModel):
     query: MongoQuery = MongoQueryField
     full_query: MongoQuery = MongoQueryField
+    slug: str
+    title: str
 
 
 # HINT: We can't create optional but not nullable field - https://github.com/pydantic/pydantic/issues/8394
@@ -66,7 +77,6 @@ class CollectionBaseTreeModel(BaseTreeModel):
 # class CollectionPartialUpdate(BaseModel):
 #     title: str | None = None
 #     slug: str | None = None
-#     has_boobs: bool | None = None
 
 #     model_config = ConfigDict(
 #         extra='forbid',
