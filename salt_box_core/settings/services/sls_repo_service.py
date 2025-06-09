@@ -1,8 +1,7 @@
 import asyncio
 import shutil
-import uuid
 from pathlib import Path
-from typing import Annotated, overload, override
+from typing import Annotated
 
 from fastapi import Depends
 
@@ -24,7 +23,7 @@ from salt_box_core.settings.schemas.sls_repos_schemas import (
 )
 from salt_box_core.settings.tasks import sync_sls_repo_task
 from salt_box_core.tasks.services.tasks_templates import TaskTemplateService
-from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService, ProjectionModel
+from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService
 
 
 # TODO (a.karmanov): Make generic send_message_to_every_master() in masters_bus
@@ -45,26 +44,6 @@ class SettingsSlsRepoService(
         SettingsSlsRepoRepository, SettingsSlsRepoModel, SettingsSlsRepoCreateSchema, SettingsSlsRepoUpdateSchema
     ]
 ):
-    @overload
-    async def create(self, data: SettingsSlsRepoCreateSchema) -> SettingsSlsRepoModel: ...
-
-    @overload
-    async def create(
-        self, data: SettingsSlsRepoCreateSchema, projection_model: type[ProjectionModel]
-    ) -> ProjectionModel: ...
-
-    @override
-    async def create(
-        self, data: SettingsSlsRepoCreateSchema, projection_model: type[ProjectionModel] | None = None
-    ) -> SettingsSlsRepoModel | ProjectionModel:
-        if await self.repo.exists({'local_path': data.local_path}):
-            unique_suffix = str(uuid.uuid4())[:8]
-            data.local_path = f'{data.local_path}_{unique_suffix}'
-
-        if projection_model:
-            return await super().create(data, projection_model)
-        return await super().create(data)
-
     async def activate(self, sid: PyObjectId) -> SettingsSlsRepoModel:
         document = await self.get(sid)
         if document.is_active:

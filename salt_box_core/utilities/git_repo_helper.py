@@ -3,6 +3,7 @@ import json
 import os
 import re
 import shutil
+import uuid
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from email.message import Message
@@ -338,16 +339,6 @@ class RepositoryLocker:
         lock_key = f'repo_lock:{repo_id}'
         return bool(await self.redis.get(lock_key))
 
-    # def __enter__(self) -> None:
-    #     """Context manager entry"""
-    #     self.acquire_lock()
-    #     return self
-
-    # def __exit__(self, exc_type, exc_val, exc_tb) -> None:
-    #     """Context manager exit"""
-    #     self.release_lock()
-    #     return self
-
 
 class GitRepoService:
     MANIFEST_FILE_ALLOWED_NAMES = ('manifest.yaml', 'manifest.yml')
@@ -363,7 +354,7 @@ class GitRepoService:
             parts = self.repo_url.split('https://')
             self.repo_url = f'https://{self.login}:{self.token}@{parts[1]}'
 
-        self.local_name = local_name or self.repo_url.rstrip('/').split('/')[-1].replace('.git', '')
+        self.local_name = local_name or uuid.uuid4().hex
         self.local_path = Path(SETTINGS.local_repos_dir) / self.local_name
 
     @property

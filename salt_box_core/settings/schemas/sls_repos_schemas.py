@@ -1,4 +1,5 @@
 import os
+import uuid
 from typing import Annotated, Self
 
 from git.types import PathLike
@@ -13,7 +14,6 @@ from pydantic import (
     model_validator,
 )
 from pydantic_core import Url
-from slugify import slugify
 
 from salt_box_core.db.mongo.schemas_base import IDMixin
 from salt_box_core.db.schemas_base import CreatedModifiedMixin, TimezoneAwareDatetime
@@ -26,7 +26,7 @@ GitRepoUrl = Annotated[
 
 class ReadOnlyFieldsShortMixin:
     repo_url: PathLike
-    local_path: str = Field(max_length=50, default='', pattern='(^[a-z0-9_-]+$|^$)')
+    local_path: str = Field(max_length=32, default='', pattern='(^[a-z0-9_-]+$|^$)')
     last_synced: TimezoneAwareDatetime | None = None
     is_last_sync_successful: StrictBool = False
     last_sync_error: str | None = None
@@ -64,8 +64,7 @@ class SettingsSlsRepoCreateSchema(
     @model_validator(mode='after')
     def validate_local_path(self) -> Self:
         if not self.local_path:
-            url = self.repo_url if isinstance(self.repo_url, str) else os.fspath(self.repo_url)
-            self.local_path = slugify(url, lowercase=True, regex_pattern=r'[^a-z0-9_-]', separator='_', max_length=30)
+            self.local_path = os.fspath(uuid.uuid4().hex)
 
         return self
 
