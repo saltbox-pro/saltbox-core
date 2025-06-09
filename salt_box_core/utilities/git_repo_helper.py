@@ -15,6 +15,8 @@ from git import Repo
 from redis.asyncio import Redis
 
 from salt_box_core.config import SETTINGS, logger
+from salt_box_core.db.mongo.config import get_mongo_db
+from salt_box_core.settings.repository import SettingsSlsRepoRepository
 from salt_box_core.settings.schemas.sls_repos_schemas import (
     MANIFEST_FILE_ALLOWED_NAMES,
     ManifestDigest,
@@ -487,7 +489,7 @@ class SlsReposServeUpdater:
             raise SlsReposServeUpdaterError(msg)
 
     def update(self) -> None:
-        # TODO : Lock
+        # TODO (a.kraman) : Lock
         dst = SETTINGS.salt_modules_serve_dir
         src_list: list[Path] = []
         for repo in self.repos:
@@ -502,6 +504,16 @@ class SlsReposServeUpdater:
             src_list.append(src_path)
         self._check_conflicts(src_list)
         self._rsync(src_list, dst)
+
+
+async def sync_sls_repos_to_serve_dir(data_repo: SettingsSlsRepoRepository | None = None) -> None:
+    if data_repo is None:
+        mongo_db = get_mongo_db()
+        data_repo = SettingsSlsRepoRepository(mongo_db)
+    active_repos = await data_repo.get_list(query={'is_active': True}, skip=0, limit=0)
+    salt_modules_serve_updater = SlsReposServeUpdater(active_repos)
+    salt_modules_serve_updater.update()
+    # TODO (akraman) Notify masters here
 
 
 @asynccontextmanager

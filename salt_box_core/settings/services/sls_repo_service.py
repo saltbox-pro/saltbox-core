@@ -6,7 +6,6 @@ from typing import Annotated
 from fastapi import Depends
 
 from salt_box_core.config import SETTINGS, logger
-from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.db.mongo.schemas_base import PyObjectId
 from salt_box_core.settings.repository import (
     SettingsSlsRepoRepository,
@@ -19,18 +18,8 @@ from salt_box_core.settings.schemas.sls_repos_schemas import (
 )
 from salt_box_core.settings.tasks import sync_sls_repo_task
 from salt_box_core.tasks.services.tasks_templates import TaskTemplateService
-from salt_box_core.utilities.git_repo_helper import SlsReposServeUpdater
+from salt_box_core.utilities.git_repo_helper import sync_sls_repos_to_serve_dir
 from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService, ProjectionModel
-
-
-async def sync_sls_repos_to_serve_dir(data_repo: SettingsSlsRepoRepository | None = None) -> None:
-    if data_repo is None:
-        mongo_db = get_mongo_db()
-        data_repo = SettingsSlsRepoRepository(mongo_db)
-    active_repos = await data_repo.get_list(query={'is_active': True}, skip=0, limit=0)
-    salt_modules_serve_updater = SlsReposServeUpdater(active_repos)
-    salt_modules_serve_updater.update()
-    # TODO Notify masters here
 
 
 class SettingsSlsRepoService(
@@ -43,7 +32,7 @@ class SettingsSlsRepoService(
         if document.is_active == state:
             return document
         result = await self.update(query=sid, data={'is_active': state})
-        await self.sync_to_serve_dir()  # TODO Async in taskiq
+        await self.sync_to_serve_dir()  # TODO (akraman) Async in taskiq
         return result
 
     async def activate(self, sid: PyObjectId) -> SettingsSlsRepoModel:

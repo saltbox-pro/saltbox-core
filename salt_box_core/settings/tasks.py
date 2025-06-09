@@ -23,7 +23,9 @@ from salt_box_core.utilities.git_repo_helper import (
     GitRepoService,
     create_sshfs_sync,
     repository_lock,
+    sync_sls_repos_to_serve_dir,
 )
+
 
 SETTINGS = Settings()
 
@@ -79,10 +81,7 @@ async def sync_sls_repo_task(
     redis: Redis = TaskiqDepends(get_redis_dep),
 ) -> dict:
     """Task for synchronizing job schemas from a Git repository."""
-    # TODO (a.karmanov): Move import to top
     try:
-        from salt_box_core.settings.services.sls_repo_service import sync_sls_repos_to_serve_dir
-
         await progress.set_progress(TaskState.STARTED, 'Sync started')
         repo_obj = await sls_repo.get({'_id': ObjectId(repo_id)})
         url = repo_obj.repo_url if isinstance(repo_obj.repo_url, str) else os.fspath(repo_obj.repo_url)
