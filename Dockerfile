@@ -60,6 +60,15 @@ ENTRYPOINT ["/usr/local/bin/uvicorn.sh"]
 FROM base AS dev
 LABEL name='saltbox-core-dev' version='1.2'
 # Install Core as editable package
+RUN \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked \
+  --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+<<EOF
+set -e
+mkdir --parents /var/cache/apt/archives/partial/ /var/lib/apt/lists/partial/
+apt-get update
+apt-get install -y ipython3
+EOF
 WORKDIR /mnt/salt_box_core/
 VOLUME /mnt/salt_box_core/
 RUN \
