@@ -489,7 +489,7 @@ class SlsReposServeUpdater:
             raise SlsReposServeUpdaterError(msg)
 
     def update(self) -> None:
-        # TODO (a.kraman) : Lock
+        # TODO (akraman) : Lock
         dst = SETTINGS.salt_modules_serve_dir
         src_list: list[Path] = []
         for repo in self.repos:
