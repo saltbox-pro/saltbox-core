@@ -40,6 +40,18 @@ async def masters_list(
     return master_list
 
 
+@router.get('/{master_id}', operation_id='master_get')
+async def master_get(
+    master_id: str,
+    master_service: Annotated[MasterService, Depends(get_master_service)],
+) -> MasterViewSchema:
+    try:
+        master: MasterModel = await master_service.get_by_master_id(master_id)
+    except ObjectNotFoundError as e:
+        raise NotFound(detail='Master not found') from e
+    return MasterViewSchema.model_validate({'_id': master.id, **master.model_dump(by_alias=True)})
+
+
 @router.post('/{mid}/accept', operation_id='task_accept')
 async def master_accept(
     mid: PyObjectId,
