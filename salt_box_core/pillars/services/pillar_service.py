@@ -109,7 +109,7 @@ class PillarService:
             msg = f'Master "{master_id}" does not exist'
             raise ValueError(msg) from e
 
-        if minion_id is None or minion_id == '*':
+        if not minion_id or minion_id == '*':
             query = {'master': master_id}
         else:
             query = {'minion_id': minion_id, 'master': master_id}
