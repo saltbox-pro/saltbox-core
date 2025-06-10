@@ -109,7 +109,12 @@ class PillarService:
             msg = f'Master "{master_id}" does not exist'
             raise ValueError(msg) from e
 
-        if master_id and not await self.minion_service.exists({'minion_id': minion_id, 'master': master_id}):
+        if minion_id is None or minion_id == '*':
+            query = {'master': master_id}
+        else:
+            query = {'minion_id': minion_id, 'master': master_id}
+
+        if master_id and not await self.minion_service.exists(query):
             msg = f'Minion "{minion_id}" from master "{master_id}" does not exist'
             raise ValueError(msg)
 
