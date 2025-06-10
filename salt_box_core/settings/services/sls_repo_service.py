@@ -16,9 +16,8 @@ from salt_box_core.settings.schemas.sls_repos_schemas import (
     SettingsSlsRepoModel,
     SettingsSlsRepoUpdateSchema,
 )
-from salt_box_core.settings.tasks import sync_sls_repo_task
+from salt_box_core.settings.tasks import sync_sls_repo_task, sync_sls_repos_to_serve_dir
 from salt_box_core.tasks.services.tasks_templates import TaskTemplateService
-from salt_box_core.utilities.git_repo_helper import sync_sls_repos_to_serve_dir
 from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService, ProjectionModel
 
 
@@ -28,6 +27,12 @@ class SettingsSlsRepoService(
     ]
 ):
     async def set_activity_state(self, sid: PyObjectId, state: bool) -> SettingsSlsRepoModel:
+        # FIXME (akraman) tmp
+        from salt_box_core.settings.tasks import task_test
+        from taskiq.exceptions import NoResultError, TaskRejectedError
+        #for i in range(10):
+            #await task_test.kiq()
+        await task_test.kiq()
         document = await self.get(sid)
         if document.is_active == state:
             return document
@@ -86,7 +91,7 @@ class SettingsSlsRepoService(
         return task.task_id
 
     async def sync_to_serve_dir(self) -> None:
-        await sync_sls_repos_to_serve_dir(self.repo)
+        await sync_sls_repos_to_serve_dir.kiq()
 
 
 def get_sls_repo_service(

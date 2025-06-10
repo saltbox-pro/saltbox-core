@@ -5,7 +5,7 @@ from typing import Any
 
 from bson import ObjectId
 from redis.asyncio import Redis
-from taskiq import TaskiqDepends
+from taskiq import TaskiqDepends, Context
 from taskiq.depends.progress_tracker import ProgressTracker, TaskState
 
 from salt_box_core.config import Settings, logger
@@ -18,16 +18,17 @@ from salt_box_core.tasks.repositories.task_template_repository import (
     get_task_template_repository,
 )
 from salt_box_core.tasks.schemas.task_template_schemas import TaskTemplateCreateSchema, TaskTemplateUpdateSchema
-from salt_box_core.tkq import broker
+from salt_box_core.tkq import broker, ConcurrencyLimiter
 from salt_box_core.utilities.git_repo_helper import (
     GitRepoService,
+    SlsReposServeUpdater,
     create_sshfs_sync,
     repository_lock,
-    sync_sls_repos_to_serve_dir,
 )
 
 
 SETTINGS = Settings()
+SYNC_SERVE_DIR_LOCK_EXPIRATION_SEC = 300
 
 
 async def sync_schemas(
@@ -118,10 +119,9 @@ async def sync_sls_repo_task(
             }
             await sls_repo.update({'_id': ObjectId(repo_id)}, update_data)
 
-            await sync_sls_repos_to_serve_dir()
+            sync_serve_task = await sync_sls_repos_to_serve_dir.kiq()
+            await sync_serve_task.wait_result()
 
-            # TODO (a.karmanov): Call upper in task owner/watcher class
-            await notify_masters()
             await progress.set_progress(TaskState.SUCCESS, 'Sync successful')
 
             return {
@@ -143,3 +143,26 @@ async def sync_sls_repo_task(
         )
         await progress.set_progress(TaskState.FAILURE, msg)
         raise
+
+
+# FIXME (akraman) tmp
+@broker.task()
+async def task_test(
+        context: Context = TaskiqDepends(),
+        limiter: None = TaskiqDepends(ConcurrencyLimiter(1, expire=360))) -> str:
+#async def task_test() -> None:
+    logger.error('>> ENTER')
+    await asyncio.sleep(3)
+    logger.error('>> EXIT')
+    return 'RESULT!'
+
+
+@broker.task()
+async def sync_sls_repos_to_serve_dir(
+    sls_repo: SettingsSlsRepoRepository = TaskiqDepends(get_sls_repo_repository),
+    limiter: None = TaskiqDepends(ConcurrencyLimiter(1, expire=SYNC_SERVE_DIR_LOCK_EXPIRATION_SEC)),
+) -> None:
+    active_repos = await sls_repo.get_list(query={'is_active': True}, skip=0, limit=0)
+    salt_modules_serve_updater = SlsReposServeUpdater(active_repos)
+    salt_modules_serve_updater.update()
+    await notify_masters()
