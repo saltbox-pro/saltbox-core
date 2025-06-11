@@ -31,6 +31,9 @@ dev = [
   "pytest-sugar>=1.0.0",
   "mongomock>=4.3.0",
 ]
+reload = [
+  "taskiq[reload]",
+]
 
 [project.scripts]
 saltbox-faststream-redis = "salt_box_core.event_bus.faststream_redis:main"

@@ -73,7 +73,7 @@ WORKDIR /mnt/salt_box_core/
 VOLUME /mnt/salt_box_core/
 RUN \
   --mount=type=bind,target=/mnt/salt_box_core/,readwrite \
-  pip3 install --no-deps --editable .[dev]
+  pip3 install --editable .[reload]
 ENV TASKIQ_RELOAD=1
 CMD ["dev"]
 

@@ -18,7 +18,7 @@ from salt_box_core.tasks.repositories.task_template_repository import (
     get_task_template_repository,
 )
 from salt_box_core.tasks.schemas.task_template_schemas import TaskTemplateCreateSchema, TaskTemplateUpdateSchema
-from salt_box_core.tkq import broker, ConcurrencyLimiter
+from salt_box_core.tkq import ConcurrencyLocker, broker
 from salt_box_core.utilities.git_repo_helper import (
     GitRepoService,
     SlsReposServeUpdater,
@@ -149,7 +149,7 @@ async def sync_sls_repo_task(
 @broker.task()
 async def task_test(
         context: Context = TaskiqDepends(),
-        limiter: None = TaskiqDepends(ConcurrencyLimiter(1, expire=360))) -> str:
+        limiter: None = TaskiqDepends(ConcurrencyLocker(1, expire=360))) -> str:
 #async def task_test() -> None:
     logger.error('>> ENTER')
     await asyncio.sleep(3)
@@ -160,7 +160,7 @@ async def task_test(
 @broker.task()
 async def sync_sls_repos_to_serve_dir(
     sls_repo: SettingsSlsRepoRepository = TaskiqDepends(get_sls_repo_repository),
-    limiter: None = TaskiqDepends(ConcurrencyLimiter(1, expire=SYNC_SERVE_DIR_LOCK_EXPIRATION_SEC)),
+    limiter: None = TaskiqDepends(ConcurrencyLocker(1, expire=SYNC_SERVE_DIR_LOCK_EXPIRATION_SEC)),
 ) -> None:
     active_repos = await sls_repo.get_list(query={'is_active': True}, skip=0, limit=0)
     salt_modules_serve_updater = SlsReposServeUpdater(active_repos)
