@@ -5,7 +5,7 @@ from typing import Any
 
 from bson import ObjectId
 from redis.asyncio import Redis
-from taskiq import Context, TaskiqDepends
+from taskiq import TaskiqDepends
 from taskiq.depends.progress_tracker import ProgressTracker, TaskState
 
 from salt_box_core.config import Settings, logger
