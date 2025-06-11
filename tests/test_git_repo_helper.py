@@ -1,6 +1,6 @@
 import pytest
 
-from salt_box_core.utilities.git_repo_helper import validate_gitfs_root
+from salt_box_core.settings.schemas.sls_repos_schemas import validate_gitfs_root
 
 
 def test_gitfs_root_validator() -> None:
