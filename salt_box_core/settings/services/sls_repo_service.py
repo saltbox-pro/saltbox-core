@@ -27,12 +27,6 @@ class SettingsSlsRepoService(
     ]
 ):
     async def set_activity_state(self, sid: PyObjectId, state: bool) -> SettingsSlsRepoModel:
-        # FIXME (akraman) tmp
-        from salt_box_core.settings.tasks import task_test
-        from taskiq.exceptions import NoResultError, TaskRejectedError
-        #for i in range(10):
-            #await task_test.kiq()
-        await task_test.kiq()
         document = await self.get(sid)
         if document.is_active == state:
             return document

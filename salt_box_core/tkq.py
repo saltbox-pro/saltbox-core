@@ -27,14 +27,19 @@ async def get_result_backend_redis_connection() -> AsyncGenerator[Redis]:
 
 
 # https://github.com/orgs/taskiq-python/discussions/132
-class ConcurrencyLimiter:
-    # TODO Docstring
+class ConcurrencyLocker:
     """
-    """
-    REQUEUE_DELAY_SEC = 1
+    Taskiq dependency to ensure monopoly task execution.
 
-    def __init__(self, limit: int, expire: int | None = None, name: str | None = None) -> None:
-        self.limit = limit
+    If task will be "kiqed" again while executing, it will be queued to execute only once
+    after the current run.
+    """
+
+    REQUEUE_DELAY_SEC = 1
+    # Taskiq has `X-Taskiq-requeue` label, but we can not be sure it is stable
+    LABEL_REQUEUED = 'SB-Requeued'
+
+    def __init__(self, expire: int | None = None, name: str | None = None) -> None:
         self.name = name
         self.expire = expire
 
@@ -43,24 +48,36 @@ class ConcurrencyLimiter:
         redis: Redis = TaskiqDepends(get_result_backend_redis_connection),
         context: Context = TaskiqDepends(),
     ) -> AsyncGenerator[None, None]:
-        counter_name = f'{self.name or context.message.task_name}_CONCURRENCY_LIMIT'
-        current_val = int(await redis.get(counter_name) or 0)
-        logger.debug('ConcurrencyLimiter %s current limit: %i', counter_name, current_val)
-
-        if current_val >= self.limit:
-            logger.info('ConcurrencyLimiter %s limit is reached', counter_name)
-            context.message.labels['delay'] = str(self.REQUEUE_DELAY_SEC)
-            # TODO REJECT
-            #raise NoResultError()
-            #context.reject()
-            await context.requeue()
+        name = self.name or context.message.task_name
+        counter_name = f'{name}_COUNTER'
 
         async with redis.pipeline(transaction=True) as pipe:
             pipe = pipe.incr(counter_name)
-            pipe = pipe.expire(name=counter_name, time=360)
-            await pipe.execute()
+            if self.expire is not None:
+                pipe = pipe.expire(name=counter_name, time=self.expire)
+            pipe = pipe.get(name=counter_name)
+            result = await pipe.execute()
+
+        current_val = int(result[-1])
+        logger.debug('ConcurrencyLocker %s counter: %i', counter_name, current_val)
+
+        if current_val > 1 and context.message.labels.get(self.LABEL_REQUEUED):
+            await redis.decr(counter_name)
+            await context.requeue()
+
+        if current_val == 2:
+            logger.info('ConcurrencyLocker requeues task because seems already in progress: %s', name)
+            context.message.labels['delay'] = str(self.REQUEUE_DELAY_SEC)
+            context.message.labels[self.LABEL_REQUEUED] = str(True)
+            await context.requeue()
+        if current_val > 2:
+            logger.info('ConcurrencyLocker rejects task because seems already requeued: %s', counter_name)
+            # Reject the task.
+            # Idea was to use context.reject(), but as for taskqik==0.11.17 it raises TaskRejectedError,
+            # which can not be handled in dependency.
+            raise NoResultError()
 
         try:
             yield
         finally:
-            await redis.decr(counter_name)
+            await redis.delete(counter_name)
