@@ -28,7 +28,7 @@ async def authorized_keys(
     masters = await master_service.get_list(query={}, skip=0, limit=0)
     if user == SETTINGS.sshfs_user:
         attr = 'sshfs_pubkey'
-    elif user == SETTINGS.gitfs_user:
+    elif user == SETTINGS.salt_conf_user:
         attr = 'gitfs_pubkey'
     else:
         msg = f'Unknown user {user}'

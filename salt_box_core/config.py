@@ -79,7 +79,7 @@ class Settings(BaseSettings):
         Path('/srv/salt'),
         description='Ready-to-sync SLS files location',)
     sshfs_user: str = Field(default='saltbox', description='SSH user name to access files')
-    gitfs_user: str = Field(default='git', description='SSH user name to access Git repos')
+    salt_conf_user: str = Field(default='master', description='SSH user name to obtain modules for SaltStack')
     sshfs_dir: MakeDirectoryPath = Field(
         default=Path('/srv/sshfs/'),
         description='Path to store of files served by sshfs',)
