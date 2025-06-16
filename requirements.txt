@@ -1,4 +1,4 @@
-# TODO Make compliant with ALT Linux p11
+# TODO (a.karmanov): Make compliant with ALT Linux p11
 fastapi~=0.115.4
 faststream[redis]==0.5.34
 httpx~=0.27.2

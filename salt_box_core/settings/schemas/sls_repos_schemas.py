@@ -126,7 +126,11 @@ def validate_digest(value: str) -> str:
 
 
 NotAbsolutePath = Annotated[Path, AfterValidator(validate_path_is_not_absolute)]
-SafeNotAbsoultePath = Annotated[Path, AfterValidator(validate_path_bounds), AfterValidator(validate_path_is_not_absolute)]
+SafeNotAbsoultePath = Annotated[
+    Path,
+    AfterValidator(validate_path_bounds),
+    AfterValidator(validate_path_is_not_absolute)
+]
 ManifestDigestStr = Annotated[str, AfterValidator(validate_digest)]
 
 

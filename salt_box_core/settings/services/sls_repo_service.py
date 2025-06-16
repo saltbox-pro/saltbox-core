@@ -31,7 +31,7 @@ class SettingsSlsRepoService(
         if document.is_active == state:
             return document
         result = await self.update(query=sid, data={'is_active': state})
-        await self.sync_to_serve_dir()  # TODO (akraman) Async in taskiq
+        await self.sync_to_serve_dir()
         return result
 
     async def activate(self, sid: PyObjectId) -> SettingsSlsRepoModel:

@@ -414,6 +414,12 @@ class GitRepoService:
 
 
 class SlsReposServeUpdater:
+    """
+    Sync active Conf Boxes files into directory to serve for Salt Masters.
+
+    Prefer to not run directly, beter use sync_sls_repos_to_serve_dir() task which is
+    safe from concurrent runs.
+    """
     # Path will be ignored in conflict check and excluded from sync.
     # DO NOT USE GLOBS:
     #  - Items will be checked on being equal or being a subpass of a value on conlicts check.
@@ -487,7 +493,6 @@ class SlsReposServeUpdater:
             raise SlsReposServeUpdaterError(msg)
 
     def update(self) -> None:
-        # TODO (akraman) : Lock
         dst = SETTINGS.salt_modules_serve_dir
         src_list: list[Path] = []
         for repo in self.repos:
