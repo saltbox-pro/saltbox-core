@@ -113,16 +113,12 @@ def validate_path_is_not_absolute(value: Path) -> Path:
     return value
 
 
-# FIXME (akraman) Rename `*gitfs*`
-# FIXME (akraman) Allow ./ back
-def validate_gitfs_root(value: str) -> str:
-    value = os.path.normpath(value)
-    if value.startswith('../'):
-        raise ValueError()
-    path = validate_path_is_not_absolute(Path(value))
-    if path == Path():
-        return ''
-    return str(path)
+def validate_path_bounds(value: Path) -> Path:
+    str_val = os.path.normpath(value)
+    if str_val.startswith('../'):
+        msg = 'Relative path leads outisde'
+        raise ValueError(msg)
+    return Path(str_val)
 
 
 def validate_digest(value: str) -> str:
@@ -130,7 +126,7 @@ def validate_digest(value: str) -> str:
 
 
 NotAbsolutePath = Annotated[Path, AfterValidator(validate_path_is_not_absolute)]
-GitFSRoot = Annotated[str, AfterValidator(validate_gitfs_root)]
+SafeNotAbsoultePath = Annotated[Path, AfterValidator(validate_path_bounds), AfterValidator(validate_path_is_not_absolute)]
 ManifestDigestStr = Annotated[str, AfterValidator(validate_digest)]
 
 
@@ -146,8 +142,7 @@ class ManifestSshfsFilesSchema(BaseModel):
 
 
 class ManifestSchema(BaseModel):
-    # FIXME (akraman) Make Path back
-    root: GitFSRoot = ''
+    root: SafeNotAbsoultePath = Path()
     sshfs_files: dict[NotAbsolutePath, ManifestSshfsFilesSchema] = {}
     sshfs_files_checksum_type: ManifestDigestStr = DEFAULT_DIGEST.value
     sshfs_files_token: str | None = None
