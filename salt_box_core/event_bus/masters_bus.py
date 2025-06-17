@@ -3,12 +3,11 @@ from typing import Any
 from faststream.redis import RedisBroker, RedisMessage
 
 from salt_box_core.db.mongo.config import get_mongo_db
-from salt_box_core.event_bus.master_bus_base_messages import BusMasterMessage
+from salt_box_core.event_bus.master_bus_base_messages import BusMasterMessage, EmptyMessage
 from salt_box_core.event_bus.master_bus_middlewares import MastersAuthMiddleware
 from salt_box_core.masters.repositories.master_repository import MasterRepository
 from salt_box_core.masters.services.master_service import MasterService
 from salt_box_core.settings.repository import SettingsSlsRepoRepository
-from salt_box_core.settings.schemas.event_bus_schemas import ListSlsReposMessage, MasterMessageSlsRepoModel
 
 
 async def send_message_to_master(
@@ -40,14 +39,17 @@ async def send_message_and_wait_response_to_master(
         return await response.decode()
 
 
-# TODO (a.karmanov): Make generic send_message_to_every_master()
-async def notify_masters() -> None:
+async def send_message_to_every_master(
+        message_tag: str,
+        message_type: type[BusMasterMessage],
+        **message_kwargs: dict[str, Any]) -> None:
     mongo_db = get_mongo_db()
     master_repo = MasterRepository(mongo_db)
-    sls_repo_repo = SettingsSlsRepoRepository(mongo_db)
     masters = await MasterService(master_repo).get_list(query={}, skip=0, limit=0)
-    active_repos = await sls_repo_repo.get_list(query={'is_active': True}, skip=0, limit=0)
-    msg_repos = [MasterMessageSlsRepoModel(**repo.dict()) for repo in active_repos]
     for m_obj in masters:
-        msg = ListSlsReposMessage(repos=msg_repos, master=m_obj.master_id)
+        msg = message_type(master=m_obj.master_id, **message_kwargs)
         await send_message_to_master(msg, 'sync_repos')
+
+
+async def notify_masters_on_repos_update() -> None:
+    return await send_message_to_every_master('sync_repos', EmptyMessage)

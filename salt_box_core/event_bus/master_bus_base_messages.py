@@ -26,3 +26,7 @@ class _BusMasterMessage(BaseModel):
 
 class BusMasterMessage(_BusMasterMessage):
     model_config = ConfigDict(extra='ignore')
+
+
+class EmptyMessage(BusMasterMessage):
+    ...
