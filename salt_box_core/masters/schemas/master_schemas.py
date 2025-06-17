@@ -21,10 +21,12 @@ def validate_is_ascii(value: str) -> str:
     return value
 
 
+# FIXME (a.karmanov) US317: To lib
 SshPubKeyToken = Annotated[str, AfterValidator(validate_ssh_pubkey_token)]
 AsciiStr = Annotated[str, AfterValidator(validate_is_ascii)]
 
 
+# FIXME (a.karmanov) US317: To lib
 class SshPubKeyModel(BaseModel):
     type_name: SshPubKeyToken
     public_key: SshPubKeyToken
@@ -49,6 +51,7 @@ class SshPubKeyModel(BaseModel):
         return cls(type_name=tokens[0], public_key=tokens[1], comment=comment)
 
 
+# FIXME (a.karmanov) US317: To lib
 class MasterStatus(str, Enum):
     # TODO(a.karmanov): status to refresh keys (`revoked`?)
     new = 'new'
@@ -60,6 +63,7 @@ class MasterReadOnlyFieldsMixin:
     master_id: str = Field(title='Master ID', min_length=3)
 
 
+# FIXME (a.karmanov) US317: To lib
 class MasterSecretsMixin:
     # TODO(a.karmanov): make non-optional, reset with special master.status
     pubkey: str | None = Field(title='Public key', default=None)

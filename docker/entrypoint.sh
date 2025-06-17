@@ -27,11 +27,15 @@ TASKIQ_BROKER_URL="${TASKIQ_BROKER_URL}/${REDIS_TASKIQ_DB}"
 
 export REDIS_PASSWORD MONGO_PASSWORD TASKIQ_BROKER_URL KEYCLOAK_CLIENT_SECRET
 
+if [ "$DEV_MODE" = 1 ]; then
+  pip3 install --editable .[reload] "${SALTBOX_BRIDGE_MESSAGES_SRC_PATH}"
+fi
+
 cmd_uvicorn() {
   cmd='/usr/bin/uvicorn salt_box_core.main:app'
   cmd="${cmd} --host=0.0.0.0 --port=8000"
   cmd="${cmd} --timeout-graceful-shutdown=${TIMEOUT_GRACEFUL_SHUTDOWN}"
-  if [ "$DEV_RELOAD" = 1 ]; then
+  if [ "$DEV_MODE" = 1 ]; then
     cmd="$cmd --reload"
   fi
 }
@@ -44,7 +48,7 @@ cmd_taskiq_worker() {
   # --max-fails - max number of failed tasks before stopping the worker
   cmd='/usr/bin/taskiq worker salt_box_core.tkq:broker'
   cmd="${cmd} salt_box_core.jobs salt_box_core.settings -w 1 --max-fails 1"
-  if [ "$DEV_RELOAD" = 1 ]; then
+  if [ "$DEV_MODE" = 1 ]; then
     cmd="$cmd --reload"
   fi
 }

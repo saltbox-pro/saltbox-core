@@ -61,14 +61,12 @@ mkdir --parents /var/cache/apt/archives/partial/ /var/lib/apt/lists/partial/
 apt-get update
 apt-get install -y ipython3
 EOF
-WORKDIR /mnt/saltbox_core/
+WORKDIR /mnt/saltbox-core/
+ENV DEV_MODE=1
 # User should mount respective repositories to run the image
-VOLUME /mnt/saltbox_core/
-VOLUME /mnt/saltbox_bridge_messages/
-RUN \
-  --mount=type=bind,target=/mnt/saltbox_core/,readwrite \
-  pip3 install --editable .[reload]
-ENV DEV_RELOAD=1
+VOLUME /mnt/saltbox-core/
+VOLUME /mnt/saltbox-bridge-messages/
+ENV SALTBOX_BRIDGE_MESSAGES_SRC_PATH /mnt/saltbox-bridge-messages/
 
 
 ################
@@ -79,6 +77,6 @@ FROM base AS main
 LABEL name='saltbox-core' version='1.2'
 # Install Core as usual package
 RUN \
-  --mount=type=bind,target=/mnt/saltbox_core/,readwrite \
+  --mount=type=bind,target=/mnt/saltbox-core/,readwrite \
   --mount=type=cache,target=/root/.cache/pip/ \
-  pip3 install --no-deps /mnt/saltbox_core/
+  pip3 install --no-deps /mnt/saltbox-core/

@@ -52,7 +52,7 @@ build-backend = "setuptools.build_meta"
 include = ["salt_box_core", "salt_box_core.*"]
 
 [tool.setuptools.dynamic]
-dependencies = { file = ["requirements.txt"] }
+dependencies = { file = ["requirements.txt", "local_requirements.txt"] }
 version = { attr = "salt_box_core.__version__" }
 
 [tool.ruff]
