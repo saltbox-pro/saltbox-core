@@ -7,7 +7,7 @@
 
 
 FROM registry.altlinux.org/alt/alt:p11 AS base
-LABEL version='1.1'
+LABEL version='1.2'
 EXPOSE 8000
 
 RUN \
@@ -27,13 +27,7 @@ RUN \
   --mount=type=cache,target=/root/.cache/pip/ \
   pip3 install --requirement /mnt/requirements.txt
 
-COPY --chmod=644 docker/shell_init.sh /etc/
-COPY --chmod=755 \
-  docker/entrypoint.sh \
-  docker/uvicorn.sh \
-  docker/taskiq-worker.sh \
-  docker/taskiq-scheduler.sh \
-  /usr/local/bin/
+COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/
 
 RUN mkdir --parents /var/lib/saltbox-core/
 
@@ -48,17 +42,15 @@ ENV REDIS_TASKIQ_PORT=6379
 ENV REDIS_TASKIQ_DB=0
 
 WORKDIR /
-ENTRYPOINT ["/usr/local/bin/uvicorn.sh"]
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 
 ################
 ## Dev image ##
 ################
 
-## Mount Core repository dir to /mnt/salt_box_core to serve with the container.
-
 FROM base AS dev
-LABEL name='saltbox-core-dev' version='1.2'
+LABEL name='saltbox-core-dev' version='1.3'
 # Install Core as editable package
 RUN \
   --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -69,13 +61,14 @@ mkdir --parents /var/cache/apt/archives/partial/ /var/lib/apt/lists/partial/
 apt-get update
 apt-get install -y ipython3
 EOF
-WORKDIR /mnt/salt_box_core/
-VOLUME /mnt/salt_box_core/
+WORKDIR /mnt/saltbox_core/
+# User should mount respective repositories to run the image
+VOLUME /mnt/saltbox_core/
+VOLUME /mnt/saltbox_bridge_messages/
 RUN \
-  --mount=type=bind,target=/mnt/salt_box_core/,readwrite \
+  --mount=type=bind,target=/mnt/saltbox_core/,readwrite \
   pip3 install --editable .[reload]
-ENV TASKIQ_RELOAD=1
-CMD ["dev"]
+ENV DEV_RELOAD=1
 
 
 ################
@@ -83,10 +76,9 @@ CMD ["dev"]
 ################
 
 FROM base AS main
-LABEL name='saltbox-core' version='1.1'
+LABEL name='saltbox-core' version='1.2'
 # Install Core as usual package
 RUN \
-  --mount=type=bind,target=/mnt/salt_box_core/,readwrite \
+  --mount=type=bind,target=/mnt/saltbox_core/,readwrite \
   --mount=type=cache,target=/root/.cache/pip/ \
-  pip3 install --no-deps /mnt/salt_box_core/
-CMD ["start"]
+  pip3 install --no-deps /mnt/saltbox_core/
