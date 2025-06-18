@@ -2,7 +2,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict
 
-from salt_box_core.event_bus.master_bus_base_messages import BusMasterMessage
+# FIXME US317
+from saltbox_bridge_messages import BusMasterMessage
 
 
 class NewJobMessage(BusMasterMessage):

@@ -1,9 +1,9 @@
 from typing import Any
 
 from faststream.redis import RedisBroker, RedisMessage
+from saltbox_bridge_messages import BusMasterMessage, EmptyMessage
 
 from salt_box_core.db.mongo.config import get_mongo_db
-from salt_box_core.event_bus.master_bus_base_messages import BusMasterMessage, EmptyMessage
 from salt_box_core.event_bus.master_bus_middlewares import MastersAuthMiddleware
 from salt_box_core.masters.repositories.master_repository import MasterRepository
 from salt_box_core.masters.services.master_service import MasterService
