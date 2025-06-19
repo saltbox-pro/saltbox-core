@@ -7,6 +7,7 @@ from salt_box_core.config import LOG_CONFIG
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import PyObjectId
 from salt_box_core.db.schemas_base import PaginatedResponse
+from salt_box_core.event_bus.masters_bus import notify_master_on_repos_update
 from salt_box_core.http_errors import NotFound
 from salt_box_core.masters.schemas.master_schemas import MasterModel, MasterQueryParams, MasterViewSchema
 from salt_box_core.masters.services.master_service import MasterService, get_master_service
@@ -60,9 +61,10 @@ async def master_accept(
     try:
         master: MasterModel = await master_service.accept(mid)
 
-    except ObjectNotFoundError as e:
-        raise NotFound(detail='Master not found') from e
+    except ObjectNotFoundError as err:
+        raise NotFound(detail='Master not found') from err
 
+    await notify_master_on_repos_update(master)
     return MasterViewSchema.model_validate({'_id': master.id, **master.model_dump(by_alias=True)})
 
 

@@ -11,7 +11,7 @@ from taskiq.depends.progress_tracker import ProgressTracker, TaskState
 from salt_box_core.config import Settings, logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.redis.config import get_redis_dep
-from salt_box_core.event_bus.masters_bus import notify_masters_on_repos_update
+from salt_box_core.event_bus.masters_bus import notify_accepted_masters_on_repos_update
 from salt_box_core.settings.repository import SettingsSlsRepoRepository, get_sls_repo_repository
 from salt_box_core.tasks.repositories.task_template_repository import (
     TaskTemplateRepository,
@@ -152,4 +152,4 @@ async def sync_sls_repos_to_serve_dir(
     active_repos = await sls_repo.get_list(query={'is_active': True}, skip=0, limit=0)
     salt_modules_serve_updater = SlsReposServeUpdater(active_repos)
     salt_modules_serve_updater.update()
-    await notify_masters_on_repos_update()
+    await notify_accepted_masters_on_repos_update()

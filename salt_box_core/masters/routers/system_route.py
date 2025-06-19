@@ -25,7 +25,7 @@ async def authorized_keys(
     user: str,
     master_service: Annotated[MasterService, Depends(get_master_service)],
 ) -> str:
-    masters = await master_service.get_list(query={}, skip=0, limit=0)
+    masters = await master_service.get_accepted_list()
     if user == SETTINGS.sshfs_user:
         attr = 'sshfs_pubkey'
     elif user == SETTINGS.salt_conf_user:
