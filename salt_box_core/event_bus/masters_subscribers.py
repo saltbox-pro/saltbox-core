@@ -6,9 +6,9 @@ from saltbox_bridge_messages import (
     AuthRequestMessage,
     AuthResponseMessage,
     BridgeMinionGrainsMessage,
+    BridgeMinionPresenceMessage,
     CoreMessageBase,
     MasterStatusMessage,
-    MinionPresenceMessage,
 )
 
 from salt_box_core.config import logger
@@ -92,7 +92,7 @@ async def grains_handler(
 
 @router.subscriber('presence')
 async def presence_handler(
-    message: MinionPresenceMessage,
+    message: BridgeMinionPresenceMessage,
     minion_service: MinionService = Context(),  # noqa: B008
 ) -> None:
     last_activity_dt = datetime.fromtimestamp(message.stamp, tz=UTC)

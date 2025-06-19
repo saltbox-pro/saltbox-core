@@ -4,6 +4,7 @@ from typing import Annotated
 import pydantic
 from fastapi import APIRouter, Query, WebSocket
 from pydantic import Field, ValidationError
+from saltbox_bridge_messages import BridgeNewJobResponce, CoreNewJobRequest
 
 from salt_box_core import http_errors
 from salt_box_core.config import LOG_CONFIG, SETTINGS
@@ -16,7 +17,6 @@ from salt_box_core.jobs.exceptions import (
     JobServiceException,
     JobServiceInvalidArgsException,
 )
-from salt_box_core.jobs.schemas.event_bus_schemas import CreateJobMessage, JobSyncMessage
 from salt_box_core.jobs.schemas.job_schemas import (
     CreateJobRequest,
     GetJobReturnResponse,
@@ -130,16 +130,17 @@ async def job_create_sync(
     item: CreateJobRequest,
 ) -> JobSyncResponse:
     try:
-        job_res: JobSyncMessage = JobSyncMessage(
+        msg = CoreNewJobRequest(
+            tgt=item.tgt,
+            tgt_type=item.tgt_type,
+            fun=item.fun,
+            master=item.salt_master,
+            arg=item.data.data_args or [] if item.data else [],
+            kwarg=item.data.data_kwargs or {} if item.data else {},
+        )
+        job_res = BridgeNewJobResponce(
             **await send_message_and_wait_response_to_master(
-                message=CreateJobMessage(
-                    tgt=item.tgt,
-                    tgt_type=item.tgt_type,
-                    fun=item.fun,
-                    master=item.salt_master,
-                    arg=item.data.data_args or [] if item.data else [],
-                    kwarg=item.data.data_kwargs or {} if item.data else {},
-                ),
+                message=msg,
                 message_tag='run_job_sync',
                 response_timeout=10.0,
             )

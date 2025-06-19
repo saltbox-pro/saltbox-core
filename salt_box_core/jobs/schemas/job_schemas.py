@@ -13,9 +13,9 @@ from pydantic import (
     model_validator,
 )
 from pydantic.functional_validators import AfterValidator
+from saltbox_bridge_messages import JobReturnSchema
 
 from salt_box_core.db.schemas_base import SkipLimitParams
-from salt_box_core.jobs.schemas.event_bus_schemas import JobReturn
 from salt_box_core.utilities.jid import JID, JidError
 from salt_box_core.utilities.salt import fill_salt_kwarg_from_arg
 
@@ -184,7 +184,7 @@ class JobSyncResponse(BaseModel):
     fun: str
     arg: list
     kwarg: dict
-    returns: dict[str, JobReturn]
+    returns: dict[str, JobReturnSchema]
 
 
 class GetJobReturnResponse(BaseModel):

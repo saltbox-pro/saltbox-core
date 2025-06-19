@@ -9,6 +9,7 @@ from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 from pydantic import Field, NonNegativeInt, PastDatetime
 from pydantic import ValidationError as PydanticValidationError
 from redis import exceptions as redis_exceptions
+from saltbox_bridge_messages import CoreNewJobAsyncRequest
 
 from salt_box_core.config import LOG_CONFIG, SETTINGS
 from salt_box_core.db.exceptions import ObjectNotFoundError
@@ -24,7 +25,6 @@ from salt_box_core.jobs.exceptions import (
     JobServiceInvalidArgsException,
 )
 from salt_box_core.jobs.repositories.job_repository import JobRepository, get_job_repository
-from salt_box_core.jobs.schemas.event_bus_schemas import NewJobMessage
 from salt_box_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel, JobResult, JobUpdateSchema
 from salt_box_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
 from salt_box_core.masters.schemas.master_schemas import MasterModel, MasterStatus
@@ -82,8 +82,8 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
             raise JobCreateException(str(e)) from e
 
         if master.status != MasterStatus.accepted:
-            msg = 'Master is not accepted'
-            raise JobCreateException(msg)
+            err_msg = 'Master is not accepted'
+            raise JobCreateException(err_msg)
 
         try:
             _data: dict[str, str] = {
@@ -105,10 +105,8 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
             )
             await self.rdb.expire(name=create_job_hash_name, time=60 * 10)
 
-            await send_message_to_master(
-                message=NewJobMessage(hash_name=create_job_hash_name, master=master.master_id),
-                message_tag='run_job',
-            )
+            msg = CoreNewJobAsyncRequest(hash_name=create_job_hash_name, master=master.master_id)
+            await send_message_to_master(message=msg, message_tag='run_job')
         except redis_exceptions.RedisError as error:
             raise JobCreateException(error) from error
 
