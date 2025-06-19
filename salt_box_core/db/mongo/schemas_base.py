@@ -110,7 +110,7 @@ class PyObjectId(ObjectId):
                     when_used='json',
                 ),
             )
-        return no_info_plain_validator_function(  # type: ignore[call-arg]
+        return no_info_plain_validator_function(
             cls._validate,
             json_schema_input_schema=str_schema(
                 pattern='^[0-9a-f]{24}$',

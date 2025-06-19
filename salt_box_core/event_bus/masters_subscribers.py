@@ -5,8 +5,10 @@ from faststream.redis import RedisRouter
 from saltbox_bridge_messages import (
     AuthRequestMessage,
     AuthResponseMessage,
-    BusMasterMessage,
+    BusMasterMessageBase,
     MasterStatusMessage,
+    MinionGrainsMessage,
+    MinionPresenceMessage,
 )
 
 from salt_box_core.config import logger
@@ -14,7 +16,6 @@ from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.event_bus.master_bus_middlewares import MastersAuthMiddleware
 from salt_box_core.masters.schemas.master_schemas import MasterCreateSchema, MasterModel, MasterStatus
 from salt_box_core.masters.services.master_service import MasterService
-from salt_box_core.minion_collections.schemas.event_bus_schemas import MinionGrainsMessage, MinionPresenceMessage
 from salt_box_core.minion_collections.schemas.minion_schemas import (
     GrainsSchema,
     MinionCreateSchema,
@@ -54,7 +55,7 @@ async def auth(
 
 @router_not_auth.subscriber('status', middlewares=[])
 async def status(
-    message: BusMasterMessage,
+    message: BusMasterMessageBase,
     master_service: MasterService = Context(),  # noqa: B008
 ) -> MasterStatusMessage:
     try:
