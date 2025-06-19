@@ -5,9 +5,9 @@ from faststream.redis import RedisRouter
 from saltbox_bridge_messages import (
     AuthRequestMessage,
     AuthResponseMessage,
-    BusMasterMessageBase,
+    BridgeMinionGrainsMessage,
+    CoreMessageBase,
     MasterStatusMessage,
-    MinionGrainsMessage,
     MinionPresenceMessage,
 )
 
@@ -38,6 +38,7 @@ async def auth(
     try:
         master: MasterModel = await master_service.get_by_master_id(message.master)
     except ObjectNotFoundError:
+        logger.error(message.dict())
         master_dict = {
             'master_id': message.master,
             'title': message.master,
@@ -50,12 +51,12 @@ async def auth(
         master.pubkey = message.crypt_pubkey
         master = await master_service.update(query=master.id, data=master.model_dump())
 
-    return AuthResponseMessage(crypt_pubkey=saltbox_crypt.pubkey)
+    return AuthResponseMessage(master=master.master_id, crypt_pubkey=saltbox_crypt.pubkey)
 
 
 @router_not_auth.subscriber('status', middlewares=[])
 async def status(
-    message: BusMasterMessageBase,
+    message: CoreMessageBase,
     master_service: MasterService = Context(),  # noqa: B008
 ) -> MasterStatusMessage:
     try:
@@ -69,7 +70,7 @@ async def status(
 
 @router.subscriber('grains')
 async def grains_handler(
-    message: MinionGrainsMessage,
+    message: BridgeMinionGrainsMessage,
     minion_service: MinionService = Context(),  # noqa: B008
 ) -> None:
     grains = message.grains

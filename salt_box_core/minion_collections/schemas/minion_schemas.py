@@ -183,16 +183,6 @@ class MinionIDs(BaseModel, IDMixin):
     pass
 
 
-class MinionGatherMinionSchema(BaseModel):
-    minion_id: str = Field(title='Minion ID')
-    master: str = Field(title='Master')
-
-
-class MinionGatherResponseSchema(BaseModel):
-    count: Annotated[int, PositiveInt] = Field(title='Minion count', default=0)
-    minions: list[MinionGatherMinionSchema] = Field(title='Minion list (max 100)', default=[])
-
-
 class MinionListBody(SkipLimitParams):
     collection_slug: str
     query: MongoQuery = Field(

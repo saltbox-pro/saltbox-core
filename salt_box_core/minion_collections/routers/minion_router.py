@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Response, status
 from fastapi.responses import FileResponse
-from saltbox_bridge_messages import GatherMinionsByTargeting
+from saltbox_bridge_messages import CoreGatherMinionsRequest, GatheredMinionSchema
 
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
@@ -13,7 +13,6 @@ from salt_box_core.masters.schemas.master_schemas import MasterModel, MasterStat
 from salt_box_core.masters.services.master_service import MasterService, get_master_service
 from salt_box_core.minion_collections.schemas.minion_schemas import (
     MinionDetailSchema,
-    MinionGatherResponseSchema,
     MinionListBody,
     MinionShortSchema,
 )
@@ -114,7 +113,7 @@ async def gather_minions(
     tgt_type: str,
     master: str,
     master_service: Annotated[MasterService, Depends(get_master_service)],
-) -> MinionGatherResponseSchema:
+) -> GatheredMinionSchema:
     try:
         master_obj: MasterModel = await master_service.get_by_master_id(master)
 
@@ -122,14 +121,14 @@ async def gather_minions(
             raise HTTPException(status_code=403, detail='Master not accepted')
 
         minions = await send_message_and_wait_response_to_master(
-            message=GatherMinionsByTargeting(master=master_obj.master_id, tgt=tgt, tgt_type=tgt_type),
+            message=CoreGatherMinionsRequest(master=master_obj.master_id, tgt=tgt, tgt_type=tgt_type),
             message_tag='gather_minions',
             response_timeout=10.0,
         )
     except ObjectNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from None
 
-    return MinionGatherResponseSchema.model_validate(minions)
+    return GatheredMinionSchema.model_validate(minions)
 
 
 @router.get('/{mid}')

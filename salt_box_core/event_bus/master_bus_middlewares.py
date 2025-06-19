@@ -5,7 +5,7 @@ from faststream import BaseMiddleware, context
 from faststream.broker.message import StreamMessage
 from faststream.types import AsyncFunc, AsyncFuncAny
 from pydantic import BaseModel
-from saltbox_bridge_messages import BusMasterMessageBase
+from saltbox_bridge_messages import CoreMessageBase
 
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
@@ -65,7 +65,7 @@ class MastersAuthMiddleware(BaseMiddleware):
         # if sign is None or not self.validate_signature(message=msg.raw_message, sign=sign):
         #     return None
 
-        message = BusMasterMessageBase(**await msg.decode())  # type: ignore[arg-type]
+        message = CoreMessageBase(**await msg.decode())  # type: ignore[arg-type]
 
         try:
             await self.master_service.get_by_master_id(master_id=message.master)

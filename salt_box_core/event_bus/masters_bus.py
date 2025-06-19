@@ -1,7 +1,7 @@
 from typing import Any
 
 from faststream.redis import RedisBroker, RedisMessage
-from saltbox_bridge_messages import BusMasterMessageBase, EmptyMessage
+from saltbox_bridge_messages import CoreMessageBase, CoreEmptyMessage
 
 from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.event_bus.master_bus_middlewares import MastersAuthMiddleware
@@ -11,7 +11,7 @@ from salt_box_core.settings.repository import SettingsSlsRepoRepository
 
 
 async def send_message_to_master(
-    message: BusMasterMessageBase, message_tag: str, broker: RedisBroker | None = None
+    message: CoreMessageBase, message_tag: str, broker: RedisBroker | None = None
 ) -> None:
     from salt_box_core.event_bus.faststream_redis import get_faststream_broker
 
@@ -23,7 +23,7 @@ async def send_message_to_master(
 
 
 async def send_message_and_wait_response_to_master(
-    message: BusMasterMessageBase, message_tag: str, response_timeout: float = 3.0, broker: RedisBroker | None = None
+    message: CoreMessageBase, message_tag: str, response_timeout: float = 3.0, broker: RedisBroker | None = None
 ) -> Any:
     from salt_box_core.event_bus.faststream_redis import get_faststream_broker
 
@@ -41,7 +41,7 @@ async def send_message_and_wait_response_to_master(
 
 async def send_message_to_every_master(
         message_tag: str,
-        message_type: type[BusMasterMessageBase],
+        message_type: type[CoreMessageBase],
         **message_kwargs: dict[str, Any]) -> None:
     mongo_db = get_mongo_db()
     master_repo = MasterRepository(mongo_db)
@@ -52,4 +52,4 @@ async def send_message_to_every_master(
 
 
 async def notify_masters_on_repos_update() -> None:
-    return await send_message_to_every_master('sync_repos', EmptyMessage)
+    return await send_message_to_every_master('sync_repos', CoreEmptyMessage)

@@ -1,7 +1,7 @@
 # FIXME US317
-from saltbox_bridge_messages import BusMasterMessageBase
+from saltbox_bridge_messages import CoreMessageBase
 
 
-class PillarClearCacheMessage(BusMasterMessageBase):
+class PillarClearCacheMessage(CoreMessageBase):
     tgt: str
     tgt_type: str

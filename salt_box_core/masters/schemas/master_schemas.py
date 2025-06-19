@@ -1,7 +1,7 @@
 from enum import Enum
-from typing import Annotated, Self
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
+from saltbox_bridge_messages import MasterStatus as MasterStatus, SshPubKeyModel
 
 from salt_box_core.db.mongo.schemas_base import IDMixin
 from salt_box_core.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
@@ -19,44 +19,6 @@ def validate_is_ascii(value: str) -> str:
         msg = 'Expected ASCII string'
         raise ValueError(msg)
     return value
-
-
-# FIXME (a.karmanov) US317: To lib
-SshPubKeyToken = Annotated[str, AfterValidator(validate_ssh_pubkey_token)]
-AsciiStr = Annotated[str, AfterValidator(validate_is_ascii)]
-
-
-# FIXME (a.karmanov) US317: To lib
-class SshPubKeyModel(BaseModel):
-    type_name: SshPubKeyToken
-    public_key: SshPubKeyToken
-    comment: AsciiStr = ''
-
-    def __str__(self) -> str:
-        result = f'{self.type_name} {self.public_key}'
-        if self.comment:
-            result = f'{result} {self.comment}'
-        return result
-
-    @classmethod
-    def from_str(cls, value: str) -> Self:
-        tokens = value.split(' ', maxsplit=2)
-        if 2 > len(tokens) > 3:
-            msg = 'Unexpected OpenSSH public key string'
-            raise ValueError(msg)
-        try:
-            comment = tokens[2]
-        except IndexError:
-            comment = ''
-        return cls(type_name=tokens[0], public_key=tokens[1], comment=comment)
-
-
-# FIXME (a.karmanov) US317: To lib
-class MasterStatus(str, Enum):
-    # TODO(a.karmanov): status to refresh keys (`revoked`?)
-    new = 'new'
-    accepted = 'accepted'
-    rejected = 'rejected'
 
 
 class MasterReadOnlyFieldsMixin:

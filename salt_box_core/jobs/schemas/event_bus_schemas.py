@@ -3,14 +3,14 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict
 
 # FIXME US317
-from saltbox_bridge_messages import BusMasterMessageBase
+from saltbox_bridge_messages import CoreMessageBase
 
 
-class NewJobMessage(BusMasterMessageBase):
+class NewJobMessage(CoreMessageBase):
     hash_name: str
 
 
-class CreateJobMessage(BusMasterMessageBase):
+class CreateJobMessage(CoreMessageBase):
     tgt: str
     tgt_type: str
     fun: str
@@ -27,7 +27,7 @@ class JobReturn(BaseModel):
     model_config = ConfigDict(extra='allow')
 
 
-class JobSyncMessage(BusMasterMessageBase):
+class JobSyncMessage(CoreMessageBase):
     jid: str
     tgt: str
     tgt_type: str
