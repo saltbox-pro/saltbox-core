@@ -18,7 +18,7 @@ from salt_box_core.settings.schemas.sls_repos_schemas import (
 )
 from salt_box_core.settings.tasks import sync_sls_repo_task, sync_sls_repos_to_serve_dir
 from salt_box_core.tasks.services.tasks_templates import TaskTemplateService
-from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService, ProjectionModel
+from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService
 
 
 class SettingsSlsRepoService(
