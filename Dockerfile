@@ -51,7 +51,7 @@ ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 FROM base AS dev
 LABEL name='saltbox-core-dev' version='1.3'
-# Install Core as editable package
+# Install Core as an editable package
 RUN \
   --mount=type=cache,target=/var/cache/apt,sharing=locked \
   --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
@@ -75,8 +75,8 @@ ENV SALTBOX_BRIDGE_MESSAGES_SRC_PATH /mnt/saltbox-bridge-messages/
 
 FROM base AS main
 LABEL name='saltbox-core' version='1.2'
-# Install Core as usual package
+# Install Core as a normal package
 RUN \
   --mount=type=bind,target=/mnt/saltbox-core/,readwrite \
   --mount=type=cache,target=/root/.cache/pip/ \
-  pip3 install --no-deps /mnt/saltbox-core/
+  pip3 install /mnt/saltbox-core/

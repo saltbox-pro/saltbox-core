@@ -70,12 +70,17 @@ cmd_shell() {
   cmd="$*"
 }
 
+wrong_cmd() {
+  warn "Unknown command \"${*}\""
+  err "Try \"shell ${*}\" for arbitrary command"
+}
+
 case $1 in
   uvicorn) cmd_uvicorn ;;
   taskiq-worker) cmd_taskiq_worker ;;
   taskiq-scheduler) cmd_taskiq_worker ;;
   shell) cmd_shell "$@" ;;
-  *) err "Unknown command \"${1}\"" ;;
+  *) wrong_cmd "$@" ;;
 esac
 
 echo "$ ${cmd}"
