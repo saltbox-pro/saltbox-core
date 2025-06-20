@@ -1,7 +1,7 @@
 from datetime import datetime
-from typing import Annotated, Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from salt_box_core.db.mongo.schemas_base import IDMixin, MongoQuery
 from salt_box_core.db.schemas_base import CreatedModifiedMixin, SkipLimitParams, TimezoneAwareDatetime

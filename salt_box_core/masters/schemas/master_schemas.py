@@ -1,7 +1,6 @@
-from enum import Enum
-
 from pydantic import BaseModel, ConfigDict, Field, computed_field
-from saltbox_bridge_messages import MasterStatus as MasterStatus, SshPubKeyModel
+from saltbox_bridge_messages import MasterStatus as MasterStatus
+from saltbox_bridge_messages import SshPubKeyModel
 
 from salt_box_core.db.mongo.schemas_base import IDMixin
 from salt_box_core.db.schemas_base import CreatedModifiedMixin, SkipLimitParams

@@ -1,7 +1,7 @@
 from typing import Any
 
 from faststream.redis import RedisBroker, RedisMessage
-from saltbox_bridge_messages import CoreMessageBase, CoreEmptyMessage, MasterStatus
+from saltbox_bridge_messages import CoreEmptyMessage, CoreMessageBase, MasterStatus
 
 from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.event_bus.master_bus_middlewares import MastersAuthMiddleware
