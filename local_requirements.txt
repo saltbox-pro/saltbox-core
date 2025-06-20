@@ -1,1 +1,1 @@
-saltbox-bridge-messages
+git+https://dev.saltbox.pro/saltbox/saltbox-bridge-messages/@371f0b4

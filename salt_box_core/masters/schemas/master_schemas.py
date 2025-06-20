@@ -25,9 +25,8 @@ class MasterReadOnlyFieldsMixin:
     master_id: str = Field(title='Master ID', min_length=3)
 
 
-# FIXME (a.karmanov) US317: To lib
 class MasterSecretsMixin:
-    # TODO(a.karmanov): make non-optional, reset with special master.status
+    # TODO (a.karmanov): make non-optional, reset with special master.status
     pubkey: str | None = Field(title='Public key', default=None)
 
 
