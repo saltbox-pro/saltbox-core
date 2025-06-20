@@ -1,1 +1,7 @@
-saltbox-bridge-messages @ git+https://dev.saltbox.pro/saltbox/saltbox-bridge-messages/@371f0b4
+# Dependencies from Salt.Box Team server.
+# - Prefer tag or commit hash over branch to specify version.
+# - Prefer long hash over short hash for pip efficiency.
+
+saltbox-bridge-messages @ git+https://dev.saltbox.pro/saltbox/saltbox-bridge-messages/@371f0b40dfa02973b342ea679e26184b66ae5153
+
+# vi: ft=requirements
