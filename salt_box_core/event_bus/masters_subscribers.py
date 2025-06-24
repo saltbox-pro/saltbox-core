@@ -7,6 +7,7 @@ from saltbox_bridge_messages import (
     AuthResponseMessage,
     BridgeMinionGrainsMessage,
     BridgeMinionPresenceMessage,
+    BridgeTestBurstLoadMessage,
     CoreMessageBase,
     MasterStatusMessage,
 )
@@ -104,3 +105,9 @@ async def presence_handler(
             await minion_service.update(minion.id, MinionUpdateSchema(**minion.model_dump()))
         except ObjectNotFoundError:
             logger.info(f'{minion_id} from presence not found in the DB')
+
+
+@router.subscriber('burst_test_load')
+async def burst_test_load_handler(message: BridgeTestBurstLoadMessage) -> None:
+    # TODO (a.karmanov) : Count burst rate and save to DB
+    ...
