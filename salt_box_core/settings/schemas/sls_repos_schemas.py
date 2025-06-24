@@ -47,7 +47,7 @@ class ReadOnlyFieldsShortMixin:
     last_synced: TimezoneAwareDatetime | None = None
     is_last_sync_successful: StrictBool = False
     last_sync_error: str | None = None
-    root: str = Field(default='', description='Path in repository supposed as Salt GitFS root')
+    root: str = Field(default='', description='Path in repository to serve for masters')
 
 
 class ReadOnlyFieldsFullMixin(ReadOnlyFieldsShortMixin): ...

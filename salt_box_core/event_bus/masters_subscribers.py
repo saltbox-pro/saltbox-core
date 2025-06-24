@@ -43,7 +43,7 @@ async def auth(
         master_dict = {
             'master_id': message.master,
             'title': message.master,
-            'gitfs_pubkey': message.gitfs_pubkey,
+            'salt_conf_pubkey': message.salt_conf_pubkey,
             'sshfs_pubkey': message.sshfs_pubkey,
         }
         master = await master_service.create(MasterCreateSchema.model_validate(master_dict))

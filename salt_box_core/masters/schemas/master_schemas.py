@@ -30,7 +30,7 @@ class MasterSecretsMixin:
 
 
 class MasterSshPubkeysMixin:
-    gitfs_pubkey: SshPubKeyModel
+    salt_conf_pubkey: SshPubKeyModel
     sshfs_pubkey: SshPubKeyModel
 
 

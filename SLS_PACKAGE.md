@@ -1,15 +1,16 @@
 # SLS package
 
-Salt.Box uses SLS packages as modules of SaltStack config. Salt.Box SLS packge
-is a regular Git repository to connect to master GitFS. Such repository should
-additionaly contains a manifest file which provides some metadata.
+Salt.Box uses SLS packages as modules of SaltStack config. Salt.Box SLS package
+is a regular Git repository to provide files for Salt.Box connected masters.
+Such repository should additionaly contains a manifest file which provides some
+metadata.
 
 Example of a manifest file:
 
 ```yaml
 # The file is a Salt.Box package manifest file
 
-# GitFS root of the repository
+# SLS files direcotry into the repository
 # Must be a relative path
 root: migration/states/
 

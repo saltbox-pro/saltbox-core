@@ -32,7 +32,7 @@ async def authorized_keys(
     if user == SETTINGS.sshfs_user:
         attr = 'sshfs_pubkey'
     elif user == SETTINGS.salt_conf_user:
-        attr = 'gitfs_pubkey'
+        attr = 'salt_conf_pubkey'
     else:
         msg = f'Unknown user {user}'
         raise BadRequest(msg)
