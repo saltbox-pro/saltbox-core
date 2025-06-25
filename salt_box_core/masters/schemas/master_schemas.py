@@ -64,6 +64,7 @@ class MasterModel(
     MasterSshPubkeysMixin,
     IDMixin,
 ):
+    # TODO (a.karmanov) US317 : Del
     @computed_field  # type: ignore[prop-decorator]
     @property
     def is_pubkey_set(self) -> bool:
