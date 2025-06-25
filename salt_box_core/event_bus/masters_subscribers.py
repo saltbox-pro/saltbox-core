@@ -3,13 +3,11 @@ from datetime import UTC, datetime
 from faststream import Context
 from faststream.redis import RedisRouter
 from saltbox_bridge_messages import (
-    AuthRequestMessage,
-    AuthResponseMessage,
+    BridgeAuthRequest,
+    CoreAuthResponse,
     BridgeMinionGrainsMessage,
     BridgeMinionPresenceMessage,
     BridgeTestBurstLoadMessage,
-    CoreMessageBase,
-    MasterStatusMessage,
 )
 
 from salt_box_core.config import logger
@@ -30,12 +28,13 @@ router_not_auth = RedisRouter(prefix='master_', middlewares=[])
 router = RedisRouter(prefix='master_', middlewares=[MastersAuthMiddleware])
 
 
+# TODO (a.karmanov) US317 : Renew keys workflow
 @router_not_auth.subscriber('auth', middlewares=[])
 async def auth(
-    message: AuthRequestMessage,
+    message: BridgeAuthRequest,
     master_service: MasterService = Context(),  # noqa: B008
     saltbox_crypt: SaltBoxCrypt = Context(),  # noqa: B008
-) -> AuthResponseMessage:
+) -> CoreAuthResponse:
     try:
         master: MasterModel = await master_service.get_by_master_id(message.master)
     except ObjectNotFoundError:
@@ -48,25 +47,12 @@ async def auth(
         }
         master = await master_service.create(MasterCreateSchema.model_validate(master_dict))
 
-    if not master.pubkey:
-        master.pubkey = message.crypt_pubkey
-        master = await master_service.update(query=master.id, data=master.model_dump())
-
-    return AuthResponseMessage(master=master.master_id, crypt_pubkey=saltbox_crypt.pubkey)
-
-
-@router_not_auth.subscriber('status', middlewares=[])
-async def status(
-    message: CoreMessageBase,
-    master_service: MasterService = Context(),  # noqa: B008
-) -> MasterStatusMessage:
-    try:
-        master: MasterModel = await master_service.get_by_master_id(message.master)
-    except ObjectNotFoundError:
-        # TODO(a.karmanov): return error or special status (`unknown`)
-        return MasterStatusMessage(master=message.master, status=MasterStatus.rejected, is_pubkey_set=False)
-
-    return MasterStatusMessage(master=master.master_id, status=master.status, is_pubkey_set=master.is_pubkey_set)
+    response = CoreAuthResponse(
+        master=master.master_id,
+        crypt_pubkey=saltbox_crypt.pubkey,
+        status=master.status,
+    )
+    return response
 
 
 @router.subscriber('grains')

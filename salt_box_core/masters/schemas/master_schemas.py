@@ -24,9 +24,8 @@ class MasterReadOnlyFieldsMixin:
     master_id: str = Field(title='Master ID', min_length=3)
 
 
-class MasterSecretsMixin:
-    # TODO (a.karmanov): make non-optional, reset with special master.status
-    pubkey: str | None = Field(title='Public key', default=None)
+class MasterPubkeyMixin:
+    pubkey: str = Field(description='Crypto public key of the Master')
 
 
 class MasterSshPubkeysMixin:
@@ -36,7 +35,6 @@ class MasterSshPubkeysMixin:
 
 class MasterEditableFieldsMixin:
     title: str = Field(title='Title', min_length=3)
-
     status: MasterStatus = Field(title='Status', default=MasterStatus.new)
 
 
@@ -44,15 +42,13 @@ class MasterCreateSchema(
     BaseModel,
     MasterEditableFieldsMixin,
     MasterReadOnlyFieldsMixin,
-    MasterSecretsMixin,
+    MasterPubkeyMixin,
     MasterSshPubkeysMixin,
 ): ...
 
 
-class MasterUpdateSchema(BaseModel, MasterEditableFieldsMixin, MasterSecretsMixin):
-    model_config = ConfigDict(
-        extra='ignore',
-    )
+class MasterUpdateSchema(BaseModel, MasterEditableFieldsMixin, MasterPubkeyMixin):
+    model_config = ConfigDict(extra='ignore')
 
 
 class MasterModel(
@@ -60,19 +56,19 @@ class MasterModel(
     CreatedModifiedMixin,
     MasterEditableFieldsMixin,
     MasterReadOnlyFieldsMixin,
-    MasterSecretsMixin,
+    MasterPubkeyMixin,
     MasterSshPubkeysMixin,
     IDMixin,
-):
-    # TODO (a.karmanov) US317 : Del
-    @computed_field  # type: ignore[prop-decorator]
-    @property
-    def is_pubkey_set(self) -> bool:
-        return self.pubkey is not None
+): ...
 
 
-class MasterViewSchema(BaseModel, CreatedModifiedMixin, MasterEditableFieldsMixin, MasterReadOnlyFieldsMixin, IDMixin):
-    pass
+class MasterViewSchema(
+    BaseModel,
+    CreatedModifiedMixin,
+    MasterEditableFieldsMixin,
+    MasterReadOnlyFieldsMixin,
+    IDMixin
+): ...
 
 
 class MasterQueryParams(SkipLimitParams):

@@ -103,7 +103,11 @@ ignore = [
   # "G004", # Logging statement uses string formatting
 ]
 fixable = ["ALL"]
-unfixable = ["F401", "F841", "UP035"]
+unfixable = [
+  "F401", # Unused import
+  "F841", # Unused variable
+  "UP035", # Deprecated import
+]
 
 [tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = [
