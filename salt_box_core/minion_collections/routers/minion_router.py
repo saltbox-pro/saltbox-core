@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Response, status
 from fastapi.responses import FileResponse
-from saltbox_bridge_messages import CoreGatherMinionsRequest, GatheredMinionSchema
+from saltbox_bridge_messages import BridgeGatherMinionsResponse, CoreGatherMinionsRequest
 
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
@@ -113,7 +113,7 @@ async def gather_minions(
     tgt_type: str,
     master: str,
     master_service: Annotated[MasterService, Depends(get_master_service)],
-) -> GatheredMinionSchema:
+) -> BridgeGatherMinionsResponse:
     try:
         master_obj: MasterModel = await master_service.get_by_master_id(master)
 
@@ -127,8 +127,7 @@ async def gather_minions(
         )
     except ObjectNotFoundError as e:
         raise HTTPException(status_code=404, detail=str(e)) from None
-
-    return GatheredMinionSchema.model_validate(minions)
+    return BridgeGatherMinionsResponse.model_validate(minions)
 
 
 @router.get('/{mid}')
