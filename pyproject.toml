@@ -152,6 +152,7 @@ show_error_codes = true
 warn_return_any = true
 warn_unreachable = true
 warn_unused_ignores = true
+mypy_path = '../saltbox-bridge-messages/'
 
 [tool.pytest.ini_options]
 asyncio_default_fixture_loop_scope = "function"
