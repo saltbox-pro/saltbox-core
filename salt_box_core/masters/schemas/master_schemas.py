@@ -34,7 +34,7 @@ class MasterSshPubkeysMixin:
 
 class MasterEditableFieldsMixin:
     title: str = Field(title='Title', min_length=3)
-    status: MasterStatus = Field(title='Status', default=MasterStatus.new)
+    status: MasterStatus = Field(title='Status', default=MasterStatus.NEW)
 
 
 class MasterCreateSchema(

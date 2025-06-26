@@ -70,7 +70,7 @@ class MastersAuthMiddleware(BaseMiddleware):
         try:
             await self.master_service.get_by_master_id(master_id=message.master)
         except ObjectNotFoundError:
-            logger.error(f'Master "{message.master}" not found')
+            logger.error('Master %s not found', message.master)
             return None
 
         return await super().consume_scope(call_next, msg)

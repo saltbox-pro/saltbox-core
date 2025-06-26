@@ -117,7 +117,7 @@ async def gather_minions(
     try:
         master_obj: MasterModel = await master_service.get_by_master_id(master)
 
-        if master_obj.status != MasterStatus.accepted:
+        if master_obj.status != MasterStatus.ACCEPTED:
             raise HTTPException(status_code=403, detail='Master not accepted')
 
         minions = await send_message_and_wait_response_to_master(

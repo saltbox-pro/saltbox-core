@@ -14,7 +14,7 @@ from saltbox_bridge_messages import (
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.event_bus.master_bus_middlewares import MastersAuthMiddleware
-from salt_box_core.masters.schemas.master_schemas import MasterCreateSchema, MasterUpdateSchema, MasterModel
+from salt_box_core.masters.schemas.master_schemas import MasterCreateSchema, MasterModel
 from salt_box_core.masters.services.master_service import MasterService
 from salt_box_core.minion_collections.schemas.minion_schemas import (
     GrainsSchema,
@@ -38,7 +38,6 @@ async def auth(
     try:
         master: MasterModel = await master_service.get_by_master_id(message.master)
     except ObjectNotFoundError:
-        logger.error(message.dict())
         create = MasterCreateSchema(
             master_id=message.master,
             title=message.master,
@@ -48,8 +47,8 @@ async def auth(
         )
         master = await master_service.create(create)
     else:
-        if master.status is MasterStatus.keys_stale:
-            master.status = MasterStatus.new
+        if master.status is MasterStatus.KEYS_STALE:
+            master.status = MasterStatus.NEW
             master.pubkey = message.crypt_pubkey
             master.salt_conf_pubkey = message.salt_conf_pubkey
             master.sshfs_pubkey = message.sshfs_pubkey
@@ -97,7 +96,7 @@ async def presence_handler(
             minion.last_activity = last_activity_dt
             await minion_service.update(minion.id, MinionUpdateSchema(**minion.model_dump()))
         except ObjectNotFoundError:
-            logger.info(f'{minion_id} from presence not found in the DB')
+            logger.info('Minion "%s" from presence not found in DB', minion_id)
 
 
 @router.subscriber('burst_test_load')

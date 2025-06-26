@@ -157,7 +157,7 @@ class MongoPipelineBuilder:
 
     def _build_pipeline(self) -> None:
         if self.field_name in self._field_handler_map:
-            logger.debug(f'Apply custom handler {self._field_handler_map[self.field_name].__name__}')
+            logger.debug('Apply custom handler %s', self._field_handler_map[self.field_name].__name__)
             self._field_handler_map[self.field_name]()
             return
         if self._is_allowed_field_types():

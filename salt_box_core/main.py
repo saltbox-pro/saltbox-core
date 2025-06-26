@@ -97,7 +97,7 @@ app.add_middleware(
 @app.exception_handler(HTTPException)
 async def logged_http_exception_handler(request: Request, exc: HTTPException) -> Response:
     """Custom exception handler for HTTP exceptions with logging"""
-    logger.exception(f'HTTP Exception: {request.url.path}: {exc}', exc_info=True)
+    logger.exception('HTTP Exception: %s: %s', request.url.path, exc, exc_info=True)
     return await http_exception_handler(request, exc)
 
 

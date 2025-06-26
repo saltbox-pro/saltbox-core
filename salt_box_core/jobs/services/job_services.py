@@ -9,7 +9,7 @@ from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 from pydantic import Field, NonNegativeInt, PastDatetime
 from pydantic import ValidationError as PydanticValidationError
 from redis import exceptions as redis_exceptions
-from saltbox_bridge_messages import CoreNewJobAsyncRequest
+from saltbox_bridge_messages import CoreNewJobAsyncRequest, MasterStatus
 
 from salt_box_core.config import LOG_CONFIG, SETTINGS
 from salt_box_core.db.exceptions import ObjectNotFoundError
@@ -27,7 +27,7 @@ from salt_box_core.jobs.exceptions import (
 from salt_box_core.jobs.repositories.job_repository import JobRepository, get_job_repository
 from salt_box_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel, JobResult, JobUpdateSchema
 from salt_box_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
-from salt_box_core.masters.schemas.master_schemas import MasterModel, MasterStatus
+from salt_box_core.masters.schemas.master_schemas import MasterModel
 from salt_box_core.masters.services.master_service import MasterService, get_master_service
 from salt_box_core.utilities.jid import JID, JidError
 from salt_box_core.utilities.serivces.redis_sortedset_base_service import RedisSortedsetBaseService
@@ -81,7 +81,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
         except ObjectNotFoundError as e:
             raise JobCreateException(str(e)) from e
 
-        if master.status != MasterStatus.accepted:
+        if master.status != MasterStatus.ACCEPTED:
             err_msg = 'Master is not accepted'
             raise JobCreateException(err_msg)
 

@@ -51,7 +51,7 @@ async def send_message_to_every_master(
     By default `query` matches accepted only masters.
     """
     if query is None:
-        query = {'status': MasterStatus.accepted.value}
+        query = {'status': MasterStatus.ACCEPTED.value}
     mongo_db = get_mongo_db()
     master_repo = MasterRepository(mongo_db)
     masters = await MasterService(master_repo).get_list(query=query, skip=0, limit=0)
