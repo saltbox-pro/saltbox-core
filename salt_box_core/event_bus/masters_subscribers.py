@@ -4,16 +4,16 @@ from faststream import Context
 from faststream.redis import RedisRouter
 from saltbox_bridge_messages import (
     BridgeAuthRequest,
-    CoreAuthResponse,
     BridgeMinionGrainsMessage,
     BridgeMinionPresenceMessage,
     BridgeTestBurstLoadMessage,
+    CoreAuthResponse,
 )
 
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.event_bus.master_bus_middlewares import MastersAuthMiddleware
-from salt_box_core.masters.schemas.master_schemas import MasterCreateSchema, MasterModel, MasterStatus
+from salt_box_core.masters.schemas.master_schemas import MasterCreateSchema, MasterModel
 from salt_box_core.masters.services.master_service import MasterService
 from salt_box_core.minion_collections.schemas.minion_schemas import (
     GrainsSchema,
@@ -44,6 +44,7 @@ async def auth(
             'title': message.master,
             'salt_conf_pubkey': message.salt_conf_pubkey,
             'sshfs_pubkey': message.sshfs_pubkey,
+            'pubkey': message.crypt_pubkey,
         }
         master = await master_service.create(MasterCreateSchema.model_validate(master_dict))
 
