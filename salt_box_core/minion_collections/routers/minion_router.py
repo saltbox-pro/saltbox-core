@@ -2,14 +2,14 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Response, status
 from fastapi.responses import FileResponse
-from saltbox_bridge_messages import BridgeGatherMinionsResponse, CoreGatherMinionsRequest
+from saltbox_bridge_messages import BridgeGatherMinionsResponse, CoreGatherMinionsRequest, MasterStatus
 
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import PyObjectId
 from salt_box_core.db.schemas_base import PaginatedResponse
 from salt_box_core.event_bus.masters_bus import send_message_and_wait_response_to_master
-from salt_box_core.masters.schemas.master_schemas import MasterModel, MasterStatus
+from salt_box_core.masters.schemas.master_schemas import MasterModel
 from salt_box_core.masters.services.master_service import MasterService, get_master_service
 from salt_box_core.minion_collections.schemas.minion_schemas import (
     MinionDetailSchema,
