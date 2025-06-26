@@ -8,12 +8,13 @@ from saltbox_bridge_messages import (
     BridgeMinionPresenceMessage,
     BridgeTestBurstLoadMessage,
     CoreAuthResponse,
+    MasterStatus,
 )
 
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.event_bus.master_bus_middlewares import MastersAuthMiddleware
-from salt_box_core.masters.schemas.master_schemas import MasterCreateSchema, MasterModel
+from salt_box_core.masters.schemas.master_schemas import MasterCreateSchema, MasterUpdateSchema, MasterModel
 from salt_box_core.masters.services.master_service import MasterService
 from salt_box_core.minion_collections.schemas.minion_schemas import (
     GrainsSchema,
@@ -28,7 +29,6 @@ router_not_auth = RedisRouter(prefix='master_', middlewares=[])
 router = RedisRouter(prefix='master_', middlewares=[MastersAuthMiddleware])
 
 
-# TODO (a.karmanov) US317 : Renew keys workflow
 @router_not_auth.subscriber('auth', middlewares=[])
 async def auth(
     message: BridgeAuthRequest,
@@ -39,21 +39,27 @@ async def auth(
         master: MasterModel = await master_service.get_by_master_id(message.master)
     except ObjectNotFoundError:
         logger.error(message.dict())
-        master_dict = {
-            'master_id': message.master,
-            'title': message.master,
-            'salt_conf_pubkey': message.salt_conf_pubkey,
-            'sshfs_pubkey': message.sshfs_pubkey,
-            'pubkey': message.crypt_pubkey,
-        }
-        master = await master_service.create(MasterCreateSchema.model_validate(master_dict))
+        create = MasterCreateSchema(
+            master_id=message.master,
+            title=message.master,
+            salt_conf_pubkey=message.salt_conf_pubkey,
+            sshfs_pubkey=message.sshfs_pubkey,
+            pubkey=message.crypt_pubkey,
+        )
+        master = await master_service.create(create)
+    else:
+        if master.status is MasterStatus.keys_stale:
+            master.status = MasterStatus.new
+            master.pubkey = message.crypt_pubkey
+            master.salt_conf_pubkey = message.salt_conf_pubkey
+            master.sshfs_pubkey = message.sshfs_pubkey
+            master = await master_service.update(query=master.id, data=master.model_dump())
 
-    response = CoreAuthResponse(
+    return CoreAuthResponse(
         master=master.master_id,
         crypt_pubkey=saltbox_crypt.pubkey,
         status=master.status,
     )
-    return response
 
 
 @router.subscriber('grains')
