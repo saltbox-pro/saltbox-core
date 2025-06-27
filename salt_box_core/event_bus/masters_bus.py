@@ -43,7 +43,7 @@ async def send_message_to_every_master(
     message_tag: str,
     message_type: type[CoreMessageBase],
     query: dict[str, Any] | None = None,
-    **message_kwargs: dict[str, Any],
+    **message_kwargs: Any,
 ) -> None:
     """
     Send message of `message_type` with `message_kwargs` for all masters by `query`
@@ -52,6 +52,7 @@ async def send_message_to_every_master(
     """
     if query is None:
         query = {'status': MasterStatus.ACCEPTED.value}
+    message_kwargs.pop('master', None)
     mongo_db = get_mongo_db()
     master_repo = MasterRepository(mongo_db)
     masters = await MasterService(master_repo).get_list(query=query, skip=0, limit=0)
@@ -62,8 +63,8 @@ async def send_message_to_every_master(
 
 async def notify_master_on_repos_update(master: MasterModel) -> None:
     msg = CoreEmptyMessage(master=master.master_id)
-    return await send_message_to_master(message=msg, message_tag='sync_repos')
+    await send_message_to_master(message=msg, message_tag='sync_repos')
 
 
 async def notify_accepted_masters_on_repos_update() -> None:
-    return await send_message_to_every_master('sync_repos', CoreEmptyMessage)
+    await send_message_to_every_master('sync_repos', CoreEmptyMessage)
