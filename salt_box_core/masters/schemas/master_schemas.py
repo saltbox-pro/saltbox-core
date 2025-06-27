@@ -1,9 +1,8 @@
-from pydantic import  BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field
 from saltbox_bridge_messages import MasterStatus, MasterSyncStatus, SshPubKeyModel
 
 from salt_box_core.db.mongo.schemas_base import IDMixin
-from salt_box_core.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
-from salt_box_core.db.schemas_base import TimezoneAwareDatetime
+from salt_box_core.db.schemas_base import CreatedModifiedMixin, SkipLimitParams, TimezoneAwareDatetime
 
 
 def validate_ssh_pubkey_token(value: str) -> str:
