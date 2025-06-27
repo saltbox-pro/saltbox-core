@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Allow running jobs as tasks
 - Base support for tree structures
 - Add tree structure to collections
+- Master `last_sync_status` and `last_sync_timestamp` fields
 
 ### Changed
 
@@ -21,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `LOG_LEVEL` setting instead of `DEBUG` flag
 - Rsync based synchronization of SLS files
 - Common Core-Bridge message classes moved to `saltbox-bridge-messages` library
+- Shorten Master authentication process
 
 ### Fixed
 
