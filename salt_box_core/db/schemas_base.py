@@ -1,19 +1,18 @@
-from datetime import datetime
-from typing import Annotated, Generic, TypeVar
+from typing import Generic, TypeVar
 
 from pydantic import (
     BaseModel,
     Field,
-    PlainSerializer,
     computed_field,
 )
+from saltbox_bridge_messages import Iso8601ZDatetime as TimezoneAwareDatetime
 from taskiq import TaskiqResult
 from taskiq.depends.progress_tracker import TaskState
 
 from salt_box_core.config import SETTINGS
-from salt_box_core.utilities.helpers import format_iso8601_z
 
-TimezoneAwareDatetime = Annotated[datetime, PlainSerializer(format_iso8601_z, when_used='json')]
+__all__ = ['TimezoneAwareDatetime']
+
 SchemaType = TypeVar('SchemaType', bound=BaseModel)
 
 

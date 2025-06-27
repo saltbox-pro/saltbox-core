@@ -6,6 +6,7 @@ from saltbox_bridge_messages import (
     BridgeAuthRequest,
     BridgeMinionGrainsMessage,
     BridgeMinionPresenceMessage,
+    BridgeSyncDoneMessage,
     BridgeTestBurstLoadMessage,
     CoreAuthResponse,
     MasterStatus,
@@ -59,6 +60,17 @@ async def auth(
         crypt_pubkey=saltbox_crypt.pubkey,
         status=master.status,
     )
+
+
+@router.subscriber('sync_saltbox_done')
+async def sync_saltbox_done(
+    message: BridgeSyncDoneMessage,
+    master_service: MasterService = Context(),  # noqa: B008
+) -> None:
+    master = await master_service.get_by_master_id(message.master)
+    master.last_sync_timestamp = message.time
+    master.last_sync_status = message.status
+    await master_service.update(query=master.id, data=master.model_dump())
 
 
 @router.subscriber('grains')

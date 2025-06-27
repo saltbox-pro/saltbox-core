@@ -43,13 +43,3 @@ def recursive_replace_dates(obj: Any) -> Any:
         return datetime.strptime(obj, '%Y-%m-%dT%H:%M:%S.%fZ').replace(tzinfo=UTC)
     else:
         return obj
-
-
-def format_iso8601_z(dt: datetime) -> str:
-    """
-    Format datetime to ISO 8601 with Z-suffix (UTC).
-    Example: 2025-04-08T11:39:06.140000Z
-    """
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=UTC)
-    return dt.strftime('%Y-%m-%dT%H:%M:%S.%fZ')
