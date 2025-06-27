@@ -58,13 +58,13 @@ async def send_message_to_every_master(
     masters = await MasterService(master_repo).get_list(query=query, skip=0, limit=0)
     for m_obj in masters:
         msg = message_type(master=m_obj.master_id, **message_kwargs)
-        await send_message_to_master(msg, 'sync_repos')
+        await send_message_to_master(msg, 'sync_saltbox')
 
 
 async def notify_master_on_repos_update(master: MasterModel) -> None:
     msg = CoreEmptyMessage(master=master.master_id)
-    await send_message_to_master(message=msg, message_tag='sync_repos')
+    await send_message_to_master(message=msg, message_tag='sync_saltbox')
 
 
 async def notify_accepted_masters_on_repos_update() -> None:
-    await send_message_to_every_master('sync_repos', CoreEmptyMessage)
+    await send_message_to_every_master('sync_saltbox', CoreEmptyMessage)
