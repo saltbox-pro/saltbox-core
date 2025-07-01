@@ -2,8 +2,10 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Response, status
 from fastapi.responses import FileResponse
+from pydantic import ValidationError
 from saltbox_bridge_messages import BridgeGatherMinionsResponse, CoreGatherMinionsRequest, MasterStatus
 
+from salt_box_core import http_errors
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import PyObjectId
@@ -116,17 +118,21 @@ async def gather_minions(
 ) -> BridgeGatherMinionsResponse:
     try:
         master_obj: MasterModel = await master_service.get_by_master_id(master)
+    except ObjectNotFoundError as err:
+        raise HTTPException(status_code=404, detail=str(err)) from err
 
-        if master_obj.status != MasterStatus.ACCEPTED:
-            raise HTTPException(status_code=403, detail='Master not accepted')
+    if master_obj.status != MasterStatus.ACCEPTED:
+        raise HTTPException(status_code=403, detail='Master not accepted')
 
-        minions = await send_message_and_wait_response_to_master(
-            message=CoreGatherMinionsRequest(master=master_obj.master_id, tgt=tgt, tgt_type=tgt_type),
-            message_tag='gather_minions',
-            response_timeout=10.0,
-        )
-    except ObjectNotFoundError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from None
+    try:
+        gather_minions_req = CoreGatherMinionsRequest(master=master_obj.master_id, tgt=tgt, tgt_type=tgt_type)
+    except ValidationError as err:
+        raise http_errors.BadRequest(err.errors()) from err
+    minions = await send_message_and_wait_response_to_master(
+        message=gather_minions_req,
+        message_tag='gather_minions',
+        response_timeout=10.0,
+    )
     return BridgeGatherMinionsResponse.model_validate(minions)
 
 
