@@ -187,6 +187,30 @@ class PillarService:
 
         return None
 
+    async def get_parse_item_result(
+        self, master_id: str, minion_id: str | None, pillar_name: str, pillar_value: str
+    ) -> PillarCSVParseResult:
+        error_codes = []
+
+        try:
+            await self.master_service.get_by_master_id(master_id=master_id)
+        except ObjectNotFoundError:
+            error_codes.append(PillarCSVParseResultErrorCode.master_does_not_exist)
+
+        if not await self.minion_service.exists({'minion_id': minion_id, 'master': master_id}):
+            error_codes.append(PillarCSVParseResultErrorCode.minion_does_not_exist)
+
+        if await self.exists(master_id=master_id, minion_id=minion_id, name=pillar_name):
+            error_codes.append(PillarCSVParseResultErrorCode.pillar_already_exists)
+
+        return PillarCSVParseResult(
+            master_id=master_id,
+            minion_id=minion_id,
+            name=pillar_name,
+            value=pillar_value,
+            error_codes=error_codes,
+        )
+
     async def parse_csv(self, master_id: str, file: BinaryIO) -> list[PillarCSVParseResult]:
         csv_reader = csv.DictReader(codecs.iterdecode(file, 'utf-8'))
         result: list[PillarCSVParseResult] = []
@@ -198,28 +222,23 @@ class PillarService:
                 if pillar_name == 'minion_id':
                     continue
 
-                error_codes = []
-
-                try:
-                    await self.master_service.get_by_master_id(master_id=master_id)
-                except ObjectNotFoundError:
-                    error_codes.append(PillarCSVParseResultErrorCode.master_does_not_exist)
-
-                if not await self.minion_service.exists({'minion_id': minion_id, 'master': master_id}):
-                    error_codes.append(PillarCSVParseResultErrorCode.minion_does_not_exist)
-
-                if await self.exists(master_id=master_id, minion_id=minion_id, name=pillar_name):
-                    error_codes.append(PillarCSVParseResultErrorCode.pillar_already_exists)
-
                 result.append(
-                    PillarCSVParseResult(
-                        master_id=master_id,
-                        minion_id=minion_id,
-                        name=pillar_name,
-                        value=pillar_value,
-                        error_codes=error_codes,
+                    await self.get_parse_item_result(
+                        master_id=master_id, minion_id=minion_id, pillar_name=pillar_name, pillar_value=pillar_value
                     )
                 )
+
+        return result
+
+    async def validate_import_date(self, items: list[PillarModel]) -> list[PillarCSVParseResult]:
+        result: list[PillarCSVParseResult] = []
+
+        for item in items:
+            result.append(
+                await self.get_parse_item_result(
+                    master_id=item.master_id, minion_id=item.minion_id, pillar_name=item.name, pillar_value=item.value
+                )
+            )
 
         return result
 

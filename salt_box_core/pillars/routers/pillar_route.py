@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 from salt_box_core.config import LOG_CONFIG
 from salt_box_core.db.exceptions import ObjectCreateError, ObjectNotFoundError
 from salt_box_core.pillars.schemas.pillar_schemas import (
+    PillarCSVParseResult,
     PillarImportResultSchema,
     PillarImportSchema,
     PillarListQueryParams,
@@ -82,8 +83,16 @@ async def pillar_parse_csv(
     master_id: str,
     pillars_csv: UploadFile,
     pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
-) -> list:
+) -> list[PillarCSVParseResult]:
     return await pillar_service.parse_csv(master_id=master_id, file=pillars_csv.file)
+
+
+@router.post('/validate', operation_id='pillar_import_validate')
+async def pillar_import_validate(
+    data: list[PillarModel],
+    pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
+) -> list[PillarCSVParseResult]:
+    return await pillar_service.validate_import_date(data)
 
 
 @router.post('/import', operation_id='pillar_import')

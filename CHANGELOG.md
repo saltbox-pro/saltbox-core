@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Base support for tree structures
 - Add tree structure to collections
 - Master `last_sync_status` and `last_sync_timestamp` fields
+- Add `/pillar/validate` endpoint for validating import pillars data
 
 ### Changed
 
