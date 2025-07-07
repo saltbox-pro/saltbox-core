@@ -1,13 +1,18 @@
 import logging.config
-from typing import Annotated
+from datetime import timedelta
+from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import PlainTextResponse
+from pydantic import ValidationError
+from saltbox_bridge_messages import BridgeTestBurstResponse, CoreTestBurstJobsRequest, CoreTestBurstRequest
 
 from salt_box_core.config import LOG_CONFIG, SETTINGS
 from salt_box_core.db.exceptions import ObjectNotFoundError
-from salt_box_core.event_bus.masters_bus import send_message_and_wait_response_to_master
+from salt_box_core.event_bus.masters_bus import send_message_and_wait_response_to_master, send_message_to_master
 from salt_box_core.http_errors import BadRequest, NotFound
+from salt_box_core.jobs.services.job_services import JobServiceDependency
+from salt_box_core.masters.schemas.system_schemas import BurstJobsTestResponse
 from salt_box_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_bridge_messages import BridgeTestBurstResponse, CoreTestBurstRequest
 
@@ -60,3 +65,35 @@ async def burst_test(
         msg = 'Execution is too long, try lesser count of load size or wait master to boot'
         raise BadRequest(msg) from None
     return BridgeTestBurstResponse(**resp)
+
+
+@router.post('/{master}/burst_jobs_test')
+async def burst_jobs_test(
+    master_id: str,
+    master_service: Annotated[MasterService, Depends(get_master_service)],
+    duration: Annotated[int, 'Burst duration in seconds'],
+    rate: Annotated[int, 'Target events rate per second'],
+) -> BurstJobsTestResponse:
+    try:
+        await master_service.get_by_master_id(master_id)
+    except ObjectNotFoundError:
+        msg = f"Not found master_id='{master_id}'"
+        raise NotFound(msg) from None
+
+    try:
+        message = CoreTestBurstJobsRequest(master=master_id, duration=timedelta(seconds=duration), rate=rate)
+    except ValidationError as err:
+        raise BadRequest(err.errors()) from err
+
+    await send_message_to_master(message, message_tag='burst_jobs_test')
+    return BurstJobsTestResponse(id=message.id)
+
+
+@router.delete('/burst_jobs_test')
+async def burst_jobs_test_delete(
+    job_service: JobServiceDependency,
+    id: str | None = None,
+) -> int:
+    # TODO Doc return
+    # TODO Doc Schema
+    return await job_service.delete_fake_jobs(label=id)
