@@ -1,5 +1,9 @@
 from pydantic import BaseModel
 
 
-class BurstJobsTestResponse(BaseModel):
+class BurstJobsTestPostResponse(BaseModel):
     id: str
+
+
+class BurstJobsTestDeleteResponse(BaseModel):
+    deletions: int
