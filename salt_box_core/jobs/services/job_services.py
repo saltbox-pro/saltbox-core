@@ -40,6 +40,9 @@ JOB_CREATE_HASH_NAME: str = 'job_create:{jid}'
 
 
 class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSchema, JobUpdateSchema]):
+    DELETION_BULK_SIZE = 1000
+    FAKE_MESSAGE_LABEL_FIELD = '_fake_message_label'
+
     def __init__(
         self,
         rdb: RedisDependency,
@@ -272,30 +275,6 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
         else:
             return await super().get_list_paginated(start=int(start), end=int(end), limit=limit, skip=skip, desc=desc)
 
-    async def delete_fake_jobs(self, label: str | None = None) -> int:
-        cur = 0
-        count = 1000  # FIXME (a.karmanov) : dangled value, deciede to move to args
-        label_field = '_fake_message_label'  # FIXME
-        key = 'jobs'
-        deletions = 0
-
-        if label is None:
-            match = f'*"{label_field}": *'
-        else:
-            match = f'*"{label_field}": "{label}"*'
-        logger.error(match)
-
-        while True:
-            try:
-                cur, records = await self.rdb.zscan(name=key, cursor=cur, match=match, count=count,)
-                logger.error(records)
-                if records:
-                    deletions += await self.rdb.zrem(key, *[i[0] for i in records])
-            except redis_exceptions.ResponseError as exc:
-                raise JobServiceException(str(exc)) from exc
-            if cur == 0:
-                return deletions
-
     async def get_job_returns(
         self,
         jid: JID,
@@ -342,6 +321,33 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
             return 0
 
         return returns_count
+
+    async def delete_fake_jobs(self, label: str | None = None) -> int:
+        cur = 0
+        key = 'jobs'
+        deletions = 0
+        label_field = self.FAKE_MESSAGE_LABEL_FIELD
+        count = self.DELETION_BULK_SIZE
+
+        match = f'*{label_field}*'
+
+        while True:
+            try:
+                cur, records = await self.rdb.zscan(name=key, cursor=cur, match=match, count=count)
+            except redis_exceptions.ResponseError as exc:
+                raise JobServiceException(str(exc)) from exc
+            to_delete = []
+            for i in records:
+                data = json.loads(i[0])
+                if label_field in data and (label is None or data[label_field] == label):
+                    to_delete.append(i[0])
+            if to_delete:
+                try:
+                    deletions += await self.rdb.zrem(key, *to_delete)
+                except redis_exceptions.ResponseError as exc:
+                    raise JobServiceException(str(exc)) from exc
+            if cur == 0:
+                return deletions
 
 
 async def get_job_service(
