@@ -28,6 +28,7 @@ from salt_box_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel, Jo
 from salt_box_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
 from salt_box_core.masters.schemas.master_schemas import MasterModel
 from salt_box_core.masters.services.master_service import MasterService, get_master_service
+from salt_box_core.utilities.context import replace_raised
 from salt_box_core.utilities.jid import JID, JidError
 from salt_box_core.utilities.serivces.redis_sortedset_base_service import RedisSortedsetBaseService
 from saltbox_bridge_messages import CoreNewJobAsyncRequest, MasterStatus
@@ -298,10 +299,8 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
         return res, next_cur
 
     async def get_job_all_returns(self, jid: JID) -> list[JobResult]:
-        try:
+        with replace_raised(redis_exceptions.ResponseError, JobServiceException):
             records = await self.rdb.hgetall(name=f'job:{jid}:return')
-        except redis_exceptions.ResponseError as exc:
-            raise JobServiceException(str(exc)) from exc
 
         res: list[JobResult] = []
         for _, ret in records.items():
@@ -332,20 +331,16 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
         match = f'*{label_field}*'
 
         while True:
-            try:
+            with replace_raised(redis_exceptions.ResponseError, JobServiceException):
                 cur, records = await self.rdb.zscan(name=key, cursor=cur, match=match, count=count)
-            except redis_exceptions.ResponseError as exc:
-                raise JobServiceException(str(exc)) from exc
             to_delete = []
             for i in records:
                 data = json.loads(i[0])
                 if label_field in data and (label is None or data[label_field] == label):
                     to_delete.append(i[0])
             if to_delete:
-                try:
+                with replace_raised(redis_exceptions.ResponseError, JobServiceException):
                     deletions += await self.rdb.zrem(key, *to_delete)
-                except redis_exceptions.ResponseError as exc:
-                    raise JobServiceException(str(exc)) from exc
             if cur == 0:
                 return deletions
 
