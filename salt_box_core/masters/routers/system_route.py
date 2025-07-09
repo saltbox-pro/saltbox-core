@@ -12,7 +12,7 @@ from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.event_bus.masters_bus import send_message_and_wait_response_to_master, send_message_to_master
 from salt_box_core.http_errors import BadRequest, NotFound
 from salt_box_core.jobs.services.job_services import JobServiceDependency
-from salt_box_core.masters.schemas.system_schemas import BurstJobsTestDeleteResponse, BurstJobsTestPostResponse
+from salt_box_core.masters.schemas.system_schemas import BurstJobsTestDeleteResponse, BurstJobsTestPostResponse, BurstJobsTestStatsResponse
 from salt_box_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_bridge_messages import BridgeTestBurstResponse, CoreTestBurstRequest
 
@@ -68,7 +68,7 @@ async def burst_test(
 
 
 @router.post('/{master}/burst_jobs_test')
-async def burst_jobs_test(
+async def burst_jobs_test_post(
     master_id: str,
     master_service: Annotated[MasterService, Depends(get_master_service)],
     duration: Annotated[int, 'Burst duration in seconds'],
@@ -96,3 +96,37 @@ async def burst_jobs_test_delete(
 ) -> BurstJobsTestDeleteResponse:
     deletions = await job_service.delete_fake_jobs(label=id)
     return BurstJobsTestDeleteResponse(deletions=deletions)
+
+
+@router.get('/burst_jobs_test')
+async def burst_jobs_test_get(
+    job_service: JobServiceDependency,
+    id: Annotated[str | None, Query(description='Burst ID to delete selectively')],
+) -> BurstJobsTestStatsResponse:
+    # TODO (a.karmanov) : Check burst has been ended
+    count = 0
+    first_dt = None
+    last_dt = None
+    cur = 0
+
+    while True:
+        cur, jobs = await job_service.get_fake_jobs(cursor=cur, label=id)
+        count += len(jobs)
+        #if jobs:
+        #    if first_dt is None:
+        #        first_dt = jobs[0]['_stamp']
+        #    last_dt = jobs[-1]['_stamp']
+        for j in jobs:
+            job_dt = j['_stamp']
+            if first_dt is None or job_dt < first_dt:
+                first_dt = job_dt
+            if last_dt is None or job_dt > last_dt:
+                last_dt = job_dt
+        if cur == 0:
+            break
+
+    return BurstJobsTestStatsResponse(
+        jobs_created=count,
+        first_job_time=first_dt,
+        last_job_time=last_dt,
+    )

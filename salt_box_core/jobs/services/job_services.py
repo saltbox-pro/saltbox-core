@@ -39,9 +39,11 @@ logger = logging.getLogger(__name__)
 
 JOB_CREATE_HASH_NAME: str = 'job_create:{jid}'
 
+JobData = dict[str, Any]
+
 
 class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSchema, JobUpdateSchema]):
-    DELETION_BULK_SIZE = 1000
+    FAKE_MESSAGES_DEFAULT_BULK_SIZE = 1000
     FAKE_MESSAGE_LABEL_FIELD = '_fake_message_label'
 
     def __init__(
@@ -121,7 +123,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
 
     async def stop_job(self, jid: JID) -> None: ...  # TODO (i.moshkov): stop jobs
 
-    async def _get_job_data_from_store(self, jid: JID) -> dict[str, Any] | None:
+    async def _get_job_data_from_store(self, jid: JID) -> JobData | None:
         ts = jid.to_timestamp()
         job_data = await self.rdb.zrange('jobs', start=ts, end=ts, byscore=True)  # type: ignore[call-overload]
 
@@ -321,23 +323,54 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
 
         return returns_count
 
-    async def delete_fake_jobs(self, label: str | None = None) -> int:
-        cur = 0
+    async def _get_fake_jobs(
+        self,
+        cursor: int,
+        label: str | None = None,
+        count: int = FAKE_MESSAGES_DEFAULT_BULK_SIZE
+    ) -> tuple[int, list[bytes], list[JobData]]:
         key = 'jobs'
-        deletions = 0
         label_field = self.FAKE_MESSAGE_LABEL_FIELD
-        count = self.DELETION_BULK_SIZE
+        count = self.FAKE_MESSAGES_DEFAULT_BULK_SIZE
 
         match = f'*{label_field}*'
 
+        with replace_raised(redis_exceptions.ResponseError, JobServiceException):
+            cursor, records = await self.rdb.zscan(name=key, cursor=cursor, match=match, count=count)
+        matches = []
+        parsed = []
+        for i in records:
+            data = json.loads(i[0])
+            if label_field in data and (label is None or data[label_field] == label):
+                matches.append(i[0])
+                parsed.append(data)
+        return (cursor, matches, parsed)
+
+    async def get_fake_jobs(
+        self,
+        cursor: int,
+        label: str | None = None,
+        count: int = FAKE_MESSAGES_DEFAULT_BULK_SIZE
+    ) -> tuple[int, list[JobData]]:
+        cursor, _, parsed = await self._get_fake_jobs(label=label, cursor=cursor, count=count)
+        return (cursor, parsed)
+
+    async def get_fake_jobs_raw(
+        self,
+        cursor: int,
+        label: str | None = None,
+        count: int = FAKE_MESSAGES_DEFAULT_BULK_SIZE
+    ) -> tuple[int, list[bytes]]:
+        cursor, raw, _ = await self._get_fake_jobs(label=label, cursor=cursor, count=count)
+        return (cursor, raw)
+
+    async def delete_fake_jobs(self, label: str | None = None) -> int:
+        cur = 0
+        deletions = 0
+        key = 'jobs'
+
         while True:
-            with replace_raised(redis_exceptions.ResponseError, JobServiceException):
-                cur, records = await self.rdb.zscan(name=key, cursor=cur, match=match, count=count)
-            to_delete = []
-            for i in records:
-                data = json.loads(i[0])
-                if label_field in data and (label is None or data[label_field] == label):
-                    to_delete.append(i[0])
+            cur, to_delete = await self.get_fake_jobs_raw(cursor=cur)
             if to_delete:
                 with replace_raised(redis_exceptions.ResponseError, JobServiceException):
                     deletions += await self.rdb.zrem(key, *to_delete)
