@@ -5,16 +5,28 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import PlainTextResponse
 from pydantic import ValidationError
-from saltbox_bridge_messages import BridgeTestBurstResponse, CoreTestBurstJobsRequest, CoreTestBurstRequest
+from saltbox_bridge_messages import (
+    BridgeTestBurstResponse,
+    BurstJobsTestReportSchema,
+    CoreTestBurstJobsRequest,
+    CoreTestBurstRequest,
+)
 
 from salt_box_core.config import LOG_CONFIG, SETTINGS
 from salt_box_core.db.exceptions import ObjectNotFoundError
+from salt_box_core.db.redis.config import RedisDependency
 from salt_box_core.event_bus.masters_bus import send_message_and_wait_response_to_master, send_message_to_master
 from salt_box_core.http_errors import BadRequest, NotFound
 from salt_box_core.jobs.services.job_services import JobServiceDependency
-from salt_box_core.masters.schemas.system_schemas import BurstJobsTestDeleteResponse, BurstJobsTestPostResponse, BurstJobsTestStatsResponse
+from salt_box_core.masters.schemas.system_schemas import (
+    BurstJobsTestDeleteResponse,
+    BurstJobsTestPostResponse,
+    BurstJobsTestStatsResponse,
+)
 from salt_box_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_bridge_messages import BridgeTestBurstResponse, CoreTestBurstRequest
+
+BURST_JOBS_TEST_REPORT_HASH_NAME = 'burst_jobs_test'
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
@@ -101,9 +113,16 @@ async def burst_jobs_test_delete(
 @router.get('/burst_jobs_test')
 async def burst_jobs_test_get(
     job_service: JobServiceDependency,
-    id: Annotated[str | None, Query(description='Burst ID to delete selectively')],
+    rdb: RedisDependency,
+    id: Annotated[str, Query(description='Burst ID to delete selectively')],
 ) -> BurstJobsTestStatsResponse:
-    # TODO (a.karmanov) : Check burst has been ended
+    bridge_stats_raw = await rdb.hget(name=BURST_JOBS_TEST_REPORT_HASH_NAME, key=id)
+    if bridge_stats_raw is None:
+        msg = f"No record for '{id}'. The burst is not completed yet?"
+        raise NotFound(msg)
+
+    bridge_stats = BurstJobsTestReportSchema.model_validate_json(bridge_stats_raw)
+
     count = 0
     first_dt = None
     last_dt = None
@@ -112,10 +131,6 @@ async def burst_jobs_test_get(
     while True:
         cur, jobs = await job_service.get_fake_jobs(cursor=cur, label=id)
         count += len(jobs)
-        #if jobs:
-        #    if first_dt is None:
-        #        first_dt = jobs[0]['_stamp']
-        #    last_dt = jobs[-1]['_stamp']
         for j in jobs:
             job_dt = j['_stamp']
             if first_dt is None or job_dt < first_dt:
@@ -126,6 +141,9 @@ async def burst_jobs_test_get(
             break
 
     return BurstJobsTestStatsResponse(
+        messages_sent=bridge_stats.count,
+        burst_start=bridge_stats.start,
+        burst_end=bridge_stats.end,
         jobs_created=count,
         first_job_time=first_dt,
         last_job_time=last_dt,
