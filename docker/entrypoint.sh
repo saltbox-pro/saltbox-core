@@ -54,7 +54,7 @@ cmd_taskiq_worker() {
   fi
 }
 
-cmd_taqkiq_sheduler() {
+cmd_taskiq_sheduler() {
   # -fsd - autodiscover tasks in all modules
   # -fp - file pattern for autodiscover (default: **/tasks.py)
   # --skip-first-run - scheduler will wait until the start of the next minute and then start executing tasks
@@ -78,7 +78,7 @@ wrong_cmd() {
 case $1 in
   uvicorn) cmd_uvicorn ;;
   taskiq-worker) cmd_taskiq_worker ;;
-  taskiq-scheduler) cmd_taskiq_worker ;;
+  taskiq-scheduler) cmd_taskiq_sheduler ;;
   shell) cmd_shell "$@" ;;
   *) wrong_cmd "$@" ;;
 esac
