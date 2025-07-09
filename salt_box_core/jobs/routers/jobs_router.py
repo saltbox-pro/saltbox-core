@@ -4,7 +4,6 @@ from typing import Annotated
 import pydantic
 from fastapi import APIRouter, Query, WebSocket
 from pydantic import Field, ValidationError
-from saltbox_bridge_messages import BridgeNewJobResponce, CoreNewJobRequest
 
 from salt_box_core import http_errors
 from salt_box_core.config import LOG_CONFIG, SETTINGS
@@ -32,6 +31,7 @@ from salt_box_core.jobs.schemas.job_schemas import (
 from salt_box_core.jobs.services.job_services import JobServiceDependency
 from salt_box_core.utilities.jid import JID
 from salt_box_core.utilities.websocket import PubSubAuthenticatedWebSocket
+from saltbox_bridge_messages import BridgeNewJobResponce, CoreNewJobRequest
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 

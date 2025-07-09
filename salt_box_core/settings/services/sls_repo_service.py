@@ -79,7 +79,6 @@ class SettingsSlsRepoService(
         # Delete from serve directory
         await self.sync_to_serve_dir()
 
-
     async def sync(self, sid: PyObjectId) -> str:
         task = await sync_sls_repo_task.kiq(str(sid))
         return task.task_id

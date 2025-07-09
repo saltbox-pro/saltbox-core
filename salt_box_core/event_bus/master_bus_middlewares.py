@@ -5,7 +5,6 @@ from faststream import BaseMiddleware, context
 from faststream.broker.message import StreamMessage
 from faststream.types import AsyncFunc, AsyncFuncAny
 from pydantic import BaseModel
-from saltbox_bridge_messages import CoreMessageBase
 
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
@@ -14,6 +13,7 @@ from salt_box_core.event_bus.exceptions import CreateSignError
 from salt_box_core.masters.repositories.master_repository import MasterRepository, get_master_repository
 from salt_box_core.masters.services.master_service import MasterService, get_master_service
 from salt_box_core.utilities.gpg import SaltBoxCrypt
+from saltbox_bridge_messages import CoreMessageBase
 
 
 class MastersAuthMiddleware(BaseMiddleware):

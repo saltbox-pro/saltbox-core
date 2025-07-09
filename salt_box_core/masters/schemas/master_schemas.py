@@ -1,8 +1,8 @@
 from pydantic import BaseModel, ConfigDict, Field
-from saltbox_bridge_messages import MasterStatus, MasterSyncStatus, SshPubKeyModel
 
 from salt_box_core.db.mongo.schemas_base import IDMixin
 from salt_box_core.db.schemas_base import CreatedModifiedMixin, SkipLimitParams, TimezoneAwareDatetime
+from saltbox_bridge_messages import MasterStatus, MasterSyncStatus, SshPubKeyModel
 
 
 def validate_ssh_pubkey_token(value: str) -> str:
@@ -64,11 +64,7 @@ class MasterModel(
 
 
 class MasterViewSchema(
-    BaseModel,
-    CreatedModifiedMixin,
-    MasterEditableFieldsMixin,
-    MasterReadOnlyFieldsMixin,
-    IDMixin
+    BaseModel, CreatedModifiedMixin, MasterEditableFieldsMixin, MasterReadOnlyFieldsMixin, IDMixin
 ): ...
 
 

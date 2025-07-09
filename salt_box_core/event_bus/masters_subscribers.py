@@ -2,15 +2,6 @@ from datetime import UTC, datetime
 
 from faststream import Context
 from faststream.redis import RedisRouter
-from saltbox_bridge_messages import (
-    BridgeAuthRequest,
-    BridgeMinionGrainsMessage,
-    BridgeMinionPresenceMessage,
-    BridgeSyncDoneMessage,
-    BridgeTestBurstLoadMessage,
-    CoreAuthResponse,
-    MasterStatus,
-)
 
 from salt_box_core.config import logger
 from salt_box_core.db.exceptions import ObjectNotFoundError
@@ -25,6 +16,15 @@ from salt_box_core.minion_collections.schemas.minion_schemas import (
 )
 from salt_box_core.minion_collections.services.minion_service import MinionService
 from salt_box_core.utilities.gpg import SaltBoxCrypt
+from saltbox_bridge_messages import (
+    BridgeAuthRequest,
+    BridgeMinionGrainsMessage,
+    BridgeMinionPresenceMessage,
+    BridgeSyncDoneMessage,
+    BridgeTestBurstLoadMessage,
+    CoreAuthResponse,
+    MasterStatus,
+)
 
 router_not_auth = RedisRouter(prefix='master_', middlewares=[])
 router = RedisRouter(prefix='master_', middlewares=[MastersAuthMiddleware])

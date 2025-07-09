@@ -1,7 +1,6 @@
 from typing import Annotated, Any
 
 from fastapi import Depends
-from saltbox_bridge_messages import MasterStatus
 
 from salt_box_core.db.mongo.schemas_base import PyObjectId
 from salt_box_core.masters.repositories.master_repository import MasterRepository, get_master_repository
@@ -11,6 +10,7 @@ from salt_box_core.masters.schemas.master_schemas import (
     MasterUpdateSchema,
 )
 from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService
+from saltbox_bridge_messages import MasterStatus
 
 
 class MasterService(MongoBaseService[MasterRepository, MasterModel, MasterCreateSchema, MasterUpdateSchema]):

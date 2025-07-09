@@ -42,14 +42,15 @@ def validate_log_level(value: str) -> str:
         raise ValueError(dosa)
     return value
 
+
 MakeDirectoryPath = Annotated[Path, AfterValidator(validate_path_is_absolute), AfterValidator(validate_make_dir)]
 LogLevelStr = Annotated[str, AfterValidator(validate_log_level)]
+
 
 class Settings(BaseSettings):
     var_dir: MakeDirectoryPath = Path('/var/lib/saltbox-core/')
     taskiq_broker_url: str = ''
-    log_level: LogLevelStr  = 'info'
-    show_docs: bool = False
+    log_level: LogLevelStr = 'info'
     basic_auth_username: str = ''
     basic_auth_password: str = ''
     base_url_root_path: str = '/'
@@ -74,15 +75,18 @@ class Settings(BaseSettings):
     salt_func_local_repo_name: str = 'salt-func-schemas'
     local_repos_dir: MakeDirectoryPath = Field(
         Path('/var/lib/saltbox-core/repos/'),
-        description='Salt modules cloned repos location',)
+        description='Salt modules cloned repos location',
+    )
     salt_modules_serve_dir: MakeDirectoryPath = Field(
         Path('/srv/salt'),
-        description='Ready-to-sync SLS files location',)
+        description='Ready-to-sync SLS files location',
+    )
     sshfs_user: str = Field(default='saltbox', description='SSH user name to access files')
     salt_conf_user: str = Field(default='master', description='SSH user name to obtain modules for SaltStack')
     sshfs_dir: MakeDirectoryPath = Field(
         default=Path('/srv/sshfs/'),
-        description='Path to store of files served by sshfs',)
+        description='Path to store of files served by sshfs',
+    )
     cache_dir: MakeDirectoryPath = Path('/var/cache/saltbox-core/')
     local_repo_sync_timeout_sec: int = 30
     rabbitmq_url: str = 'amqp://guest:guest@rabbitmq:5672'
@@ -164,7 +168,7 @@ class LogConfig(BaseModel):
         },
     }
     loggers: dict = {
-        'salt_box_core': {
+        'saltbox_core': {
             'handlers': ['default'],
             'level': LOG_LEVEL,
             'propagate': False,
@@ -176,4 +180,4 @@ LOG_CONFIG = LogConfig()
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
-logger = logging.getLogger('salt_box_core')
+logger = logging.getLogger('saltbox_core')

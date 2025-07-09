@@ -5,11 +5,11 @@ from pydantic import (
     Field,
     computed_field,
 )
-from saltbox_bridge_messages import Iso8601ZDatetime as TimezoneAwareDatetime
 from taskiq import TaskiqResult
 from taskiq.depends.progress_tracker import TaskState
 
 from salt_box_core.config import SETTINGS
+from saltbox_bridge_messages import Iso8601ZDatetime as TimezoneAwareDatetime
 
 __all__ = ['TimezoneAwareDatetime']
 

@@ -1,9 +1,8 @@
 from typing import Any
 
-from saltbox_bridge_messages import CoreUpdatePillarCacheRequest
-
 from salt_box_core.event_bus.masters_bus import send_message_and_wait_response_to_master
 from salt_box_core.tkq import broker
+from saltbox_bridge_messages import CoreUpdatePillarCacheRequest
 
 
 @broker.task(timeout=30, retry_on_error=True, _retries=3)

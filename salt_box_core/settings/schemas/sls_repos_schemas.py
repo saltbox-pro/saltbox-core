@@ -31,7 +31,10 @@ from salt_box_core.db.schemas_base import CreatedModifiedMixin, TimezoneAwareDat
 yaml = YAML()
 logger = logging.getLogger(__name__)
 
+
 class SlsRepoError(RuntimeError): ...
+
+
 class SlsRepoManifestError(SlsRepoError): ...
 
 
@@ -105,6 +108,7 @@ class ManifestDigest(str, Enum):
 DEFAULT_DIGEST = ManifestDigest.SHA256
 FIELD_SENTINEL: Any = object()
 
+
 def validate_path_is_not_absolute(value: Path) -> Path:
     """value must be a relative Path"""
     if value.is_absolute():
@@ -127,9 +131,7 @@ def validate_digest(value: str) -> str:
 
 NotAbsolutePath = Annotated[Path, AfterValidator(validate_path_is_not_absolute)]
 SafeNotAbsoultePath = Annotated[
-    Path,
-    AfterValidator(validate_path_bounds),
-    AfterValidator(validate_path_is_not_absolute)
+    Path, AfterValidator(validate_path_bounds), AfterValidator(validate_path_is_not_absolute)
 ]
 ManifestDigestStr = Annotated[str, AfterValidator(validate_digest)]
 

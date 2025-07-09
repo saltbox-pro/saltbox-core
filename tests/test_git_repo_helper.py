@@ -10,7 +10,7 @@ def test_path_bounds_validator() -> None:
     assert validate_path_bounds(Path('states/test/')) == Path('states/test')
     assert validate_path_bounds(Path('./states/')) == Path('states')
     assert validate_path_bounds(Path('./')) == Path()
-    assert validate_path_bounds(Path('.')) == Path()
+    assert validate_path_bounds(Path()) == Path()
     assert validate_path_bounds(Path('./root/.././states/')) == Path('states')
 
     try:

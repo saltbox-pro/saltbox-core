@@ -3,13 +3,13 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import PlainTextResponse
-from saltbox_bridge_messages import BridgeTestBurstResponse, CoreTestBurstRequest
 
 from salt_box_core.config import LOG_CONFIG, SETTINGS
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.event_bus.masters_bus import send_message_and_wait_response_to_master
 from salt_box_core.http_errors import BadRequest, NotFound
 from salt_box_core.masters.services.master_service import MasterService, get_master_service
+from saltbox_bridge_messages import BridgeTestBurstResponse, CoreTestBurstRequest
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 

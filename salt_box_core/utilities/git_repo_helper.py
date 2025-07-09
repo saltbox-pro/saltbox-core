@@ -25,8 +25,14 @@ from salt_box_core.utilities.filesystem import get_latest_ctime, recursive_force
 
 
 class GitRepoError(RuntimeError): ...
+
+
 class MultipleRepoSyncError(GitRepoError): ...
+
+
 class GitRepoSshfsFileSyncError(GitRepoError): ...
+
+
 class SlsReposServeUpdaterError(GitRepoError): ...
 
 
@@ -420,6 +426,7 @@ class SlsReposServeUpdater:
     Prefer to not run directly, beter use sync_sls_repos_to_serve_dir() task which is
     safe from concurrent runs.
     """
+
     # Path will be ignored in conflict check and excluded from sync.
     # DO NOT USE GLOBS:
     #  - Items will be checked on being equal or being a subpass of a value on conlicts check.
