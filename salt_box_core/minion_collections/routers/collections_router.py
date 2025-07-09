@@ -50,35 +50,41 @@ async def collections_list(
     return await collection_service.get_list_paginated(query=query, skip=params.skip, limit=params.limit)
 
 
-# TODO (a.baikov): Find another way to get default collection
-@router.get('/default', operation_id='minion_collection_default')
-async def collection_default(
-    collection_service: Annotated[CollectionService, Depends(get_collection_service)],
-) -> CollectionDetailSchema:
-    """Retern `root` collection if user has access to it, otherwise return first allowed collection"""
-    slug = 'root'
-    try:
-        response = await collection_service.get_by_slug(slug)
-        return CollectionDetailSchema(**{**response.model_dump(), '_id': response.id, 'allowed_actions': []})
-    except Exception as e:
-        logger.error('Error: %s', e)
-        raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
-
-
 @router.get(
     '/{slug}',
     operation_id='minion_collection_read',
     openapi_extra={
         'x-opa-policy': 'core.col',
-        'x-cache-ttl': 10,
+        'x-opa-partial': True,
+        'x-opa-query': 'allow == true',
+        'x-opa-unknowns': ['collections'],
+        'x-opa-query-filter-format': 'mongo',
+        'x-cache-ttl': 5,
     },
 )
 async def collection_retrieve(
+    request: Request,
     slug: str,
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
 ) -> CollectionDetailSchema:
+    query_str = request.query_params.get('opa_query', None)
+    query = json.loads(query_str) if query_str else {}
+    logger.info(f'Query string: {query_str}')
+
+    if slug == 'default':
+        allowed_collections = await collection_service.get_list(query=query, limit=1, skip=0)
+        logger.info(f'Allowed collections: {allowed_collections}')
+        if not allowed_collections:
+            raise HTTPException(status_code=404, detail='No collections found')
+
+        return CollectionDetailSchema(
+            **{**allowed_collections[0].model_dump(), '_id': allowed_collections[0].id, 'allowed_actions': []}
+        )
+
+    query = {**query, 'slug': slug}
+    logger.info(f'OPA query: {query}')
     try:
-        response = await collection_service.get_by_slug(slug)
+        response = await collection_service.get(query=query)
         return CollectionDetailSchema(**{**response.model_dump(), '_id': response.id, 'allowed_actions': []})
     except ObjectNotFoundError:
         raise HTTPException(status_code=404, detail='Collection not found') from None
