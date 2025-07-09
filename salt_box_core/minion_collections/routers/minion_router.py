@@ -3,7 +3,6 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Depends, HTTPException, Response, status
 from fastapi.responses import FileResponse
 from pydantic import ValidationError
-from saltbox_bridge_messages import BridgeGatherMinionsResponse, CoreGatherMinionsRequest, MasterStatus
 
 from salt_box_core import http_errors
 from salt_box_core.config import logger
@@ -18,9 +17,9 @@ from salt_box_core.minion_collections.schemas.minion_schemas import (
     MinionListBody,
     MinionShortSchema,
 )
-from salt_box_core.minion_collections.services.authz import MinionCollectionAuthzService, get_authz_service
 from salt_box_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from salt_box_core.minion_collections.services.minion_service import MinionService, get_minion_service
+from saltbox_bridge_messages import BridgeGatherMinionsResponse, CoreGatherMinionsRequest, MasterStatus
 
 router = APIRouter(prefix='/minions', tags=['Minions'])
 
@@ -28,21 +27,9 @@ router = APIRouter(prefix='/minions', tags=['Minions'])
 @router.post('', operation_id='minions_list')
 async def minions_list(
     body: Annotated[MinionListBody, Body()],
-    authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
     minion_service: Annotated[MinionService, Depends(get_minion_service)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
 ) -> PaginatedResponse[MinionShortSchema]:
-    authz_result = await authz_service.check_access(
-        input={
-            'user': authz_service.user.model_dump(),
-            'path': ['collections', body.collection_slug],
-            'method': 'GET',
-            'action': 'retrieve',
-        }
-    )
-    if not authz_result.allow:
-        raise HTTPException(status_code=403, detail='Not enough permissions')
-
     search = body.query
 
     try:
@@ -69,21 +56,9 @@ async def minions_list(
 @router.post('/export', operation_id='minions_export', response_class=FileResponse)
 async def minions_export(
     body: Annotated[MinionListBody, Body()],
-    authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
     minion_service: Annotated[MinionService, Depends(get_minion_service)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
 ) -> FileResponse:
-    authz_result = await authz_service.check_access(
-        input={
-            'user': authz_service.user.model_dump(),
-            'path': ['collections', body.collection_slug],
-            'method': 'GET',
-            'action': 'retrieve',
-        }
-    )
-    if not authz_result.allow:
-        raise HTTPException(status_code=403, detail='Not enough permissions')
-
     try:
         collection = await collection_service.get_by_slug(body.collection_slug)
 
@@ -140,21 +115,9 @@ async def gather_minions(
 async def minion_retrieve(
     collection_slug: str,
     mid: PyObjectId,
-    authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
     minion_service: Annotated[MinionService, Depends(get_minion_service)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
 ) -> MinionDetailSchema:
-    authz_result = await authz_service.check_access(
-        input={
-            'user': authz_service.user.model_dump(),
-            'path': ['collections', collection_slug],
-            'method': 'GET',
-            'action': 'retrieve',
-        }
-    )
-    if not authz_result.allow:
-        raise HTTPException(status_code=403, detail='Not enough permissions')
-
     try:
         collection = await collection_service.get_by_slug(collection_slug)
     except ObjectNotFoundError as e:
@@ -189,21 +152,9 @@ async def minion_retrieve(
 async def minion_delete(
     collection_slug: str,
     mid: PyObjectId,
-    authz_service: Annotated[MinionCollectionAuthzService, Depends(get_authz_service)],
     minion_service: Annotated[MinionService, Depends(get_minion_service)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
 ) -> Response:
-    authz_result = await authz_service.check_access(
-        input={
-            'user': authz_service.user.model_dump(),
-            'path': ['collections', collection_slug],
-            'method': 'GET',
-            'action': 'delete',
-        }
-    )
-    if not authz_result.allow:
-        raise HTTPException(status_code=403, detail='Not enough permissions')
-
     try:
         collection = await collection_service.get_by_slug(collection_slug)
     except ObjectNotFoundError as e:
