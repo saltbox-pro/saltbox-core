@@ -3,6 +3,6 @@
 # - Prefer long hash over short hash for pip efficiency.
 
 saltbox-sdk @ git+https://dev.saltbox.pro/saltbox/saltbox-sdk/@b51127019e1fd88b4718c625a9636464010a6a39
-saltbox-bridge-messages @ git+https://dev.saltbox.pro/saltbox/saltbox-bridge-messages/@8fc7363eb4230353c09c4bc97ba0a3c29cd9a686
+saltbox-bridge-messages @ git+https://dev.saltbox.pro/saltbox/saltbox-bridge-messages/@8c218c91cb4dfd772e1588439a34453dcc0dcf95
 
 # vi: ft=requirements
