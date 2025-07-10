@@ -31,7 +31,7 @@ from salt_box_core.jobs.schemas.job_schemas import (
 from salt_box_core.jobs.services.job_services import JobServiceDependency
 from salt_box_core.utilities.jid import JID
 from salt_box_core.utilities.websocket import PubSubAuthenticatedWebSocket
-from saltbox_bridge_messages import BridgeNewJobResponce, CoreNewJobRequest
+from saltbox_bridge_messages import BridgeNewJobResponse, CoreNewJobRequest
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
@@ -138,7 +138,7 @@ async def job_create_sync(
             arg=item.data.data_args or [] if item.data else [],
             kwarg=item.data.data_kwargs or {} if item.data else {},
         )
-        job_res = BridgeNewJobResponce(
+        job_res = BridgeNewJobResponse(
             **await send_message_and_wait_response_to_master(
                 message=msg,
                 message_tag='run_job_sync',

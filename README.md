@@ -4,7 +4,7 @@ This is Salt.Box backend repository.
 
 To consult SLS package format look at [`SLS_PACKAGE.md`](./SLS_PACKAGE.md).
 
-## Developement
+## Development
 
 This project uses the following tools.
 
@@ -21,7 +21,7 @@ source .venv/bin/activate
 pip3 install -e .[dev]  # pip install -e .\[dev\]  in some cases
 ```
 
-After deploying dev enivronment install pre-commit hooks with
+After deploying dev environment install pre-commit hooks with
 `pre-commit install` command.
 
 ### Verifying your setup
@@ -54,7 +54,6 @@ sudo docker build --target=main --tag saltbox-core:dev .
 ```
 
 Additional settings need to be passed as environment variables to start. Check
-[`salt_box_core/config.py`](salt\_box\_core/config.py).
+[`salt_box_core/config.py`](salt_box_core/config.py).
 
-Use [Salt.Box Compose](https://gitlab.com/saltbox/saltbox-compose) repo to run
-whole system.
+Use [Salt.Box Compose](https://gitlab.com/saltbox/saltbox-compose) repo to run the whole system.

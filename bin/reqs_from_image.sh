@@ -1,6 +1,6 @@
 #! /bin/bash
 
-## Get current versions of reqiurements in salb.box image.
+## Get current versions of requirements in sale.box image.
 ## Usage:
 ## sudo ./reqs_from_image.sh
 
