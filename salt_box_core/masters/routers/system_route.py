@@ -5,12 +5,6 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import PlainTextResponse
 from pydantic import ValidationError
-from saltbox_bridge_messages import (
-    BridgeTestBurstResponse,
-    BurstJobsTestReportSchema,
-    CoreTestBurstJobsRequest,
-    CoreTestBurstRequest,
-)
 
 from salt_box_core.config import LOG_CONFIG, SETTINGS
 from salt_box_core.db.exceptions import ObjectNotFoundError
@@ -24,7 +18,12 @@ from salt_box_core.masters.schemas.system_schemas import (
     BurstJobsTestStatsResponse,
 )
 from salt_box_core.masters.services.master_service import MasterService, get_master_service
-from saltbox_bridge_messages import BridgeTestBurstResponse, CoreTestBurstRequest
+from saltbox_bridge_messages import (
+    BridgeTestBurstResponse,
+    BurstJobsTestReportSchema,
+    CoreTestBurstJobsRequest,
+    CoreTestBurstRequest,
+)
 
 BURST_JOBS_TEST_REPORT_HASH_NAME = 'burst_jobs_test'
 

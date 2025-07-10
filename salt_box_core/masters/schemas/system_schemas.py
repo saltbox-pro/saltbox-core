@@ -1,4 +1,5 @@
 from pydantic import BaseModel, Field, computed_field
+
 from saltbox_bridge_messages import Iso8601ZDatetime
 
 
