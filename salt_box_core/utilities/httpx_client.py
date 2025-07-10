@@ -17,7 +17,7 @@ class AsyncHttpxClientSingleton:
             auth = None
             if SETTINGS.basic_auth_username != '' and SETTINGS.basic_auth_password != '':
                 auth = BasicAuth(SETTINGS.basic_auth_username, SETTINGS.basic_auth_password)
-            cls.instance.httpx_client = httpx.AsyncClient(auth=auth)
+            cls.instance.httpx_client = httpx.AsyncClient(auth=auth, verify=False)  # noqa: S501
             logger.debug('HTTPX AsyncClient initialized.')
         return cls.instance
 
