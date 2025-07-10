@@ -85,6 +85,7 @@ async def burst_jobs_test_post(
     master_service: Annotated[MasterService, Depends(get_master_service)],
     duration: Annotated[int, 'Burst duration in seconds'],
     rate: Annotated[int, 'Target events rate per second'],
+    strict: Annotated[bool, 'Interrupt when duration is over. Otherwise send all rate * duration messages'] = True,
 ) -> BurstJobsTestPostResponse:
     try:
         await master_service.get_by_master_id(master_id)
@@ -93,7 +94,12 @@ async def burst_jobs_test_post(
         raise NotFound(msg) from None
 
     try:
-        message = CoreTestBurstJobsRequest(master=master_id, duration=timedelta(seconds=duration), rate=rate)
+        message = CoreTestBurstJobsRequest(
+            master=master_id,
+            duration=timedelta(seconds=duration),
+            rate=rate,
+            strict=strict,
+        )
     except ValidationError as err:
         raise BadRequest(err.errors()) from err
 
@@ -142,6 +148,7 @@ async def burst_jobs_test_get(
 
     return BurstJobsTestStatsResponse(
         messages_sent=bridge_stats.count,
+        messages_overdue=bridge_stats.overdue,
         burst_start=bridge_stats.start,
         burst_end=bridge_stats.end,
         jobs_created=count,

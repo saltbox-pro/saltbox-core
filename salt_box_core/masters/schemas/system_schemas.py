@@ -12,6 +12,7 @@ class BurstJobsTestDeleteResponse(BaseModel):
 
 class BurstJobsTestStatsResponse(BaseModel):
     messages_sent: int = Field(description='Amount of messages fired by burster')
+    messages_overdue: int = Field(description='Amount of messages which were sent later than expected')
     burst_start: Iso8601ZDatetime = Field(description='Timestamp of the burst beginning')
     burst_end: Iso8601ZDatetime = Field(description='Timestamp of the burst end')
     jobs_created: int = Field(
