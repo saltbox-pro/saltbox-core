@@ -1,12 +1,12 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, WebSocket, status
+from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, status
 
 from salt_box_core import http_errors
 from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.db.mongo.schemas_base import PyObjectId
 from salt_box_core.db.redis.config import RedisDependency
-from salt_box_core.db.schemas_base import PaginatedResponse, User
+from salt_box_core.db.schemas_base import PaginatedResponse
 from salt_box_core.jobs.exceptions import JobDoesNotExistsException
 from salt_box_core.jobs.schemas.job_schemas import JobModel, JobResult
 from salt_box_core.jobs.services.job_services import JobServiceDependency
@@ -57,7 +57,6 @@ async def tasks_list(
 
 @router.post('', operation_id='task_create')
 async def task_create(
-    request: Request,
     item: TaskCreateRequestSchema,
     task_service: Annotated[TaskService, Depends(get_task_service)],
 ) -> TaskModel:
@@ -65,8 +64,7 @@ async def task_create(
     if item.query == {'$and': [{'$expr': True}]}:
         item.query = {}
 
-    user = User(**request.state.user)
-    create_data = TaskCreateInputSchema(**{'user': user.model_dump(), **item.model_dump(by_alias=True)})
+    create_data = TaskCreateInputSchema(**item.model_dump(by_alias=True))
 
     try:
         task: TaskModel = await task_service.create(data=create_data)

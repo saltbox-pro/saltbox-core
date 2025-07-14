@@ -214,6 +214,7 @@ class TaskCreateRequestSchema(BaseModel):
     max_retries: int = Field(title='Max retries', default=3)
 
     postprocessing: TaskPostProcessingCreate | None = Field(title='Postprocessing', default=None)
+    user: UserShort = Field(title='User', default_factory=lambda: UserShort(sub='', name='Unknown', email=''))
 
     @model_validator(mode='after')
     def validate_local_path(self) -> Self:
@@ -229,7 +230,7 @@ class TaskCreateRequestSchema(BaseModel):
 
 
 class TaskCreateInputSchema(TaskCreateRequestSchema):
-    user: UserShort
+    # user: UserShort
     parent_task_id: PyObjectId | None = Field(title='Parent task id', default=None)
 
 
