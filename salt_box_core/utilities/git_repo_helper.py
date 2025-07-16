@@ -103,6 +103,29 @@ class SshfsSyncBase(ABC):
     def move_to_destination(self, file_path: Path) -> None:
         """Handle donwnloaded file to put expected data to destination"""
 
+    def _get_chunk_size(self, response: httpx.Response) -> int:
+        """
+        Determine chunk size for downloading file based on its size
+
+        :param response: httpx.Response object
+        :return: chunk size in bytes
+        """
+        content_length = response.headers.get('content-length')
+        if content_length is not None:
+            file_size = int(content_length)
+        else:
+            file_size = 0
+
+        logger.debug('File size: %d Mb', file_size / 1024 / 1024)  # Convert to MB
+
+        if file_size > 500 * 1024 * 1024:  # >500 МБ
+            chunk_size = 8 * 1024 * 1024  # 8 МБ
+        else:
+            chunk_size = 512 * 1024  # 512 КБ
+
+        logger.debug('Chunk size: %d Kb', chunk_size / 1024)  # Convert to KB
+        return chunk_size
+
     async def sync(self) -> None:
         """
         Update local file in sshfs location if required
@@ -130,9 +153,16 @@ class SshfsSyncBase(ABC):
                 response.raise_for_status()
                 origin_filename = self.get_origin_filename(response)
                 download_path = self.TMP_DIR / origin_filename
+
+                chunk_size = self._get_chunk_size(response)
+
                 with download_path.open('wb') as file:
-                    async for chunk in response.aiter_bytes():
+                    total_written = 0
+                    async for chunk in response.aiter_bytes(chunk_size):
                         file.write(chunk)
+                        total_written += len(chunk)
+                        if total_written % (100 * 1024 * 1024) < chunk_size:
+                            logger.debug('Downloaded %d MB to %s', total_written // (1024 * 1024), download_path)
         except httpx.HTTPError as err:
             raise GitRepoSshfsFileSyncError(err) from None
         except httpx.HTTPStatusError as err:

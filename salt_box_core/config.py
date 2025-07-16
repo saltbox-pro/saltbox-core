@@ -88,7 +88,7 @@ class Settings(BaseSettings):
         description='Path to store of files served by sshfs',
     )
     cache_dir: MakeDirectoryPath = Path('/var/cache/saltbox-core/')
-    local_repo_sync_timeout_sec: int = 30
+    local_repo_sync_timeout_sec: int = 1200
     rabbitmq_url: str = 'amqp://guest:guest@rabbitmq:5672'
     gpg_key_length: int = 4096
     gog_key_name_real: str = 'Saltbox'
