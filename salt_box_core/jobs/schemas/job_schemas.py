@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Annotated, Any, Self, TypeVar, cast
+from typing import Annotated, Any, Self, TypeVar
 
 from pydantic import (
     BaseModel,
@@ -70,7 +70,7 @@ class JobModel(BaseModel):
 
         data['arg'], data['kwarg'] = fill_salt_kwarg_from_arg(data.get('arg'), data.get('kwarg'))
 
-        return cast(T, data)
+        return data
 
 
 class JobCreateSchema(BaseModel):
@@ -116,7 +116,7 @@ class JobResult(BaseModel):
 
         data['fun_args'], data['fun_kwarg'] = fill_salt_kwarg_from_arg(data.get('fun_args'), data.get('fun_kwarg'))
 
-        return cast(T, data)
+        return data
 
 
 class PubData(BaseModel):
