@@ -16,12 +16,13 @@ Repository = "https://dev.saltbox.pro/saltbox/saltbox-core"
 
 [project.optional-dependencies]
 dev = [
-  "mypy>=1.15.0",
-  "pre-commit",
+
+  "mypy>=1.17.0",
+  "pre-commit>=4.2.0",
   "types-redis",
   "python-lsp-server[all]",
   "types-PyYAML",
-  "ruff",
+  "ruff>=0.12.3",
   "taskiq[reload]",
   "coverage[toml]>=7.6.11",
   "pytest>=8.3.4",
