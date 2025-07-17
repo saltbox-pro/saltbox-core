@@ -166,7 +166,7 @@ class BaseMongoRepository(AbstractRepository[T], Generic[T]):
         query: dict[str, Any] | None,
         limit: int,
         skip: int,
-        projection_model: type[ProjectionModel],
+        projection_model: type[ProjectionModel] | None = None,
     ) -> list[ProjectionModel]: ...
 
     async def get_list(

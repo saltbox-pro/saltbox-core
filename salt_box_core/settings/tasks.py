@@ -71,7 +71,9 @@ async def sync_schemas(
     return created, updated, removed_count
 
 
-# TODO (a.baikov): Deal with retries
+# TODO (a.baikov): Deal with retries and timeouts
+# If we set timeout, rabbitmq will be waiting for acks for this time. After restart worker try to
+# re-execute task, but locker in redis not released (it has ttl=timeout).
 @broker.task(timeout=SETTINGS.local_repo_sync_timeout_sec, retry_on_error=True, _retries=3)
 async def sync_sls_repo_task(
     repo_id: str,
@@ -93,7 +95,7 @@ async def sync_sls_repo_task(
                 token=repo_obj.repo_pass.get_secret_value() if repo_obj.repo_pass else None,
             )
             logger.debug('Try to clone or pull repo with to_thread: %s', url)
-            # git_repo.clone_or_pull()
+
             await asyncio.wait_for(
                 asyncio.to_thread(git_repo.clone_or_pull),
                 timeout=SETTINGS.local_repo_sync_timeout_sec,

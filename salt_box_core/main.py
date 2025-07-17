@@ -47,9 +47,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator:
 
     yield
     await CustomRedisCache.clear_cache(get_redis_now())
-    await POOL.aclose()  # type: ignore[attr-defined]
     if not broker.is_worker_process:
         await broker.shutdown()
+    await POOL.aclose()  # type: ignore[attr-defined]
 
 
 app = FastAPI(

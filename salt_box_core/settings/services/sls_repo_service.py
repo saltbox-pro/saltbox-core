@@ -1,12 +1,16 @@
 import asyncio
 import shutil
 from pathlib import Path
-from typing import Annotated
+from typing import Annotated, Any, TypeVar, overload, override
 
 from fastapi import Depends
+from pydantic import BaseModel
+from redis.asyncio import Redis
 
 from salt_box_core.config import SETTINGS, logger
 from salt_box_core.db.mongo.schemas_base import PyObjectId
+from salt_box_core.db.redis.config import get_redis_dep
+from salt_box_core.db.schemas_base import PaginatedResponse
 from salt_box_core.settings.repository import (
     SettingsSlsRepoRepository,
     get_sls_repo_repository,
@@ -20,12 +24,63 @@ from salt_box_core.settings.tasks import sync_sls_repo_task, sync_sls_repos_to_s
 from salt_box_core.tasks.services.tasks_templates import TaskTemplateService
 from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService
 
+ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
+
 
 class SettingsSlsRepoService(
     MongoBaseService[
         SettingsSlsRepoRepository, SettingsSlsRepoModel, SettingsSlsRepoCreateSchema, SettingsSlsRepoUpdateSchema
     ]
 ):
+    def __init__(self, repo: SettingsSlsRepoRepository, redis: Redis) -> None:
+        self._redis = redis
+        super().__init__(repo)
+
+    @overload
+    async def get_list_paginated(
+        self, query: dict[str, Any] | None, limit: int, skip: int
+    ) -> PaginatedResponse[SettingsSlsRepoModel]: ...
+
+    @overload
+    async def get_list_paginated(
+        self,
+        query: dict[str, Any] | None,
+        limit: int,
+        skip: int,
+        projection_model: type[ProjectionModel],
+    ) -> PaginatedResponse[ProjectionModel]: ...
+
+    @override
+    async def get_list_paginated(
+        self,
+        query: dict[str, Any] | None = None,
+        limit: int = 0,
+        skip: int = 0,
+        projection_model: type[ProjectionModel] | None = None,
+    ) -> PaginatedResponse[SettingsSlsRepoModel] | PaginatedResponse[ProjectionModel]:
+        total = await self.repo.count(query)
+
+        lockers = await self._get_repo_lockers()
+
+        data = await self.repo.get_list(query, limit=limit, skip=skip, projection_model=projection_model)
+        for item in data:
+            if hasattr(item, 'repo_url') and hasattr(item, 'locked'):
+                item.locked = True if item.repo_url in lockers else False
+
+        if projection_model is None:
+            return PaginatedResponse[SettingsSlsRepoModel](total=total, data=data)
+
+        return PaginatedResponse[ProjectionModel](total=total, data=data)
+
+    async def _get_repo_lockers(self) -> list[str]:
+        """Get list of locked repositories.
+        Lock string format: 'repo_lock:https://user:token@domain.ru/path/to/repo.git'
+        """
+        keys = await self._redis.keys('repo_lock:*')
+        lockers = [key.decode('utf-8').split(':', 1)[-1] for key in keys]
+        logger.debug('Locked repositories: %s', lockers)
+        return lockers
+
     async def set_activity_state(self, sid: PyObjectId, state: bool) -> SettingsSlsRepoModel:
         document = await self.get(sid)
         if document.is_active == state:
@@ -89,5 +144,6 @@ class SettingsSlsRepoService(
 
 def get_sls_repo_service(
     repo: Annotated[SettingsSlsRepoRepository, Depends(get_sls_repo_repository)],
+    redis: Annotated[Redis, Depends(get_redis_dep)],
 ) -> SettingsSlsRepoService:
-    return SettingsSlsRepoService(repo)
+    return SettingsSlsRepoService(repo=repo, redis=redis)
