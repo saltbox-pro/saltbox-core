@@ -1,7 +1,7 @@
 [project]
 dynamic = ["dependencies", "version"]
 name = "saltbox-core"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 license = "Apache-2.0"
 description = ""
 readme = "README.md"
@@ -16,7 +16,6 @@ Repository = "https://dev.saltbox.pro/saltbox/saltbox-core"
 
 [project.optional-dependencies]
 dev = [
-
   "mypy>=1.17.0",
   "pre-commit>=4.2.0",
   "types-redis",

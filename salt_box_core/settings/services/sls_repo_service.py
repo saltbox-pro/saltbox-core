@@ -62,7 +62,9 @@ class SettingsSlsRepoService(
 
         lockers = await self._get_repo_lockers()
 
-        data = await self.repo.get_list(query, limit=limit, skip=skip, projection_model=projection_model)
+        data = await self.repo.get_list(
+            query, limit=limit, skip=skip, projection_model=projection_model or SettingsSlsRepoModel
+        )
         for item in data:
             if hasattr(item, 'repo_url') and hasattr(item, 'locked'):
                 item.locked = True if item.repo_url in lockers else False

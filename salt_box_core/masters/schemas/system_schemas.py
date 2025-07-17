@@ -25,9 +25,7 @@ class BurstJobsTestStatsResponse(BaseModel):
         )
     )
     first_job_time: Iso8601ZDatetime | None = Field(
-        description=(
-            'Fist message timestamp may be useful to estimate time lag between request and bursting.'
-        )
+        description=('Fist message timestamp may be useful to estimate time lag between request and bursting.')
     )
     last_job_time: Iso8601ZDatetime | None = Field()
 

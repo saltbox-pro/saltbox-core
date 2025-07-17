@@ -324,10 +324,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
         return returns_count
 
     async def _get_fake_jobs(
-        self,
-        cursor: int,
-        label: str | None = None,
-        count: int = FAKE_MESSAGES_DEFAULT_BULK_SIZE
+        self, cursor: int, label: str | None = None, count: int = FAKE_MESSAGES_DEFAULT_BULK_SIZE
     ) -> tuple[int, list[bytes], list[JobData]]:
         key = 'jobs'
         label_field = self.FAKE_MESSAGE_LABEL_FIELD
@@ -347,19 +344,13 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
         return (cursor, matches, parsed)
 
     async def get_fake_jobs(
-        self,
-        cursor: int,
-        label: str | None = None,
-        count: int = FAKE_MESSAGES_DEFAULT_BULK_SIZE
+        self, cursor: int, label: str | None = None, count: int = FAKE_MESSAGES_DEFAULT_BULK_SIZE
     ) -> tuple[int, list[JobData]]:
         cursor, _, parsed = await self._get_fake_jobs(label=label, cursor=cursor, count=count)
         return (cursor, parsed)
 
     async def get_fake_jobs_raw(
-        self,
-        cursor: int,
-        label: str | None = None,
-        count: int = FAKE_MESSAGES_DEFAULT_BULK_SIZE
+        self, cursor: int, label: str | None = None, count: int = FAKE_MESSAGES_DEFAULT_BULK_SIZE
     ) -> tuple[int, list[bytes]]:
         cursor, raw, _ = await self._get_fake_jobs(label=label, cursor=cursor, count=count)
         return (cursor, raw)
