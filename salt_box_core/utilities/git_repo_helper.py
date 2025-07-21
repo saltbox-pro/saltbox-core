@@ -2,13 +2,13 @@ import hashlib
 import json
 import re
 import shutil
-import subprocess
+import subprocess  # noqa: S404
 import uuid
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from email.message import Message
 from pathlib import Path
-from typing import ClassVar
+from typing import Any, ClassVar
 
 import httpx
 from git import Repo
@@ -31,6 +31,12 @@ class MultipleRepoSyncError(GitRepoError): ...
 
 
 class GitRepoSshfsFileSyncError(GitRepoError): ...
+
+
+class SlsRepoError(RuntimeError): ...
+
+
+class SlsRepoExtractingSchemaError(SlsRepoError): ...
 
 
 class SlsReposServeUpdaterError(GitRepoError): ...
@@ -354,52 +360,58 @@ class GitRepoService:
         commits = list(self.repo.iter_commits(paths=file_str, max_count=1))
         return commits[0].hexsha if commits else ''
 
-    def parse_schemas(self) -> tuple[list[dict], list[str]]:
-        schemas = []
-        errors = []
-        for file in Path(self.local_path).rglob('*.json'):
-            if any(part in file.parts for part in ['.vscode', '.idea']):
-                logger.debug('Exclude file: %s', file)
-                continue
-            try:
-                content = json.loads(file.read_text())
-                if not isinstance(content, dict):
-                    msg = f'{file}: Schema is not a dictionary'
-                    errors.append(msg)
 
-                if 'json-schema' not in content.keys() and 'title' in content.keys():
-                    json_schema = content
-                else:
-                    json_schema = content.get('json_schema', {})
-
-                schema = {
-                    'name': file.name.replace('.json', ''),
-                    'json_schema': json_schema,
-                    'ui_schema': content.get('ui_schema', {}),
-                    'commit_hash': self.get_latest_commit_hash(file),
-                }
-                schemas.append(schema)
-            except json.JSONDecodeError as e:
-                msg = f'{file}: Failed to parse file ({e!s})'
-                logger.error(msg)
+def parse_schemas(repo: GitRepoService) -> tuple[list[dict], list[str]]:
+    schemas = []
+    errors = []
+    for file in Path(repo.local_path).rglob('*.json'):
+        if any(part in file.parts for part in ['.vscode', '.idea']):
+            logger.debug('Exclude file: %s', file)
+            continue
+        try:
+            content = json.loads(file.read_text())
+            if not isinstance(content, dict):
+                msg = f'{file}: Schema is not a dictionary'
                 errors.append(msg)
-        return schemas, errors
 
-    def extract_schema(self, file: Path) -> tuple[dict | None, str | None]:
+            if 'json-schema' not in content.keys() and 'title' in content.keys():
+                json_schema = content
+            else:
+                json_schema = content.get('json_schema', {})
+
+            schema = {
+                'name': file.name.replace('.json', ''),
+                'json_schema': json_schema,
+                'ui_schema': content.get('ui_schema', {}),
+                'commit_hash': repo.get_latest_commit_hash(file),
+            }
+            schemas.append(schema)
+        except json.JSONDecodeError as e:
+            msg = f'{file}: Failed to parse file ({e!s})'
+            logger.error(msg)
+            errors.append(msg)
+    return schemas, errors
+
+
+class SlsRepo:
+    def __init__(self, repo: GitRepoService) -> None:
+        self.repo = repo
+
+    def _extract_schema(self, file: Path) -> dict[str, Any] | None:
         with Path.open(file) as f:
             content = f.read()
 
-        logger.debug('file: %s', file.parts)
+        logger.debug('SLS file parts: %s', file.parts)
 
         # take only path from `states` dir
         try:
-            salt_find_sls_index = file.parts.index(self.local_name)
+            salt_find_sls_index = file.parts.index(self.repo.local_name)
             path_parts = file.parts[salt_find_sls_index + 1 : -1]
         except ValueError:
-            path_parts = ()
-        logger.debug('parts_after_salt_find_sls: %s', path_parts)
+            path_parts = ()  # FIXME Chego kuda?
+        logger.debug('Parts after salt_find_sls_index: %s', path_parts)
 
-        name = file.stem if not path_parts else '.'.join(path_parts) + '.' + file.stem
+        name = '.'.join((*path_parts, file.stem))
 
         pattern = re.compile(r'{#start_schema(.*?)end_schema#}', re.DOTALL)
         match = pattern.search(content)
@@ -411,7 +423,7 @@ class GitRepoService:
                 schema_dict = json.loads(schema_content)
                 if not isinstance(schema_dict, dict):
                     msg = f'{file}: Schema is not a dictionary'
-                    return None, msg
+                    raise SlsRepoExtractingSchemaError(msg)
 
                 if 'json_schema' not in schema_dict.keys() and 'title' in schema_dict.keys():
                     # For v1 format without ui_schema
@@ -428,23 +440,29 @@ class GitRepoService:
                     'json_schema': json_schema,
                     'ui_schema': schema_dict.get('ui_schema', {}),
                     'sls_content': content,
-                    'commit_hash': self.get_latest_commit_hash(file),
+                    'commit_hash': self.repo.get_latest_commit_hash(file),
                 }
-                return schema, None
+                return schema
             except json.JSONDecodeError as e:
                 msg = f'{file}: Failed to parse file ({e!s})'
                 logger.error(msg)
-                return None, msg
+                raise SlsRepoExtractingSchemaError(msg) from None
         else:
-            return None, None
+            return None
 
     def extract_schema_from_sls(self) -> tuple[list[dict], list[str]]:
-        files = list(Path(self.local_path).rglob('*.sls'))
-        tasks = [self.extract_schema(file) for file in files]
-        # results = await asyncio.gather(*tasks)
+        files = list(Path(self.repo.local_path).rglob('*.sls'))
+        schemas = []
+        errors = []
 
-        schemas = [result[0] for result in tasks if result[0] is not None]
-        errors = [result[1] for result in tasks if result[1] is not None]
+        for file in files:
+            try:
+                schema = self._extract_schema(file)
+            except SlsRepoExtractingSchemaError as err:
+                errors.append(str(err))
+            else:
+                if schema is not None:
+                    schemas.append(schema)
 
         return schemas, errors
 

@@ -11,7 +11,7 @@ from salt_box_core.db.redis.config import get_redis_dep
 from salt_box_core.jobs.repositories.job_sc_repository import JobSchemaRepository, get_job_schema_repository
 from salt_box_core.jobs.schemas.job_sc_schemas import JobSchemaCreateSchema, JobSchemaUpdateSchema
 from salt_box_core.tkq import broker
-from salt_box_core.utilities.git_repo_helper import GitRepoService, repository_lock
+from salt_box_core.utilities.git_repo_helper import GitRepoService, parse_schemas, repository_lock
 
 
 async def sync_schemas(
@@ -65,7 +65,7 @@ async def job_schemas_sync_task(
             logger.debug('Repo cloned or pulled')
 
             logger.debug('Try to parse schemas')
-            schemas, errors = git_repo.parse_schemas()
+            schemas, errors = parse_schemas(git_repo)
             parsed_schema_names = [schema['name'] for schema in schemas]
 
             created, updated, removed_count = await sync_schemas(repo, schemas, parsed_schema_names)

@@ -21,6 +21,7 @@ from salt_box_core.tasks.schemas.task_template_schemas import TaskTemplateCreate
 from salt_box_core.tkq import ConcurrencyLocker, broker
 from salt_box_core.utilities.git_repo_helper import (
     GitRepoService,
+    SlsRepo,
     SlsReposServeUpdater,
     create_sshfs_sync,
     repository_lock,
@@ -79,13 +80,13 @@ async def sync_sls_repo_task(
     repo_id: str,
     progress: ProgressTracker[Any] = TaskiqDepends(),
     repo: TaskTemplateRepository = TaskiqDepends(get_task_template_repository),
-    sls_repo: SettingsSlsRepoRepository = TaskiqDepends(get_sls_repo_repository),
+    sls_repo_model: SettingsSlsRepoRepository = TaskiqDepends(get_sls_repo_repository),
     redis: Redis = TaskiqDepends(get_redis_dep),
 ) -> dict:
     """Task for synchronizing job schemas from a Git repository."""
     try:
         await progress.set_progress(TaskState.STARTED, 'Sync started')
-        repo_obj = await sls_repo.get({'_id': ObjectId(repo_id)})
+        repo_obj = await sls_repo_model.get({'_id': ObjectId(repo_id)})
         url = repo_obj.repo_url if isinstance(repo_obj.repo_url, str) else os.fspath(repo_obj.repo_url)
         async with repository_lock(redis, url):
             git_repo = GitRepoService(
@@ -94,6 +95,7 @@ async def sync_sls_repo_task(
                 login=repo_obj.repo_user,
                 token=repo_obj.repo_pass.get_secret_value() if repo_obj.repo_pass else None,
             )
+            sls_repo = SlsRepo(repo=git_repo)
             logger.debug('Try to clone or pull repo with to_thread: %s', url)
 
             await asyncio.wait_for(
@@ -107,7 +109,7 @@ async def sync_sls_repo_task(
                 await create_sshfs_sync(file_path, file_entry).sync()
 
             logger.debug('Try to parse schemas')
-            schemas, errors = git_repo.extract_schema_from_sls()
+            schemas, errors = sls_repo.extract_schema_from_sls()
             parsed_schema_names = [schema['name'] for schema in schemas]
 
             created, updated, removed_count = await sync_schemas(repo_obj.id, repo, schemas, parsed_schema_names)
@@ -118,7 +120,7 @@ async def sync_sls_repo_task(
                 'is_last_sync_successful': True,
                 'last_sync_error': '\n'.join(errors) if errors else '',
             }
-            await sls_repo.update({'_id': ObjectId(repo_id)}, update_data)
+            await sls_repo_model.update({'_id': ObjectId(repo_id)}, update_data)
 
             sync_serve_task = await sync_sls_repos_to_serve_dir.kiq()
             await sync_serve_task.wait_result()
@@ -134,7 +136,7 @@ async def sync_sls_repo_task(
     except Exception as e:
         msg = f'Error during task execution: {e!s}'
         logger.error(msg)
-        await sls_repo.update(
+        await sls_repo_model.update(
             {'_id': ObjectId(repo_id)},
             {
                 'last_synced': datetime.now(UTC),
@@ -148,10 +150,10 @@ async def sync_sls_repo_task(
 
 @broker.task()
 async def sync_sls_repos_to_serve_dir(
-    sls_repo: SettingsSlsRepoRepository = TaskiqDepends(get_sls_repo_repository),
+    sls_repo_model: SettingsSlsRepoRepository = TaskiqDepends(get_sls_repo_repository),
     limiter: None = TaskiqDepends(ConcurrencyLocker(expire=SYNC_SERVE_DIR_LOCK_EXPIRATION_SEC)),
 ) -> None:
-    active_repos = await sls_repo.get_list(query={'is_active': True}, skip=0, limit=0)
+    active_repos = await sls_repo_model.get_list(query={'is_active': True}, skip=0, limit=0)
     salt_modules_serve_updater = SlsReposServeUpdater(active_repos)
     salt_modules_serve_updater.update()
     await notify_accepted_masters_on_repos_update()
