@@ -15,6 +15,9 @@ APP_DESC = 'Salt.Box Core API'
 CACHE_LIFETIME = timedelta(days=1)
 ENV_FILE = Path(os.environ.get('SALTBOX_CORE_ENV_FILE', '.env'))
 
+# SLS repo Manifest file possible names
+MANIFEST_FILE_ALLOWED_NAMES = ('manifest.yaml', 'manifest.yml')
+
 
 def validate_path_is_absolute(value: Path) -> Path:
     """value must not be a relative Path"""

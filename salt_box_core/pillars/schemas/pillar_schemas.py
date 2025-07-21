@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel
 
@@ -17,7 +17,7 @@ class PillarModel(BaseModel):
     value: str
 
 
-class PillarCSVParseResultErrorCode(str, Enum):
+class PillarCSVParseResultErrorCode(StrEnum):
     minion_does_not_exist = 'minion_does_not_exist'
     master_does_not_exist = 'master_does_not_exist'
     pillar_already_exists = 'pillar_already_exists'
@@ -32,7 +32,7 @@ class PillarImportSchema(BaseModel):
     update_existing: bool = False
 
 
-class PillarImportResultItemStatus(str, Enum):
+class PillarImportResultItemStatus(StrEnum):
     success = 'success'
     fail = 'fail'
     skipped = 'skipped'

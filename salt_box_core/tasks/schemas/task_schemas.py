@@ -1,4 +1,4 @@
-from enum import Enum
+from enum import StrEnum
 from typing import Any, ClassVar, Self
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
@@ -10,21 +10,21 @@ from salt_box_core.utilities.helpers import utc_now
 # Task job
 
 
-class TaskJobStatus(str, Enum):
+class TaskJobStatus(StrEnum):
     pending = 'pending'
     running = 'running'
     succeeded = 'succeeded'
     failed = 'failed'
 
 
-class TaskJobReturnStatus(str, Enum):
+class TaskJobReturnStatus(StrEnum):
     succeeded = 'succeeded'
     failed = 'failed'
     waiting = 'waiting'
     timeout = 'timeout'
 
 
-class TaskJobTargetType(str, Enum):
+class TaskJobTargetType(StrEnum):
     list = 'list'
     compound = 'compound'
 
@@ -56,14 +56,14 @@ class TaskTargetMinion(BaseModel):
     master: str
 
 
-class TaskMinionStatus(str, Enum):
+class TaskMinionStatus(StrEnum):
     pending = 'pending'
     in_work = 'in_work'
     success = 'success'
     failed = 'failed'
 
 
-class TaskMinionJobStatus(str, Enum):
+class TaskMinionJobStatus(StrEnum):
     created = 'created'
     in_work = 'in_work'
     success = 'success'
@@ -91,7 +91,7 @@ class TaskMinion(BaseModel):
 # Task postprocessing
 
 
-class TaskPostProcessingType(str, Enum):
+class TaskPostProcessingType(StrEnum):
     on_success = 'on_success'
     on_anyway = 'on_anyway'
 
@@ -120,7 +120,7 @@ class TaskPostProcessing(TaskPostProcessingCreate):
 # Task
 
 
-class TaskStatus(str, Enum):
+class TaskStatus(StrEnum):
     created = 'created'
     running = 'running'
     stopping = 'stopping'

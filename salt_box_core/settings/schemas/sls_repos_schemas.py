@@ -1,7 +1,7 @@
 import logging
 import os
 import uuid
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Annotated, Any, Self
 
@@ -24,7 +24,7 @@ from pydantic_core import Url
 from ruamel.yaml import YAML
 from ruamel.yaml.scanner import ScannerError
 
-from salt_box_core.config import SETTINGS
+from salt_box_core.config import MANIFEST_FILE_ALLOWED_NAMES, SETTINGS
 from salt_box_core.db.mongo.schemas_base import IDMixin
 from salt_box_core.db.schemas_base import CreatedModifiedMixin, TimezoneAwareDatetime
 
@@ -100,7 +100,7 @@ class SettingsSlsRepoShortSchema(BaseModel, ReadOnlyFieldsShortMixin, EditableFi
     pass
 
 
-class ManifestDigest(str, Enum):
+class ManifestDigest(StrEnum):
     MD5 = 'md5'
     SHA256 = 'sha256'
     SHA512 = 'sha512'
@@ -165,9 +165,6 @@ class ManifestSchema(BaseModel):
             if file_entry.token is FIELD_SENTINEL:
                 file_entry.token = self.sshfs_files_token
         return self
-
-
-MANIFEST_FILE_ALLOWED_NAMES = ('manifest.yaml', 'manifest.yml')
 
 
 class SettingsSlsRepoModel(BaseModel, CreatedModifiedMixin, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin, IDMixin):

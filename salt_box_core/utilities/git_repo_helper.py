@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import re
 import shutil
 import subprocess
@@ -14,14 +15,15 @@ import httpx
 from git import Repo
 from redis.asyncio import Redis
 
-from salt_box_core.config import SETTINGS, logger
+from salt_box_core.config import MANIFEST_FILE_ALLOWED_NAMES, SETTINGS
 from salt_box_core.settings.schemas.sls_repos_schemas import (
-    MANIFEST_FILE_ALLOWED_NAMES,
     ManifestDigest,
     ManifestSshfsFilesSchema,
     SettingsSlsRepoModel,
 )
 from salt_box_core.utilities.filesystem import get_latest_ctime, recursive_force_remove
+
+logger = logging.getLogger(__name__)
 
 
 class GitRepoError(RuntimeError): ...
