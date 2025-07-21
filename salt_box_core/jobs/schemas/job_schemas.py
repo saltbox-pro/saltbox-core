@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
 from typing import Annotated, Any, Self, TypeVar
 
 from pydantic import (
@@ -41,7 +41,7 @@ class JobData(BaseModel):  # type: ignore[no-redef]
 
 
 class JobModel(BaseModel):
-    class JobStatus(str, Enum):
+    class JobStatus(StrEnum):
         in_queue = 'in_queue'
         started = 'started'
 

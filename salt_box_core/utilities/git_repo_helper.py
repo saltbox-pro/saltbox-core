@@ -2,7 +2,7 @@ import hashlib
 import json
 import re
 import shutil
-import subprocess  # noqa: S404
+import subprocess
 import uuid
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
