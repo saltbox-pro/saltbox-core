@@ -9,22 +9,27 @@ sequenceDiagram
   actor User
   participant Core
   participant Master as Salt Master
-  
+
   User ->> Core: [POST] Add repository
   Core ->> User: [201] Created
   User -) Core: [POST] Sync repository
   Core ->> Core: Clone/pull repo
-  Core ->> Core: Get files by repo Manifest
+  Note over Core: Repo is in<br>/var/lib/saltbox-core/repos/
+  Core ->> Core: Get AUX files by repo Manifest
+  Note over Core: AUX files are in /srv/sshfs/
   Core ->> Core: Merge repos to serve dir
-  
+  Note over Core: Repos merged to /srv/salt/
+
   Core -) User: [200] Sync is done
 
   par Master sync
     Core -) Master: [FastStream] sync_saltbox
-    Master -> Master: sync_salt
-    Note left of Master: salt.states.rsync
+    Note over Core,Master: Files will be syncing with salt.states.rsync
+    Master ->> Master: sync_salt
+    Note over Master: SLS files are in /srv/saltbox_salt/
     opt
-        Master -> Master: sync_sshfs
+        Master ->> Master: sync_sshfs
+        Note over Master: AUX files to serve with SSH<br>are in /srv/sshfs/
     end
     Master -) Core: [FastStream] sync_saltbox_done
   and State polling

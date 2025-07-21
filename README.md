@@ -2,7 +2,10 @@
 
 This is Salt.Box backend repository.
 
-To consult SLS package format look at [`SLS_PACKAGE.md`](./SLS_PACKAGE.md).
+To consult SLS package format look at [`sls_package.md`](./sls_package.md).
+
+For common inner flows description consult with
+[`common_flows.md`](./common_flows.md).
 
 ## Development
 
