@@ -465,14 +465,17 @@ class SlsRepoService:
         except ValidationError as err:
             raise SlsRepoManifestError(err) from None
 
-    def extract_schemas(self) -> tuple[list[dict], list[str]]:
-        files = list(Path(self.storage.local_path).rglob('*.sls'))
+    def extract_schemas(self, manifest_root: Path) -> tuple[list[dict], list[str]]:
+        assert not manifest_root.is_absolute()  # noqa: S101
         schemas = []
         errors = []
 
-        for file in files:
+        repo_root = self.storage.local_path / manifest_root
+        assert repo_root.is_absolute()  # noqa: S101
+
+        for file in repo_root.rglob('*.sls'):
             try:
-                schema = self._extract_schema(file)
+                schema = self._extract_schema(path=file, repo_root=repo_root)
             except SlsRepoExtractingSchemaError as err:
                 errors.append(str(err))
             else:
@@ -481,21 +484,15 @@ class SlsRepoService:
 
         return schemas, errors
 
-    def _extract_schema(self, file: Path) -> dict[str, Any] | None:
-        with Path.open(file) as f:
+    def _extract_schema(self, path: Path, repo_root: Path) -> dict[str, Any] | None:
+        with Path.open(path) as f:
             content = f.read()
 
-        logger.debug('SLS file parts: %s', file.parts)
+        relapath = path.relative_to(repo_root)
+        logger.debug('SLS file relative path: %s', relapath)
 
-        # take only path from `states` dir
-        try:
-            salt_find_sls_index = file.parts.index(self.storage.local_name)
-            path_parts = file.parts[salt_find_sls_index + 1 : -1]
-        except ValueError:
-            path_parts = ()  # FIXME Chego kuda?
-        logger.debug('Parts after salt_find_sls_index: %s', path_parts)
-
-        name = '.'.join((*path_parts, file.stem))
+        name = '.'.join((*relapath.parent.parts, relapath.stem))
+        logger.debug('SLS file call name: %s', name)
 
         pattern = re.compile(r'{#start_schema(.*?)end_schema#}', re.DOTALL)
         match = pattern.search(content)
@@ -503,10 +500,10 @@ class SlsRepoService:
         if match:
             schema_content = match.group(1).strip()
             try:
-                logger.debug('Try json_load from file: %s', file)
+                logger.debug('Try json_load from file: %s', path)
                 schema_dict = json.loads(schema_content)
                 if not isinstance(schema_dict, dict):
-                    msg = f'{file}: Schema is not a dictionary'
+                    msg = f'{path}: Schema is not a dictionary'
                     raise SlsRepoExtractingSchemaError(msg)
 
                 if 'json_schema' not in schema_dict.keys() and 'title' in schema_dict.keys():
@@ -515,7 +512,7 @@ class SlsRepoService:
                 else:
                     json_schema = schema_dict.get('json_schema', {})
 
-                logger.debug('resolved path: %s', file.resolve())
+                logger.debug('resolved path: %s', path.resolve())
 
                 schema = {
                     'fun': 'state.apply',
@@ -524,11 +521,11 @@ class SlsRepoService:
                     'json_schema': json_schema,
                     'ui_schema': schema_dict.get('ui_schema', {}),
                     'sls_content': content,
-                    'commit_hash': self.storage.get_latest_commit_hash(file),
+                    'commit_hash': self.storage.get_latest_commit_hash(path),
                 }
                 return schema
             except json.JSONDecodeError as e:
-                msg = f'{file}: Failed to parse file ({e!s})'
+                msg = f'{path}: Failed to parse file ({e!s})'
                 logger.error(msg)
                 raise SlsRepoExtractingSchemaError(msg) from None
         else:

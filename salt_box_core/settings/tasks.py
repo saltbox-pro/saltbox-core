@@ -102,7 +102,7 @@ async def sync_sls_repo_task(
                 await create_sshfs_sync(file_path, file_entry).sync()
 
             logger.debug('Try to parse schemas')
-            schemas, errors = sls_repo.extract_schemas()
+            schemas, errors = sls_repo.extract_schemas(manifest_root=manifest.root)
             parsed_schema_names = [schema['name'] for schema in schemas]
 
             created, updated, removed_count = await sync_schemas(repo_mod.id, repo, schemas, parsed_schema_names)
