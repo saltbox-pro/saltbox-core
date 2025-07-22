@@ -20,7 +20,7 @@ from salt_box_core.tasks.schemas.task_template_schemas import TaskTemplateCreate
 from salt_box_core.tkq import ConcurrencyLocker, broker
 from salt_box_core.utilities.git_repo_helper import (
     GitRepoService,
-    SlsRepo,
+    SlsRepoService,
     SlsReposServeUpdater,
     create_sshfs_sync,
     repository_lock,
@@ -85,9 +85,9 @@ async def sync_sls_repo_task(
     """Task for synchronizing job schemas from a Git repository."""
     try:
         await progress.set_progress(TaskState.STARTED, 'Sync started')
-        repo_obj = await sls_repo_of_repo.get({'_id': ObjectId(repo_id)})
-        git_repo = GitRepoService.from_model(repo_obj)
-        sls_repo = SlsRepo(repo=git_repo)
+        repo_mod = await sls_repo_of_repo.get({'_id': ObjectId(repo_id)})
+        git_repo = GitRepoService.from_model(repo_mod)
+        sls_repo = SlsRepoService(repo_model=repo_mod)
         async with repository_lock(redis, git_repo.repo_url):
             logger.debug('Try to clone or pull repo with to_thread: %s', git_repo.repo_url)
 
@@ -97,15 +97,15 @@ async def sync_sls_repo_task(
             )
             logger.debug('Repo cloned or pulled')
 
-            manifest = repo_obj.parse_manifest()
+            manifest = sls_repo.parse_manifest()
             for file_path, file_entry in manifest.sshfs_files.items():
                 await create_sshfs_sync(file_path, file_entry).sync()
 
             logger.debug('Try to parse schemas')
-            schemas, errors = sls_repo.extract_schema_from_sls()
+            schemas, errors = sls_repo.extract_schemas()
             parsed_schema_names = [schema['name'] for schema in schemas]
 
-            created, updated, removed_count = await sync_schemas(repo_obj.id, repo, schemas, parsed_schema_names)
+            created, updated, removed_count = await sync_schemas(repo_mod.id, repo, schemas, parsed_schema_names)
 
             update_data = {
                 'root': str(manifest.root),

@@ -8,22 +8,28 @@ import uuid
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from email.message import Message
+from functools import cached_property
 from pathlib import Path
 from typing import Any, ClassVar, Self
 
 import httpx
 from git import Repo
+from pydantic import ValidationError
 from redis.asyncio import Redis
+from ruamel.yaml import YAML
+from ruamel.yaml.scanner import ScannerError
 
 from salt_box_core.config import MANIFEST_FILE_ALLOWED_NAMES, SETTINGS
 from salt_box_core.settings.schemas.sls_repos_schemas import (
     ManifestDigest,
+    ManifestSchema,
     ManifestSshfsFilesSchema,
     SettingsSlsRepoModel,
 )
 from salt_box_core.utilities.filesystem import get_latest_ctime, recursive_force_remove
 
 logger = logging.getLogger(__name__)
+yaml = YAML()
 
 
 class GitRepoError(RuntimeError): ...
@@ -36,6 +42,9 @@ class GitRepoSshfsFileSyncError(GitRepoError): ...
 
 
 class SlsRepoError(RuntimeError): ...
+
+
+class SlsRepoManifestError(SlsRepoError): ...
 
 
 class SlsRepoExtractingSchemaError(SlsRepoError): ...
@@ -373,10 +382,10 @@ class GitRepoService:
         return commits[0].hexsha if commits else ''
 
 
-def parse_schemas(repo: GitRepoService) -> tuple[list[dict], list[str]]:
+def parse_schemas(schema_repo: GitRepoService) -> tuple[list[dict], list[str]]:
     schemas = []
     errors = []
-    for file in Path(repo.local_path).rglob('*.json'):
+    for file in Path(schema_repo.local_path).rglob('*.json'):
         if any(part in file.parts for part in ['.vscode', '.idea']):
             logger.debug('Exclude file: %s', file)
             continue
@@ -395,7 +404,7 @@ def parse_schemas(repo: GitRepoService) -> tuple[list[dict], list[str]]:
                 'name': file.name.replace('.json', ''),
                 'json_schema': json_schema,
                 'ui_schema': content.get('ui_schema', {}),
-                'commit_hash': repo.get_latest_commit_hash(file),
+                'commit_hash': schema_repo.get_latest_commit_hash(file),
             }
             schemas.append(schema)
         except json.JSONDecodeError as e:
@@ -405,10 +414,72 @@ def parse_schemas(repo: GitRepoService) -> tuple[list[dict], list[str]]:
     return schemas, errors
 
 
-class SlsRepo:
+class SlsRepoService:
     # TODO ( a.karmanov ) :: Support plain file/archive repo
-    def __init__(self, repo: GitRepoService) -> None:
-        self.repo = repo
+    def __init__(self, repo_model: SettingsSlsRepoModel) -> None:
+        self.repo_model = repo_model
+
+    @property
+    def local_path(self) -> str:
+        return self.repo_model.local_path
+
+    @property
+    def local_path_abs(self) -> Path:
+        if not self.local_path:
+            err_msg = 'Empty local_path, uninitialized?'
+            raise SlsRepoError(err_msg)
+        return Path(SETTINGS.local_repos_dir) / self.local_path
+
+    @cached_property
+    def storage(self) -> GitRepoService:
+        return GitRepoService.from_model(self.repo_model)
+
+    def get_manifest_file(self) -> Path | None:
+        for name in MANIFEST_FILE_ALLOWED_NAMES:
+            path = self.local_path_abs / name
+            if path.is_file():
+                return path
+        return None
+
+    def parse_manifest(self) -> ManifestSchema:
+        """
+        :raises OSError: on filesystem operations errors
+        :raises GitRepoManifestError:
+        """
+        path = self.get_manifest_file()
+        if path is None:
+            logger.warning(
+                "Not found manifest file in salt module repo '%s', using defaults",
+                self.local_path_abs,
+            )
+            return ManifestSchema()
+
+        with path.open() as m_file:
+            try:
+                manifest_data = yaml.load(m_file)
+            except ScannerError as err:
+                raise SlsRepoManifestError(err) from None
+
+        try:
+            return ManifestSchema.parse_obj(manifest_data)
+        except ValidationError as err:
+            raise SlsRepoManifestError(err) from None
+
+    def extract_schemas(self) -> tuple[list[dict], list[str]]:
+        files = list(Path(self.storage.local_path).rglob('*.sls'))
+        schemas = []
+        errors = []
+
+        for file in files:
+            try:
+                schema = self._extract_schema(file)
+            except SlsRepoExtractingSchemaError as err:
+                errors.append(str(err))
+            else:
+                if schema is not None:
+                    schemas.append(schema)
+
+        return schemas, errors
 
     def _extract_schema(self, file: Path) -> dict[str, Any] | None:
         with Path.open(file) as f:
@@ -418,7 +489,7 @@ class SlsRepo:
 
         # take only path from `states` dir
         try:
-            salt_find_sls_index = file.parts.index(self.repo.local_name)
+            salt_find_sls_index = file.parts.index(self.storage.local_name)
             path_parts = file.parts[salt_find_sls_index + 1 : -1]
         except ValueError:
             path_parts = ()  # FIXME Chego kuda?
@@ -453,7 +524,7 @@ class SlsRepo:
                     'json_schema': json_schema,
                     'ui_schema': schema_dict.get('ui_schema', {}),
                     'sls_content': content,
-                    'commit_hash': self.repo.get_latest_commit_hash(file),
+                    'commit_hash': self.storage.get_latest_commit_hash(file),
                 }
                 return schema
             except json.JSONDecodeError as e:
@@ -462,22 +533,6 @@ class SlsRepo:
                 raise SlsRepoExtractingSchemaError(msg) from None
         else:
             return None
-
-    def extract_schema_from_sls(self) -> tuple[list[dict], list[str]]:
-        files = list(Path(self.repo.local_path).rglob('*.sls'))
-        schemas = []
-        errors = []
-
-        for file in files:
-            try:
-                schema = self._extract_schema(file)
-            except SlsRepoExtractingSchemaError as err:
-                errors.append(str(err))
-            else:
-                if schema is not None:
-                    schemas.append(schema)
-
-        return schemas, errors
 
 
 class SlsReposServeUpdater:
@@ -564,11 +619,12 @@ class SlsReposServeUpdater:
         dst = SETTINGS.salt_modules_serve_dir
         src_list: list[Path] = []
         for repo in self.repos:
-            manifest = repo.parse_manifest()
-            if not repo.local_path_abs.exists():
+            sls_repo = SlsRepoService(repo)
+            manifest = sls_repo.parse_manifest()
+            if not sls_repo.local_path_abs.exists():
                 logger.info('Skipping local repo which is not yet exists: %s', repo.local_path)
                 continue
-            src_path = repo.local_path_abs / manifest.root
+            src_path = sls_repo.local_path_abs / manifest.root
             if not src_path.is_dir():
                 msg = f'Path is not a regular directory: {src_path}'
                 raise SlsReposServeUpdaterError(msg)

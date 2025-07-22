@@ -16,26 +16,15 @@ from pydantic import (
     SecretStr,
     StrictBool,
     UrlConstraints,
-    ValidationError,
     field_serializer,
     model_validator,
 )
 from pydantic_core import Url
-from ruamel.yaml import YAML
-from ruamel.yaml.scanner import ScannerError
 
-from salt_box_core.config import MANIFEST_FILE_ALLOWED_NAMES, SETTINGS
 from salt_box_core.db.mongo.schemas_base import IDMixin
 from salt_box_core.db.schemas_base import CreatedModifiedMixin, TimezoneAwareDatetime
 
-yaml = YAML()
 logger = logging.getLogger(__name__)
-
-
-class SlsRepoError(RuntimeError): ...
-
-
-class SlsRepoManifestError(SlsRepoError): ...
 
 
 GitRepoUrl = Annotated[
@@ -169,38 +158,10 @@ class ManifestSchema(BaseModel):
         return self
 
 
-class SettingsSlsRepoModel(BaseModel, CreatedModifiedMixin, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin, IDMixin):
-    @property
-    def local_path_abs(self) -> Path:
-        if not self.local_path:
-            dosa = 'Empty local_path, uninitialized?'
-            raise SlsRepoError(dosa)
-        return Path(SETTINGS.local_repos_dir) / self.local_path
-
-    def get_manifest_file(self) -> Path | None:
-        for name in MANIFEST_FILE_ALLOWED_NAMES:
-            path = self.local_path_abs / name
-            if path.is_file():
-                return path
-        return None
-
-    def parse_manifest(self) -> ManifestSchema:
-        """
-        :raises OSError: on filesystem operations errors
-        :raises GitRepoManifestError:
-        """
-        path = self.get_manifest_file()
-        if path is None:
-            logger.warning("Not found manifest file in salt module repo '%s', using defaults", self.local_path_abs)
-            return ManifestSchema()
-
-        with path.open() as m_file:
-            try:
-                manifest_data = yaml.load(m_file)
-            except ScannerError as err:
-                raise SlsRepoManifestError(err) from None
-
-        try:
-            return ManifestSchema.parse_obj(manifest_data)
-        except ValidationError as err:
-            raise SlsRepoManifestError(err) from None
+class SettingsSlsRepoModel(
+    BaseModel,
+    CreatedModifiedMixin,
+    EditableFieldsFullMixin,
+    ReadOnlyFieldsFullMixin,
+    IDMixin
+): ...
