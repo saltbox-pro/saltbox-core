@@ -1,5 +1,4 @@
 import asyncio
-import os
 from datetime import UTC, datetime
 from typing import Any
 
@@ -80,23 +79,17 @@ async def sync_sls_repo_task(
     repo_id: str,
     progress: ProgressTracker[Any] = TaskiqDepends(),
     repo: TaskTemplateRepository = TaskiqDepends(get_task_template_repository),
-    sls_repo_model: SettingsSlsRepoRepository = TaskiqDepends(get_sls_repo_repository),
+    sls_repo_of_repo: SettingsSlsRepoRepository = TaskiqDepends(get_sls_repo_repository),
     redis: Redis = TaskiqDepends(get_redis_dep),
 ) -> dict:
     """Task for synchronizing job schemas from a Git repository."""
     try:
         await progress.set_progress(TaskState.STARTED, 'Sync started')
-        repo_obj = await sls_repo_model.get({'_id': ObjectId(repo_id)})
-        url = repo_obj.repo_url if isinstance(repo_obj.repo_url, str) else os.fspath(repo_obj.repo_url)
-        async with repository_lock(redis, url):
-            git_repo = GitRepoService(
-                repo_url=url,
-                local_name=repo_obj.local_path,
-                login=repo_obj.repo_user,
-                token=repo_obj.repo_pass.get_secret_value() if repo_obj.repo_pass else None,
-            )
-            sls_repo = SlsRepo(repo=git_repo)
-            logger.debug('Try to clone or pull repo with to_thread: %s', url)
+        repo_obj = await sls_repo_of_repo.get({'_id': ObjectId(repo_id)})
+        git_repo = GitRepoService.from_model(repo_obj)
+        sls_repo = SlsRepo(repo=git_repo)
+        async with repository_lock(redis, git_repo.repo_url):
+            logger.debug('Try to clone or pull repo with to_thread: %s', git_repo.repo_url)
 
             await asyncio.wait_for(
                 asyncio.to_thread(git_repo.clone_or_pull),
@@ -120,7 +113,7 @@ async def sync_sls_repo_task(
                 'is_last_sync_successful': True,
                 'last_sync_error': '\n'.join(errors) if errors else '',
             }
-            await sls_repo_model.update({'_id': ObjectId(repo_id)}, update_data)
+            await sls_repo_of_repo.update({'_id': ObjectId(repo_id)}, update_data)
 
             sync_serve_task = await sync_sls_repos_to_serve_dir.kiq()
             await sync_serve_task.wait_result()
@@ -136,7 +129,7 @@ async def sync_sls_repo_task(
     except Exception as e:
         msg = f'Error during task execution: {e!s}'
         logger.error(msg)
-        await sls_repo_model.update(
+        await sls_repo_of_repo.update(
             {'_id': ObjectId(repo_id)},
             {
                 'last_synced': datetime.now(UTC),

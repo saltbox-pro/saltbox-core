@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
 from email.message import Message
 from pathlib import Path
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Self
 
 import httpx
 from git import Repo
@@ -318,6 +318,16 @@ class GitRepoService:
         self.local_name = local_name or uuid.uuid4().hex
         self.local_path = Path(SETTINGS.local_repos_dir) / self.local_name
 
+    @classmethod
+    def from_model(cls, model: SettingsSlsRepoModel) -> Self:
+        url = model.get_repo_url_as_str()
+        return cls(
+            repo_url=url,
+            local_name=model.local_path,
+            login=model.repo_user,
+            token=model.repo_pass.get_secret_value() if model.repo_pass else None,
+        )
+
     @property
     def repo(self) -> Repo | None:
         if self.local_path.exists() and self.local_path.is_dir():
@@ -396,6 +406,7 @@ def parse_schemas(repo: GitRepoService) -> tuple[list[dict], list[str]]:
 
 
 class SlsRepo:
+    # TODO ( a.karmanov ) :: Support plain file/archive repo
     def __init__(self, repo: GitRepoService) -> None:
         self.repo = repo
 

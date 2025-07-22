@@ -53,6 +53,9 @@ class ReadOnlyFieldsShortMixin:
     locked: bool | None = None
     root: str = Field(default='', description='Path in repository to serve for masters')
 
+    def get_repo_url_as_str(self) -> str:
+        return os.fspath(self.repo_url)
+
 
 class ReadOnlyFieldsFullMixin(ReadOnlyFieldsShortMixin): ...
 
@@ -80,13 +83,12 @@ class SettingsSlsRepoCreateSchema(
 ):
     @field_serializer('repo_url')
     def serialize_url(self, url: PathLike) -> str:
-        return url if isinstance(url, str) else os.fspath(url)
+        return self.get_repo_url_as_str()
 
     @model_validator(mode='after')
     def validate_local_path(self) -> Self:
         if not self.local_path:
-            self.local_path = os.fspath(uuid.uuid4().hex)
-
+            self.local_path = uuid.uuid4().hex
         return self
 
 
