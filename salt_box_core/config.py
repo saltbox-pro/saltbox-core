@@ -149,6 +149,8 @@ class Settings(BaseSettings):
 
 SETTINGS = Settings(_env_file=ENV_FILE)
 
+_main_logger_name = __name__.split('.')[0]
+
 
 class LogConfig(BaseModel):
     LOG_FORMAT: str = '%(levelprefix)s [%(filename)s:%(lineno)d] %(message)s'
@@ -171,7 +173,7 @@ class LogConfig(BaseModel):
         },
     }
     loggers: dict = {
-        'saltbox_core': {
+        _main_logger_name: {
             'handlers': ['default'],
             'level': LOG_LEVEL,
             'propagate': False,
@@ -183,4 +185,4 @@ LOG_CONFIG = LogConfig()
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
-logger = logging.getLogger('saltbox_core')
+logger = logging.getLogger(_main_logger_name)
