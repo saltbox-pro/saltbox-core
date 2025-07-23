@@ -418,6 +418,7 @@ class SlsRepoService:
     # TODO ( a.karmanov ) :: Support plain file/archive repo
     def __init__(self, repo_model: SettingsSlsRepoModel) -> None:
         self.repo_model = repo_model
+        self._manifest: ManifestSchema | None = None
 
     @property
     def local_path(self) -> str:
@@ -434,6 +435,17 @@ class SlsRepoService:
     def storage(self) -> GitRepoService:
         return GitRepoService.from_model(self.repo_model)
 
+    @property
+    def manifest(self) -> ManifestSchema:
+        if self._manifest is None:
+            self._manifest = self._parse_manifest()
+        return self._manifest
+
+    def reread_manifest(self) -> ManifestSchema:
+        """ Update Manifest from repository Manifest file """
+        self._manifest = self._parse_manifest()
+        return self._manifest
+
     def get_manifest_file(self) -> Path | None:
         for name in MANIFEST_FILE_ALLOWED_NAMES:
             path = self.local_path_abs / name
@@ -441,7 +453,7 @@ class SlsRepoService:
                 return path
         return None
 
-    def parse_manifest(self) -> ManifestSchema:
+    def _parse_manifest(self) -> ManifestSchema:
         """
         :raises OSError: on filesystem operations errors
         :raises GitRepoManifestError:
@@ -465,12 +477,11 @@ class SlsRepoService:
         except ValidationError as err:
             raise SlsRepoManifestError(err) from None
 
-    def extract_schemas(self, manifest_root: Path) -> tuple[list[dict], list[str]]:
-        assert not manifest_root.is_absolute()  # noqa: S101
+    def extract_schemas(self) -> tuple[list[dict], list[str]]:
         schemas = []
         errors = []
 
-        repo_root = self.storage.local_path / manifest_root
+        repo_root = self.storage.local_path / self.manifest.root
         assert repo_root.is_absolute()  # noqa: S101
 
         for file in repo_root.rglob('*.sls'):
@@ -617,7 +628,7 @@ class SlsReposServeUpdater:
         src_list: list[Path] = []
         for repo in self.repos:
             sls_repo = SlsRepoService(repo)
-            manifest = sls_repo.parse_manifest()
+            manifest = sls_repo.manifest
             if not sls_repo.local_path_abs.exists():
                 logger.info('Skipping local repo which is not yet exists: %s', repo.local_path)
                 continue
