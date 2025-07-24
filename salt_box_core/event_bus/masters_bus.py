@@ -2,12 +2,12 @@ from typing import Any
 
 from faststream.redis import RedisBroker, RedisMessage
 
-from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.event_bus.master_bus_middlewares import MastersAuthMiddleware
 from salt_box_core.masters.repositories.master_repository import MasterRepository
 from salt_box_core.masters.schemas.master_schemas import MasterModel
 from salt_box_core.masters.services.master_service import MasterService
 from saltbox_bridge_messages import CoreEmptyMessage, CoreMessageBase, MasterStatus
+from saltbox_sdk.db.mongo.config import get_mongo_db
 
 
 async def send_message_to_master(message: CoreMessageBase, message_tag: str, broker: RedisBroker | None = None) -> None:

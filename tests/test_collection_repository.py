@@ -2,13 +2,13 @@ from datetime import datetime
 
 import pytest
 
-from salt_box_core.db.exceptions import DuplicateKeyError
-from salt_box_core.db.mongo.schemas_base import PyObjectId
 from salt_box_core.minion_collections.repositories.collection_repository import (
     CollectionRepository,
     get_collection_repository,
 )
 from salt_box_core.minion_collections.schemas.collection_schemas import CollectionCreateSchema, CollectionModel
+from saltbox_sdk.db.exceptions import DuplicateKeyError
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 
 
 @pytest.mark.asyncio

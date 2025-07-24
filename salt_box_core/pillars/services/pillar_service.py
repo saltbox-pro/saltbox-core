@@ -5,8 +5,6 @@ from typing import Annotated, BinaryIO
 from fastapi import Depends
 from redis.asyncio import Redis
 
-from salt_box_core.db.exceptions import ObjectCreateError, ObjectNotFoundError
-from salt_box_core.db.redis.config import get_redis
 from salt_box_core.masters.services.master_service import MasterService, get_master_service
 from salt_box_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from salt_box_core.pillars.schemas.pillar_schemas import (
@@ -18,6 +16,8 @@ from salt_box_core.pillars.schemas.pillar_schemas import (
     PillarModel,
 )
 from salt_box_core.pillars.tasks import update_pillar_cache as update_pillar_cache_task
+from saltbox_sdk.db.exceptions import ObjectCreateError, ObjectNotFoundError
+from saltbox_sdk.db.redis.config import get_redis
 
 PILLAR_BY_MASTER_HASH_NAME = 'pillar:{master_id}'
 PILLAR_BY_MASTER_AND_MINION_HASH_NAME = 'pillar:{master_id}:{minion_id}'

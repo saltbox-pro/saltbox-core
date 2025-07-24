@@ -7,8 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from salt_box_core import __version__
 from salt_box_core.config import APP_DESC, APP_NAME, SETTINGS, logger
-from salt_box_core.db.mongo.init_db import init_mongo_db
-from salt_box_core.db.redis.config import POOL, get_redis_now
+from salt_box_core.db.init_mongo_db import init_mongo_db
 from salt_box_core.jobs.routers.job_sc_router import router as job_schemas_router
 from salt_box_core.jobs.routers.jobs_router import router as jobs_router
 from salt_box_core.jobs.routers.jobs_router import ws_router as jobs_ws_router
@@ -27,6 +26,7 @@ from salt_box_core.utilities.gpg import SaltBoxCrypt
 from salt_box_core.utilities.httpx_client import get_httpx_async_client
 from salt_box_core.utilities.redis_cache import CustomRedisCache
 from saltbox_sdk.config import SETTINGS as SDKSETTINGS
+from saltbox_sdk.db.redis.config import POOL, get_redis_now
 from saltbox_sdk.discovery_client.client import DiscoveryClient
 from saltbox_sdk.discovery_client.schemas import HealthCheckResponse
 

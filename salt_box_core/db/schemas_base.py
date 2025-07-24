@@ -1,5 +1,3 @@
-from typing import Generic, TypeVar
-
 from pydantic import (
     BaseModel,
     Field,
@@ -9,31 +7,6 @@ from taskiq import TaskiqResult
 from taskiq.depends.progress_tracker import TaskState
 
 from salt_box_core.config import SETTINGS
-from saltbox_bridge_messages import Iso8601ZDatetime as TimezoneAwareDatetime
-
-__all__ = ['TimezoneAwareDatetime']
-
-SchemaType = TypeVar('SchemaType', bound=BaseModel)
-
-
-class CreatedModifiedMixin:
-    created: TimezoneAwareDatetime = Field(title='Created')
-    modified: TimezoneAwareDatetime = Field(title='Modified')
-
-
-class PaginatedResponse(BaseModel, Generic[SchemaType]):
-    total: int = Field(description='Total number of items', ge=0)
-    data: list[SchemaType] = Field(description='Items list')
-
-
-class CursoredResponse(BaseModel, Generic[SchemaType]):
-    next_cursor: int = Field(description='Pointer to get next portion of data, 0 when no more data', ge=0)
-    data: list[SchemaType] = Field(description='Items list')
-
-
-class SkipLimitParams(BaseModel):
-    skip: int = Field(default=0, ge=0)
-    limit: int = Field(default=0, ge=0)
 
 
 class AccessModel(BaseModel):

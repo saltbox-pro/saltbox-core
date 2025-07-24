@@ -1,7 +1,7 @@
 from pydantic import BaseModel, Field
 
-from salt_box_core.db.mongo.schemas_base import IDMixin
-from salt_box_core.db.schemas_base import CreatedModifiedMixin
+from saltbox_sdk.db.mongo.schemas_base import IDMixin
+from saltbox_sdk.db.schemas_base import CreatedModifiedMixin
 
 
 class ReadOnlyFieldsMixin:

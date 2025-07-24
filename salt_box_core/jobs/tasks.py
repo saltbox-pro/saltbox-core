@@ -6,12 +6,12 @@ from taskiq import TaskiqDepends
 from taskiq.depends.progress_tracker import ProgressTracker, TaskState
 
 from salt_box_core.config import SETTINGS, logger
-from salt_box_core.db.exceptions import ObjectNotFoundError
-from salt_box_core.db.redis.config import get_redis_dep
 from salt_box_core.jobs.repositories.job_sc_repository import JobSchemaRepository, get_job_schema_repository
 from salt_box_core.jobs.schemas.job_sc_schemas import JobSchemaCreateSchema, JobSchemaUpdateSchema
 from salt_box_core.tkq import broker
 from salt_box_core.utilities.git_repo_helper import GitRepoService, parse_schemas, repository_lock
+from saltbox_sdk.db.exceptions import ObjectNotFoundError
+from saltbox_sdk.db.redis.config import get_redis_dep
 
 
 async def sync_schemas(

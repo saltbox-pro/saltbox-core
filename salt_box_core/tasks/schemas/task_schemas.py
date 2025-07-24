@@ -3,9 +3,11 @@ from typing import Any, ClassVar, Self
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
-from salt_box_core.db.mongo.schemas_base import IDMixin, PyObjectId
-from salt_box_core.db.schemas_base import CreatedModifiedMixin, SkipLimitParams, TimezoneAwareDatetime, UserShort
-from salt_box_core.utilities.helpers import utc_now
+from salt_box_core.db.schemas_base import UserShort
+from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId
+from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
+from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
+from saltbox_sdk.utilities.helpers import utc_now
 
 # Task job
 

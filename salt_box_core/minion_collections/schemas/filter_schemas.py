@@ -3,8 +3,8 @@ from typing import ClassVar, TypedDict
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from salt_box_core.db.mongo.schemas_base import MongoQuery
 from salt_box_core.minion_collections.schemas.minion_schemas import GrainsSchema, MinionModel
+from saltbox_sdk.db.mongo.schemas_base import MongoQuery
 
 
 class MinionFilterValuesBody(BaseModel):

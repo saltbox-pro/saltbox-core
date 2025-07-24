@@ -2,8 +2,8 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from salt_box_core.db.mongo.schemas_base import BaseTreeModel, MongoQuery, TreeMixin
-from salt_box_core.db.schemas_base import CreatedModifiedMixin
+from saltbox_sdk.db.mongo.schemas_base import BaseTreeModel, MongoQuery, TreeMixin
+from saltbox_sdk.db.schemas_base import CreatedModifiedMixin
 
 MongoQueryField: dict[str, Any] = Field(
     default_factory=dict,

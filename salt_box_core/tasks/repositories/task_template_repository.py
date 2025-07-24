@@ -4,10 +4,11 @@ from fastapi import Depends
 from pydantic import BaseModel
 from pymongo.asynchronous.database import AsyncDatabase
 
-# from salt_box_core.config import logger
-from salt_box_core.db.mongo.config import get_mongo
-from salt_box_core.db.mongo.repository_base import BaseMongoRepository
 from salt_box_core.tasks.schemas.task_template_schemas import TaskTemplateModel
+
+# from salt_box_core.config import logger
+from saltbox_sdk.db.mongo.config import get_mongo
+from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
 
 ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
 

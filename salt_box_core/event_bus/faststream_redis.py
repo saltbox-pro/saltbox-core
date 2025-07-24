@@ -9,8 +9,6 @@ from faststream.broker.types import BrokerMiddleware
 from faststream.redis import RedisBroker
 from faststream.security import SASLPlaintext
 
-from salt_box_core.config import SETTINGS, logger
-from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.event_bus.masters_subscribers import router as masters_router
 from salt_box_core.event_bus.masters_subscribers import router_not_auth as masters_router_not_auth
 from salt_box_core.masters.repositories.master_repository import MasterRepository, get_master_repository
@@ -18,34 +16,38 @@ from salt_box_core.masters.services.master_service import MasterService, get_mas
 from salt_box_core.minion_collections.repositories.minion_repository import MinionRepository, get_minion_repository
 from salt_box_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from salt_box_core.utilities.gpg import SaltBoxCrypt
+from saltbox_sdk.config import REDIS_SETTINGS, logger
+from saltbox_sdk.db.mongo.config import get_mongo_db
 
 
 def get_faststream_broker(middlewares: list[BrokerMiddleware] | None = None) -> RedisBroker:
-    if SETTINGS.redis_username is None or SETTINGS.redis_password is None:
+    if REDIS_SETTINGS.redis_username is None or REDIS_SETTINGS.redis_password is None:
         msg = 'You must provide both `redis_username` and `redis_password`'
         raise ValueError(msg)
 
-    if SETTINGS.redis_url.startswith('rediss:'):
+    if REDIS_SETTINGS.redis_url.startswith('rediss:'):
         ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS)
         ssl_context.verify_mode = {
             'none': ssl.CERT_NONE,
             'required': ssl.CERT_REQUIRED,
             'optional': ssl.CERT_OPTIONAL,
-        }[SETTINGS.redis_tls_verification]
+        }[REDIS_SETTINGS.redis_tls_verification]
 
-        if SETTINGS.redis_ca_cert:
-            ssl_context.load_verify_locations(cafile=os.path.relpath(SETTINGS.redis_ca_cert), capath=None, cadata=None)
+        if REDIS_SETTINGS.redis_ca_cert:
+            ssl_context.load_verify_locations(
+                cafile=os.path.relpath(REDIS_SETTINGS.redis_ca_cert), capath=None, cadata=None
+            )
 
         security = SASLPlaintext(
-            username=SETTINGS.redis_username, password=SETTINGS.redis_password, ssl_context=ssl_context
+            username=REDIS_SETTINGS.redis_username, password=REDIS_SETTINGS.redis_password, ssl_context=ssl_context
         )
     else:
-        security = SASLPlaintext(username=SETTINGS.redis_username, password=SETTINGS.redis_password)
+        security = SASLPlaintext(username=REDIS_SETTINGS.redis_username, password=REDIS_SETTINGS.redis_password)
 
     if middlewares:
-        return RedisBroker(url=SETTINGS.redis_url, security=security, middlewares=middlewares)
+        return RedisBroker(url=REDIS_SETTINGS.redis_url, security=security, middlewares=middlewares)
 
-    return RedisBroker(url=SETTINGS.redis_url, security=security)
+    return RedisBroker(url=REDIS_SETTINGS.redis_url, security=security)
 
 
 @asynccontextmanager

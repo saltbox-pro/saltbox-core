@@ -4,7 +4,6 @@ from faststream import Context
 from faststream.redis import RedisRouter
 
 from salt_box_core.config import logger
-from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.event_bus.master_bus_middlewares import MastersAuthMiddleware
 from salt_box_core.masters.schemas.master_schemas import MasterCreateSchema, MasterModel
 from salt_box_core.masters.services.master_service import MasterService
@@ -25,6 +24,7 @@ from saltbox_bridge_messages import (
     CoreAuthResponse,
     MasterStatus,
 )
+from saltbox_sdk.db.exceptions import ObjectNotFoundError
 
 router_not_auth = RedisRouter(prefix='master_', middlewares=[])
 router = RedisRouter(prefix='master_', middlewares=[MastersAuthMiddleware])

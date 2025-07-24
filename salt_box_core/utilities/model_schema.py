@@ -8,8 +8,8 @@ from pydantic import BaseModel
 from pydantic.fields import ComputedFieldInfo, FieldInfo
 
 # from salt_box_core.config import logger
-from salt_box_core.db.mongo.schemas_base import PyObjectId
-from salt_box_core.db.schemas_base import TimezoneAwareDatetime
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
 
 
 class UnsupportedSchemaType(Exception):

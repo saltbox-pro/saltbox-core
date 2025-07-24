@@ -2,12 +2,12 @@ from datetime import datetime
 
 import pytest
 
-from salt_box_core.db.exceptions import (
+from saltbox_sdk.db.exceptions import (
     MultipleObjectsFoundError,
     ObjectNotFoundError,
     ObjectUpdateError,
 )
-from salt_box_core.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from tests.fixtures.mongo_repository_fixtures import (
     CreateUpdateModel,
     SampleModel,

@@ -10,9 +10,9 @@ from pydantic import ValidationError
 from redis.asyncio import Redis
 
 from salt_box_core.config import SETTINGS, logger
-from salt_box_core.db.redis.config import get_redis_now
 from salt_box_core.utilities.httpx_client import get_httpx_async_client
 from salt_box_core.utilities.redis_cache import CustomRedisCache
+from saltbox_sdk.db.redis.config import get_redis_now
 
 request_context: ContextVar[Request] = ContextVar('request_context')
 

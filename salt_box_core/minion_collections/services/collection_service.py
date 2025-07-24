@@ -11,7 +11,7 @@ from salt_box_core.minion_collections.schemas.collection_schemas import (
     CollectionModel,
     CollectionUpdateSchema,
 )
-from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService
+from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 
 
 class CollectionService(

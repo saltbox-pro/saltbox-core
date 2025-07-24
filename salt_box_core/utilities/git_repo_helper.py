@@ -442,7 +442,7 @@ class SlsRepoService:
         return self._manifest
 
     def reread_manifest(self) -> ManifestSchema:
-        """ Update Manifest from repository Manifest file """
+        """Update Manifest from repository Manifest file"""
         self._manifest = self._parse_manifest()
         return self._manifest
 

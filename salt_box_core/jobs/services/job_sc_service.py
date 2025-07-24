@@ -6,7 +6,6 @@ from typing import Annotated
 from fastapi import Depends
 
 from salt_box_core.config import SETTINGS, logger
-from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.jobs.repositories.job_sc_repository import JobSchemaRepository, get_job_schema_repository
 from salt_box_core.jobs.schemas.job_sc_schemas import (
     JobSchemaCreateSchema,
@@ -15,7 +14,8 @@ from salt_box_core.jobs.schemas.job_sc_schemas import (
 )
 from salt_box_core.jobs.tasks import job_schemas_sync_task
 from salt_box_core.utilities.json_schema import Draft4ValidatorWithDefaults
-from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService
+from saltbox_sdk.db.exceptions import ObjectNotFoundError
+from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 
 
 class JobSchemaService(

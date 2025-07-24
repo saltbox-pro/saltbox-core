@@ -2,7 +2,6 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from salt_box_core.db.exceptions import ObjectNotFoundError
 from salt_box_core.minion_collections.schemas.filter_schemas import (
     MinionFilterSchema,
     MinionFilterValuesBody,
@@ -12,6 +11,7 @@ from salt_box_core.minion_collections.schemas.minion_schemas import MinionModel
 from salt_box_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from salt_box_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from salt_box_core.utilities.model_schema import get_model_schema
+from saltbox_sdk.db.exceptions import ObjectNotFoundError
 
 router = APIRouter(prefix='/filters', tags=['Filters'])
 

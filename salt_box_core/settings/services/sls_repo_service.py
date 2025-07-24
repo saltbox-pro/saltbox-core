@@ -8,9 +8,6 @@ from pydantic import BaseModel
 from redis.asyncio import Redis
 
 from salt_box_core.config import SETTINGS, logger
-from salt_box_core.db.mongo.schemas_base import PyObjectId
-from salt_box_core.db.redis.config import get_redis_dep
-from salt_box_core.db.schemas_base import PaginatedResponse
 from salt_box_core.settings.repository import (
     SettingsSlsRepoRepository,
     get_sls_repo_repository,
@@ -22,7 +19,10 @@ from salt_box_core.settings.schemas.sls_repos_schemas import (
 )
 from salt_box_core.settings.tasks import sync_sls_repo_task, sync_sls_repos_to_serve_dir
 from salt_box_core.tasks.services.tasks_templates import TaskTemplateService
-from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.redis.config import get_redis_dep
+from saltbox_sdk.db.schemas_base import PaginatedResponse
+from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 
 ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
 

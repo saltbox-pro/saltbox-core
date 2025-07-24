@@ -3,7 +3,7 @@ import os
 from datetime import timedelta
 from functools import cached_property
 from pathlib import Path
-from typing import Annotated, Any, Literal
+from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, DirectoryPath, Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -58,16 +58,7 @@ class Settings(BaseSettings):
     basic_auth_password: str = ''
     base_url_root_path: str = '/'
     max_count: int = Field(default=1000, description='Max array length to request')
-    mongo_db: str = ''
-    mongo_password: str | None = None
-    mongo_port: int = 27017
-    mongo_user: str = ''
     origins: list[str] = Field(['*'], description='CORS allowed resources')
-    redis_ca_cert: str | None = Field(None, description='Path to file of concatenated PEM certs')
-    redis_password: str | None = None
-    redis_tls_verification: Literal['none', 'optional', 'required'] = 'required'
-    redis_url: str = ''
-    redis_username: str | None = None
     keycloak_server_url: str = ''
     keycloak_front_url: str = ''
     keycloak_realm: str = ''
@@ -121,26 +112,6 @@ class Settings(BaseSettings):
     @property
     def keycloak_token_url(self) -> str:
         return f'{self.keycloak_front_url}/realms/{self.keycloak_realm}/protocol/openid-connect/token'
-
-    @property
-    def mongo_url(self) -> str:
-        return f'mongodb://{self.mongo_user}:{self.mongo_password}@mongo:{self.mongo_port}/'
-
-    @property
-    def redis_connection_kwargs(self) -> dict[str, Any]:
-        """
-        Additional options for redis.*.from_url() group of methods
-        """
-        result = {
-            'username': self.redis_username,
-            'password': self.redis_password,
-        }
-        if self.redis_url.startswith('rediss:'):
-            result |= {
-                'ssl_cert_reqs': self.redis_tls_verification,
-                'ssl_ca_certs': self.redis_ca_cert,
-            }
-        return result
 
     @property
     def taskiq_redis_url(self) -> str:

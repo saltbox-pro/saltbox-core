@@ -3,9 +3,9 @@ from typing import Annotated
 from fastapi import Depends
 from redis.asyncio import Redis
 
-from salt_box_core.db.redis.config import get_redis
-from salt_box_core.db.redis.repository_sortedset_base import SortedsetRedisRepository
 from salt_box_core.jobs.schemas.job_schemas import JobModel
+from saltbox_sdk.db.redis.config import get_redis
+from saltbox_sdk.db.redis.repository_sortedset_base import SortedsetRedisRepository
 
 
 class JobRepository(SortedsetRedisRepository[JobModel]):

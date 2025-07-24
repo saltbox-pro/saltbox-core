@@ -21,8 +21,9 @@ from pydantic import (
 )
 from pydantic_core import Url
 
-from salt_box_core.db.mongo.schemas_base import IDMixin
-from salt_box_core.db.schemas_base import CreatedModifiedMixin, TimezoneAwareDatetime
+from saltbox_sdk.db.mongo.schemas_base import IDMixin
+from saltbox_sdk.db.schemas_base import CreatedModifiedMixin
+from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
 
 logger = logging.getLogger(__name__)
 
@@ -159,9 +160,5 @@ class ManifestSchema(BaseModel):
 
 
 class SettingsSlsRepoModel(
-    BaseModel,
-    CreatedModifiedMixin,
-    EditableFieldsFullMixin,
-    ReadOnlyFieldsFullMixin,
-    IDMixin
+    BaseModel, CreatedModifiedMixin, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin, IDMixin
 ): ...

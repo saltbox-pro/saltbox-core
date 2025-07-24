@@ -8,8 +8,6 @@ from taskiq import TaskiqDepends
 from taskiq.depends.progress_tracker import ProgressTracker, TaskState
 
 from salt_box_core.config import Settings, logger
-from salt_box_core.db.exceptions import ObjectNotFoundError
-from salt_box_core.db.redis.config import get_redis_dep
 from salt_box_core.event_bus.masters_bus import notify_accepted_masters_on_repos_update
 from salt_box_core.settings.repository import SettingsSlsRepoRepository, get_sls_repo_repository
 from salt_box_core.tasks.repositories.task_template_repository import (
@@ -24,6 +22,8 @@ from salt_box_core.utilities.git_repo_helper import (
     create_sshfs_sync,
     repository_lock,
 )
+from saltbox_sdk.db.exceptions import ObjectNotFoundError
+from saltbox_sdk.db.redis.config import get_redis_dep
 
 SETTINGS = Settings()
 SYNC_SERVE_DIR_LOCK_EXPIRATION_SEC = 300

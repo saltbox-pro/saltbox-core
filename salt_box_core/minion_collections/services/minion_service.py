@@ -16,7 +16,7 @@ from salt_box_core.minion_collections.schemas.minion_schemas import (
     MinionUpdateSchema,
 )
 from salt_box_core.minion_collections.services.pipeline_builder import MongoPipelineBuilder
-from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService, ProjectionModel
+from saltbox_sdk.serivces.mongo_base_service import MongoBaseService, ProjectionModel
 
 
 class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreateSchema, MinionUpdateSchema]):

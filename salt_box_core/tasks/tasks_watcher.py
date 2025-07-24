@@ -2,9 +2,7 @@ import asyncio
 
 from redis import asyncio as aioredis
 
-from salt_box_core.config import SETTINGS, logger
-from salt_box_core.db.mongo.config import get_mongo_db
-from salt_box_core.db.mongo.init_db import init_mongo_db
+from salt_box_core.db.init_mongo_db import init_mongo_db
 from salt_box_core.jobs.repositories.job_repository import JobRepository
 from salt_box_core.jobs.repositories.job_sc_repository import JobSchemaRepository
 from salt_box_core.jobs.services.job_sc_service import JobSchemaService
@@ -21,6 +19,8 @@ from salt_box_core.tasks.schemas.task_schemas import TaskModel, TaskStatus
 from salt_box_core.tasks.services.tasks import TaskService
 from salt_box_core.tasks.services.tasks_lifespan import TaskLifespanService
 from salt_box_core.tasks.services.tasks_templates import TaskTemplateService
+from saltbox_sdk.config import REDIS_SETTINGS, logger
+from saltbox_sdk.db.mongo.config import get_mongo_db
 
 
 class TasksWatcher:
@@ -39,7 +39,7 @@ class TasksWatcher:
 
     async def get_redis(self) -> aioredis.Redis:
         if self.redis is None:
-            self.redis = await aioredis.from_url(SETTINGS.redis_url, **SETTINGS.redis_connection_kwargs)
+            self.redis = await aioredis.from_url(REDIS_SETTINGS.redis_url, **REDIS_SETTINGS.redis_connection_kwargs)
 
         return self.redis
 

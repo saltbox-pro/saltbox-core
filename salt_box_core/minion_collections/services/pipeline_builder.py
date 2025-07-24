@@ -3,8 +3,8 @@ from types import UnionType
 from typing import Any, Union, get_args, get_origin
 
 from salt_box_core.config import logger
-from salt_box_core.http_errors import BadRequest
 from salt_box_core.minion_collections.schemas.minion_schemas import GrainsSchema, MinionModel
+from saltbox_sdk.http_errors import BadRequest
 
 LIST_HANDLER_FIELDS = [
     'grains.fqdns',

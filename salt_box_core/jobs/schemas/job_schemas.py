@@ -14,10 +14,10 @@ from pydantic import (
 )
 from pydantic.functional_validators import AfterValidator
 
-from salt_box_core.db.schemas_base import SkipLimitParams
 from salt_box_core.utilities.jid import JID, JidError
 from salt_box_core.utilities.salt import fill_salt_kwarg_from_arg
 from saltbox_bridge_messages import JobReturnSchema
+from saltbox_sdk.db.schemas_base import SkipLimitParams
 
 T = TypeVar('T')
 JID_T = TypeVar('JID_T', str, int)

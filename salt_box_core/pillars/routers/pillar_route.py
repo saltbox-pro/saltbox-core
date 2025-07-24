@@ -4,7 +4,6 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
 
 from salt_box_core.config import LOG_CONFIG
-from salt_box_core.db.exceptions import ObjectCreateError, ObjectNotFoundError
 from salt_box_core.pillars.schemas.pillar_schemas import (
     PillarCSVParseResult,
     PillarImportResultSchema,
@@ -14,6 +13,7 @@ from salt_box_core.pillars.schemas.pillar_schemas import (
     PillarSelector,
 )
 from salt_box_core.pillars.services.pillar_service import PillarService, get_pillar_service
+from saltbox_sdk.db.exceptions import ObjectCreateError, ObjectNotFoundError
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 

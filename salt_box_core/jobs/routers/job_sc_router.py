@@ -3,11 +3,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from salt_box_core.config import logger
-from salt_box_core.db.exceptions import DuplicateKeyError, ObjectNotFoundError
-from salt_box_core.db.schemas_base import PaginatedResponse, SkipLimitParams, TaskiqTaskIdResponse, TaskiqTaskResult
+from salt_box_core.db.schemas_base import TaskiqTaskIdResponse, TaskiqTaskResult
 from salt_box_core.jobs.schemas.job_sc_schemas import JobSchemaModel, JobSchemaShortSchema
 from salt_box_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
 from salt_box_core.tkq import broker
+from saltbox_sdk.db.exceptions import DuplicateKeyError, ObjectNotFoundError
+from saltbox_sdk.db.schemas_base import PaginatedResponse, SkipLimitParams
 
 router = APIRouter(prefix='/json-schemas', tags=['JSON Schemas'])
 

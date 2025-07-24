@@ -2,15 +2,15 @@ from typing import Annotated, Any
 
 from fastapi import Depends
 
-from salt_box_core.db.mongo.schemas_base import PyObjectId
 from salt_box_core.masters.repositories.master_repository import MasterRepository, get_master_repository
 from salt_box_core.masters.schemas.master_schemas import (
     MasterCreateSchema,
     MasterModel,
     MasterUpdateSchema,
 )
-from salt_box_core.utilities.serivces.mongo_base_service import MongoBaseService
 from saltbox_bridge_messages import MasterStatus
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 
 
 class MasterService(MongoBaseService[MasterRepository, MasterModel, MasterCreateSchema, MasterUpdateSchema]):

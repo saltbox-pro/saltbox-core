@@ -4,10 +4,11 @@ from typing import Annotated, Any, ClassVar, overload
 from fastapi import Depends
 from pymongo.asynchronous.database import AsyncDatabase
 
-# from salt_box_core.config import logger
-from salt_box_core.db.mongo.config import get_mongo
-from salt_box_core.db.mongo.repository_base import BaseMongoRepository, ProjectionModel
 from salt_box_core.minion_collections.schemas.minion_schemas import MinionModel
+
+# from salt_box_core.config import logger
+from saltbox_sdk.db.mongo.config import get_mongo
+from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository, ProjectionModel
 
 
 class MinionRepository(BaseMongoRepository[MinionModel]):

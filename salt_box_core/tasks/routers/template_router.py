@@ -3,9 +3,6 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from salt_box_core.config import logger
-from salt_box_core.db.exceptions import ObjectNotFoundError
-from salt_box_core.db.mongo.schemas_base import PyObjectId
-from salt_box_core.db.schemas_base import PaginatedResponse
 from salt_box_core.settings.schemas.sls_repos_schemas import SettingsSlsRepoShortSchema
 from salt_box_core.settings.services.sls_repo_service import SettingsSlsRepoService, get_sls_repo_service
 from salt_box_core.tasks.schemas.task_template_schemas import (
@@ -14,6 +11,9 @@ from salt_box_core.tasks.schemas.task_template_schemas import (
     TaskTemplateShortSchema,
 )
 from salt_box_core.tasks.services.tasks_templates import TaskTemplateService, get_task_template_service
+from saltbox_sdk.db.exceptions import ObjectNotFoundError
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.schemas_base import PaginatedResponse
 
 router = APIRouter(prefix='/tasks/template', tags=['Task Templates'])
 

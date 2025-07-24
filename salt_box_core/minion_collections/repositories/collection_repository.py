@@ -4,12 +4,12 @@ from fastapi import Depends
 from pydantic import BaseModel
 from pymongo.asynchronous.database import AsyncDatabase
 
-from salt_box_core.db.exceptions import ObjectNotFoundError
-from salt_box_core.db.mongo.config import get_mongo
-from salt_box_core.db.mongo.repository_base import ModelType
-from salt_box_core.db.mongo.repository_tree_base import BaseTreeMongoRepository, OnDelete
-from salt_box_core.db.mongo.schemas_base import PyObjectId
 from salt_box_core.minion_collections.schemas.collection_schemas import CollectionBaseTreeModel, CollectionModel
+from saltbox_sdk.db.exceptions import ObjectNotFoundError
+from saltbox_sdk.db.mongo.config import get_mongo
+from saltbox_sdk.db.mongo.repository_base import ModelType
+from saltbox_sdk.db.mongo.repository_tree_base import BaseTreeMongoRepository, OnDelete
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 
 
 class CollectionRepository(BaseTreeMongoRepository[CollectionModel]):

@@ -3,9 +3,9 @@ from typing import Annotated, ClassVar
 from fastapi import Depends
 from pymongo.asynchronous.database import AsyncDatabase
 
-from salt_box_core.db.mongo.config import get_mongo
-from salt_box_core.db.mongo.repository_base import BaseMongoRepository
 from salt_box_core.jobs.schemas.job_sc_schemas import JobSchemaModel
+from saltbox_sdk.db.mongo.config import get_mongo
+from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
 
 
 class JobSchemaRepository(BaseMongoRepository[JobSchemaModel]):

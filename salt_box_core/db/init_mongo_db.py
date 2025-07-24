@@ -1,13 +1,13 @@
 import pymongo
 
 from salt_box_core.config import logger
-from salt_box_core.db.mongo.config import get_mongo_db
 from salt_box_core.jobs.repositories.job_sc_repository import JobSchemaRepository
 from salt_box_core.masters.repositories.master_repository import MasterRepository
 from salt_box_core.minion_collections.repositories.collection_repository import CollectionRepository
 from salt_box_core.minion_collections.schemas.collection_schemas import CollectionCreateSchema
 from salt_box_core.settings.repository import SettingsSlsRepoRepository
 from salt_box_core.tasks.repositories.task_template_repository import TaskTemplateRepository
+from saltbox_sdk.db.mongo.config import get_mongo_db
 
 
 async def init_task_tpl() -> None:
