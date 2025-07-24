@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated, Any, Self, TypeVar
+from typing import Annotated, Any
 
 from pydantic import (
     BaseModel,
@@ -19,11 +19,8 @@ from saltbox_core.utilities.jid import JID, JidError
 from saltbox_core.utilities.salt import fill_salt_kwarg_from_arg
 from saltbox_sdk.db.schemas_base import SkipLimitParams
 
-T = TypeVar('T')
-JID_T = TypeVar('JID_T', str, int)
 
-
-def jidable(value: JID_T) -> JID_T:
+def jidable[JID_T: str | int](value: JID_T) -> JID_T:
     try:
         JID(value)
     except JidError as err:
@@ -63,7 +60,7 @@ class JobModel(BaseModel):
 
     @model_validator(mode='before')
     @classmethod
-    def _extract_kwargs(cls, data: T) -> T:
+    def _extract_kwargs[T](cls, data: T) -> T:
         # data may be an instantiated Job or potentially any object
         if not isinstance(data, dict):
             return data
@@ -109,7 +106,7 @@ class JobResult(BaseModel):
 
     @model_validator(mode='before')
     @classmethod
-    def _extract_kwargs(cls, data: T) -> T:
+    def _extract_kwargs[T](cls, data: T) -> T:
         # data may be an instantiated Job or potentially any object
         if not isinstance(data, dict):
             return data
@@ -132,7 +129,7 @@ class JobsListRequest(SkipLimitParams):
     desc: bool = True
 
     @model_validator(mode='after')
-    def dt_validate(self) -> Self:
+    def dt_validate(self) -> JobsListRequest:
         if self.start_datetime > self.end_datetime:
             msg = '`end_datetime` must be before `start_datetime`'
             raise ValueError(msg)
@@ -149,7 +146,7 @@ class JobsListCursorRequest(BaseModel):
     minion: str | None = None
 
     @model_validator(mode='after')
-    def dt_validate(self) -> Self:
+    def dt_validate(self) -> JobsListCursorRequest:
         if self.end_datetime and self.start_datetime > self.end_datetime:
             msg = '`end_datetime` must be before `start_datetime`'
             raise ValueError(msg)

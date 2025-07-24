@@ -1,13 +1,11 @@
 from datetime import datetime
-from typing import Any, Generic, TypeVar
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from saltbox_sdk.db.mongo.schemas_base import IDMixin, MongoQuery
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
-
-T = TypeVar('T')
 
 
 class GrainsSchema(BaseModel):
@@ -130,7 +128,7 @@ class GrainsShortSchema(BaseModel):
     mem_total: int | None = None
 
 
-class MinionEditableFieldsMixin(BaseModel, Generic[T]):
+class MinionEditableFieldsMixin[T](BaseModel):
     minion_id: str = Field(title='Minion ID')
     master: str = Field(title='Master')
     grains: T = Field(title='Grains')
