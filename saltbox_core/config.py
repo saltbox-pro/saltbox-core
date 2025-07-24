@@ -13,7 +13,7 @@ from saltbox_core.utilities.filesystem import remove_older_than
 APP_NAME = 'Salt.Box Core'
 APP_DESC = 'Salt.Box Core API'
 CACHE_LIFETIME = timedelta(days=1)
-ENV_FILE = Path(os.environ.get('SALTBOX_CORE_ENV_FILE', '.env'))
+ENV_FILE = Path(os.environ.get('SALTBOX_ENV_FILE', '.env'))
 
 # SLS repo Manifest file possible names
 MANIFEST_FILE_ALLOWED_NAMES = ('manifest.yaml', 'manifest.yml')
@@ -89,7 +89,7 @@ class Settings(BaseSettings):
     gpg_key_email: str = 'gpg@saltbox.pro'
     gpg_key_comment: str = 'This is a certificate for saltbox services'
 
-    model_config = SettingsConfigDict(env_file='.env')
+    model_config = SettingsConfigDict(env_file=ENV_FILE, extra='ignore')
 
     @computed_field  # type: ignore[prop-decorator]
     @cached_property
@@ -118,7 +118,7 @@ class Settings(BaseSettings):
         return self.taskiq_broker_url
 
 
-SETTINGS = Settings(_env_file=ENV_FILE)
+SETTINGS = Settings()
 
 _main_logger_name = __name__.split('.')[0]
 

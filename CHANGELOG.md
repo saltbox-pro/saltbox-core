@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `SALTBOX_CORE_ENV_FILE` environment variable support to override dotenv location.
+- `SALTBOX_ENV_FILE` environment variable support to override dotenv location.
 - Allow running jobs as tasks
 - Base support for tree structures
 - Add tree structure to collections
