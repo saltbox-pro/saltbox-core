@@ -2,7 +2,7 @@ from datetime import datetime
 
 import pytest
 
-from salt_box_core.utilities.jid import JID, JidError
+from saltbox_core.utilities.jid import JID, JidError
 
 TEST_JID = 20240726114145466988
 TEST_TIMESTAMP = 1721994105.466988

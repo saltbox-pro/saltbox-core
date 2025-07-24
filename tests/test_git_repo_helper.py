@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from salt_box_core.settings.schemas.sls_repos_schemas import validate_path_bounds
+from saltbox_core.settings.schemas.sls_repos_schemas import validate_path_bounds
 
 
 def test_path_bounds_validator() -> None:

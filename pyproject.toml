@@ -36,8 +36,8 @@ reload = [
 ]
 
 [project.scripts]
-saltbox-faststream-redis = "salt_box_core.event_bus.faststream_redis:main"
-saltbox-tasks-watcher = "salt_box_core.tasks.tasks_watcher:main"
+saltbox-faststream-redis = "saltbox_core.event_bus.faststream_redis:main"
+saltbox-tasks-watcher = "saltbox_core.tasks.tasks_watcher:main"
 
 # [metadata]
 # url = "https://gitlab.com/saltbox/saltbox-core"
@@ -49,16 +49,16 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 # Explicit package dir for flat-layout
-include = ["salt_box_core", "salt_box_core.*"]
+include = ["saltbox_core", "saltbox_core.*"]
 
 [tool.setuptools.dynamic]
 dependencies = { file = ["requirements.txt", "local_requirements.txt"] }
-version = { attr = "salt_box_core.__version__" }
+version = { attr = "saltbox_core.__version__" }
 
 [tool.ruff]
 target-version = "py311"
 line-length = 120
-src = ["salt_box_core", "tests"]
+src = ["saltbox_core", "tests"]
 extend-exclude = ["docs", "env", "__pycache__", "*.egg", "htmlcov"]
 respect-gitignore = true
 unsafe-fixes = false
@@ -131,7 +131,7 @@ convention = "google"
 
 [tool.ruff.lint.isort]
 known-first-party = [
-    "salt_box_core",
+    "saltbox_core",
     "saltbox_sdk",
     "saltbox_bridge_messages",
     "tests",
@@ -165,7 +165,7 @@ mypy_path = '../saltbox-bridge-messages/,../saltbox-sdk/'
 asyncio_default_fixture_loop_scope = "function"
 minversion = "8.0"
 addopts = [
-  "--cov=salt_box_core",
+  "--cov=saltbox_core",
   "--cov-report=term-missing",
   "--durations=5",
   # "--maxfail=1",
@@ -177,7 +177,7 @@ testpaths = ["tests"]
 [tool.coverage.run]
 # concurrency = ["gevent"]
 # branch = true
-source = ["salt_box_core"]
+source = ["saltbox_core"]
 omit = [
   "main.py",
   "config.py",

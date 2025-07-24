@@ -51,12 +51,12 @@ Build core image for branch:
 
 Ruff:
   extends: .lint-job
-  script: ruff check salt_box_core
+  script: ruff check saltbox_core
 
 
 Mypy:
   extends: .lint-job
-  script: mypy salt_box_core
+  script: mypy saltbox_core
 
 
 pytest:

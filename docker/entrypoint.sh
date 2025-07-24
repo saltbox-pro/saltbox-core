@@ -34,7 +34,7 @@ if [ "$DEV_MODE" = 1 ]; then
 fi
 
 cmd_uvicorn() {
-  cmd='/usr/bin/uvicorn salt_box_core.main:app'
+  cmd='/usr/bin/uvicorn saltbox_core.main:app'
   cmd="${cmd} --host=0.0.0.0 --port=8000"
   cmd="${cmd} --timeout-graceful-shutdown=${TIMEOUT_GRACEFUL_SHUTDOWN}"
   if [ "$DEV_MODE" = 1 ]; then
@@ -48,8 +48,8 @@ cmd_taskiq_worker() {
   # -r - autoreload for dev
   # -w - number of workers
   # --max-fails - max number of failed tasks before stopping the worker
-  cmd='/usr/bin/taskiq worker salt_box_core.tkq:broker'
-  cmd="${cmd} salt_box_core.jobs salt_box_core.settings -w 1 --max-fails 1"
+  cmd='/usr/bin/taskiq worker saltbox_core.tkq:broker'
+  cmd="${cmd} saltbox_core.jobs saltbox_core.settings -w 1 --max-fails 1"
   if [ "$DEV_MODE" = 1 ]; then
     cmd="$cmd --reload"
   fi
@@ -59,10 +59,10 @@ cmd_taskiq_sheduler() {
   # -fsd - autodiscover tasks in all modules
   # -fp - file pattern for autodiscover (default: **/tasks.py)
   # --skip-first-run - scheduler will wait until the start of the next minute and then start executing tasks
-  # cmd="taskiq scheduler -tp **/tasksq.py salt_box_core.tkq_sched:scheduler salt_box_core.async_tasks" # bad
-  # cmd="taskiq scheduler -tp **/tasksq.py salt_box_core.tkq_sched:scheduler salt_box_core.async_tasks.tasksq" # good
+  # cmd="taskiq scheduler -tp **/tasksq.py saltbox_core.tkq_sched:scheduler saltbox_core.async_tasks" # bad
+  # cmd="taskiq scheduler -tp **/tasksq.py saltbox_core.tkq_sched:scheduler saltbox_core.async_tasks.tasksq" # good
 
-  cmd="/usr/bin/taskiq scheduler salt_box_core.tkq_sched:scheduler salt_box_core.jobs.tasks"
+  cmd="/usr/bin/taskiq scheduler saltbox_core.tkq_sched:scheduler saltbox_core.jobs.tasks"
 }
 
 cmd_shell() {

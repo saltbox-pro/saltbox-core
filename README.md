@@ -57,6 +57,6 @@ sudo docker build --target=main --tag saltbox-core:dev .
 ```
 
 Additional settings need to be passed as environment variables to start. Check
-[`salt_box_core/config.py`](salt_box_core/config.py).
+[`saltbox_core/config.py`](saltbox_core/config.py).
 
 Use [Salt.Box Compose](https://gitlab.com/saltbox/saltbox-compose) repo to run the whole system.
