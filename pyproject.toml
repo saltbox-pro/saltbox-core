@@ -56,7 +56,7 @@ dependencies = { file = ["requirements.txt", "local_requirements.txt"] }
 version = { attr = "saltbox_core.__version__" }
 
 [tool.ruff]
-target-version = "py311"
+target-version = "py312"
 line-length = 120
 src = ["saltbox_core", "tests"]
 extend-exclude = ["docs", "env", "__pycache__", "*.egg", "htmlcov"]
