@@ -9,6 +9,7 @@ from faststream.broker.types import BrokerMiddleware
 from faststream.redis import RedisBroker
 from faststream.security import SASLPlaintext
 
+from saltbox_core.config import logger
 from saltbox_core.event_bus.masters_subscribers import router as masters_router
 from saltbox_core.event_bus.masters_subscribers import router_not_auth as masters_router_not_auth
 from saltbox_core.masters.repositories.master_repository import MasterRepository, get_master_repository
@@ -16,7 +17,7 @@ from saltbox_core.masters.services.master_service import MasterService, get_mast
 from saltbox_core.minion_collections.repositories.minion_repository import MinionRepository, get_minion_repository
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from saltbox_core.utilities.gpg import SaltBoxCrypt
-from saltbox_sdk.config import REDIS_SETTINGS, logger
+from saltbox_sdk.config.redis_config import REDIS_SETTINGS
 from saltbox_sdk.db.mongo.config import get_mongo_db
 
 

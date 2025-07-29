@@ -2,6 +2,7 @@ import asyncio
 
 from redis import asyncio as aioredis
 
+from saltbox_core.config import logger
 from saltbox_core.db.init_mongo_db import init_mongo_db
 from saltbox_core.jobs.repositories.job_repository import JobRepository
 from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository
@@ -19,7 +20,7 @@ from saltbox_core.tasks.schemas.task_schemas import TaskModel, TaskStatus
 from saltbox_core.tasks.services.tasks import TaskService
 from saltbox_core.tasks.services.tasks_lifespan import TaskLifespanService
 from saltbox_core.tasks.services.tasks_templates import TaskTemplateService
-from saltbox_sdk.config import REDIS_SETTINGS, logger
+from saltbox_sdk.config.redis_config import REDIS_SETTINGS
 from saltbox_sdk.db.mongo.config import get_mongo_db
 
 

@@ -1,5 +1,7 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from functools import partial
+from typing import Any
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.exception_handlers import http_exception_handler
@@ -25,10 +27,11 @@ from saltbox_core.tkq import broker
 from saltbox_core.utilities.gpg import SaltBoxCrypt
 from saltbox_core.utilities.httpx_client import get_httpx_async_client
 from saltbox_core.utilities.redis_cache import CustomRedisCache
-from saltbox_sdk.config import SETTINGS as SDKSETTINGS
+from saltbox_sdk.config.discovery_config import DISCOVERY_SETTINGS
 from saltbox_sdk.db.redis.config import POOL, get_redis_now
 from saltbox_sdk.discovery_client.client import DiscoveryClient
 from saltbox_sdk.discovery_client.schemas import HealthCheckResponse
+from saltbox_sdk.utilities.custom_openapi import custom_openapi, patch_swagger_config
 
 
 @asynccontextmanager
@@ -52,16 +55,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator:
     await POOL.aclose()  # type: ignore[attr-defined]
 
 
-app = FastAPI(
-    title=APP_NAME,
-    version=__version__,
-    description=APP_DESC,
-    lifespan=lifespan,
-    root_path=SETTINGS.base_url_root_path,
-    servers=[
-        {'url': SETTINGS.base_url_root_path},
-    ],
-)
+app_config: dict[str, Any] = {
+    'title': APP_NAME,
+    'lifespan': lifespan,
+    'version': __version__,
+    'description': APP_DESC,
+    'root_path': SETTINGS.base_url_root_path,
+}
+
+app_config = patch_swagger_config(app_config)
+
+app = FastAPI(**app_config)
 
 
 app.add_middleware(
@@ -85,7 +89,7 @@ async def health_check() -> HealthCheckResponse:
     """Health check endpoint"""
     return HealthCheckResponse(
         status='ok',
-        message=f'Instance of {SDKSETTINGS.service_name} is running',
+        message=f'Instance of {DISCOVERY_SETTINGS.service_name} is running',
     )
 
 
@@ -102,3 +106,6 @@ app.include_router(masters_router)
 app.include_router(system_router)
 app.include_router(pillars_router)
 app.include_router(router=settings_sls_router, prefix='/settings', tags=['Settings'])
+
+
+app.openapi = partial(custom_openapi, app, app_config, servers=[{'url': SETTINGS.base_url_root_path}])  # type: ignore[method-assign]
