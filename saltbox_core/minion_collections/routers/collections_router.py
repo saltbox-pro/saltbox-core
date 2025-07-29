@@ -20,6 +20,7 @@ from saltbox_sdk.db.exceptions import (
     ObjectUpdateError,
 )
 from saltbox_sdk.db.schemas_base import PaginatedResponse, SkipLimitParams
+from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig, OPAQueryFilterFormat
 
 router = APIRouter(prefix='/collections', tags=['Minion Collections'])
 
@@ -27,16 +28,15 @@ router = APIRouter(prefix='/collections', tags=['Minion Collections'])
 @router.get(
     '',
     operation_id='minion_collections_list',
-    openapi_extra={
-        'x-opa-policy': 'core.col',
-        'x-opa-partial': True,
-        # Result query will be 'data.core.col.allow == true'
-        'x-opa-query': 'allow == true',
-        # List of unknowns that will be used in the OPA query (without `data.` prefix)
-        'x-opa-unknowns': ['collections'],
-        'x-opa-query-filter-format': 'mongo',
-        'x-cache-ttl': 60,
-    },
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.col',
+        is_partial=True,
+        partial_query='allow == true',
+        unknowns=['collections'],
+        query_filter_format=OPAQueryFilterFormat.MONGO,
+        action='list',
+        cache_ttl=60,
+    ).model_dump(by_alias=True),  # need to use by_alias=True to match the OpenAPI schema format
 )
 async def collections_list(
     request: Request,
