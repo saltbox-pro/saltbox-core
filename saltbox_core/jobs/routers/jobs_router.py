@@ -59,14 +59,17 @@ async def jobs_list_cursor(
     if request.minion:
         matches.append(rf'"minions": \[*"{request.minion}"*\]')
 
-    return await job_service.get_list_cursored_by_dt(
-        start_datetime=request.start_datetime,
-        end_datetime=request.end_datetime,
-        cursor=request.cursor or 0,
-        count=request.count,
-        match='*' + '*'.join(matches) + '*',
-        projection_model=JobsListResponse,
-    )
+    try:
+        return await job_service.get_list_cursored_by_dt(
+            start_datetime=request.start_datetime,
+            end_datetime=request.end_datetime,
+            cursor=request.cursor or 0,
+            count=request.count,
+            match='*' + '*'.join(matches) + '*',
+            projection_model=JobsListResponse,
+        )
+    except ValueError as err:
+        raise http_errors.BadRequest(str(err)) from err
 
 
 @router.get('', operation_id='jobs_list')
