@@ -55,8 +55,6 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
 
     async def export_to_csv(self, query: dict[str, Any], skip: int = 0, limit: int = 0) -> str:
         data = await self.get_list(query, skip=skip, limit=limit)
-        if not data:
-            return ''
 
         Path('./reports').mkdir(parents=True, exist_ok=True)
         current_datetime = datetime.now(UTC).strftime('%Y%m%d_%H%M%S')

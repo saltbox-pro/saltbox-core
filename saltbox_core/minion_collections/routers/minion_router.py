@@ -69,7 +69,7 @@ async def minions_export(
 
         file_path = await minion_service.export_to_csv(query=query, skip=body.skip, limit=body.limit)
         if not file_path:
-            raise HTTPException(status_code=404, detail='No data found')
+            raise ObjectNotFoundError(detail='Error on creating CSV file')
         headers = {'Content-Disposition': f'attachment; filename={file_path.split("/")[-1]}'}
         return FileResponse(
             file_path,
