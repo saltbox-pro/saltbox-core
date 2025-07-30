@@ -28,9 +28,9 @@ from saltbox_core.masters.services.master_service import MasterService, get_mast
 from saltbox_core.utilities.context import replace_raised
 from saltbox_core.utilities.jid import JID, JidError
 from saltbox_sdk.db.exceptions import ObjectNotFoundError
-from saltbox_sdk.db.redis.config import RedisDependency
 from saltbox_sdk.db.redis.repository_sortedset_base import ProjectionModel
 from saltbox_sdk.db.schemas_base import CursoredResponse, PaginatedResponse
+from saltbox_sdk.fastapi_utils.dependencies import RedisDependency
 from saltbox_sdk.serivces.redis_sortedset_base_service import RedisSortedsetBaseService
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())

@@ -26,7 +26,7 @@ from saltbox_core.tasks.services.tasks_templates import TaskTemplateService, get
 from saltbox_core.utilities.exceptions import ObjectDoesNotExistError, ServiceError
 from saltbox_sdk.db.exceptions import ObjectNotFoundError
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
-from saltbox_sdk.db.redis.config import RedisDependency
+from saltbox_sdk.fastapi_utils.dependencies import RedisDependency
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 from saltbox_sdk.utilities.helpers import utc_now
 

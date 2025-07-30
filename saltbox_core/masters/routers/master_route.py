@@ -10,7 +10,7 @@ from saltbox_core.masters.services.master_service import MasterService, get_mast
 from saltbox_sdk.db.exceptions import ObjectNotFoundError
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse
-from saltbox_sdk.http_errors import NotFound
+from saltbox_sdk.fastapi_utils.http_errors import NotFound
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 

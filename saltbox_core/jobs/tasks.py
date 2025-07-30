@@ -11,7 +11,7 @@ from saltbox_core.jobs.schemas.job_sc_schemas import JobSchemaCreateSchema, JobS
 from saltbox_core.tkq import broker
 from saltbox_core.utilities.git_repo_helper import GitRepoService, parse_schemas, repository_lock
 from saltbox_sdk.db.exceptions import ObjectNotFoundError
-from saltbox_sdk.db.redis.config import get_redis_dep
+from saltbox_sdk.fastapi_utils.dependencies import get_redis_dep
 
 
 async def sync_schemas(

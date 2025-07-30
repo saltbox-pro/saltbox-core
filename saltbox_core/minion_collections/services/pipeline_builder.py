@@ -4,7 +4,7 @@ from typing import Any, Union, get_args, get_origin
 
 from saltbox_core.config import logger
 from saltbox_core.minion_collections.schemas.minion_schemas import GrainsSchema, MinionModel
-from saltbox_sdk.http_errors import BadRequest
+from saltbox_sdk.fastapi_utils.http_errors import BadRequest
 
 LIST_HANDLER_FIELDS = [
     'grains.fqdns',

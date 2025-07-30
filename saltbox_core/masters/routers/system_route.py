@@ -22,8 +22,8 @@ from saltbox_core.masters.schemas.system_schemas import (
 )
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_sdk.db.exceptions import ObjectNotFoundError
-from saltbox_sdk.db.redis.config import RedisDependency
-from saltbox_sdk.http_errors import BadRequest, NotFound
+from saltbox_sdk.fastapi_utils.dependencies import RedisDependency
+from saltbox_sdk.fastapi_utils.http_errors import BadRequest, NotFound
 
 BURST_JOBS_TEST_REPORT_HASH_NAME = 'burst_jobs_test'
 

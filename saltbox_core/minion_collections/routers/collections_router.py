@@ -28,6 +28,10 @@ router = APIRouter(prefix='/collections', tags=['Minion Collections'])
 @router.get(
     '',
     operation_id='minion_collections_list',
+    # openapi_extra={
+    #     'x-action': 'list',
+    #     'x-cache-ttl': 60,
+    # },
     openapi_extra=GatewayEndpointConfig(
         policy='core.col',
         is_partial=True,

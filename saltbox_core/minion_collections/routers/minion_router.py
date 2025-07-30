@@ -16,10 +16,10 @@ from saltbox_core.minion_collections.schemas.minion_schemas import (
 )
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
-from saltbox_sdk import http_errors
 from saltbox_sdk.db.exceptions import ObjectNotFoundError
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse
+from saltbox_sdk.fastapi_utils import http_errors
 
 router = APIRouter(prefix='/minions', tags=['Minions'])
 

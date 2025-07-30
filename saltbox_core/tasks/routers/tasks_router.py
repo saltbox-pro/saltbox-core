@@ -1,7 +1,8 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 
+from saltbox_core.config import logger
 from saltbox_core.jobs.exceptions import JobDoesNotExistsException
 from saltbox_core.jobs.schemas.job_schemas import JobModel, JobResult
 from saltbox_core.jobs.services.job_services import JobServiceDependency
@@ -18,12 +19,10 @@ from saltbox_core.tasks.services.tasks import TaskService, get_task_service
 from saltbox_core.tasks.services.tasks_lifespan import TaskLifespanService, get_task_lifespan_service
 from saltbox_core.utilities.exceptions import ServiceError
 from saltbox_core.utilities.jid import JID
-from saltbox_core.utilities.websocket import PubSubAuthenticatedWebSocket
-from saltbox_sdk import http_errors
 from saltbox_sdk.db.exceptions import ObjectNotFoundError
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
-from saltbox_sdk.db.redis.config import RedisDependency
-from saltbox_sdk.db.schemas_base import PaginatedResponse
+from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
+from saltbox_sdk.fastapi_utils.dependencies import get_current_user
 
 router = APIRouter(
     prefix='/tasks',
@@ -58,13 +57,16 @@ async def tasks_list(
 @router.post('', operation_id='task_create')
 async def task_create(
     item: TaskCreateRequestSchema,
+    user: Annotated[UserShort, Depends(get_current_user)],
     task_service: Annotated[TaskService, Depends(get_task_service)],
 ) -> TaskModel:
     # TODO (i.moshkov): remove this
     if item.query == {'$and': [{'$expr': True}]}:
         item.query = {}
 
-    create_data = TaskCreateInputSchema(**item.model_dump(by_alias=True))
+    logger.debug(f'User {user}')
+
+    create_data = TaskCreateInputSchema(**{'user': user.model_dump(), **item.model_dump(by_alias=True)})
 
     try:
         task: TaskModel = await task_service.create(data=create_data)
@@ -195,38 +197,38 @@ async def restart_failed_on_minion(
     return task
 
 
-@ws_router.websocket('')
-async def tasks_websocket(websocket: WebSocket, rdb: RedisDependency) -> None:
-    secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
-    await secure_websocket.handle_pubsub(
-        {
-            'task:*:create': TaskModel,
-            'task:*:update': TaskModel,
-        }
-    )
+# @ws_router.websocket('')
+# async def tasks_websocket(websocket: WebSocket, rdb: RedisDependency) -> None:
+#     secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
+#     await secure_websocket.handle_pubsub(
+#         {
+#             'task:*:create': TaskModel,
+#             'task:*:update': TaskModel,
+#         }
+#     )
 
 
-@ws_router.websocket('/{tid}')
-async def task_websocket(
-    tid: PyObjectId,
-    websocket: WebSocket,
-    rdb: RedisDependency,
-    task_service: Annotated[TaskService, Depends(get_task_service)],
-) -> None:
-    task: TaskModel = await task_service.get(query=tid)
+# @ws_router.websocket('/{tid}')
+# async def task_websocket(
+#     tid: PyObjectId,
+#     websocket: WebSocket,
+#     rdb: RedisDependency,
+#     task_service: Annotated[TaskService, Depends(get_task_service)],
+# ) -> None:
+#     task: TaskModel = await task_service.get(query=tid)
 
-    if not task:
-        msg = f'Task not found by ID={tid}'
-        raise http_errors.WebSocketPolicyViolation(msg)
+#     if not task:
+#         msg = f'Task not found by ID={tid}'
+#         raise http_errors.WebSocketPolicyViolation(msg)
 
-    def job_new_handler(data: dict) -> str:
-        return JobModel(**{'status': JobModel.JobStatus.started, **data}).model_dump_json(by_alias=True)
+#     def job_new_handler(data: dict) -> str:
+#         return JobModel(**{'status': JobModel.JobStatus.started, **data}).model_dump_json(by_alias=True)
 
-    secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
-    await secure_websocket.handle_pubsub(
-        {
-            f'task:{tid}:job:*:return': JobResult,
-            f'task:{tid}:job:*:new': job_new_handler,
-            f'task:{tid}:update': TaskModel,
-        }
-    )
+#     secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
+#     await secure_websocket.handle_pubsub(
+#         {
+#             f'task:{tid}:job:*:return': JobResult,
+#             f'task:{tid}:job:*:new': job_new_handler,
+#             f'task:{tid}:update': TaskModel,
+#         }
+#     )

@@ -11,7 +11,6 @@ from saltbox_core import __version__
 from saltbox_core.config import APP_DESC, APP_NAME, SETTINGS, logger
 from saltbox_core.db.init_mongo_db import init_mongo_db
 from saltbox_core.errors import CoreError
-from saltbox_core.exception_handlers import custom_http_handler
 from saltbox_core.jobs.routers.job_sc_router import router as job_schemas_router
 from saltbox_core.jobs.routers.jobs_router import router as jobs_router
 from saltbox_core.jobs.routers.jobs_router import ws_router as jobs_ws_router
@@ -33,7 +32,8 @@ from saltbox_sdk.config.discovery_config import DISCOVERY_SETTINGS
 from saltbox_sdk.db.redis.config import POOL, get_redis_now
 from saltbox_sdk.discovery_client.client import DiscoveryClient
 from saltbox_sdk.discovery_client.schemas import HealthCheckResponse
-from saltbox_sdk.utilities.custom_openapi import custom_openapi, patch_swagger_config
+from saltbox_sdk.fastapi_utils.custom_openapi import custom_openapi, patch_swagger_config
+from saltbox_sdk.fastapi_utils.exception_handlers import custom_http_handler
 
 
 @asynccontextmanager

@@ -23,7 +23,7 @@ from saltbox_core.utilities.git_repo_helper import (
     repository_lock,
 )
 from saltbox_sdk.db.exceptions import ObjectNotFoundError
-from saltbox_sdk.db.redis.config import get_redis_dep
+from saltbox_sdk.fastapi_utils.dependencies import get_redis_dep
 
 SETTINGS = Settings()
 SYNC_SERVE_DIR_LOCK_EXPIRATION_SEC = 300

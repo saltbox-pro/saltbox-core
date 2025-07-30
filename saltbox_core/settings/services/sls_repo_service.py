@@ -20,8 +20,8 @@ from saltbox_core.settings.schemas.sls_repos_schemas import (
 from saltbox_core.settings.tasks import sync_sls_repo_task, sync_sls_repos_to_serve_dir
 from saltbox_core.tasks.services.tasks_templates import TaskTemplateService
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
-from saltbox_sdk.db.redis.config import get_redis_dep
 from saltbox_sdk.db.schemas_base import PaginatedResponse
+from saltbox_sdk.fastapi_utils.dependencies import get_redis_dep
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 
 ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)

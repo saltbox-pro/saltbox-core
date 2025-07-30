@@ -2,7 +2,7 @@ import logging.config
 from typing import Annotated
 
 import pydantic
-from fastapi import APIRouter, Query, WebSocket
+from fastapi import APIRouter, Query
 from pydantic import Field, ValidationError
 
 from saltbox_bridge_messages import BridgeNewJobResponse, CoreNewJobRequest
@@ -20,7 +20,6 @@ from saltbox_core.jobs.schemas.job_schemas import (
     IntJid,
     JobCreateSchema,
     JobModel,
-    JobResult,
     JobsListCursorRequest,
     JobsListRequest,
     JobsListResponse,
@@ -28,10 +27,8 @@ from saltbox_core.jobs.schemas.job_schemas import (
 )
 from saltbox_core.jobs.services.job_services import JobServiceDependency
 from saltbox_core.utilities.jid import JID
-from saltbox_core.utilities.websocket import PubSubAuthenticatedWebSocket
-from saltbox_sdk import http_errors
-from saltbox_sdk.db.redis.config import RedisDependency
 from saltbox_sdk.db.schemas_base import CursoredResponse, PaginatedResponse
+from saltbox_sdk.fastapi_utils import http_errors
 
 logging.config.dictConfig(LOG_CONFIG.model_dump())
 
@@ -188,29 +185,29 @@ async def job_returns_list(
     return GetJobReturnResponse(cursor=next_cursor, result=job_returns, length=len(job_returns))
 
 
-@ws_router.websocket('')
-async def jobs_rets_websocket(websocket: WebSocket, rdb: RedisDependency) -> None:
-    def job_new_handler(data: dict) -> str:
-        return JobModel(**{'status': JobModel.JobStatus.started, **data}).model_dump_json(by_alias=True)
+# @ws_router.websocket('')
+# async def jobs_rets_websocket(websocket: WebSocket, rdb: RedisDependency) -> None:
+#     def job_new_handler(data: dict) -> str:
+#         return JobModel(**{'status': JobModel.JobStatus.started, **data}).model_dump_json(by_alias=True)
 
-    secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
-    await secure_websocket.handle_pubsub({'job:*:new': job_new_handler})
+#     secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
+#     await secure_websocket.handle_pubsub({'job:*:new': job_new_handler})
 
 
-@ws_router.websocket('/{jid}/return')
-async def jobs_endpoint_websocket(
-    jid: IntJid,
-    job_service: JobServiceDependency,
-    websocket: WebSocket,
-    rdb: RedisDependency,
-) -> None:
-    _jid = JID(jid)
+# @ws_router.websocket('/{jid}/return')
+# async def jobs_endpoint_websocket(
+#     jid: IntJid,
+#     job_service: JobServiceDependency,
+#     websocket: WebSocket,
+#     rdb: RedisDependency,
+# ) -> None:
+#     _jid = JID(jid)
 
-    try:
-        await job_service.get_job(_jid)
-    except JobDoesNotExistsException as e:
-        msg = f'Job not found by JID={jid}'
-        raise http_errors.WebSocketPolicyViolation(msg) from e
+#     try:
+#         await job_service.get_job(_jid)
+#     except JobDoesNotExistsException as e:
+#         msg = f'Job not found by JID={jid}'
+#         raise http_errors.WebSocketPolicyViolation(msg) from e
 
-    secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
-    await secure_websocket.handle_pubsub({f'job:{jid}:return': JobResult})
+#     secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
+#     await secure_websocket.handle_pubsub({f'job:{jid}:return': JobResult})

@@ -33,7 +33,7 @@ from saltbox_core.utilities.mongo_query_to_salt_tgt_converter import MongoQueryT
 from saltbox_sdk.db.exceptions import MultipleObjectsFoundError, ObjectNotFoundError
 from saltbox_sdk.db.mongo.config import get_mongo_db
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
-from saltbox_sdk.db.redis.config import RedisDependency
+from saltbox_sdk.fastapi_utils.dependencies import RedisDependency
 from saltbox_sdk.utilities.helpers import utc_now
 
 
