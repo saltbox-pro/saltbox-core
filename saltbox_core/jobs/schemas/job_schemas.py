@@ -10,6 +10,7 @@ from pydantic import (
     Field,
     PastDatetime,
     computed_field,
+    field_validator,
     model_validator,
 )
 from pydantic.functional_validators import AfterValidator
@@ -123,13 +124,20 @@ class PubData(BaseModel):
     minions: list[str] = Field(min_length=1)
 
 
-class JobsListRequest(SkipLimitParams):
+class StartEndDatetimeMixin(BaseModel):
     start_datetime: Annotated[datetime, PastDatetime]
     end_datetime: datetime
-    desc: bool = True
+
+    @field_validator('start_datetime', 'end_datetime', mode='before')
+    @classmethod
+    def forbid_year_only(cls, v: Any) -> datetime:
+        if isinstance(v, str) and v.isdigit():
+            msg = '`start_datetime` and `end_datetime` must be in full datetime format (YYYY-MM-DD)'
+            raise ValueError(msg)
+        return datetime.fromisoformat(v) if isinstance(v, str) else v
 
     @model_validator(mode='after')
-    def dt_validate(self) -> JobsListRequest:
+    def dt_validate(self) -> StartEndDatetimeMixin:
         if self.start_datetime > self.end_datetime:
             msg = '`end_datetime` must be before `start_datetime`'
             raise ValueError(msg)
@@ -137,21 +145,15 @@ class JobsListRequest(SkipLimitParams):
         return self
 
 
-class JobsListCursorRequest(BaseModel):
-    start_datetime: Annotated[datetime, PastDatetime]
-    end_datetime: datetime
+class JobsListRequest(SkipLimitParams, StartEndDatetimeMixin):
+    desc: bool = True
+
+
+class JobsListCursorRequest(StartEndDatetimeMixin):
     cursor: int | None = Field(default=None, ge=0)
     count: int = Field(gt=0, lt=1000, default=100)
     fun: str | None = None
     minion: str | None = None
-
-    @model_validator(mode='after')
-    def dt_validate(self) -> JobsListCursorRequest:
-        if self.end_datetime and self.start_datetime > self.end_datetime:
-            msg = '`end_datetime` must be before `start_datetime`'
-            raise ValueError(msg)
-
-        return self
 
 
 class JobsListResponse(BaseModel):
