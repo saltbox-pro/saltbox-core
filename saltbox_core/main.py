@@ -10,6 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from saltbox_core import __version__
 from saltbox_core.config import APP_DESC, APP_NAME, SETTINGS, logger
 from saltbox_core.db.init_mongo_db import init_mongo_db
+from saltbox_core.errors import CoreError
+from saltbox_core.exception_handlers import custom_http_handler
 from saltbox_core.jobs.routers.job_sc_router import router as job_schemas_router
 from saltbox_core.jobs.routers.jobs_router import router as jobs_router
 from saltbox_core.jobs.routers.jobs_router import ws_router as jobs_ws_router
@@ -75,6 +77,8 @@ app.add_middleware(
     allow_methods=['*'],
     allow_headers=['*'],
 )
+
+app.add_exception_handler(CoreError, custom_http_handler)
 
 
 @app.exception_handler(HTTPException)

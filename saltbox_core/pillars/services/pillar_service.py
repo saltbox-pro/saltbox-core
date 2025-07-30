@@ -5,6 +5,7 @@ from typing import Annotated, BinaryIO
 from fastapi import Depends
 from redis.asyncio import Redis
 
+from saltbox_core.errors import CoreError
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from saltbox_core.pillars.schemas.pillar_schemas import (
@@ -21,6 +22,25 @@ from saltbox_sdk.db.redis.config import get_redis
 
 PILLAR_BY_MASTER_HASH_NAME = 'pillar:{master_id}'
 PILLAR_BY_MASTER_AND_MINION_HASH_NAME = 'pillar:{master_id}:{minion_id}'
+
+
+class PillarServiceError(CoreError):
+    """Base exception for PillarService."""
+
+    detail: str = 'An error occurred in the PillarService'
+    status_code: int = 500
+
+
+class PillarServiceParseCsvError(PillarServiceError):
+    """Custom exception for errors during CSV parsing in PillarService."""
+
+    detail: str = 'An error occurred while parsing the CSV file'
+    status_code: int = 400
+
+    def __init__(self, message: str):
+        if message:
+            self.detail = message
+        super().__init__(self.detail)
 
 
 class PillarService:
@@ -216,7 +236,10 @@ class PillarService:
         result: list[PillarCSVParseResult] = []
 
         for row in csv_reader:
-            minion_id = row['minion_id']
+            minion_id = row.get('minion_id', None)
+            if not minion_id:
+                msg = 'CSV file must contain "minion_id" column'
+                raise PillarServiceParseCsvError(msg)
 
             for pillar_name, pillar_value in row.items():
                 if pillar_name == 'minion_id':
