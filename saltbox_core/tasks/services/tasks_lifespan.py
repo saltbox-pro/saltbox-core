@@ -7,7 +7,6 @@ from saltbox_core.config import logger
 from saltbox_core.jobs.exceptions import JobCreateException, JobDoesNotExistsException
 from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
-from saltbox_core.minion_collections.schemas.minion_schemas import MinionModel
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from saltbox_core.tasks.exceptions import TaskServiceException
