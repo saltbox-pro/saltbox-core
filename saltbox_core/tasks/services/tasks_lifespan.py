@@ -222,8 +222,8 @@ class TaskLifespanService:
     async def __fill_minions_by_targeting(self) -> None:
         task = await self.get_task()
         targeting_query = await self.__get__targeting_query()
-        not_compound_compatible_query: bool = self.__check_compound_compatible_query(targeting_query)
-        minions: list[MinionModel] = await self.minion_service.get_list(query=targeting_query, limit=0, skip=0)
+        not_compound_compatible_query = self.__check_compound_compatible_query(targeting_query)
+        minions = await self.minion_service.get_list(query=targeting_query, limit=0, skip=0)
         minions_by_master: dict[str, list[str]] = {}
 
         for minion in minions:
