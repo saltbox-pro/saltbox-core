@@ -3,8 +3,8 @@ from types import UnionType
 from typing import Any, Union, get_args, get_origin
 
 from saltbox_core.config import logger
+from saltbox_core.minion_collections.exceptions import UnsupportedFieldTypeException
 from saltbox_core.minion_collections.schemas.minion_schemas import GrainsSchema, MinionModel
-from saltbox_sdk.exceptions import BadRequestException
 
 LIST_HANDLER_FIELDS = [
     'grains.fqdns',
@@ -164,7 +164,8 @@ class MongoPipelineBuilder:
             logger.debug('Apply str handler')
             self._str_int_handler()
             return
-        raise BadRequestException(detail=f'Unsupported field: {self.field_name}') from None
+        msg = f'Unsupported field: {self.field_name}'
+        raise UnsupportedFieldTypeException(msg)
 
     def build(self) -> list:
         self._build_pipeline()

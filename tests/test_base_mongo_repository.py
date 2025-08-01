@@ -6,7 +6,6 @@ from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.exceptions import (
     MultipleObjectsFoundException,
     ObjectNotFoundException,
-    ObjectUpdateException,
 )
 from tests.fixtures.mongo_repository_fixtures import (
     CreateUpdateModel,
@@ -220,7 +219,7 @@ async def test_update_not_found(mocked_db):
     repo = SampleRepository(mocked_db)
 
     # Try to update a non-existent object
-    with pytest.raises(ObjectUpdateException):
+    with pytest.raises(ObjectNotFoundException):
         await repo.update(
             PyObjectId('000000000000000000000000'), {'name': "Won't Update", 'description': "Object doesn't exist"}
         )

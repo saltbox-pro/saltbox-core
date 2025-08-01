@@ -4,7 +4,7 @@ from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from saltbox_core.minion_collections.schemas.minion_schemas import GrainsSchema, MinionModel
-from saltbox_sdk.db.mongo.schemas_base import MongoQuery
+from saltbox_sdk.db.mongo.schemas_base import PipelineMongoQuery
 
 
 class MinionFilterValuesBody(BaseModel):
@@ -12,7 +12,7 @@ class MinionFilterValuesBody(BaseModel):
         description='Collection slug',
         default='root',
     )
-    query: MongoQuery = Field(
+    query: PipelineMongoQuery = Field(
         default_factory=dict,
         title='MongoDB Query',
         description='A valid MongoDB query dictionary',
@@ -27,8 +27,8 @@ class MinionFilterValuesBody(BaseModel):
         examples=['grains.os', 'grains.cpu_model', 'grains.mem_total'],
         json_schema_extra={'example': 'grains.os'},
     )
-    skip: int = 0
-    limit: int | None = 100
+    skip: int = Field(strict=True, default=0, ge=0, le=1000)
+    limit: int | None = Field(strict=True, default=None, ge=0, le=1000)
 
     model_config: ClassVar[ConfigDict] = {'extra': 'forbid'}
 

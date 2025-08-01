@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Depends, HTTPException, Response, status
 from fastapi.responses import FileResponse
 
-from saltbox_bridge_messages import BridgeGatherMinionsResponse, CoreGatherMinionsRequest, MasterStatus
+from saltbox_bridge_messages import BridgeGatherMinionsResponse, CoreGatherMinionsRequest, MasterStatus, SaltTgtType
 from saltbox_core.config import logger
 from saltbox_core.event_bus.masters_bus import send_message_and_wait_response_to_master
 from saltbox_core.masters.schemas.master_schemas import MasterModel
@@ -69,7 +69,7 @@ async def minions_export(
 @router.get('/gather')
 async def gather_minions(
     tgt: str,
-    tgt_type: str,
+    tgt_type: SaltTgtType,
     master: str,
     master_service: Annotated[MasterService, Depends(get_master_service)],
 ) -> BridgeGatherMinionsResponse:
