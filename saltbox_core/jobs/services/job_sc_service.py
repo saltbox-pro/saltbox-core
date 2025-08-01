@@ -6,6 +6,7 @@ from typing import Annotated
 from fastapi import Depends
 
 from saltbox_core.config import SETTINGS, logger
+from saltbox_core.jobs.exceptions import JobException
 from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository, get_job_schema_repository
 from saltbox_core.jobs.schemas.job_sc_schemas import (
     JobSchemaCreateSchema,
@@ -14,7 +15,7 @@ from saltbox_core.jobs.schemas.job_sc_schemas import (
 )
 from saltbox_core.jobs.tasks import job_schemas_sync_task
 from saltbox_core.utilities.json_schema import Draft4ValidatorWithDefaults
-from saltbox_sdk.db.exceptions import ObjectNotFoundError
+from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 
 
@@ -27,7 +28,7 @@ class JobSchemaService(
     async def get_validated_data(self, name: str, data: dict) -> dict:
         try:
             json_schema = await self.get_by_name(name)
-        except ObjectNotFoundError:
+        except ObjectNotFoundException:
             json_schema = await self.get_by_name('default')
 
         Draft4ValidatorWithDefaults(json_schema.json_schema).validate(data)
@@ -42,8 +43,7 @@ class JobSchemaService(
                 await asyncio.to_thread(shutil.rmtree, path)
         except Exception as e:
             msg = f'{e!s}'
-            logger.error(msg)
-            raise
+            raise JobException(msg) from None
 
     async def sync(self) -> str:
         logger.debug('Start task: %s', SETTINGS.salt_func_repo_url)

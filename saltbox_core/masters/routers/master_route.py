@@ -1,21 +1,12 @@
-import logging.config
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 
-from saltbox_core.config import LOG_CONFIG
 from saltbox_core.event_bus.masters_bus import notify_master_on_repos_update
 from saltbox_core.masters.schemas.master_schemas import MasterModel, MasterQueryParams, MasterViewSchema
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
-from saltbox_sdk.db.exceptions import ObjectNotFoundError
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse
-from saltbox_sdk.fastapi_utils.http_errors import NotFound
-
-logging.config.dictConfig(LOG_CONFIG.model_dump())
-
-logger = logging.getLogger(__name__)
-
 
 router = APIRouter(
     prefix='/masters',
@@ -46,10 +37,7 @@ async def master_get(
     master_id: str,
     master_service: Annotated[MasterService, Depends(get_master_service)],
 ) -> MasterViewSchema:
-    try:
-        master: MasterModel = await master_service.get_by_master_id(master_id)
-    except ObjectNotFoundError as e:
-        raise NotFound(detail='Master not found') from e
+    master: MasterModel = await master_service.get_by_master_id(master_id)
     return MasterViewSchema.model_validate({'_id': master.id, **master.model_dump(by_alias=True)})
 
 
@@ -58,11 +46,7 @@ async def master_accept(
     mid: PyObjectId,
     master_service: Annotated[MasterService, Depends(get_master_service)],
 ) -> MasterViewSchema:
-    try:
-        master: MasterModel = await master_service.accept(mid)
-
-    except ObjectNotFoundError as err:
-        raise NotFound(detail='Master not found') from err
+    master: MasterModel = await master_service.accept(mid)
 
     await notify_master_on_repos_update(master)
     return MasterViewSchema.model_validate({'_id': master.id, **master.model_dump(by_alias=True)})
@@ -73,9 +57,5 @@ async def master_reject(
     mid: PyObjectId,
     master_service: Annotated[MasterService, Depends(get_master_service)],
 ) -> MasterViewSchema:
-    try:
-        master: MasterModel = await master_service.reject(mid)
-    except ObjectNotFoundError as e:
-        raise NotFound(detail='Master not found') from e
-
+    master: MasterModel = await master_service.reject(mid)
     return MasterViewSchema.model_validate({'_id': master.id, **master.model_dump(by_alias=True)})

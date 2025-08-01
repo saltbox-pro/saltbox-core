@@ -3,14 +3,12 @@ from contextlib import asynccontextmanager
 from functools import partial
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Request, Response
-from fastapi.exception_handlers import http_exception_handler
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from saltbox_core import __version__
-from saltbox_core.config import APP_DESC, APP_NAME, SETTINGS, logger
+from saltbox_core.config import APP_DESC, APP_NAME, SETTINGS
 from saltbox_core.db.init_mongo_db import init_mongo_db
-from saltbox_core.errors import CoreError
 from saltbox_core.jobs.routers.job_sc_router import router as job_schemas_router
 from saltbox_core.jobs.routers.jobs_router import router as jobs_router
 from saltbox_core.jobs.routers.jobs_router import ws_router as jobs_ws_router
@@ -32,6 +30,7 @@ from saltbox_sdk.config.discovery_config import DISCOVERY_SETTINGS
 from saltbox_sdk.db.redis.config import POOL, get_redis_now
 from saltbox_sdk.discovery_client.client import DiscoveryClient
 from saltbox_sdk.discovery_client.schemas import HealthCheckResponse
+from saltbox_sdk.exceptions import SaltBoxBaseException
 from saltbox_sdk.fastapi_utils.custom_openapi import custom_openapi, patch_swagger_config
 from saltbox_sdk.fastapi_utils.exception_handlers import custom_http_handler
 
@@ -78,14 +77,7 @@ app.add_middleware(
     allow_headers=['*'],
 )
 
-app.add_exception_handler(CoreError, custom_http_handler)
-
-
-@app.exception_handler(HTTPException)
-async def logged_http_exception_handler(request: Request, exc: HTTPException) -> Response:
-    """Custom exception handler for HTTP exceptions with logging"""
-    logger.exception('HTTP Exception: %s: %s', request.url.path, exc, exc_info=True)
-    return await http_exception_handler(request, exc)
+app.add_exception_handler(SaltBoxBaseException, custom_http_handler)
 
 
 @app.get('/discovery/health')

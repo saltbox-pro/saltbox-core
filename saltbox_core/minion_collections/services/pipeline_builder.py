@@ -4,7 +4,7 @@ from typing import Any, Union, get_args, get_origin
 
 from saltbox_core.config import logger
 from saltbox_core.minion_collections.schemas.minion_schemas import GrainsSchema, MinionModel
-from saltbox_sdk.fastapi_utils.http_errors import BadRequest
+from saltbox_sdk.exceptions import BadRequestException
 
 LIST_HANDLER_FIELDS = [
     'grains.fqdns',
@@ -164,7 +164,7 @@ class MongoPipelineBuilder:
             logger.debug('Apply str handler')
             self._str_int_handler()
             return
-        raise BadRequest(detail=f'Unsupported field: {self.field_name}') from None
+        raise BadRequestException(detail=f'Unsupported field: {self.field_name}') from None
 
     def build(self) -> list:
         self._build_pipeline()

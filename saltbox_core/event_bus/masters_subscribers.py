@@ -24,7 +24,7 @@ from saltbox_core.minion_collections.schemas.minion_schemas import (
 )
 from saltbox_core.minion_collections.services.minion_service import MinionService
 from saltbox_core.utilities.gpg import SaltBoxCrypt
-from saltbox_sdk.db.exceptions import ObjectNotFoundError
+from saltbox_sdk.exceptions import ObjectNotFoundException
 
 router_not_auth = RedisRouter(prefix='master_', middlewares=[])
 router = RedisRouter(prefix='master_', middlewares=[MastersAuthMiddleware])
@@ -38,7 +38,7 @@ async def auth(
 ) -> CoreAuthResponse:
     try:
         master: MasterModel = await master_service.get_by_master_id(message.master)
-    except ObjectNotFoundError:
+    except ObjectNotFoundException:
         create = MasterCreateSchema(
             master_id=message.master,
             title=message.master,
@@ -86,7 +86,7 @@ async def grains_handler(
             minion: MinionModel = await minion_service.get_by_master_and_id(master=message.master, minion_id=minion_id)
             minion.grains = GrainsSchema(**grains)
             await minion_service.update(minion.id, MinionUpdateSchema(**minion.model_dump()))
-        except ObjectNotFoundError:
+        except ObjectNotFoundException:
             minion_obj = {
                 'minion_id': minion_id,
                 'master': message.master,
@@ -107,7 +107,7 @@ async def presence_handler(
             minion: MinionModel = await minion_service.get_by_master_and_id(master=message.master, minion_id=minion_id)
             minion.last_activity = last_activity_dt
             await minion_service.update(minion.id, MinionUpdateSchema(**minion.model_dump()))
-        except ObjectNotFoundError:
+        except ObjectNotFoundException:
             logger.info('Minion "%s" from presence not found in DB', minion_id)
 
 

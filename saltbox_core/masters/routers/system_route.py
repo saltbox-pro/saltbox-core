@@ -1,10 +1,8 @@
-import logging.config
 from datetime import timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import PlainTextResponse
-from pydantic import ValidationError
 
 from saltbox_bridge_messages import (
     BridgeTestBurstResponse,
@@ -12,24 +10,20 @@ from saltbox_bridge_messages import (
     CoreTestBurstJobsRequest,
     CoreTestBurstRequest,
 )
-from saltbox_core.config import LOG_CONFIG, SETTINGS
+from saltbox_core.config import SETTINGS
 from saltbox_core.event_bus.masters_bus import send_message_and_wait_response_to_master, send_message_to_master
 from saltbox_core.jobs.services.job_services import JobServiceDependency
+from saltbox_core.masters.exceptions import UnknownUserException
 from saltbox_core.masters.schemas.system_schemas import (
     BurstJobsTestDeleteResponse,
     BurstJobsTestPostResponse,
     BurstJobsTestStatsResponse,
 )
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
-from saltbox_sdk.db.exceptions import ObjectNotFoundError
+from saltbox_sdk.exceptions import NotFoundException
 from saltbox_sdk.fastapi_utils.dependencies import RedisDependency
-from saltbox_sdk.fastapi_utils.http_errors import BadRequest, NotFound
 
 BURST_JOBS_TEST_REPORT_HASH_NAME = 'burst_jobs_test'
-
-logging.config.dictConfig(LOG_CONFIG.model_dump())
-
-logger = logging.getLogger(__name__)
 
 
 router = APIRouter(
@@ -51,7 +45,7 @@ async def authorized_keys(
         attr = 'salt_conf_pubkey'
     else:
         msg = f'Unknown user {user}'
-        raise BadRequest(msg)
+        raise UnknownUserException(msg)
     keys = [str(getattr(master, attr)) for master in masters]
     return '\n'.join(keys)
 
@@ -63,18 +57,10 @@ async def burst_test(
     count: int = 100,
     size: int = 0,
 ) -> BridgeTestBurstResponse:
-    try:
-        await master_service.get_by_master_id(master_id)
-    except ObjectNotFoundError:
-        msg = f"Not found master_id='{master_id}'"
-        raise NotFound(msg) from None
+    await master_service.get_by_master_id(master_id)
     message = CoreTestBurstRequest(master=master_id, count=count, size=size)
     # TODO (a.karmanov) : Run async, keep result in DB
-    try:
-        resp = await send_message_and_wait_response_to_master(message, message_tag='burst_test')
-    except TimeoutError:
-        msg = 'Execution is too long, try lesser count of load size or wait master to boot'
-        raise BadRequest(msg) from None
+    resp = await send_message_and_wait_response_to_master(message, message_tag='burst_test')
     return BridgeTestBurstResponse(**resp)
 
 
@@ -86,21 +72,14 @@ async def burst_jobs_test_post(
     rate: Annotated[int, 'Target events rate per second'],
     strict: Annotated[bool, 'Interrupt when duration is over. Otherwise send all rate * duration messages'] = True,
 ) -> BurstJobsTestPostResponse:
-    try:
-        await master_service.get_by_master_id(master_id)
-    except ObjectNotFoundError:
-        msg = f"Not found master_id='{master_id}'"
-        raise NotFound(msg) from None
+    await master_service.get_by_master_id(master_id)
 
-    try:
-        message = CoreTestBurstJobsRequest(
-            master=master_id,
-            duration=timedelta(seconds=duration),
-            rate=rate,
-            strict=strict,
-        )
-    except ValidationError as err:
-        raise BadRequest(err.errors()) from err
+    message = CoreTestBurstJobsRequest(
+        master=master_id,
+        duration=timedelta(seconds=duration),
+        rate=rate,
+        strict=strict,
+    )
 
     await send_message_to_master(message, message_tag='burst_jobs_test')
     return BurstJobsTestPostResponse(id=message.id)
@@ -124,7 +103,7 @@ async def burst_jobs_test_get(
     bridge_stats_raw = await rdb.hget(name=BURST_JOBS_TEST_REPORT_HASH_NAME, key=id)
     if bridge_stats_raw is None:
         msg = f"No record for '{id}'. The burst is not completed yet?"
-        raise NotFound(msg)
+        raise NotFoundException(msg)
 
     bridge_stats = BurstJobsTestReportSchema.model_validate_json(bridge_stats_raw)
 

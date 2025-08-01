@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 
 from saltbox_core.minion_collections.schemas.filter_schemas import (
     MinionFilterSchema,
@@ -11,7 +11,6 @@ from saltbox_core.minion_collections.schemas.minion_schemas import MinionModel
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from saltbox_core.utilities.model_schema import get_model_schema
-from saltbox_sdk.db.exceptions import ObjectNotFoundError
 
 router = APIRouter(prefix='/filters', tags=['Filters'])
 
@@ -28,11 +27,7 @@ async def unique_field_values(
     minion_service: Annotated[MinionService, Depends(get_minion_service)],
 ) -> UniqueGrainValuesResponse:
     """Get unique values for a field in the Minion model"""
-    try:
-        collection = await collection_service.get_by_slug(body.collection_slug)
-    except ObjectNotFoundError:
-        msg = f"Collection '{body.collection_slug}' not found"
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=msg) from None
+    collection = await collection_service.get_by_slug(body.collection_slug)
 
     query = {'$and': [collection.full_query, body.query]}
 

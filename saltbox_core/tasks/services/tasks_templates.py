@@ -12,8 +12,8 @@ from saltbox_core.tasks.schemas.task_template_schemas import (
     TaskTemplateUpdateSchema,
 )
 from saltbox_core.utilities.json_schema import Draft4ValidatorWithDefaults
-from saltbox_sdk.db.exceptions import ObjectNotFoundError
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 
 
@@ -26,7 +26,7 @@ class TaskTemplateService(
     async def get_validated_data(self, name: str, sid: PyObjectId, data: dict) -> dict:
         try:
             task_template = await self.get_by_name(name=name, sid=sid)
-        except ObjectNotFoundError:
+        except ObjectNotFoundException:
             task_template = await self.get_by_name('default', sid=sid)
 
         Draft4ValidatorWithDefaults(task_template.json_schema).validate(data)

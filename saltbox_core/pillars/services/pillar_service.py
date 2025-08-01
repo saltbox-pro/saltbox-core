@@ -5,9 +5,9 @@ from typing import Annotated, BinaryIO
 from fastapi import Depends
 from redis.asyncio import Redis
 
-from saltbox_core.errors import CoreError
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
+from saltbox_core.pillars.exceptions import PillarServiceParseCsvException
 from saltbox_core.pillars.schemas.pillar_schemas import (
     PillarCSVParseResult,
     PillarCSVParseResultErrorCode,
@@ -17,30 +17,11 @@ from saltbox_core.pillars.schemas.pillar_schemas import (
     PillarModel,
 )
 from saltbox_core.pillars.tasks import update_pillar_cache as update_pillar_cache_task
-from saltbox_sdk.db.exceptions import ObjectCreateError, ObjectNotFoundError
 from saltbox_sdk.db.redis.config import get_redis
+from saltbox_sdk.exceptions import ObjectCreateException, ObjectNotFoundException
 
 PILLAR_BY_MASTER_HASH_NAME = 'pillar:{master_id}'
 PILLAR_BY_MASTER_AND_MINION_HASH_NAME = 'pillar:{master_id}:{minion_id}'
-
-
-class PillarServiceError(CoreError):
-    """Base exception for PillarService."""
-
-    detail: str = 'An error occurred in the PillarService'
-    status_code: int = 500
-
-
-class PillarServiceParseCsvError(PillarServiceError):
-    """Custom exception for errors during CSV parsing in PillarService."""
-
-    detail: str = 'An error occurred while parsing the CSV file'
-    status_code: int = 400
-
-    def __init__(self, message: str):
-        if message:
-            self.detail = message
-        super().__init__(self.detail)
 
 
 class PillarService:
@@ -67,8 +48,8 @@ class PillarService:
             tgt = ','.join(tgt)
             tgt_type = 'list'
         else:
-            msg: str = 'tgt must be a None, str or list'  # type: ignore
-            raise ValueError(msg)
+            detail = 'tgt must be a None, str or list'  # type: ignore
+            raise ValueError(detail)
 
         task = await update_pillar_cache_task.kiq(master_id=master_id, tgt=tgt, tgt_type=tgt_type)
 
@@ -84,7 +65,7 @@ class PillarService:
                 msg = f'Pillar "{name}" for master "{master_id}" and minion "{minion_id}" not found'
             else:
                 msg = f'Pillar "{name}" for master "{master_id}" not found'
-            raise ObjectNotFoundError(msg)
+            raise ObjectNotFoundException(msg)
 
         return PillarModel(master_id=master_id, minion_id=minion_id, name=name, value=pillar_value.decode())
 
@@ -125,9 +106,9 @@ class PillarService:
     ) -> PillarModel:
         try:
             await self.master_service.get_by_master_id(master_id=master_id)
-        except ObjectNotFoundError as e:
+        except ObjectNotFoundException:
             msg = f'Master "{master_id}" does not exist'
-            raise ValueError(msg) from e
+            raise ObjectCreateException(msg) from None
 
         if not minion_id or minion_id == '*':
             query = {'master': master_id}
@@ -136,7 +117,7 @@ class PillarService:
 
         if master_id and not await self.minion_service.exists(query):
             msg = f'Minion "{minion_id}" from master "{master_id}" does not exist'
-            raise ValueError(msg)
+            raise ObjectCreateException(msg)
 
         hash_name = self.__get_redis_hash_name(master_id=master_id, minion_id=minion_id)
 
@@ -145,7 +126,7 @@ class PillarService:
                 msg = f'Pillar "{name}" for master "{master_id}" and minion "{minion_id}" already exists'
             else:
                 msg = f'Pillar "{name}" for master "{master_id}" already exists'
-            raise ObjectCreateError(msg)
+            raise ObjectCreateException(msg)
 
         await self.redis_client.hset(hash_name, name, value)
 
@@ -164,7 +145,7 @@ class PillarService:
                 msg = f'Pillar "{name}" for master "{master_id}" and minion "{minion_id}" not found'
             else:
                 msg = f'Pillar "{name}" for master "{master_id}" not found'
-            raise ObjectNotFoundError(msg)
+            raise ObjectNotFoundException(msg)
 
         await self.redis_client.hset(hash_name, name, value)
 
@@ -184,7 +165,7 @@ class PillarService:
                 minion_id=minion_id,
                 update_pillar_cache=update_pillar_cache,
             )
-        except ObjectNotFoundError:
+        except ObjectNotFoundException:
             return await self.create(
                 name=name,
                 value=value,
@@ -201,7 +182,7 @@ class PillarService:
                 msg = f'Pillar "{name}" for master "{master_id}" and minion "{minion_id}" not found'
             else:
                 msg = f'Pillar "{name}" for master "{master_id}" not found'
-            raise ObjectNotFoundError(msg)
+            raise ObjectNotFoundException(msg)
 
         await self.redis_client.hdel(hash_name, name)
 
@@ -214,7 +195,7 @@ class PillarService:
 
         try:
             await self.master_service.get_by_master_id(master_id=master_id)
-        except ObjectNotFoundError:
+        except ObjectNotFoundException:
             error_codes.append(PillarCSVParseResultErrorCode.master_does_not_exist)
 
         if not await self.minion_service.exists({'minion_id': minion_id, 'master': master_id}):
@@ -239,7 +220,7 @@ class PillarService:
             minion_id = row.get('minion_id', None)
             if not minion_id:
                 msg = 'CSV file must contain "minion_id" column'
-                raise PillarServiceParseCsvError(msg)
+                raise PillarServiceParseCsvException(msg)
 
             for pillar_name, pillar_value in row.items():
                 if pillar_name == 'minion_id':
@@ -266,11 +247,11 @@ class PillarService:
         return result
 
     async def import_pillar(self, items: list[PillarModel], update_existing: bool = False) -> PillarImportResultSchema:
-        result: PillarImportResultSchema = PillarImportResultSchema()
+        result = PillarImportResultSchema()
         minions_updated: dict[str, set[str]] = {}
 
         for item in items:
-            item_exists: bool = await self.exists(master_id=item.master_id, minion_id=item.minion_id, name=item.name)
+            item_exists = await self.exists(master_id=item.master_id, minion_id=item.minion_id, name=item.name)
 
             if item_exists and not update_existing:
                 result.items.append(
@@ -280,14 +261,14 @@ class PillarService:
                 continue
 
             try:
-                pillar: PillarModel = await self.update_or_create(**item.model_dump(), update_pillar_cache=False)
+                pillar = await self.update_or_create(**item.model_dump(), update_pillar_cache=False)
                 result.items.append(PillarImportResultItemSchema(**pillar.model_dump()))
                 if item.minion_id:
                     minions_updated.setdefault(item.master_id, set()).add(item.minion_id)
                 else:
                     minions_updated.setdefault(item.master_id, set())
                 result.succeed += 1
-            except (ObjectCreateError, ValueError) as e:
+            except (ObjectCreateException, ValueError) as e:
                 result.items.append(
                     PillarImportResultItemSchema(
                         **item.model_dump(), status=PillarImportResultItemStatus.fail, error_text=str(e)

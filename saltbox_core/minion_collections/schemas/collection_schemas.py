@@ -1,3 +1,4 @@
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -74,23 +75,9 @@ class CollectionBaseTreeModel(BaseTreeModel):
     title: str
 
 
-# HINT: We can't create optional but not nullable field - https://github.com/pydantic/pydantic/issues/8394
-# Waiting for Pydantic 2.11 release
-# class CollectionPartialUpdate(BaseModel):
-#     title: str | None = None
-#     slug: str | None = None
-
-#     model_config = ConfigDict(
-#         extra='forbid',
-#     )
-
-
-# CollectionUpdate = create_model(  # type: ignore[call-overload]
-#     'CollectionUpdate',
-#     **{
-#         name: (field_info.annotation, field_info)
-#         for name, field_info in CollectionBase.model_fields.items()
-#         if field_info.json_schema_extra and not field_info.json_schema_extra.get('readOnly', False)
-#     },
-#     __base__=BaseModel,
-# )
+class CollectionActions(StrEnum):
+    CREATE = 'create'
+    READ = 'read'
+    UPDATE = 'update'
+    DELETE = 'delete'
+    LIST = 'list'

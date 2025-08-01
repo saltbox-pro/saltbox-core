@@ -8,6 +8,7 @@ from redis.asyncio import Redis
 
 from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
+from saltbox_core.tasks.exceptions import TaskObjectDoesNotExistException, TaskServiceException
 from saltbox_core.tasks.repositories.task_repository import TaskRepository, get_task_repository
 from saltbox_core.tasks.schemas.task_schemas import (
     CollectionShort,
@@ -23,9 +24,8 @@ from saltbox_core.tasks.schemas.task_template_schemas import (
     TaskTemplateModel,
 )
 from saltbox_core.tasks.services.tasks_templates import TaskTemplateService, get_task_template_service
-from saltbox_core.utilities.exceptions import ObjectDoesNotExistError, ServiceError
-from saltbox_sdk.db.exceptions import ObjectNotFoundError
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.fastapi_utils.dependencies import RedisDependency
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 from saltbox_sdk.utilities.helpers import utc_now
@@ -59,11 +59,11 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
 
         if not data.task_template_id and not data.fun:
             msg = 'One of `task_template_id` or `fun` is required'
-            raise ServiceError(msg)
+            raise TaskServiceException(msg)
 
         elif data.task_template_id and data.fun:
             msg = 'Only one of `task_template_id` or `fun` is set at same time'
-            raise ServiceError(msg)
+            raise TaskServiceException(msg)
 
         elif data.task_template_id:
             task_template = await self.task_template_service.get(query=data.task_template_id)
@@ -74,7 +74,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
                     name=task_template.name, sid=task_template.repo_id, data=task_data
                 )
             except JsonSchemaValidationError as err:
-                raise ServiceError(err) from err
+                raise TaskServiceException(str(err)) from err
 
         elif data.fun:
             fun = data.fun
@@ -82,7 +82,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
             try:
                 validated_data = await self.job_schema_service.get_validated_data(name=fun, data=task_data)
             except JsonSchemaValidationError as err:
-                raise ServiceError(err) from err
+                raise TaskServiceException(str(err)) from err
 
         collection = await self.collections_service.get(query=data.collection_id)
 
@@ -197,9 +197,9 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
                 )
             else:
                 updated_obj = await self.repo.update(query=query, data=data)
-        except ObjectNotFoundError as e:
+        except ObjectNotFoundException as e:
             msg = 'Object does not found'
-            raise ObjectDoesNotExistError(msg) from e
+            raise TaskObjectDoesNotExistException(msg) from e
 
         if isinstance(notify, bool) and notify and hasattr(updated_obj, 'id'):
             await self.rdb.publish(
@@ -216,7 +216,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
 
     async def delete(self, query: dict[str, Any] | PyObjectId, notify: bool | None = None) -> int:
         obj = await self.get(query=query)
-        deleted_count: int = await super().delete(query=query)
+        deleted_count = await super().delete(query=query)
 
         if isinstance(notify, bool) and notify:
             await self.rdb.publish(channel=f'task:{obj.id}:delete', message=self.__prepare_pub_message(obj))
@@ -225,7 +225,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
 
     @staticmethod
     def __prepare_pub_message(obj: BaseModel) -> str:
-        data: dict = obj.model_dump(by_alias=True, mode='json')
+        data = obj.model_dump(by_alias=True, mode='json')
 
         if 'id' in data:
             data['_id'] = data['id']

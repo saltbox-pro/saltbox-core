@@ -7,8 +7,8 @@ from saltbox_core.minion_collections.repositories.collection_repository import (
     get_collection_repository,
 )
 from saltbox_core.minion_collections.schemas.collection_schemas import CollectionCreateSchema, CollectionModel
-from saltbox_sdk.db.exceptions import DuplicateKeyError
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.exceptions import DuplicateKeyException
 
 
 @pytest.mark.asyncio
@@ -86,7 +86,7 @@ async def test_collection_repository_create_duplicate(mocked_db):
     duplicate_data = {'title': 'Вторая коллекция', 'slug': 'duplicate-slug', 'query': {'grains.os': 'CentOS'}}
 
     # Check that exception will be raised
-    with pytest.raises(DuplicateKeyError):
+    with pytest.raises(DuplicateKeyException):
         await repo.create(duplicate_data)
 
 

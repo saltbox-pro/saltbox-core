@@ -10,7 +10,7 @@ from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository
 from saltbox_core.jobs.schemas.job_sc_schemas import JobSchemaCreateSchema, JobSchemaUpdateSchema
 from saltbox_core.tkq import broker
 from saltbox_core.utilities.git_repo_helper import GitRepoService, parse_schemas, repository_lock
-from saltbox_sdk.db.exceptions import ObjectNotFoundError
+from saltbox_sdk.exceptions import ObjectNotFoundException, TaskiqException, TaskiqTimeoutException
 from saltbox_sdk.fastapi_utils.dependencies import get_redis_dep
 
 
@@ -25,7 +25,7 @@ async def sync_schemas(
     for schema in schemas:
         try:
             existing_schema = await repo.get({'name': schema['name']})
-        except ObjectNotFoundError:
+        except ObjectNotFoundException:
             existing_schema = None
 
         if not existing_schema:
@@ -77,8 +77,11 @@ async def job_schemas_sync_task(
                 'removed_count': removed_count,
                 'errors': errors,
             }
+    except TimeoutError:
+        msg = 'Timeout while trying to clone or pull the repository'
+        await progress.set_progress(TaskState.FAILURE, msg)
+        raise TaskiqTimeoutException(msg) from None
     except Exception as e:
         msg = f'Error during task execution: {e!s}'
-        logger.error(msg)
         await progress.set_progress(TaskState.FAILURE, msg)
-        raise
+        raise TaskiqException(msg) from e

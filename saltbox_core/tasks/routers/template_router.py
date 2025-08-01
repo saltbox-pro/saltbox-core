@@ -1,8 +1,7 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 
-from saltbox_core.config import logger
 from saltbox_core.settings.schemas.sls_repos_schemas import SettingsSlsRepoShortSchema
 from saltbox_core.settings.services.sls_repo_service import SettingsSlsRepoService, get_sls_repo_service
 from saltbox_core.tasks.schemas.task_template_schemas import (
@@ -11,7 +10,6 @@ from saltbox_core.tasks.schemas.task_template_schemas import (
     TaskTemplateShortSchema,
 )
 from saltbox_core.tasks.services.tasks_templates import TaskTemplateService, get_task_template_service
-from saltbox_sdk.db.exceptions import ObjectNotFoundError
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse
 
@@ -37,17 +35,12 @@ async def task_template_list(
         ]
     }
 
-    try:
-        return await service.get_list_paginated(
-            query=query,
-            skip=params.skip,
-            limit=params.limit,
-            projection_model=TaskTemplateShortSchema,
-        )
-    except Exception as e:
-        msg = f'{e!s}'
-        logger.error(msg)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=msg) from e
+    return await service.get_list_paginated(
+        query=query,
+        skip=params.skip,
+        limit=params.limit,
+        projection_model=TaskTemplateShortSchema,
+    )
 
 
 @router.get('/{tpl_id}')
@@ -55,11 +48,4 @@ async def task_template_retrieve(
     tpl_id: PyObjectId,
     service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
 ) -> TaskTemplateModel:
-    try:
-        return await service.get(tpl_id)
-    except ObjectNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-    except Exception as e:
-        msg = f'{e!s}'
-        logger.error(msg)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=msg) from e
+    return await service.get(tpl_id)

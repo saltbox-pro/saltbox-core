@@ -4,6 +4,7 @@ from faststream.redis import RedisBroker, RedisMessage
 
 from saltbox_bridge_messages import CoreEmptyMessage, CoreMessageBase, MasterStatus
 from saltbox_core.event_bus.master_bus_middlewares import MastersAuthMiddleware
+from saltbox_core.masters.exceptions import TimeoutResponseToMasterException
 from saltbox_core.masters.repositories.master_repository import MasterRepository
 from saltbox_core.masters.schemas.master_schemas import MasterModel
 from saltbox_core.masters.services.master_service import MasterService
@@ -29,11 +30,14 @@ async def send_message_and_wait_response_to_master(
         broker = get_faststream_broker(middlewares=[MastersAuthMiddleware])
 
     async with broker as br:
-        response: RedisMessage = await br.request(  # type: ignore
-            message,
-            channel=f'master_{message_tag}',
-            timeout=response_timeout,
-        )
+        try:
+            response: RedisMessage = await br.request(  # type: ignore
+                message,
+                channel=f'master_{message_tag}',
+                timeout=response_timeout,
+            )
+        except TimeoutError:
+            raise TimeoutResponseToMasterException() from None
         return await response.decode()
 
 

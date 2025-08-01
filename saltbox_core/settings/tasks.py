@@ -22,7 +22,7 @@ from saltbox_core.utilities.git_repo_helper import (
     create_sshfs_sync,
     repository_lock,
 )
-from saltbox_sdk.db.exceptions import ObjectNotFoundError
+from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.fastapi_utils.dependencies import get_redis_dep
 
 SETTINGS = Settings()
@@ -50,7 +50,7 @@ async def sync_schemas(
     for schema in schemas:
         try:
             existing_schema = await repo.get({'name': schema['name'], 'repo_id': sls_repo_id})
-        except ObjectNotFoundError:
+        except ObjectNotFoundException:
             existing_schema = None
 
         if not existing_schema:

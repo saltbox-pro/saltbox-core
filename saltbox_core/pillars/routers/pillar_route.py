@@ -1,9 +1,7 @@
-import logging.config
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, status
+from fastapi import APIRouter, Depends, Query, UploadFile, status
 
-from saltbox_core.config import LOG_CONFIG
 from saltbox_core.pillars.schemas.pillar_schemas import (
     PillarCSVParseResult,
     PillarImportResultSchema,
@@ -13,12 +11,6 @@ from saltbox_core.pillars.schemas.pillar_schemas import (
     PillarSelector,
 )
 from saltbox_core.pillars.services.pillar_service import PillarService, get_pillar_service
-from saltbox_sdk.db.exceptions import ObjectCreateError, ObjectNotFoundError
-
-logging.config.dictConfig(LOG_CONFIG.model_dump())
-
-logger = logging.getLogger(__name__)
-
 
 router = APIRouter(
     prefix='/pillars',
@@ -42,14 +34,9 @@ async def pillar_create(
     item: PillarModel,
     pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
 ) -> PillarModel:
-    try:
-        pillar: PillarModel = await pillar_service.create(
-            master_id=item.master_id, minion_id=item.minion_id, name=item.name, value=item.value
-        )
-    except (ObjectCreateError, ValueError) as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
-
-    return pillar
+    return await pillar_service.create(
+        master_id=item.master_id, minion_id=item.minion_id, name=item.name, value=item.value
+    )
 
 
 @router.put('', operation_id='pillar_update')
@@ -57,14 +44,9 @@ async def pillar_update(
     item: PillarModel,
     pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
 ) -> PillarModel:
-    try:
-        pillar: PillarModel = await pillar_service.update(
-            master_id=item.master_id, minion_id=item.minion_id, name=item.name, value=item.value
-        )
-    except ObjectNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-
-    return pillar
+    return await pillar_service.update(
+        master_id=item.master_id, minion_id=item.minion_id, name=item.name, value=item.value
+    )
 
 
 @router.delete('', operation_id='pillar_delete')
@@ -72,10 +54,7 @@ async def pillar_delete(
     item: PillarSelector,
     pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
 ) -> None:
-    try:
-        await pillar_service.delete(master_id=item.master_id, minion_id=item.minion_id, name=item.name)
-    except ObjectNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
+    await pillar_service.delete(master_id=item.master_id, minion_id=item.minion_id, name=item.name)
 
 
 @router.post('/parse_csv', operation_id='pillar_parse_csv')

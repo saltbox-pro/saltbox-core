@@ -7,14 +7,10 @@ from uuid import UUID
 from pydantic import BaseModel
 from pydantic.fields import ComputedFieldInfo, FieldInfo
 
-# from saltbox_core.config import logger
+from saltbox_core.config import logger
+from saltbox_core.exceptions import UnsupportedSchemaTypeException
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
-
-
-class UnsupportedSchemaType(Exception):
-    pass
-
 
 # TODO (a.baikov): remove this in new version querybuilder
 TEMP_EXCLUDE_FIELDS_LIST = [
@@ -143,7 +139,7 @@ def analyze_field(field: Any) -> tuple[type[BaseModel] | None, bool, Any]:  # no
         elif type(field) is ComputedFieldInfo:
             field_annotations = get_args(field.return_type)
         else:
-            raise UnsupportedSchemaType
+            raise UnsupportedSchemaTypeException()
         field_annotations = (field.annotation,) if not field_annotations else field_annotations
 
         for field_class in field_annotations:
@@ -155,15 +151,15 @@ def analyze_field(field: Any) -> tuple[type[BaseModel] | None, bool, Any]:  # no
                     if field_class in [list[str], list[int], list[Any]]:
                         computed_field_class = list
                         continue
-                    raise UnsupportedSchemaType
+                    raise UnsupportedSchemaTypeException()
             if isclass(field_class) and issubclass(field_class, BaseModel):
                 sub_model = field_class
                 break
             if field_class:
                 computed_field_class = field_class
 
-    except UnsupportedSchemaType:
-        pass
+    except UnsupportedSchemaTypeException:
+        logger.warning('Unsupported schema type for field')
 
     return sub_model, nullable_field, computed_field_class
 

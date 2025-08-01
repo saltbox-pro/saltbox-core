@@ -1,5 +1,4 @@
 import json
-import logging.config
 from collections.abc import AsyncGenerator
 from datetime import datetime
 from typing import Annotated, Any, overload
@@ -11,7 +10,7 @@ from pydantic import ValidationError as PydanticValidationError
 from redis import exceptions as redis_exceptions
 
 from saltbox_bridge_messages import CoreNewJobAsyncRequest, MasterStatus
-from saltbox_core.config import LOG_CONFIG, SETTINGS
+from saltbox_core.config import SETTINGS
 from saltbox_core.event_bus.masters_bus import send_message_to_master
 from saltbox_core.jobs.exceptions import (
     JobCreateException,
@@ -27,15 +26,11 @@ from saltbox_core.masters.schemas.master_schemas import MasterModel
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_core.utilities.context import replace_raised
 from saltbox_core.utilities.jid import JID, JidError
-from saltbox_sdk.db.exceptions import ObjectNotFoundError
 from saltbox_sdk.db.redis.repository_sortedset_base import ProjectionModel
 from saltbox_sdk.db.schemas_base import CursoredResponse, PaginatedResponse
+from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.fastapi_utils.dependencies import RedisDependency
 from saltbox_sdk.serivces.redis_sortedset_base_service import RedisSortedsetBaseService
-
-logging.config.dictConfig(LOG_CONFIG.model_dump())
-
-logger = logging.getLogger(__name__)
 
 JOB_CREATE_HASH_NAME: str = 'job_create:{jid}'
 
@@ -79,17 +74,17 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
                 name=data.fun,
                 data=data.data.model_dump(exclude_none=True, by_alias=True) if data.data else {},
             )
-        except JsonSchemaValidationError as err:
-            raise JobCreateException(err) from err
+        except JsonSchemaValidationError as e:
+            raise JobCreateException(str(e)) from e
 
         try:
             master: MasterModel = await self.master_service.get_by_master_id(data.salt_master)
-        except ObjectNotFoundError as e:
+        except ObjectNotFoundException as e:
             raise JobCreateException(str(e)) from e
 
         if master.status != MasterStatus.ACCEPTED:
-            err_msg = 'Master is not accepted'
-            raise JobCreateException(err_msg)
+            msg = 'Master is not accepted'
+            raise JobCreateException(msg)
 
         try:
             _data: dict[str, str] = {
@@ -111,10 +106,10 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
             )
             await self.rdb.expire(name=create_job_hash_name, time=60 * 10)
 
-            msg = CoreNewJobAsyncRequest(hash_name=create_job_hash_name, master=master.master_id)
-            await send_message_to_master(message=msg, message_tag='run_job')
-        except redis_exceptions.RedisError as error:
-            raise JobCreateException(error) from error
+            message = CoreNewJobAsyncRequest(hash_name=create_job_hash_name, master=master.master_id)
+            await send_message_to_master(message=message, message_tag='run_job')
+        except redis_exceptions.RedisError as e:
+            raise JobCreateException(str(e)) from e
 
         if projection_model:
             return await self.get_job(jid=JID(jid), projection_model=projection_model)
@@ -293,10 +288,11 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
         for _, ret in records.items():
             data = json.loads(ret)
 
+            # TODO: maybe not need handle this exception here? It handled in global exception handler
             try:
                 res.append(JobResult(**data))
             except PydanticValidationError as e:
-                raise JobServiceException(e.errors()) from e
+                raise JobServiceException(str(e)) from e
 
         return res, next_cur
 
@@ -308,10 +304,11 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
         for _, ret in records.items():
             data = json.loads(ret)
 
+            # TODO: maybe not need handle this exception here? It handled in global exception handler
             try:
                 res.append(JobResult(**data))
             except PydanticValidationError as e:
-                raise JobServiceException(e.errors()) from e
+                raise JobServiceException(str(e)) from e
 
         return res
 

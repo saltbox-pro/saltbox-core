@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response,
 
 from saltbox_core.config import logger
 from saltbox_core.minion_collections.schemas.collection_schemas import (
+    CollectionActions,
     CollectionCreateRequestSchema,
     CollectionCreateSchema,
     CollectionDetailSchema,
@@ -12,13 +13,6 @@ from saltbox_core.minion_collections.schemas.collection_schemas import (
     CollectionUpdateSchema,
 )
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
-from saltbox_sdk.db.exceptions import (
-    DuplicateKeyError,
-    ObjectCreateError,
-    ObjectDeleteError,
-    ObjectNotFoundError,
-    ObjectUpdateError,
-)
 from saltbox_sdk.db.schemas_base import PaginatedResponse, SkipLimitParams
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig, OPAQueryFilterFormat
 
@@ -29,6 +23,7 @@ router = APIRouter(prefix='/collections', tags=['Minion Collections'])
     '',
     operation_id='minion_collections_list',
     # openapi_extra={
+    #     'x-resource: 'collections',
     #     'x-action': 'list',
     #     'x-cache-ttl': 60,
     # },
@@ -38,7 +33,7 @@ router = APIRouter(prefix='/collections', tags=['Minion Collections'])
         partial_query='allow == true',
         unknowns=['collections'],
         query_filter_format=OPAQueryFilterFormat.MONGO,
-        action='list',
+        action=CollectionActions.LIST,
         cache_ttl=60,
     ).model_dump(by_alias=True),  # need to use by_alias=True to match the OpenAPI schema format
 )
@@ -87,17 +82,19 @@ async def collection_retrieve(
 
     query = {**query, 'slug': slug}
     logger.info(f'OPA query: {query}')
-    try:
-        response = await collection_service.get(query=query)
-        return CollectionDetailSchema(**{**response.model_dump(), '_id': response.id, 'allowed_actions': []})
-    except ObjectNotFoundError:
-        raise HTTPException(status_code=404, detail='Collection not found') from None
-    except Exception as e:
-        logger.error('Error: %s', e)
-        raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
+    response = await collection_service.get(query=query)
+    return CollectionDetailSchema(**{**response.model_dump(), '_id': response.id, 'allowed_actions': []})
 
 
-@router.post('', operation_id='minion_collection_create')
+@router.post(
+    '',
+    operation_id='minion_collection_create',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.col',
+        # resource='collections',
+        action=CollectionActions.CREATE,
+    ).model_dump(by_alias=True),
+)
 async def collection_create(
     collection: CollectionCreateRequestSchema,
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
@@ -105,22 +102,10 @@ async def collection_create(
     creation_data = collection.model_dump()
     parent_slug = creation_data.pop('parent_slug')
 
-    try:
-        parent_collection = await collection_service.get_by_slug(parent_slug)
-        creation_data['parent_id'] = parent_collection.id
-    except ObjectNotFoundError as e:
-        raise HTTPException(status_code=404, detail='Parent collection not found') from e
+    parent_collection = await collection_service.get_by_slug(parent_slug)
+    creation_data['parent_id'] = parent_collection.id
 
-    try:
-        return await collection_service.create(CollectionCreateSchema.model_validate(creation_data))
-    except ObjectCreateError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-    except DuplicateKeyError as e:
-        msg = f'Collection with slug `{collection.slug}` already exists'
-        raise HTTPException(status_code=400, detail=msg) from e
-    except Exception as e:
-        logger.error('Error: %s', e)
-        raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
+    return await collection_service.create(CollectionCreateSchema.model_validate(creation_data))
 
 
 @router.put('/{slug}', operation_id='minion_collection_update')
@@ -129,39 +114,19 @@ async def collection_update(
     collection: CollectionUpdateSchema,
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
 ) -> CollectionDetailSchema:
-    try:
-        response = await collection_service.update_by_slug(slug, collection)
-        # TODO (a.baikov): Add allowed actions to response
-        return CollectionDetailSchema(**{**response.model_dump(), '_id': response.id, 'allowed_actions': []})
-    except ObjectUpdateError:
-        raise HTTPException(status_code=404, detail='Collection not found') from None
-    except Exception as e:
-        logger.error('Error: %s', e)
-        raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
+    response = await collection_service.update_by_slug(slug, collection)
+    # TODO (a.baikov): Add allowed actions to response
+    return CollectionDetailSchema(**{**response.model_dump(), '_id': response.id, 'allowed_actions': []})
 
 
 @router.delete(
     '/{slug}',
     operation_id='minion_collection_delete',
     status_code=status.HTTP_204_NO_CONTENT,
-    responses={
-        204: {'description': 'No Content'},
-        403: {'description': 'Forbidden'},
-        404: {'description': 'Not Found'},
-        422: {'description': 'Unprocessable Entity'},
-    },
 )
 async def collection_delete(
     slug: str,
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
 ) -> Response:
-    try:
-        await collection_service.delete_by_slug(slug)
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-    except ObjectNotFoundError as e:
-        raise HTTPException(status_code=404, detail='Collection not found') from e
-    except ObjectDeleteError as e:
-        raise HTTPException(status_code=400, detail=e.detail) from e
-    except Exception as e:
-        logger.error('Error: %s', e)
-        raise HTTPException(status_code=500, detail='Something went wrong... See logs') from e
+    await collection_service.delete_by_slug(slug)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

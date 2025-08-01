@@ -5,12 +5,12 @@ from redis.asyncio import Redis
 
 from saltbox_core.config import logger
 from saltbox_core.jobs.exceptions import JobCreateException, JobDoesNotExistsException
-from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel, JobResult
+from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
-from saltbox_core.minion_collections.schemas.collection_schemas import CollectionModel
 from saltbox_core.minion_collections.schemas.minion_schemas import MinionModel
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
+from saltbox_core.tasks.exceptions import TaskServiceException
 from saltbox_core.tasks.schemas.task_schemas import (
     TaskCreateInputSchema,
     TaskJob,
@@ -27,12 +27,11 @@ from saltbox_core.tasks.schemas.task_schemas import (
     TaskUpdateSchema,
 )
 from saltbox_core.tasks.services.tasks import TaskService, get_task_service
-from saltbox_core.utilities.exceptions import ServiceError
 from saltbox_core.utilities.jid import JID
 from saltbox_core.utilities.mongo_query_to_salt_tgt_converter import MongoQueryToSaltTgtConverter
-from saltbox_sdk.db.exceptions import MultipleObjectsFoundError, ObjectNotFoundError
 from saltbox_sdk.db.mongo.config import get_mongo_db
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.exceptions import MultipleObjectsFoundException, ObjectNotFoundException
 from saltbox_sdk.fastapi_utils.dependencies import RedisDependency
 from saltbox_sdk.utilities.helpers import utc_now
 
@@ -57,11 +56,11 @@ class TaskLifespanService:
 
         if task_id and task:
             msg = "TaskLifespanService can't accept both `task_id` and `task` args at the same time"
-            raise ServiceError(msg)
+            raise TaskServiceException(msg)
 
         if task_id is None and task is None:
             msg = "TaskLifespanService can't accept arguments `task_id` and `task` equal to None at the same time"
-            raise ServiceError(msg)
+            raise TaskServiceException(msg)
 
         self.task_id = task_id
         self.__task = task
@@ -74,10 +73,10 @@ class TaskLifespanService:
             return self.__task
 
         msg = 'Task does not set'
-        raise ServiceError(msg)
+        raise TaskServiceException(msg)
 
     async def update_task(self, notify: bool = True, **kwargs: Any) -> TaskModel:
-        task: TaskModel = await self.get_task()
+        task = await self.get_task()
 
         for attr, value in kwargs.items():
             task.__setattr__(attr, value)
@@ -109,24 +108,24 @@ class TaskLifespanService:
                             'status': TaskStatus.running,
                         },
                     )
-                except ObjectNotFoundError:
+                except ObjectNotFoundException:
                     await self.update_task(parent_task_id=None)
 
     async def __stop_jobs(self) -> None:
-        task: TaskModel = await self.get_task()
+        task = await self.get_task()
 
         for jid in task.jobs.keys():
             await self.job_service.stop_job(JID(jid))
 
     async def stop(self) -> None:
-        task: TaskModel = await self.get_task()
+        task = await self.get_task()
 
         if task.status == TaskStatus.running:
             await self.__stop_jobs()
             await self.update_task(status=TaskStatus.stopping)
 
     async def restart_failed(self) -> None:
-        task: TaskModel = await self.get_task()
+        task = await self.get_task()
 
         if task.status == TaskStatus.finished:
             for minion in task.minions.values():
@@ -137,7 +136,7 @@ class TaskLifespanService:
             await self.run(force=True)
 
     async def restart_failed_on_minion(self, master: str, minion_id: str) -> None:
-        task: TaskModel = await self.get_task()
+        task = await self.get_task()
         minion_key = self.__get_minion_key(master=master, minion_id=minion_id)
 
         if task.status != TaskStatus.finished:
@@ -157,7 +156,7 @@ class TaskLifespanService:
         await self.update_task(status=TaskStatus.running)
 
     async def __can_start_job(self, master: str | None = None) -> bool:
-        task: TaskModel = await self.get_task()
+        task = await self.get_task()
         running_job_count: int = 0
 
         for job in task.jobs.values():
@@ -195,8 +194,8 @@ class TaskLifespanService:
         return False
 
     async def __get__targeting_query(self) -> dict:
-        task: TaskModel = await self.get_task()
-        collection: CollectionModel = await self.collection_service.get(task.target_collection.id)
+        task = await self.get_task()
+        collection = await self.collection_service.get(task.target_collection.id)
         sub_queries: list[dict] = [collection.full_query] if collection.full_query else []
 
         if task.target_query:
@@ -221,7 +220,7 @@ class TaskLifespanService:
         return query
 
     async def __fill_minions_by_targeting(self) -> None:
-        task: TaskModel = await self.get_task()
+        task = await self.get_task()
         targeting_query = await self.__get__targeting_query()
         not_compound_compatible_query: bool = self.__check_compound_compatible_query(targeting_query)
         minions: list[MinionModel] = await self.minion_service.get_list(query=targeting_query, limit=0, skip=0)
@@ -250,11 +249,11 @@ class TaskLifespanService:
                     continue
 
     async def __create_job(self, master: str, minions: list[str], compound: str | None = None) -> None:
-        task: TaskModel = await self.get_task()
-        tgt: str = compound if compound else ','.join(minions)
-        tgt_type: TaskJobTargetType = TaskJobTargetType.compound if compound else TaskJobTargetType.list
+        task = await self.get_task()
+        tgt = compound if compound else ','.join(minions)
+        tgt_type = TaskJobTargetType.compound if compound else TaskJobTargetType.list
 
-        job: JobModel = await self.job_service.create(
+        job = await self.job_service.create(
             JobCreateSchema.model_validate(
                 {
                     'jid_postfix': f't{task.id}',
@@ -284,7 +283,7 @@ class TaskLifespanService:
             minion.start_last_dt = task.jobs[str(job.jid)].created_dt
 
     async def __create_jobs(self, ignore_limits: bool = True) -> None:
-        task: TaskModel = await self.get_task()
+        task = await self.get_task()
         minions_queue: dict[str, list[list[str]]] = {}
 
         for minion in task.minions.values():
@@ -313,14 +312,14 @@ class TaskLifespanService:
                     continue
 
     async def __check_jobs(self) -> None:
-        task: TaskModel = await self.get_task()
+        task = await self.get_task()
 
         for task_job in task.jobs.values():
             if task_job.status in [TaskJobStatus.failed, TaskJobStatus.succeeded]:
                 continue
 
             try:
-                job_data: JobModel = await self.job_service.get_job(JID(task_job.jid))
+                job_data = await self.job_service.get_job(JID(task_job.jid))
 
             except JobDoesNotExistsException:
                 task_job.status = TaskJobStatus.failed
@@ -337,7 +336,7 @@ class TaskLifespanService:
             await self.__update_task_job_status(task_job=task_job)
 
     async def __check_minions_in_job(self, task_job: TaskJob, job_data: JobModel) -> None:
-        task: TaskModel = await self.get_task()
+        task = await self.get_task()
 
         for minion_id in task_job.minions_by_targeting:
             minion = task.minions[self.__get_minion_key(master=task_job.target.master, minion_id=minion_id)]
@@ -357,12 +356,10 @@ class TaskLifespanService:
             minion_key: str = self.__get_minion_key(master=task_job.target.master, minion_id=minion_id)
 
             try:
-                minion_obj: MinionModel | None = await self.minion_service.get(
-                    {'minion_id': minion_id, 'master': task_job.target.master}
-                )
-            except ObjectNotFoundError:
+                minion_obj = await self.minion_service.get({'minion_id': minion_id, 'master': task_job.target.master})
+            except ObjectNotFoundException:
                 minion_obj = None
-            except MultipleObjectsFoundError:
+            except MultipleObjectsFoundException:
                 logger.error('Multiple minion objects returned')
                 continue
 
@@ -375,14 +372,14 @@ class TaskLifespanService:
                 )
 
     async def __check_job_returns(self, task_job: TaskJob, jid: JID) -> None:
-        task: TaskModel = await self.get_task()
-        job_returns: list[JobResult] = await self.job_service.get_job_all_returns(jid)
+        task = await self.get_task()
+        job_returns = await self.job_service.get_job_all_returns(jid)
         now = utc_now()
 
         for job_return in job_returns:
-            minion_id: str = job_return.id
-            master: str = job_return.salt_master
-            minion_key: str = self.__get_minion_key(master=master, minion_id=minion_id)
+            minion_id = job_return.id
+            master = job_return.salt_master
+            minion_key = self.__get_minion_key(master=master, minion_id=minion_id)
             returns_status = task_job.returns_statuses.get(minion_id, TaskJobReturnStatus.waiting)
 
             if returns_status != TaskJobReturnStatus.waiting:
@@ -427,7 +424,7 @@ class TaskLifespanService:
                 task_job.status = TaskJobStatus.succeeded
 
     async def __postprocessing(self) -> None:  # noqa: C901
-        task: TaskModel = await self.get_task()
+        task = await self.get_task()
 
         if not task.postprocessing:
             return
@@ -447,7 +444,7 @@ class TaskLifespanService:
                     minion = await self.minion_service.get_by_master_and_id(
                         master=minion_data.master, minion_id=minion_data.minion_id
                     )
-                except ObjectNotFoundError:
+                except ObjectNotFoundException:
                     return
 
                 if not minion.last_activity:
@@ -462,7 +459,7 @@ class TaskLifespanService:
 
         if task.postprocessing.task_create_request:
             if not task.postprocessing.task_create_id:
-                created_task: TaskModel = await self.task_service.create(
+                created_task = await self.task_service.create(
                     TaskCreateInputSchema.model_validate(
                         {
                             **task.postprocessing.task_create_request.model_dump(by_alias=True),
@@ -481,7 +478,7 @@ class TaskLifespanService:
             else:
                 try:
                     children_task = await self.task_service.get(task.postprocessing.task_create_id)
-                except ObjectNotFoundError:
+                except ObjectNotFoundException:
                     task.postprocessing.task_create_id = None
                     return
 
@@ -495,7 +492,7 @@ class TaskLifespanService:
             task.status = TaskStatus.finished
 
     async def process(self) -> None:
-        task: TaskModel = await self.get_task()
+        task = await self.get_task()
 
         if task.status not in [TaskStatus.running, TaskStatus.stopping, TaskStatus.postprocessing]:
             return

@@ -1,12 +1,11 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query, status
 
 from saltbox_core.config import logger
 from saltbox_core.jobs.exceptions import JobDoesNotExistsException
 from saltbox_core.jobs.schemas.job_schemas import JobModel, JobResult
 from saltbox_core.jobs.services.job_services import JobServiceDependency
-from saltbox_core.minion_collections.schemas.collection_schemas import CollectionModel
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_core.tasks.schemas.task_schemas import (
     TaskCreateInputSchema,
@@ -17,9 +16,7 @@ from saltbox_core.tasks.schemas.task_schemas import (
 )
 from saltbox_core.tasks.services.tasks import TaskService, get_task_service
 from saltbox_core.tasks.services.tasks_lifespan import TaskLifespanService, get_task_lifespan_service
-from saltbox_core.utilities.exceptions import ServiceError
 from saltbox_core.utilities.jid import JID
-from saltbox_sdk.db.exceptions import ObjectNotFoundError
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.fastapi_utils.dependencies import get_current_user
@@ -39,12 +36,9 @@ async def tasks_list(
     task_service: Annotated[TaskService, Depends(get_task_service)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
 ) -> PaginatedResponse[TaskListResponseSchema]:
-    try:
-        collection: CollectionModel = await collection_service.get_by_slug(params.collection_slug)
-    except ObjectNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Collection does not exists') from e
+    collection = await collection_service.get_by_slug(params.collection_slug)
 
-    task_list: PaginatedResponse[TaskListResponseSchema] = await task_service.get_list_paginated(
+    task_list = await task_service.get_list_paginated(
         query={'target_collection.id': PyObjectId(collection.id)},
         limit=params.limit,
         skip=params.skip,
@@ -67,17 +61,7 @@ async def task_create(
     logger.debug(f'User {user}')
 
     create_data = TaskCreateInputSchema(**{'user': user.model_dump(), **item.model_dump(by_alias=True)})
-
-    try:
-        task: TaskModel = await task_service.create(data=create_data)
-    except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
-    except ServiceError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
-    except ObjectNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
-
-    return task
+    return await task_service.create(data=create_data)
 
 
 @router.get('/{tid}', operation_id='task_retrieve')
@@ -85,12 +69,7 @@ async def task_retrieve(
     tid: PyObjectId,
     task_service: Annotated[TaskService, Depends(get_task_service)],
 ) -> TaskModel:
-    try:
-        task: TaskModel = await task_service.get(query=tid)
-    except ObjectNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task does not found') from e
-
-    return task
+    return await task_service.get(query=tid)
 
 
 @router.get('/{tid}/jobs', operation_id='task_jobs')
@@ -100,19 +79,14 @@ async def task_jobs(
     job_service: JobServiceDependency,
 ) -> list[JobModel]:
     result: list[JobModel] = []
+    task = await task_service.get(query=tid)
 
-    try:
-        task: TaskModel = await task_service.get(query=tid)
-
-        for task_job in task.jobs.values():
-            try:
-                job = await job_service.get_job(JID(task_job.jid))
-                result.append(job)
-            except JobDoesNotExistsException:
-                continue
-    except ObjectNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task does not found') from e
-
+    for task_job in task.jobs.values():
+        try:
+            job = await job_service.get_job(JID(task_job.jid))
+            result.append(job)
+        except JobDoesNotExistsException:
+            continue
     return result
 
 
@@ -124,18 +98,14 @@ async def task_returns(
 ) -> list[JobResult]:
     result: list[JobResult] = []
 
-    try:
-        task: TaskModel = await task_service.get(query=tid)
+    task = await task_service.get(query=tid)
 
-        for task_job in task.jobs.values():
-            try:
-                job_returns: list[JobResult] = await job_service.get_job_all_returns(JID(task_job.jid))
-                result.extend(job_returns)
-            except JobDoesNotExistsException:
-                continue
-    except ObjectNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task does not found') from e
-
+    for task_job in task.jobs.values():
+        try:
+            job_returns = await job_service.get_job_all_returns(JID(task_job.jid))
+            result.extend(job_returns)
+        except JobDoesNotExistsException:
+            continue
     return result
 
 
@@ -143,13 +113,8 @@ async def task_returns(
 async def task_run(
     task_lifespan_service: Annotated[TaskLifespanService, Depends(get_task_lifespan_service)],
 ) -> TaskModel:
-    try:
-        task: TaskModel = await task_lifespan_service.get_task()
-    except ObjectNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task not found') from e
-
+    task = await task_lifespan_service.get_task()
     await task_lifespan_service.run()
-
     return task
 
 
@@ -157,11 +122,7 @@ async def task_run(
 async def task_stop(
     task_lifespan_service: Annotated[TaskLifespanService, Depends(get_task_lifespan_service)],
 ) -> TaskModel:
-    try:
-        task: TaskModel = await task_lifespan_service.get_task()
-    except ObjectNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task not found') from e
-
+    task = await task_lifespan_service.get_task()
     await task_lifespan_service.stop()
 
     return task
@@ -171,11 +132,7 @@ async def task_stop(
 async def restart_failed(
     task_lifespan_service: Annotated[TaskLifespanService, Depends(get_task_lifespan_service)],
 ) -> TaskModel:
-    try:
-        task: TaskModel = await task_lifespan_service.get_task()
-    except ObjectNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task not found') from e
-
+    task = await task_lifespan_service.get_task()
     await task_lifespan_service.restart_failed()
 
     return task
@@ -187,48 +144,7 @@ async def restart_failed_on_minion(
     minion_id: str,
     task_lifespan_service: Annotated[TaskLifespanService, Depends(get_task_lifespan_service)],
 ) -> TaskModel:
-    try:
-        task: TaskModel = await task_lifespan_service.get_task()
-    except ObjectNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='Task not found') from e
-
+    task = await task_lifespan_service.get_task()
     await task_lifespan_service.restart_failed_on_minion(master=master, minion_id=minion_id)
 
     return task
-
-
-# @ws_router.websocket('')
-# async def tasks_websocket(websocket: WebSocket, rdb: RedisDependency) -> None:
-#     secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
-#     await secure_websocket.handle_pubsub(
-#         {
-#             'task:*:create': TaskModel,
-#             'task:*:update': TaskModel,
-#         }
-#     )
-
-
-# @ws_router.websocket('/{tid}')
-# async def task_websocket(
-#     tid: PyObjectId,
-#     websocket: WebSocket,
-#     rdb: RedisDependency,
-#     task_service: Annotated[TaskService, Depends(get_task_service)],
-# ) -> None:
-#     task: TaskModel = await task_service.get(query=tid)
-
-#     if not task:
-#         msg = f'Task not found by ID={tid}'
-#         raise http_errors.WebSocketPolicyViolation(msg)
-
-#     def job_new_handler(data: dict) -> str:
-#         return JobModel(**{'status': JobModel.JobStatus.started, **data}).model_dump_json(by_alias=True)
-
-#     secure_websocket = PubSubAuthenticatedWebSocket(websocket, rdb)
-#     await secure_websocket.handle_pubsub(
-#         {
-#             f'task:{tid}:job:*:return': JobResult,
-#             f'task:{tid}:job:*:new': job_new_handler,
-#             f'task:{tid}:update': TaskModel,
-#         }
-#     )

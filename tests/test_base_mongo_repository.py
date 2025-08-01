@@ -2,12 +2,12 @@ from datetime import datetime
 
 import pytest
 
-from saltbox_sdk.db.exceptions import (
-    MultipleObjectsFoundError,
-    ObjectNotFoundError,
-    ObjectUpdateError,
-)
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.exceptions import (
+    MultipleObjectsFoundException,
+    ObjectNotFoundException,
+    ObjectUpdateException,
+)
 from tests.fixtures.mongo_repository_fixtures import (
     CreateUpdateModel,
     SampleModel,
@@ -135,11 +135,11 @@ async def test_object_not_found(mocked_db):
     repo = SampleRepository(mocked_db)
 
     # Try to get a non-existent object
-    with pytest.raises(ObjectNotFoundError):
+    with pytest.raises(ObjectNotFoundException):
         await repo.get(PyObjectId('000000000000000000000000'))
 
     # Try to get by non-existent query
-    with pytest.raises(ObjectNotFoundError):
+    with pytest.raises(ObjectNotFoundException):
         await repo.get({'name': 'Non-existent Object'})
 
 
@@ -153,7 +153,7 @@ async def test_multiple_objects_found(mocked_db):
     await repo.create({'name': 'Multiple 2', 'description': 'Same description'})
 
     # Try to get object by description - should return multiple results
-    with pytest.raises(MultipleObjectsFoundError):
+    with pytest.raises(MultipleObjectsFoundException):
         await repo.get({'description': 'Same description'})
 
 
@@ -220,7 +220,7 @@ async def test_update_not_found(mocked_db):
     repo = SampleRepository(mocked_db)
 
     # Try to update a non-existent object
-    with pytest.raises(ObjectUpdateError):
+    with pytest.raises(ObjectUpdateException):
         await repo.update(
             PyObjectId('000000000000000000000000'), {'name': "Won't Update", 'description': "Object doesn't exist"}
         )
@@ -239,7 +239,7 @@ async def test_delete(mocked_db):
     assert deleted_count == 1
 
     # Check that the object was actually deleted
-    with pytest.raises(ObjectNotFoundError):
+    with pytest.raises(ObjectNotFoundException):
         await repo.get(created_obj.id)
 
 
@@ -249,7 +249,7 @@ async def test_delete_not_found(mocked_db):
     repo = SampleRepository(mocked_db)
 
     # Try to delete a non-existent object
-    with pytest.raises(ObjectNotFoundError):
+    with pytest.raises(ObjectNotFoundException):
         await repo.delete(PyObjectId('000000000000000000000000'))
 
 

@@ -12,8 +12,8 @@ from saltbox_core.event_bus.exceptions import CreateSignError
 from saltbox_core.masters.repositories.master_repository import MasterRepository, get_master_repository
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_core.utilities.gpg import SaltBoxCrypt
-from saltbox_sdk.db.exceptions import ObjectNotFoundError
 from saltbox_sdk.db.mongo.config import get_mongo_db
+from saltbox_sdk.exceptions import ObjectNotFoundException
 
 
 class MastersAuthMiddleware(BaseMiddleware):
@@ -69,8 +69,8 @@ class MastersAuthMiddleware(BaseMiddleware):
 
         try:
             await self.master_service.get_by_master_id(master_id=message.master)
-        except ObjectNotFoundError:
-            logger.error('Master %s not found', message.master)
+        except ObjectNotFoundException:
+            logger.exception('Master %s not found', message.master)
             return None
 
         return await super().consume_scope(call_next, msg)

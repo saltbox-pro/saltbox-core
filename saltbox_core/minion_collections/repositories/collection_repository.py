@@ -5,11 +5,11 @@ from pydantic import BaseModel
 from pymongo.asynchronous.database import AsyncDatabase
 
 from saltbox_core.minion_collections.schemas.collection_schemas import CollectionBaseTreeModel, CollectionModel
-from saltbox_sdk.db.exceptions import ObjectNotFoundError
 from saltbox_sdk.db.mongo.config import get_mongo
 from saltbox_sdk.db.mongo.repository_base import ModelType
 from saltbox_sdk.db.mongo.repository_tree_base import BaseTreeMongoRepository, OnDelete
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.exceptions import ObjectNotFoundException
 
 
 class CollectionRepository(BaseTreeMongoRepository[CollectionModel]):
@@ -53,9 +53,9 @@ class CollectionRepository(BaseTreeMongoRepository[CollectionModel]):
         if parent_id:
             try:
                 await self.get(PyObjectId(parent_id))
-            except ObjectNotFoundError as e:
+            except ObjectNotFoundException:
                 msg = f'Parent collection with id "{parent_id}" not found'
-                raise ValueError(msg) from e
+                raise ObjectNotFoundException(msg) from None
 
         return data
 
