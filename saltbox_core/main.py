@@ -62,6 +62,9 @@ app_config: dict[str, Any] = {
     'version': __version__,
     'description': APP_DESC,
     'root_path': SETTINGS.base_url_root_path,
+    'healthcheck_path': '/discovery/health',
+    # 'docs_url': '/docs', # or None to disable
+    # 'openapi_url': '/openapi.json', # or None to disable
 }
 
 app_config = patch_swagger_config(app_config)
