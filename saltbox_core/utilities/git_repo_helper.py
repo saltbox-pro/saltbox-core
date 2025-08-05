@@ -20,6 +20,7 @@ from ruamel.yaml import YAML
 from ruamel.yaml.scanner import ScannerError
 
 from saltbox_core.config import MANIFEST_FILE_ALLOWED_NAMES, SETTINGS
+from saltbox_core.exceptions import CoreException
 from saltbox_core.settings.schemas.sls_repos_schemas import (
     ManifestDigest,
     ManifestSchema,
@@ -27,31 +28,46 @@ from saltbox_core.settings.schemas.sls_repos_schemas import (
     SettingsSlsRepoModel,
 )
 from saltbox_core.utilities.filesystem import get_latest_ctime, recursive_force_remove
-# TODO from saltbox_core.exceptions import CoreException
 
 logger = logging.getLogger(__name__)
 yaml = YAML()
 
 
-class GitRepoError(RuntimeError): ...
+class GitRepoException(CoreException): ...
 
 
-class MultipleRepoSyncError(GitRepoError): ...
+class MultipleRepoSyncException(GitRepoException): ...
 
 
-class GitRepoSshfsFileSyncError(GitRepoError): ...
+class GitRepoSshfsFileSyncException(GitRepoException): ...
 
 
-class SlsRepoError(RuntimeError): ...
+class SlsRepoException(CoreException): ...
 
 
-class SlsRepoManifestError(SlsRepoError): ...
+class SlsRepoManifestException(SlsRepoException): ...
 
 
-class SlsRepoExtractingSchemaError(SlsRepoError): ...
+class SlsRepoExtractingSchemaException(SlsRepoException): ...
 
 
-class SlsReposServeUpdaterError(GitRepoError): ...
+class SlsReposServeUpdaterException(SlsRepoException): ...
+
+
+class SlsReposValidationException(SlsReposServeUpdaterException): ...
+
+
+class SlsReposDuplicatesException(SlsReposValidationException):
+    detail = 'Conflicting paths have been found in Salt modules'
+
+    def __init__(self, dups: list[Path], detail: str | None = None) -> None:
+        if detail is not None:
+            self.detail = detail
+        self.dups = dups.copy()
+        for dup in self.dups:
+            # TODO (a.karmanov) :: Extract self.dups in exception handler instead of direct logging
+            logger.error('Path exists in multiple Salt modules: %s', dup)
+        super().__init__(self.detail)
 
 
 class SshfsSyncBase(ABC):
@@ -115,7 +131,7 @@ class SshfsSyncBase(ABC):
             return filename
         else:
             msg = f'Failed to obtain origin filename from content-disposal header for {response.url}'
-            raise GitRepoSshfsFileSyncError(msg)
+            raise GitRepoSshfsFileSyncException(msg)
 
     @abstractmethod
     def move_to_destination(self, file_path: Path) -> None:
@@ -182,10 +198,10 @@ class SshfsSyncBase(ABC):
                         if total_written % (100 * 1024 * 1024) < chunk_size:
                             logger.debug('Downloaded %d MB to %s', total_written // (1024 * 1024), download_path)
         except httpx.HTTPError as err:
-            raise GitRepoSshfsFileSyncError(err) from None
+            raise GitRepoSshfsFileSyncException(err) from None
         except httpx.HTTPStatusError as err:
             msg = f'Response {err.response.status_code} for {err.request.url!r}'
-            raise GitRepoSshfsFileSyncError(msg) from None
+            raise GitRepoSshfsFileSyncException(msg) from None
 
         logger.debug('Downloaded %s to %s', origin_filename, download_path)
 
@@ -193,7 +209,7 @@ class SshfsSyncBase(ABC):
 
         if new_checksum != self.file_entry.checksum:
             msg = f'Checksum of downloaded {self.dest_path} mismatches the manifest'
-            raise GitRepoSshfsFileSyncError(msg)
+            raise GitRepoSshfsFileSyncException(msg)
 
         self.move_to_destination(download_path)
 
@@ -429,7 +445,7 @@ class SlsRepoService:
     def local_path_abs(self) -> Path:
         if not self.local_path:
             err_msg = 'Empty local_path, uninitialized?'
-            raise SlsRepoError(err_msg)
+            raise SlsRepoException(err_msg)
         return Path(SETTINGS.local_repos_dir) / self.local_path
 
     @cached_property
@@ -471,12 +487,12 @@ class SlsRepoService:
             try:
                 manifest_data = yaml.load(m_file)
             except ScannerError as err:
-                raise SlsRepoManifestError(err) from None
+                raise SlsRepoManifestException(err) from None
 
         try:
             return ManifestSchema.parse_obj(manifest_data)
         except ValidationError as err:
-            raise SlsRepoManifestError(err) from None
+            raise SlsRepoManifestException(err) from None
 
     def extract_schemas(self) -> tuple[list[dict], list[str]]:
         schemas = []
@@ -488,7 +504,7 @@ class SlsRepoService:
         for file in repo_root.rglob('*.sls'):
             try:
                 schema = self._extract_schema(path=file, repo_root=repo_root)
-            except SlsRepoExtractingSchemaError as err:
+            except SlsRepoExtractingSchemaException as err:
                 errors.append(str(err))
             else:
                 if schema is not None:
@@ -516,7 +532,7 @@ class SlsRepoService:
                 schema_dict = json.loads(schema_content)
                 if not isinstance(schema_dict, dict):
                     msg = f'{path}: Schema is not a dictionary'
-                    raise SlsRepoExtractingSchemaError(msg)
+                    raise SlsRepoExtractingSchemaException(msg)
 
                 if 'json_schema' not in schema_dict.keys() and 'title' in schema_dict.keys():
                     # For v1 format without ui_schema
@@ -539,7 +555,7 @@ class SlsRepoService:
             except json.JSONDecodeError as e:
                 msg = f'{path}: Failed to parse file ({e!s})'
                 logger.error(msg)
-                raise SlsRepoExtractingSchemaError(msg) from None
+                raise SlsRepoExtractingSchemaException(msg) from None
         else:
             return None
 
@@ -558,6 +574,7 @@ class SlsReposServeUpdater:
     #  - Items will be passed to rsync `--exclude` as is. Trailing `/` is significant.
     # Rsync excludes to not to sync to serve location.
     IGNORE_LIST: ClassVar = ('.git', '.gitignore', 'README.md', *MANIFEST_FILE_ALLOWED_NAMES)
+    ALLOW_DUPLICATING_DIRS = SETTINGS.salt_modules_allow_duplicating_dirs
 
     def __init__(self, repos: list[SettingsSlsRepoModel]) -> None:
         self.repos = repos
@@ -583,10 +600,10 @@ class SlsReposServeUpdater:
             proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=True)  # noqa
         except FileNotFoundError:
             dosa = 'No rsync binary in $PATH'
-            raise SlsReposServeUpdaterError(dosa) from None
+            raise SlsReposServeUpdaterException(dosa) from None
         except subprocess.CalledProcessError as err:
             logger.error('rsync exit code %i with output:\n%s', err.returncode, err.stdout)
-            raise SlsReposServeUpdaterError(err) from None
+            raise SlsReposServeUpdaterException(err) from None
         else:
             msg = proc.stdout.decode()
             if msg:
@@ -615,8 +632,8 @@ class SlsReposServeUpdater:
             #   - There are no symlinks leads to outer locations.
             #   - There are no conflicts between dir symlinks and dirs.
             if cont.is_symlink():
-                msg = f'Symlink {rel_cont} is found. Symlinks in SLS repoes currently not permitted.'
-                raise SlsReposServeUpdaterError(msg)
+                msg = f'Symlink "{rel_cont}" is found. Symlinks in SLS repoes currently are not permitted.'
+                raise SlsReposValidationException(msg)
             if not cls._is_ignored(rel_cont):
                 if cont.is_dir():
                     dirs.add(rel_cont)
@@ -624,30 +641,28 @@ class SlsReposServeUpdater:
                     files.add(rel_cont)
                 else:
                     msg = f'Unexpected filesystem entry: {rel_cont}'
-                    raise SlsReposServeUpdaterError(msg)
+                    raise SlsReposServeUpdaterException(msg)
         return dirs, files
 
     def _check_conflicts(self, dirs: list[Path]) -> None:
         dir_merge: set[Path] = set()
-        dir_dups: set[Path] = set()
         file_merge: set[Path] = set()
-        file_dups: set[Path] = set()
+        dups: set[Path] = set()
 
         for d in dirs:
             dir_cont, file_cont = self._get_dir_content(d)
-            dir_dups |= dir_merge & dir_cont
+            if not self.ALLOW_DUPLICATING_DIRS:
+                dups |= dir_merge & dir_cont
+            dups |= file_merge & file_cont
             dir_merge |= dir_cont
-            file_dups |= file_merge & file_cont
             file_merge |= file_cont
+
+        # Can not mix a dir from one module and a file with the same path from another one.
         file_dir_dups = file_merge | dir_merge
-        dups = file_dups | file_dir_dups
-        if not SETTINGS.salt_modules_allow_duplicating_dirs:
-            dups |= dir_dups
+        dups |= file_dir_dups
+
         if dups:
-            for dup in dups:  # TODO No need to logging with correct exception
-                logger.error('Path exists in multiple Salt modules: %s', dup)
-            msg = 'Conflicting paths have been found in Salt modules, check log'
-            raise SlsReposServeUpdaterError(msg)
+            raise SlsReposDuplicatesException(dups=list(dups))
 
     def update(self) -> None:
         dst = SETTINGS.salt_modules_serve_dir
@@ -661,7 +676,7 @@ class SlsReposServeUpdater:
             src_path = sls_repo.local_path_abs / manifest.root
             if not src_path.is_dir():
                 msg = f'Path is not a regular directory: {src_path}'
-                raise SlsReposServeUpdaterError(msg)
+                raise SlsReposServeUpdaterException(msg)
             src_list.append(src_path)
         self._check_conflicts(src_list)
         self._rsync(src_list, dst)
@@ -675,7 +690,7 @@ async def repository_lock(redis: Redis, repo_url: str):  # type: ignore[no-untyp
     if await locker.is_locked(repo_url):
         msg = 'Another task is running for the same repo'
         logger.debug(msg)
-        raise MultipleRepoSyncError(msg)
+        raise MultipleRepoSyncException(msg)
 
     await locker.acquire_lock(repo_url)
     logger.debug('Repo locked')
