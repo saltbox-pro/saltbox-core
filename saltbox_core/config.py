@@ -76,7 +76,7 @@ class Settings(BaseSettings):
         description='Ready-to-sync SLS files location',
     )
     salt_modules_allow_duplicating_dirs: bool = Field(
-        default=False,
+        default=True,
         description='No error on duplicating directories in SLS modules'
     )
     sshfs_user: str = Field(default='saltbox', description='SSH user name to access files')
