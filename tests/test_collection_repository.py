@@ -29,14 +29,18 @@ async def test_collection_repository_create(mocked_db):
     # Create repository instance with mocked database
     repo = CollectionRepository(mocked_db)
 
-    root_collection = CollectionCreateSchema(title='Root collection', slug='root', query={})
+    root_collection = CollectionCreateSchema(title='Root collection', slug='root', query={}, owner='user1')
     await repo.create(root_collection)
 
     root_collection = await repo.get(query={'slug': 'root'})
 
     # Prepare test data
     collection_data = CollectionCreateSchema(
-        title='Тестовая коллекция', slug='test-collection', query={'grains.os': 'Ubuntu'}, parent_id=root_collection.id
+        title='Тестовая коллекция',
+        slug='test-collection',
+        query={'grains.os': 'Ubuntu'},
+        parent_id=root_collection.id,
+        owner='user1',
     )
 
     # Call create method
@@ -46,6 +50,7 @@ async def test_collection_repository_create(mocked_db):
     assert isinstance(created_collection, CollectionModel)
     assert created_collection.title == 'Тестовая коллекция'
     assert created_collection.slug == 'test-collection'
+    assert created_collection.owner == 'user1'
     assert created_collection.query == {'grains.os': 'Ubuntu'}
     assert isinstance(created_collection.id, PyObjectId)
     assert isinstance(created_collection.created, datetime)
@@ -62,6 +67,7 @@ async def test_collection_repository_create_with_dict(mocked_db):
         'title': 'Тестовая коллекция 2',
         'slug': 'test-collection-2',
         'query': {'grains.cpu_model': {'$regex': 'Intel'}},
+        'owner': 'user1',
     }
 
     created_collection = await repo.create(collection_data)
@@ -69,6 +75,7 @@ async def test_collection_repository_create_with_dict(mocked_db):
     assert isinstance(created_collection, CollectionModel)
     assert created_collection.title == 'Тестовая коллекция 2'
     assert created_collection.slug == 'test-collection-2'
+    assert created_collection.owner == 'user1'
     assert created_collection.query == {'grains.cpu_model': {'$regex': 'Intel'}}
     assert isinstance(created_collection.created, datetime)
     assert isinstance(created_collection.modified, datetime)
@@ -80,10 +87,17 @@ async def test_collection_repository_create_duplicate(mocked_db):
     repo = CollectionRepository(mocked_db)
 
     # Create first collection
-    await repo.create({'title': 'Первая коллекция', 'slug': 'duplicate-slug', 'query': {'grains.os': 'Ubuntu'}})
+    await repo.create(
+        {'title': 'Первая коллекция', 'slug': 'duplicate-slug', 'query': {'grains.os': 'Ubuntu'}, 'owner': 'user1'}
+    )
 
     # Try to create second collection with the same slug
-    duplicate_data = {'title': 'Вторая коллекция', 'slug': 'duplicate-slug', 'query': {'grains.os': 'CentOS'}}
+    duplicate_data = {
+        'title': 'Вторая коллекция',
+        'slug': 'duplicate-slug',
+        'query': {'grains.os': 'CentOS'},
+        'owner': 'user1',
+    }
 
     # Check that exception will be raised
     with pytest.raises(DuplicateKeyException):
