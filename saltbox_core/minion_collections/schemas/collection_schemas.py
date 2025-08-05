@@ -25,6 +25,7 @@ class CollectionComputedFieldsMixin:
 class CollectionReadOnlyFieldsMixin:
     slug: str = Field(title='Slug', pattern=r'^[a-z0-9-]+$', min_length=3, max_length=30)
     parent_title: str | None = Field(title='Title', min_length=3, max_length=50, default=None)
+    owner: str = Field(title='Owner', min_length=3, max_length=50)
 
 
 class CollectionEditableFieldsMixin:

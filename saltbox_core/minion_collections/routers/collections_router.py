@@ -1,7 +1,7 @@
 import json
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 
 from saltbox_core.config import logger
 from saltbox_core.minion_collections.schemas.collection_schemas import (
@@ -13,8 +13,9 @@ from saltbox_core.minion_collections.schemas.collection_schemas import (
     CollectionUpdateSchema,
 )
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
-from saltbox_sdk.db.schemas_base import PaginatedResponse, SkipLimitParams
+from saltbox_sdk.db.schemas_base import PaginatedResponse, SkipLimitParams, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig, OPAQueryFilterFormat
+from saltbox_sdk.fastapi_utils.dependencies import get_current_user
 
 router = APIRouter(prefix='/collections', tags=['Minion Collections'])
 
@@ -22,19 +23,14 @@ router = APIRouter(prefix='/collections', tags=['Minion Collections'])
 @router.get(
     '',
     operation_id='minion_collections_list',
-    # openapi_extra={
-    #     'x-resource: 'collections',
-    #     'x-action': 'list',
-    #     'x-cache-ttl': 60,
-    # },
     openapi_extra=GatewayEndpointConfig(
-        policy='core.col',
+        policy='core.collections',
         is_partial=True,
         partial_query='allow == true',
         unknowns=['collections'],
         query_filter_format=OPAQueryFilterFormat.MONGO,
         action=CollectionActions.LIST,
-        cache_ttl=60,
+        cache_ttl=0,
     ).model_dump(by_alias=True),  # need to use by_alias=True to match the OpenAPI schema format
 )
 async def collections_list(
@@ -50,39 +46,49 @@ async def collections_list(
 
 
 @router.get(
-    '/{slug}',
-    operation_id='minion_collection_read',
-    openapi_extra={
-        'x-opa-policy': 'core.col',
-        'x-opa-partial': True,
-        'x-opa-query': 'allow == true',
-        'x-opa-unknowns': ['collections'],
-        'x-opa-query-filter-format': 'mongo',
-        'x-cache-ttl': 5,
-    },
+    '/default',
+    operation_id='minion_collection_default',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.collections',
+        is_partial=True,
+        partial_query='allow == true',
+        unknowns=['collections'],
+        query_filter_format=OPAQueryFilterFormat.MONGO,
+        action=CollectionActions.READ,
+        cache_ttl=0,
+    ).model_dump(by_alias=True),
 )
-async def collection_retrieve(
+async def collection_default(
     request: Request,
-    slug: str,
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
 ) -> CollectionDetailSchema:
     query_str = request.query_params.get('opa_query', None)
     query = json.loads(query_str) if query_str else {}
     logger.info(f'Query string: {query_str}')
 
-    if slug == 'default':
-        allowed_collections = await collection_service.get_list(query=query, limit=1, skip=0)
-        logger.info(f'Allowed collections: {allowed_collections}')
-        if not allowed_collections:
-            raise HTTPException(status_code=404, detail='No collections found')
-
-        return CollectionDetailSchema(
-            **{**allowed_collections[0].model_dump(), '_id': allowed_collections[0].id, 'allowed_actions': []}
-        )
-
-    query = {**query, 'slug': slug}
     logger.info(f'OPA query: {query}')
     response = await collection_service.get(query=query)
+    return CollectionDetailSchema(**{**response.model_dump(), '_id': response.id, 'allowed_actions': []})
+
+
+@router.get(
+    '/{slug}',
+    operation_id='minion_collection_read',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.collections',
+        is_partial=False,
+        action=CollectionActions.READ,
+        cache_ttl=0,
+    ).model_dump(by_alias=True),
+)
+async def collection_retrieve(
+    slug: str,
+    collection_service: Annotated[CollectionService, Depends(get_collection_service)],
+) -> CollectionDetailSchema:
+    query = {'slug': slug}
+    logger.info(f'OPA query: {query}')
+    response = await collection_service.get(query=query)
+    logger.info(f'Collection retrieved: {response}')
     return CollectionDetailSchema(**{**response.model_dump(), '_id': response.id, 'allowed_actions': []})
 
 
@@ -97,6 +103,7 @@ async def collection_retrieve(
 )
 async def collection_create(
     collection: CollectionCreateRequestSchema,
+    user: Annotated[UserShort, Depends(get_current_user)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
 ) -> CollectionModel:
     creation_data = collection.model_dump()
@@ -104,6 +111,7 @@ async def collection_create(
 
     parent_collection = await collection_service.get_by_slug(parent_slug)
     creation_data['parent_id'] = parent_collection.id
+    creation_data['owner'] = user.sub
 
     return await collection_service.create(CollectionCreateSchema.model_validate(creation_data))
 
