@@ -658,7 +658,7 @@ class SlsReposServeUpdater:
             file_merge |= file_cont
 
         # Can not mix a dir from one module and a file with the same path from another one.
-        file_dir_dups = file_merge | dir_merge
+        file_dir_dups = file_merge & dir_merge
         dups |= file_dir_dups
 
         if dups:
