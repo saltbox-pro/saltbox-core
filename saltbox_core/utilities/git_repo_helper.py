@@ -27,6 +27,7 @@ from saltbox_core.settings.schemas.sls_repos_schemas import (
     SettingsSlsRepoModel,
 )
 from saltbox_core.utilities.filesystem import get_latest_ctime, recursive_force_remove
+# TODO from saltbox_core.exceptions import CoreException
 
 logger = logging.getLogger(__name__)
 yaml = YAML()
@@ -601,24 +602,49 @@ class SlsReposServeUpdater:
                 return True
         return False
 
+    DirContentDirs = set[Path]
+    DirContentFiles = set[Path]
+
     @classmethod
-    def _get_dir_content(cls, path: Path) -> set:
-        result: set[Path] = set()
+    def _get_dir_content(cls, path: Path) -> tuple[DirContentDirs, DirContentFiles]:
+        dirs: set[Path] = set()
+        files: set[Path] = set()
         for cont in path.rglob('*'):
             rel_cont = cont.relative_to(path)
+            # We must check at least:
+            #   - There are no symlinks leads to outer locations.
+            #   - There are no conflicts between dir symlinks and dirs.
+            if cont.is_symlink():
+                msg = f'Symlink {rel_cont} is found. Symlinks in SLS repoes currently not permitted.'
+                raise SlsReposServeUpdaterError(msg)
             if not cls._is_ignored(rel_cont):
-                result.add(rel_cont)
-        return result
+                if cont.is_dir():
+                    dirs.add(rel_cont)
+                elif cont.is_file():
+                    files.add(rel_cont)
+                else:
+                    msg = f'Unexpected filesystem entry: {rel_cont}'
+                    raise SlsReposServeUpdaterError(msg)
+        return dirs, files
 
     def _check_conflicts(self, dirs: list[Path]) -> None:
-        merge: set[Path] = set()
-        dups: set[Path] = set()
+        dir_merge: set[Path] = set()
+        dir_dups: set[Path] = set()
+        file_merge: set[Path] = set()
+        file_dups: set[Path] = set()
+
         for d in dirs:
-            content = self._get_dir_content(d)
-            dups |= merge & content
-            merge |= content
+            dir_cont, file_cont = self._get_dir_content(d)
+            dir_dups |= dir_merge & dir_cont
+            dir_merge |= dir_cont
+            file_dups |= file_merge & file_cont
+            file_merge |= file_cont
+        file_dir_dups = file_merge | dir_merge
+        dups = file_dups | file_dir_dups
+        if not SETTINGS.salt_modules_allow_duplicating_dirs:
+            dups |= dir_dups
         if dups:
-            for dup in dups:
+            for dup in dups:  # TODO No need to logging with correct exception
                 logger.error('Path exists in multiple Salt modules: %s', dup)
             msg = 'Conflicting paths have been found in Salt modules, check log'
             raise SlsReposServeUpdaterError(msg)
