@@ -24,7 +24,7 @@ router = APIRouter(prefix='/collections', tags=['Minion Collections'])
     '',
     operation_id='minion_collections_list',
     openapi_extra=GatewayEndpointConfig(
-        policy='core.collections',
+        policy='core.collections.list',
         is_partial=True,
         partial_query='allow == true',
         unknowns=['collections'],
@@ -49,7 +49,7 @@ async def collections_list(
     '/default',
     operation_id='minion_collection_default',
     openapi_extra=GatewayEndpointConfig(
-        policy='core.collections',
+        policy='core.collections.read',
         is_partial=True,
         partial_query='allow == true',
         unknowns=['collections'],
@@ -75,8 +75,7 @@ async def collection_default(
     '/{slug}',
     operation_id='minion_collection_read',
     openapi_extra=GatewayEndpointConfig(
-        policy='core.collections',
-        is_partial=False,
+        policy='core.collections.read',
         action=CollectionActions.READ,
         cache_ttl=0,
     ).model_dump(by_alias=True),
@@ -85,10 +84,7 @@ async def collection_retrieve(
     slug: str,
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
 ) -> CollectionDetailSchema:
-    query = {'slug': slug}
-    logger.info(f'OPA query: {query}')
-    response = await collection_service.get(query=query)
-    logger.info(f'Collection retrieved: {response}')
+    response = await collection_service.get(query={'slug': slug})
     return CollectionDetailSchema(**{**response.model_dump(), '_id': response.id, 'allowed_actions': []})
 
 
@@ -96,8 +92,7 @@ async def collection_retrieve(
     '',
     operation_id='minion_collection_create',
     openapi_extra=GatewayEndpointConfig(
-        policy='core.col',
-        # resource='collections',
+        policy='core.collections.create',
         action=CollectionActions.CREATE,
     ).model_dump(by_alias=True),
 )
@@ -111,7 +106,7 @@ async def collection_create(
 
     parent_collection = await collection_service.get_by_slug(parent_slug)
     creation_data['parent_id'] = parent_collection.id
-    creation_data['owner'] = user.sub
+    creation_data['owner_id'] = user.sub
 
     return await collection_service.create(CollectionCreateSchema.model_validate(creation_data))
 
