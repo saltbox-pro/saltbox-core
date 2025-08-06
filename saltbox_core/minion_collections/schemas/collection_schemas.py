@@ -24,21 +24,12 @@ class CollectionComputedFieldsMixin:
 
 class CollectionReadOnlyFieldsMixin:
     slug: str = Field(title='Slug', pattern=r'^[a-z0-9-]+$', min_length=3, max_length=30)
-    parent_title: str | None = Field(title='Title', min_length=3, max_length=50, default=None)
     owner_id: str | None = Field(title='Owner', min_length=3, max_length=50, default=None)
 
 
 class CollectionEditableFieldsMixin:
     title: str = Field(title='Title', min_length=3, max_length=50)
     query: MongoQuery = MongoQueryField
-    parent_slug: str | None = Field(
-        title='Parent Slug',
-        pattern=r'^[a-z0-9-]+$',
-        min_length=3,
-        max_length=30,
-        default=None,
-        description='Slug of the parent collection, if any',
-    )
 
 
 class CollectionCreateSchema(BaseModel, CollectionEditableFieldsMixin, CollectionReadOnlyFieldsMixin, TreeMixin):
@@ -62,7 +53,15 @@ class CollectionModel(
     CollectionReadOnlyFieldsMixin,
     CollectionComputedFieldsMixin,
 ):
-    pass
+    parent_title: str | None = Field(title='Title', min_length=3, max_length=50, default=None)
+    parent_slug: str | None = Field(
+        title='Parent Slug',
+        pattern=r'^[a-z0-9-]+$',
+        min_length=3,
+        max_length=30,
+        default=None,
+        description='Slug of the parent collection, if any',
+    )
 
 
 class CollectionDetailSchema(CollectionModel):
