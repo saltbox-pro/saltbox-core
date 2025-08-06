@@ -89,6 +89,7 @@ async def init_collections() -> None:
             title='Root collection',
             slug='root',
             query={},
+            owner='system',
         )
         await collections_repo.create(obj)
         logger.debug('MinionCollection with slug `root` created')
