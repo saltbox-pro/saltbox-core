@@ -15,6 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add tree structure to collections
 - Master `last_sync_status` and `last_sync_timestamp` fields
 - Add `/pillar/validate` endpoint for validating import pillars data
+- `salt_modules_allow_duplicating_dirs` boolean option to allow directory
+duplicates among SLS packages.
 
 ### Changed
 
@@ -24,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rsync based synchronization of SLS files
 - Common Core-Bridge message classes moved to `saltbox-bridge-messages` library
 - Shorten Master authentication process
+- Better errors handling for synchronizing of SLS packages.
 
 ### Fixed
 
