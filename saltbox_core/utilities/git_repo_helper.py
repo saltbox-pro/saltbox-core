@@ -59,14 +59,12 @@ class SlsReposValidationException(SlsReposServeUpdaterException): ...
 
 class SlsReposDuplicatesException(SlsReposValidationException):
     detail = 'Conflicting paths have been found in Salt modules'
+    extra_fields = ('dups',)
 
     def __init__(self, dups: list[Path], detail: str | None = None) -> None:
         if detail is not None:
             self.detail = detail
         self.dups = dups.copy()
-        for dup in self.dups:
-            # TODO (a.karmanov) :: Extract self.dups in exception handler instead of direct logging
-            logger.error('Path exists in multiple Salt modules: %s', dup)
         super().__init__(self.detail)
 
 
