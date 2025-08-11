@@ -1,7 +1,10 @@
+import json
+
 import pymongo
 
 from saltbox_core.config import logger
 from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository
+from saltbox_core.jobs.schemas.job_sc_schemas import JobSchemaCreateSchema
 from saltbox_core.masters.repositories.master_repository import MasterRepository
 from saltbox_core.minion_collections.repositories.collection_repository import CollectionRepository
 from saltbox_core.minion_collections.schemas.collection_schemas import CollectionCreateSchema
@@ -64,6 +67,26 @@ async def init_job_schemas() -> None:
         )
         logger.debug('Index created: %s', result)
         logger.debug('Indexes: %s', indexes)
+
+    is_default_schema_exists = await json_schemas_repo.exists(query={'name': 'default'})
+
+    if not is_default_schema_exists:
+        logger.debug('Creating default schema')
+
+        with open('saltbox_core/jobs/default_func_schema.json') as f:
+            default_schema = json.load(f)
+        with open('saltbox_core/jobs/default_func_ui_schema.json') as f:
+            default_ui_schema = json.load(f)
+
+        default_schema = await json_schemas_repo.create(
+            data=JobSchemaCreateSchema.model_validate(
+                {'name': 'default', 'json_schema': default_schema, 'ui_schema': default_ui_schema, 'commit_hash': ''}
+            )
+        )
+
+        logger.info('Created default schema: %s', default_schema)
+    else:
+        logger.debug('Default schema already exists')
 
 
 async def init_collections() -> None:

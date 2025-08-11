@@ -1,0 +1,23 @@
+{
+  "title": "Default",
+  "type": "object",
+  "properties": {
+    "args": {
+      "title": "Args",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "kwargs": {
+      "title": "Kwargs",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "propertyNames": {
+        "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+      }
+    }
+  }
+}
