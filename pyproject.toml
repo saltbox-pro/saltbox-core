@@ -44,7 +44,7 @@ saltbox-tasks-watcher = "saltbox_core.tasks.tasks_watcher:main"
 # version = "attr: package.__version__"
 
 [build-system]
-requires = ["setuptools>=75.1.0", "setuptools-scm"]
+requires = ["setuptools>=75.1.0"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
