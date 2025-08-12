@@ -1,6 +1,6 @@
 import json
+from pathlib import Path
 
-import anyio
 import pymongo
 
 from saltbox_core.config import logger
@@ -74,11 +74,11 @@ async def init_job_schemas() -> None:
     if not is_default_schema_exists:
         logger.debug('Creating default schema')
 
-        async with await anyio.open_file('./saltbox_core/jobs/default_func_schema.json') as f:
-            default_schema = json.loads(await f.read())
+        with Path('./saltbox_core/jobs/default_func_schema.json').open('r') as f:  # noqa: ASYNC230
+            default_schema = json.load(f)
 
-        async with await anyio.open_file('./saltbox_core/jobs/default_func_ui_schema.json') as f:
-            default_ui_schema = json.loads(await f.read())
+        with Path('./saltbox_core/jobs/default_func_ui_schema.json').open('r') as f:  # noqa: ASYNC230
+            default_ui_schema = json.load(f)
 
         default_schema = await json_schemas_repo.create(
             data=JobSchemaCreateSchema.model_validate(
