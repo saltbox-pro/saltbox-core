@@ -111,7 +111,14 @@ async def collection_create(
     return await collection_service.create(CollectionCreateSchema.model_validate(creation_data))
 
 
-@router.put('/{slug}', operation_id='minion_collection_update')
+@router.put(
+    '/{slug}',
+    operation_id='minion_collection_update',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.collections.update',
+        action=CollectionActions.UPDATE,
+    ).model_dump(by_alias=True),
+)
 async def collection_update(
     slug: str,
     collection: CollectionUpdateSchema,
@@ -126,6 +133,10 @@ async def collection_update(
     '/{slug}',
     operation_id='minion_collection_delete',
     status_code=status.HTTP_204_NO_CONTENT,
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.collections.delete',
+        action=CollectionActions.DELETE,
+    ).model_dump(by_alias=True),
 )
 async def collection_delete(
     slug: str,

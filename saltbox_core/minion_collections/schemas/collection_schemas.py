@@ -40,7 +40,7 @@ class CollectionCreateRequestSchema(BaseModel, CollectionEditableFieldsMixin, Co
     parent_slug: str = Field(title='Slug', pattern=r'^[a-z0-9-]+$', min_length=3, max_length=30)
 
 
-class CollectionUpdateSchema(BaseModel, CollectionEditableFieldsMixin, TreeMixin):
+class CollectionUpdateSchema(BaseModel, CollectionEditableFieldsMixin):
     model_config = ConfigDict(
         extra='forbid',
     )
