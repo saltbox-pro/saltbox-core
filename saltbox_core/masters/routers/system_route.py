@@ -50,7 +50,7 @@ async def authorized_keys(
     return '\n'.join(keys)
 
 
-@router.post('/{master}/burst_test')
+@router.post('/{master_id}/burst_test')
 async def burst_test(
     master_id: str,
     master_service: Annotated[MasterService, Depends(get_master_service)],
@@ -64,7 +64,7 @@ async def burst_test(
     return BridgeTestBurstResponse(**resp)
 
 
-@router.post('/{master}/burst_jobs_test')
+@router.post('/{master_id}/burst_jobs_test')
 async def burst_jobs_test_post(
     master_id: str,
     master_service: Annotated[MasterService, Depends(get_master_service)],
