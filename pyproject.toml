@@ -44,8 +44,11 @@ saltbox-tasks-watcher = "saltbox_core.tasks.tasks_watcher:main"
 # version = "attr: package.__version__"
 
 [build-system]
-requires = ["setuptools>=75.1.0"]
+requires = ["setuptools>=75.1.0", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools_scm]
+fallback_version = "0.0.0"
 
 [tool.setuptools.packages.find]
 # Explicit package dir for flat-layout
