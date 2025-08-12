@@ -74,10 +74,10 @@ async def init_job_schemas() -> None:
     if not is_default_schema_exists:
         logger.debug('Creating default schema')
 
-        async with await anyio.open_file('saltbox_core/jobs/default_func_schema.json') as f:
+        async with await anyio.open_file('./saltbox_core/jobs/default_func_schema.json') as f:
             default_schema = json.loads(await f.read())
 
-        async with await anyio.open_file('saltbox_core/jobs/default_func_ui_schema.json') as f:
+        async with await anyio.open_file('./saltbox_core/jobs/default_func_ui_schema.json') as f:
             default_ui_schema = json.loads(await f.read())
 
         default_schema = await json_schemas_repo.create(
