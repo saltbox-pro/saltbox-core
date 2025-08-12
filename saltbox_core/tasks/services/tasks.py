@@ -84,7 +84,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
             except JsonSchemaValidationError as err:
                 raise TaskServiceException(str(err)) from err
 
-        collection = await self.collections_service.get(query=data.collection_id)
+        collection = await self.collections_service.get_by_slug(data.collection_slug)
 
         task_args = validated_data['args'] if 'args' in validated_data else None
         task_kwargs = validated_data['kwargs'] if 'kwargs' in validated_data else None

@@ -206,7 +206,7 @@ class TaskCreateRequestSchema(BaseModel):
     salt_masters: list[str] = ['salt-master']
     data: TaskData | None = None
 
-    collection_id: PyObjectId = Field(title='Collection id')
+    collection_slug: str = Field(title='Collection slug')
     query: dict = Field(title='Query', default={})
     minions: list[TaskTargetMinion] = Field(title='Minions', default=[])
 
@@ -243,3 +243,10 @@ class TaskListResponseSchema(
 class TaskListQueryParams(SkipLimitParams):
     collection_slug: str
     model_config: ClassVar[ConfigDict] = {'extra': 'forbid'}
+
+
+class TasksActions(StrEnum):
+    CREATE = 'create'
+    READ = 'read'
+    UPDATE = 'update'
+    DELETE = 'delete'
