@@ -14,7 +14,7 @@ from saltbox_core.minion_collections.schemas.collection_schemas import (
 )
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_sdk.db.schemas_base import PaginatedResponse, SkipLimitParams, UserShort
-from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig, OPAQueryFilterFormat
+from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 from saltbox_sdk.fastapi_utils.dependencies import get_current_user
 
 router = APIRouter(prefix='/collections', tags=['Minion Collections'])
@@ -25,10 +25,6 @@ router = APIRouter(prefix='/collections', tags=['Minion Collections'])
     operation_id='minion_collections_list',
     openapi_extra=GatewayEndpointConfig(
         policy='core.collections.list',
-        is_partial=True,
-        partial_query='allow == true',
-        unknowns=['collections'],
-        query_filter_format=OPAQueryFilterFormat.MONGO,
         action=CollectionActions.LIST,
         cache_ttl=0,
     ).model_dump(by_alias=True),  # need to use by_alias=True to match the OpenAPI schema format
@@ -49,11 +45,7 @@ async def collections_list(
     '/default',
     operation_id='minion_collection_default',
     openapi_extra=GatewayEndpointConfig(
-        policy='core.collections.read',
-        is_partial=True,
-        partial_query='allow == true',
-        unknowns=['collections'],
-        query_filter_format=OPAQueryFilterFormat.MONGO,
+        policy='core.collections.default',
         action=CollectionActions.READ,
         cache_ttl=0,
     ).model_dump(by_alias=True),
@@ -64,11 +56,10 @@ async def collection_default(
 ) -> CollectionDetailSchema:
     query_str = request.query_params.get('opa_query', None)
     query = json.loads(query_str) if query_str else {}
-    logger.info(f'Query string: {query_str}')
-
     logger.info(f'OPA query: {query}')
-    response = await collection_service.get(query=query)
-    return CollectionDetailSchema(**{**response.model_dump(), '_id': response.id, 'allowed_actions': []})
+
+    response = await collection_service.get_list(query=query, limit=1, skip=0)
+    return CollectionDetailSchema(**{**response[0].model_dump(), '_id': response[0].id, 'allowed_actions': []})
 
 
 @router.get(
@@ -77,6 +68,7 @@ async def collection_default(
     openapi_extra=GatewayEndpointConfig(
         policy='core.collections.read',
         action=CollectionActions.READ,
+        include_object=True,
         cache_ttl=0,
     ).model_dump(by_alias=True),
 )
