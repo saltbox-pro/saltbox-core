@@ -47,6 +47,12 @@ saltbox-tasks-watcher = "saltbox_core.tasks.tasks_watcher:main"
 requires = ["setuptools>=75.1.0", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
 
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"saltbox_core.db.fixtures" = ["*"]
+
 [tool.setuptools_scm]
 fallback_version = "0.0.0"
 
