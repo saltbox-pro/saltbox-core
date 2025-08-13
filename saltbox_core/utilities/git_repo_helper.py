@@ -626,13 +626,13 @@ class SlsReposServeUpdater:
         files: set[Path] = set()
         for cont in path.rglob('*'):
             rel_cont = cont.relative_to(path)
-            # We must check at least:
-            #   - There are no symlinks leads to outer locations.
-            #   - There are no conflicts between dir symlinks and dirs.
-            if cont.is_symlink():
-                msg = f'Symlink "{rel_cont}" is found. Symlinks in SLS repoes currently are not permitted.'
-                raise SlsReposValidationException(msg)
             if not cls._is_ignored(rel_cont):
+                # We must check at least:
+                #   - There are no symlinks leads to outer locations.
+                #   - There are no conflicts between dir symlinks and dirs.
+                if cont.is_symlink():
+                    msg = f'Symlink "{rel_cont}" is found. Symlinks in SLS repoes currently are not permitted.'
+                    raise SlsReposValidationException(msg)
                 if cont.is_dir():
                     dirs.add(rel_cont)
                 elif cont.is_file():
