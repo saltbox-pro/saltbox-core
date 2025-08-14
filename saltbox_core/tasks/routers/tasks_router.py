@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, Request
 
 from saltbox_core.config import logger
 from saltbox_core.jobs.exceptions import JobDoesNotExistsException
@@ -13,33 +13,41 @@ from saltbox_core.tasks.schemas.task_schemas import (
     TaskListQueryParams,
     TaskListResponseSchema,
     TaskModel,
+    TasksActions,
 )
 from saltbox_core.tasks.services.tasks import TaskService, get_task_service
 from saltbox_core.tasks.services.tasks_lifespan import TaskLifespanService, get_task_lifespan_service
 from saltbox_core.utilities.jid import JID
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
-from saltbox_sdk.fastapi_utils.dependencies import get_current_user
+from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
+from saltbox_sdk.fastapi_utils.dependencies import get_current_user, get_opa_query
 
-router = APIRouter(
-    prefix='/tasks',
-    tags=['Tasks'],
-    responses={status.HTTP_404_NOT_FOUND: {'description': 'Not found'}},
+router = APIRouter(prefix='/tasks', tags=['Tasks'])
+
+
+@router.get(
+    '',
+    operation_id='tasks_list',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.list',
+        action=TasksActions.LIST,
+    ).model_dump(by_alias=True),
 )
-
-ws_router = APIRouter(prefix='/tasks')
-
-
-@router.get('', operation_id='tasks_list')
 async def tasks_list(
     params: Annotated[TaskListQueryParams, Query()],
+    opa_query: Annotated[dict, Depends(get_opa_query)],
     task_service: Annotated[TaskService, Depends(get_task_service)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
 ) -> PaginatedResponse[TaskListResponseSchema]:
-    collection = await collection_service.get_by_slug(params.collection_slug)
+    logger.info(f'OPA query: {opa_query}')
 
+    collection = await collection_service.get_by_slug(params.collection_slug)
+    query = {'target_collection.id': PyObjectId(collection.id)}
+    if opa_query:
+        query.update(opa_query)
     task_list = await task_service.get_list_paginated(
-        query={'target_collection.id': PyObjectId(collection.id)},
+        query=query,
         limit=params.limit,
         skip=params.skip,
         projection_model=TaskListResponseSchema,
@@ -48,8 +56,16 @@ async def tasks_list(
     return task_list
 
 
-@router.post('', operation_id='task_create')
+@router.post(
+    '',
+    operation_id='task_create',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.create',
+        action=TasksActions.CREATE,
+    ).model_dump(by_alias=True),
+)
 async def task_create(
+    request: Request,
     item: TaskCreateRequestSchema,
     user: Annotated[UserShort, Depends(get_current_user)],
     task_service: Annotated[TaskService, Depends(get_task_service)],
@@ -64,7 +80,14 @@ async def task_create(
     return await task_service.create(data=create_data)
 
 
-@router.get('/{tid}', operation_id='task_retrieve')
+@router.get(
+    '/{tid}',
+    operation_id='task_retrieve',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.read',
+        action=TasksActions.READ,
+    ).model_dump(by_alias=True),
+)
 async def task_retrieve(
     tid: PyObjectId,
     task_service: Annotated[TaskService, Depends(get_task_service)],
@@ -72,7 +95,14 @@ async def task_retrieve(
     return await task_service.get(query=tid)
 
 
-@router.get('/{tid}/jobs', operation_id='task_jobs')
+@router.get(
+    '/{tid}/jobs',
+    operation_id='task_jobs',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.read',
+        action=TasksActions.READ,
+    ).model_dump(by_alias=True),
+)
 async def task_jobs(
     tid: PyObjectId,
     task_service: Annotated[TaskService, Depends(get_task_service)],
@@ -90,7 +120,14 @@ async def task_jobs(
     return result
 
 
-@router.get('/{tid}/returns', operation_id='task_returns')
+@router.get(
+    '/{tid}/returns',
+    operation_id='task_returns',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.read',
+        action=TasksActions.READ,
+    ).model_dump(by_alias=True),
+)
 async def task_returns(
     tid: PyObjectId,
     task_service: Annotated[TaskService, Depends(get_task_service)],
@@ -109,7 +146,14 @@ async def task_returns(
     return result
 
 
-@router.post('/{tid}/run', operation_id='task_run')
+@router.post(
+    '/{tid}/run',
+    operation_id='task_run',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.run',
+        action=TasksActions.RUN,
+    ).model_dump(by_alias=True),
+)
 async def task_run(
     task_lifespan_service: Annotated[TaskLifespanService, Depends(get_task_lifespan_service)],
 ) -> TaskModel:
@@ -118,7 +162,14 @@ async def task_run(
     return task
 
 
-@router.post('/{tid}/stop', operation_id='task_stop')
+@router.post(
+    '/{tid}/stop',
+    operation_id='task_stop',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.run',
+        action=TasksActions.RUN,
+    ).model_dump(by_alias=True),
+)
 async def task_stop(
     task_lifespan_service: Annotated[TaskLifespanService, Depends(get_task_lifespan_service)],
 ) -> TaskModel:
@@ -128,7 +179,14 @@ async def task_stop(
     return task
 
 
-@router.post('/{tid}/restart_failed', operation_id='restart_failed')
+@router.post(
+    '/{tid}/restart_failed',
+    operation_id='restart_failed',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.run',
+        action=TasksActions.RUN,
+    ).model_dump(by_alias=True),
+)
 async def restart_failed(
     task_lifespan_service: Annotated[TaskLifespanService, Depends(get_task_lifespan_service)],
 ) -> TaskModel:
@@ -138,7 +196,14 @@ async def restart_failed(
     return task
 
 
-@router.post('/{tid}/restart_failed_on_minion', operation_id='restart_failed_on_minion')
+@router.post(
+    '/{tid}/restart_failed_on_minion',
+    operation_id='restart_failed_on_minion',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.run',
+        action=TasksActions.RUN,
+    ).model_dump(by_alias=True),
+)
 async def restart_failed_on_minion(
     master: str,
     minion_id: str,

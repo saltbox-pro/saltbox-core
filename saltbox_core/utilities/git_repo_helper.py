@@ -10,7 +10,7 @@ from contextlib import asynccontextmanager
 from email.message import Message
 from functools import cached_property
 from pathlib import Path
-from typing import Any, ClassVar, Self
+from typing import Any, ClassVar
 
 import httpx
 from git import Repo
@@ -343,7 +343,7 @@ class GitRepoService:
         self.local_path = Path(SETTINGS.local_repos_dir) / self.local_name
 
     @classmethod
-    def from_model(cls, model: SettingsSlsRepoModel) -> Self:
+    def from_model(cls, model: SettingsSlsRepoModel) -> 'GitRepoService':
         url = model.get_repo_url_as_str()
         return cls(
             repo_url=url,

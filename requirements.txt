@@ -9,7 +9,6 @@ pyjwt[crypto]~=2.10.1
 pymongo~=4.11
 python-gnupg==0.4.8
 python-multipart~=0.0.17
-python-slugify~=8.0.4
 redis~=5.2.0
 ruamel.yaml~=0.18.5
 taskiq-aio-pika~=0.4.1

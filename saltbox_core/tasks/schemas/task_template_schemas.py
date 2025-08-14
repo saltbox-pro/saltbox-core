@@ -1,5 +1,3 @@
-from typing import ClassVar
-
 from pydantic import BaseModel, ConfigDict, Field
 
 # from saltbox_core.config import logger
@@ -52,4 +50,6 @@ class TaskTemplateModel(BaseModel, CreatedModifiedMixin, EditableFieldsFullMixin
 
 class TaskTemplateListQueryParams(SkipLimitParams):
     repo_ids: list[PyObjectId] | None = None
-    model_config: ClassVar[ConfigDict] = {'extra': 'forbid'}
+    model_config = ConfigDict(
+        extra='ignore',
+    )

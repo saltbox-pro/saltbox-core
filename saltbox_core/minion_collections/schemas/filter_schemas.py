@@ -1,4 +1,4 @@
-from typing import ClassVar, TypedDict
+from typing import TypedDict
 
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -30,7 +30,9 @@ class MinionFilterValuesBody(BaseModel):
     skip: int = Field(strict=True, default=0, ge=0, le=1000)
     limit: int | None = Field(strict=True, default=None, ge=0, le=1000)
 
-    model_config: ClassVar[ConfigDict] = {'extra': 'forbid'}
+    model_config = ConfigDict(
+        extra='forbid',
+    )
 
     @field_validator('field')
     @classmethod

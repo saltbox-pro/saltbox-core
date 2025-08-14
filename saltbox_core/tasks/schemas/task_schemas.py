@@ -1,5 +1,5 @@
 from enum import StrEnum
-from typing import Any, ClassVar, Self
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
@@ -217,7 +217,7 @@ class TaskCreateRequestSchema(BaseModel):
     postprocessing: TaskPostProcessingCreate | None = Field(title='Postprocessing', default=None)
 
     @model_validator(mode='after')
-    def validate_local_path(self) -> Self:
+    def validate_local_path(self) -> 'TaskCreateRequestSchema':
         if self.task_template_id is None and self.fun is None:
             msg = 'One of `task_template` or `fun` must be set'
             raise ValueError(msg)
@@ -242,11 +242,13 @@ class TaskListResponseSchema(
 
 class TaskListQueryParams(SkipLimitParams):
     collection_slug: str
-    model_config: ClassVar[ConfigDict] = {'extra': 'forbid'}
+    model_config = ConfigDict(
+        extra='ignore',
+    )
 
 
 class TasksActions(StrEnum):
     CREATE = 'create'
     READ = 'read'
-    UPDATE = 'update'
-    DELETE = 'delete'
+    LIST = 'list'
+    RUN = 'run'

@@ -3,7 +3,7 @@ import os
 import uuid
 from enum import StrEnum
 from pathlib import Path
-from typing import Annotated, Any, Self
+from typing import Annotated, Any
 
 from git.types import PathLike
 from pydantic import (
@@ -76,7 +76,7 @@ class SettingsSlsRepoCreateSchema(
         return self.get_repo_url_as_str()
 
     @model_validator(mode='after')
-    def validate_local_path(self) -> Self:
+    def validate_local_path(self) -> 'SettingsSlsRepoCreateSchema':
         if not self.local_path:
             self.local_path = uuid.uuid4().hex
         return self
@@ -150,7 +150,7 @@ class ManifestSchema(BaseModel):
         extra = Extra.forbid
 
     @model_validator(mode='after')
-    def _set_global_values(self) -> Self:
+    def _set_global_values(self) -> 'ManifestSchema':
         for file_entry in self.sshfs_files.values():
             if file_entry.checksum_type is FIELD_SENTINEL:
                 file_entry.checksum_type = self.sshfs_files_checksum_type
