@@ -272,6 +272,19 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
         else:
             return await super().get_list_paginated(start=int(start), end=int(end), limit=limit, skip=skip, desc=desc)
 
+    async def get_job_return_for_minion(
+        self,
+        jid: JID,
+        minion_id: str,
+    ) -> JobResult | None:
+        with replace_raised(redis_exceptions.ResponseError, JobServiceException):
+            data = await self.rdb.hget(name=f'job:{jid}:return', key=minion_id)
+
+        if data is None:
+            return None
+        else:
+            return JobResult(**data)
+
     async def get_job_returns(
         self,
         jid: JID,
