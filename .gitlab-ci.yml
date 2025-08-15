@@ -107,8 +107,11 @@ api-client-generate:
     untracked: true
     expire_in: 1 day
   script:
-    - bash /usr/local/bin/docker-entrypoint.sh generate -i ./openapi.json -g typescript-fetch
-      --additional-properties=npmName=@${CI_PROJECT_NAME}/api-client
+    - bash /usr/local/bin/docker-entrypoint.sh generate 
+      -c ./openapi-generator-config.json
+      --additional-properties=npmName=@saltbox/${CI_PROJECT_NAME}-api-client
+      --additional-properties=npmVersion=${CI_COMMIT_SHA}
+      
 
 api-client-deploy:    
   image:  node:22.18.0
@@ -116,7 +119,9 @@ api-client-deploy:
   dependencies:
     - api-client-generate
   script:
+    - cp ./openapi.json ./api-client/
+    - cd ./api-client
     - echo "//${CI_SERVER_HOST}/api/v4/projects/${CI_PROJECT_ID}/packages/npm/:_authToken=${CI_JOB_TOKEN}">.npmrc
     - npm install
-    - npm config set @${CI_PROJECT_NAME}:registry https://${CI_SERVER_HOST}/api/v4/projects/${CI_PROJECT_ID}/packages/npm/
+    - npm config set @saltbox:registry https://${CI_SERVER_HOST}/api/v4/projects/${CI_PROJECT_ID}/packages/npm/
     - npm publish
