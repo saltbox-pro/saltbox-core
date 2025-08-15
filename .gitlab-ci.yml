@@ -108,29 +108,13 @@ api-client-generate:
   image:  openapitools/openapi-generator-cli:v7.14.0
   stage: generate-api-client
   variables:
-    APK_CACHE_DIR: '$CI_PROJECT_DIR/.cache/apk'
+    VERSION: "0.0.1-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_TOTAL_COMMITS:-0}.${CI_COMMIT_SHORT_SHA}"
   dependencies:
     - openapi-scheme-generate
-  before_script:
-    - mkdir --parents "$APK_CACHE_DIR"
-    - apk add --cache-dir "$APK_CACHE_DIR" git
   artifacts:
     untracked: true
     expire_in: 1 day
   script:
-    - BASE=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//' || true)
-    - '[ -z "$BASE" ] && BASE="0.0.0"'
-    - LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-    - |
-      if [ -n "$LAST_TAG" ]; then
-        COMMITS=$(git rev-list --count "$LAST_TAG"..HEAD)
-      else
-        COMMITS=$(git rev-list --count HEAD)
-      fi
-    - SHA=${CI_COMMIT_SHORT_SHA}
-    - SAFE_BRANCH=$(echo "$CI_COMMIT_REF_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^0-9a-z-]/-/g')
-    - VERSION="${BASE}-${SAFE_BRANCH}-${COMMITS}.${SHA}"
-    - |
       bash /usr/local/bin/docker-entrypoint.sh generate \
         -i ./openapi.yaml \
         -g typescript-axios \
