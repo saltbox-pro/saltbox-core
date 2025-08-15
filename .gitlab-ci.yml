@@ -108,7 +108,7 @@ api-client-generate:
   image:  openapitools/openapi-generator-cli:v7.14.0
   stage: generate-api-client
   variables:
-    VERSION: "0.0.1-${CI_COMMIT_REF_SLUG}.${CI_COMMIT_SHORT_SHA}"
+    VERSION: "0.0.1-${CI_COMMIT_REF_SLUG}.${CI_COMMIT_SHA}"
   dependencies:
     - openapi-scheme-generate
   artifacts:
