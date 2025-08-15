@@ -119,9 +119,6 @@ api-client-generate:
       --config ./openapi-generator-config.json
       --additional-properties=npmName=@saltbox/${CI_PROJECT_NAME}-api-client
       --additional-properties=npmVersion=${VERSION}
-  cache:
-    paths:
-      - '$APK_CACHE_DIR'
 
       
 
