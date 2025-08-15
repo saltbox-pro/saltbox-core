@@ -1,0 +1,13 @@
+{
+  "generatorName": "typescript-fetch",
+  "inputSpec": "./openapi.json",
+  "outputDir": "./api-client",
+  "additionalProperties": {
+    "modelPropertyNaming": "original",
+    "useSingleRequestParameter": true,
+    "fileNaming": "kebab-case",
+    "paramNaming": "original",
+    "disallowAdditionalPropertiesIfNotPresent": false,
+    "supportsES6": true
+  }
+}
