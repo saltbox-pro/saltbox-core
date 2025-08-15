@@ -108,7 +108,7 @@ api-client-generate:
     expire_in: 1 day
   script:
     - bash /usr/local/bin/docker-entrypoint.sh generate -i ./openapi.json -g typescript-fetch
-      --additional-properties=npmName={CI_PROJECT_NAME}-api-client
+      --additional-properties=npmName=@${CI_PROJECT_NAME}/api-client
 
 api-client-deploy:    
   image:  node:22.18.0
