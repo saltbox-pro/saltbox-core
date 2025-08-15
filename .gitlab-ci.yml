@@ -94,7 +94,6 @@ openapi-scheme-generate:
     - pip3 install -e .[dev]
   artifacts:
     paths:
-      - openapi-generator-config.json
       - openapi.json 
     expire_in: 1 day
   script:
@@ -109,14 +108,24 @@ api-client-generate:
     untracked: true
     expire_in: 1 day
   script:
-    - bash /usr/local/bin/docker-entrypoint.sh generate 
-      -c ./openapi-generator-config.json
-      --additional-properties=npmName=@saltbox/${CI_PROJECT_NAME}-api-client
-      --additional-properties=npmVersion=${CI_COMMIT_SHA}
+    - |
+      BASE=$(git describe --tags --abbrev=0 2>/dev/null | sed 's/^v//')
+      [[ -z "$BASE" ]] && BASE="0.0.0"
+      COMMITS=$(git rev-list --count $(git describe --tags --abbrev=0)..HEAD)
+      SHA=${CI_COMMIT_SHORT_SHA}
+      SAFE_BRANCH=$(echo "$CI_COMMIT_REF_NAME" | tr '[:upper:]' '[:lower:]' | sed 's/[^0-9a-z-]/-/g')
+      VERSION="${BASE}-${SAFE_BRANCH}-${COMMITS}.${SHA}"
+
+      bash /usr/local/bin/docker-entrypoint.sh generate \
+        -c ./openapi-generator-config.json \
+        --additional-properties=npmName=@saltbox/${CI_PROJECT_NAME}-api-client \
+        --additional-properties=npmVersion=${VERSION}
       
 
 api-client-deploy:    
   image:  node:22.18.0
+  variables:
+    GIT_STRATEGY: none
   stage: deploy
   dependencies:
     - api-client-generate
