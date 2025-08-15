@@ -190,3 +190,10 @@ class GetJobReturnResponse(BaseModel):
     result: list[JobResult]
     cursor: int = Field(description='Pointer to get next portion of data, 0 when no more data')
     length: int
+
+
+class JobsActions(StrEnum):
+    CREATE = 'create'
+    READ = 'read'
+    LIST = 'list'
+    RUN = 'run'
