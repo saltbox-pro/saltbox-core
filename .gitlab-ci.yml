@@ -93,7 +93,9 @@ openapi-scheme-generate:
     - apk add --cache-dir "$APK_CACHE_DIR" git
     - pip3 install -e .[dev]
   artifacts:
-    untracked: true
+    paths:
+      - openapi-generator-config.json
+      - openapi.json 
     expire_in: 1 day
   script:
     - python ./saltbox_core/utilities/generate_openapi.py
