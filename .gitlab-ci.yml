@@ -108,17 +108,17 @@ api-client-generate:
   image:  openapitools/openapi-generator-cli:v7.14.0
   stage: generate-api-client
   variables:
-    VERSION: "0.0.1-${CI_COMMIT_REF_SLUG}-${CI_COMMIT_TOTAL_COMMITS:-0}.${CI_COMMIT_SHORT_SHA}"
+    VERSION: "0.0.1-${CI_COMMIT_REF_SLUG}.${CI_COMMIT_SHORT_SHA}"
   dependencies:
     - openapi-scheme-generate
   artifacts:
     untracked: true
     expire_in: 1 day
   script:
-      openapi-generator-cli generate \
-        -c ./openapi-generator-config.json \
-        --additional-properties=npmName=@saltbox/${CI_PROJECT_NAME}-api-client \
-        --additional-properties=npmVersion=${VERSION}
+    - bash /usr/local/bin/docker-entrypoint.sh generate 
+      --config ./openapi-generator-config.json
+      --additional-properties=npmName=@saltbox/${CI_PROJECT_NAME}-api-client
+      --additional-properties=npmVersion=${VERSION}
   cache:
     paths:
       - '$APK_CACHE_DIR'
