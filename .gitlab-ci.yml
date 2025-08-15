@@ -98,7 +98,7 @@ openapi-scheme-generate:
     - python ./saltbox_core/utilities/generate_openapi.py
 
 api-client-generate:    
-  image:  openapitools/openapi-generator-cli:v7.14.1
+  image:  openapitools/openapi-generator-cli:v7.14.0
   stage: generate
   dependencies:
     - openapi-scheme-generate
