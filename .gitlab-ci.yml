@@ -4,6 +4,8 @@ stages:
   - lint
   - test
   - build
+  - generate
+  - deploy
 
 variables:
   # Set 0 to disable linting jobs
@@ -77,3 +79,43 @@ pytest:
     paths:
       - '$PIP_CACHE_DIR'
       - '$APK_CACHE_DIR'
+
+openapi-scheme-generate:
+  stage: generate
+  variables:
+    PIP_CACHE_DIR: '$CI_PROJECT_DIR/.cache/pip'
+    APK_CACHE_DIR: '$CI_PROJECT_DIR/.cache/apk'
+    SALTBOX_ENV_FILE: 'tests/test.env'
+  image: python:3.12-alpine
+  before_script:
+    - mkdir --parents "$APK_CACHE_DIR"
+    - apk add --cache-dir "$APK_CACHE_DIR" git
+    - pip3 install -e .[dev]
+  artifacts:
+    untracked: true
+    expire_in: 1 day
+  script:
+    - python ./saltbox_core/utilities/generate_openapi.py
+
+api-client-generate:    
+  image:  openapitools/openapi-generator-cli:v7.14.1
+  stage: generate
+  dependencies:
+    - openapi-scheme-generate
+  artifacts:
+    untracked: true
+    expire_in: 1 day
+  script:
+    - bash /usr/local/bin/docker-entrypoint.sh generate -i ./openapi.json -g typescript-fetch
+      --additional-properties=npmName={CI_PROJECT_NAME}-api-client
+
+api-client-deploy:    
+  image:  node:22.18.0
+  stage: deploy
+  dependencies:
+    - api-client-generate
+  script:
+    - echo "//${CI_SERVER_HOST}/api/v4/projects/${CI_PROJECT_ID}/packages/npm/:_authToken=${CI_JOB_TOKEN}">.npmrc
+    - npm install
+    - npm config set @${CI_PROJECT_NAME}:registry https://${CI_SERVER_HOST}/api/v4/projects/${CI_PROJECT_ID}/packages/npm/
+    - npm publish
