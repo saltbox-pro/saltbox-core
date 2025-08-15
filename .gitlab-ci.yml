@@ -98,12 +98,22 @@ openapi-scheme-generate:
     expire_in: 1 day
   script:
     - python ./saltbox_core/utilities/generate_openapi.py
+  cache:
+    paths:
+      - '$PIP_CACHE_DIR'
+      - '$APK_CACHE_DIR'
+
 
 api-client-generate:    
   image:  openapitools/openapi-generator-cli:v7.14.0
   stage: generate-api-client
+  variables:
+    APK_CACHE_DIR: '$CI_PROJECT_DIR/.cache/apk'
   dependencies:
     - openapi-scheme-generate
+  before_script:
+    - mkdir --parents "$APK_CACHE_DIR"
+    - apk add --cache-dir "$APK_CACHE_DIR" git
   artifacts:
     untracked: true
     expire_in: 1 day
@@ -127,6 +137,10 @@ api-client-generate:
         -c ./openapi-generator-config.json \
         --additional-properties=npmName=@saltbox/${CI_PROJECT_NAME}-api-client \
         --additional-properties=npmVersion=${VERSION}
+  cache:
+    paths:
+      - '$APK_CACHE_DIR'
+
       
 
 api-client-deploy:    
