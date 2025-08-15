@@ -15,6 +15,7 @@ htmlcov/
 */.venv
 /.venv
 /venv
+openapi.json
 
 # Editors
 /.vscode
