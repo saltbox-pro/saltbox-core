@@ -27,8 +27,7 @@ class EditableFieldsShortMixin: ...
 class EditableFieldsFullMixin(EditableFieldsShortMixin): ...
 
 
-class TaskTemplateCreateSchema(BaseModel, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin):
-    pass
+class TaskTemplateCreateSchema(BaseModel, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin): ...
 
 
 class TaskTemplateUpdateSchema(BaseModel, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin):

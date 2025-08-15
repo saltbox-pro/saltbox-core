@@ -12,10 +12,10 @@ from saltbox_core.minion_collections.schemas.collection_schemas import Collectio
 from saltbox_core.settings.repository import SettingsSlsRepoRepository
 from saltbox_core.tasks.repositories.task_template_repository import TaskTemplateRepository
 from saltbox_sdk.db.mongo.config import get_mongo_db
+from pymongo.asynchronous.database import AsyncDatabase
 
 
-async def init_task_tpl() -> None:
-    db = get_mongo_db()
+async def init_task_tpl(db: AsyncDatabase) -> None:
     sls_tpl_repo = TaskTemplateRepository(db)
 
     # Check existing indexes
@@ -30,8 +30,7 @@ async def init_task_tpl() -> None:
         logger.debug('Indexes: %s', indexes)
 
 
-async def init_sls_repos_settings() -> None:
-    db = get_mongo_db()
+async def init_sls_repos_settings(db: AsyncDatabase) -> None:
     sls_settings_repo = SettingsSlsRepoRepository(db)
 
     # Check existing indexes
@@ -54,8 +53,7 @@ async def init_sls_repos_settings() -> None:
         logger.debug('Indexes: %s', indexes)
 
 
-async def init_job_schemas() -> None:
-    db = get_mongo_db()
+async def init_job_schemas(db: AsyncDatabase) -> None:
     json_schemas_repo = JobSchemaRepository(db)
 
     # Check existing indexes
@@ -91,8 +89,7 @@ async def init_job_schemas() -> None:
         logger.debug('Default schema already exists')
 
 
-async def init_collections() -> None:
-    db = get_mongo_db()
+async def init_collections(db: AsyncDatabase) -> None:
     collections_repo = CollectionRepository(db)
 
     # Check existing indexes
@@ -120,8 +117,7 @@ async def init_collections() -> None:
         logger.debug('MinionCollection with slug `root` created')
 
 
-async def init_masters() -> None:
-    db = get_mongo_db()
+async def init_masters(db: AsyncDatabase) -> None:
     masters_repo = MasterRepository(db)
 
     # Check existing indexes
@@ -137,25 +133,38 @@ async def init_masters() -> None:
     logger.debug('Indexes: %s', indexes)
 
 
+from saltbox_core.event_bus.masters_subscribers import (  # FIXME (a.karmanov): Inadequate location
+    get_inventory_repository)
+
+
+async def init_inventory(db: AsyncDatabase) -> None:
+    repo = get_inventory_repository(db)
+    await repo.create_indices()
+
+
 async def init_mongo_db() -> None:
     """Initialize MongoDB collections"""
 
+    db = get_mongo_db()
+
     # Initialize minion_collections collection
-    await init_collections()
+    await init_collections(db)
     logger.debug('MongoDB collections initialized')
 
     # Initialize json_schemas collection
-    await init_job_schemas()
+    await init_job_schemas(db)
     logger.debug('Job schemas initialized')
 
     # Initialize sls_repos_settings collection
-    await init_sls_repos_settings()
+    await init_sls_repos_settings(db)
     logger.debug('SLS repos settings initialized')
 
     # Initialize sls_tpl collection
-    await init_task_tpl()
+    await init_task_tpl(db)
     logger.debug('SLS templates initialized')
 
     # Initialize masters collection
-    await init_masters()
+    await init_masters(db)
     logger.debug('Masters initialized')
+
+    await init_masters(db)

@@ -87,8 +87,7 @@ class SettingsSlsRepoUpdateSchema(BaseModel, CreateUpdateSerializerMixin, Editab
     )
 
 
-class SettingsSlsRepoShortSchema(BaseModel, ReadOnlyFieldsShortMixin, EditableFieldsShortMixin, IDMixin):
-    pass
+class SettingsSlsRepoShortSchema(BaseModel, ReadOnlyFieldsShortMixin, EditableFieldsShortMixin, IDMixin): ...
 
 
 class ManifestDigest(StrEnum):

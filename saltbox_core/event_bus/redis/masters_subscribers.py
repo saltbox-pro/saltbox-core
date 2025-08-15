@@ -121,50 +121,103 @@ async def burst_test_load_handler(message: BridgeTestBurstLoadMessage) -> None:
     ...
 
 
+# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+
 def solve_path(path: list[str | int], obj: object) -> Any:
-    next = obj
+    current = obj
     for key in path:
         try:
-            next = obj[key]  # type: ignore
-        except (IndexError, KeyError, TypeError) as err:
+            if hasattr(current, '__getitem__'):
+                current = current[key]
+            else:
+                current = getattr(current, key)  # type: ignore[arg-type]
+        except (IndexError, KeyError, TypeError, AttributeError) as err:
             path_repr = []
             for i in path:
                 path_repr.append(f'[{i}]' if isinstance(i, int) else i)
             logger.error('Failed to follow path "%s" on "%s"', '.'.join(path_repr), key)
-            raise ValueError(err) from None
-    return next
+            raise ValueError(err) from err
+    return current
 
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+import asyncio
+from typing import Annotated, ClassVar
 
+from faststream import Depends
+from pydantic import BaseModel, ConfigDict, Field
+from pymongo.asynchronous.database import AsyncDatabase
+
+from saltbox_sdk.db.mongo.config import get_mongo
 from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
-from pydantic import BaseModel, Field
-from typing import ClassVar
+from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId
+from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
+from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
 
 
-class Inventory(BaseModel):
-    _id: str = Field(description='Relation with minion')
+class InventoryCreateSchema(BaseModel):
+    model_config = ConfigDict(extra='allow')
+
+    object_type: str = Field(description='Kind of inventory data')
+    minions: list[str] = Field(description='Relation with minions')
 
 
-class InventoryRepository(BaseMongoRepository[Inventory]):
+class InventoryModel(InventoryCreateSchema, IDMixin, CreatedModifiedMixin):
+    model_config = ConfigDict(extra='allow')
+
+
+class InventoryRepository(BaseMongoRepository[InventoryModel]):
+    async def create_indices(self) -> None:
+        await self.collection.create_index('minions')
+        # TODO ??? await self.collection.create_index([('name', 1), ('version', 1)], unique=True)
+
     class Meta:
         collection_name = 'inventory'
         auto_now_add_fields: ClassVar[list[str]] = ['created']
         auto_now_fields: ClassVar[list[str]] = ['modified']
 
-#def get_task_template_repository(db: Annotated[AsyncDatabase, Depends(get_mongo)]) -> TaskTemplateRepository:
-#return TaskTemplateRepository(db)
+    # TODO (a.karmanov): Implement handful methods
+    #async def get_by_type(self, value: str) -> list[InventoryModel]:
+        #return await self.get(query={'_type': value})
+
+
+class InventoryService(
+    MongoBaseService[InventoryRepository, InventoryModel, InventoryCreateSchema, InventoryCreateSchema]
+):
+    ...
+
+
+def get_inventory_repository(db: Annotated[AsyncDatabase, Depends(get_mongo)]) -> InventoryRepository:
+    return InventoryRepository(db)
+
+
+def get_inventory_service(repo: Annotated[InventoryRepository, Depends(get_inventory_repository)]) -> InventoryService:
+    return InventoryService(repo)
+
 
 
 @router.subscriber('inventory_saved')
 async def inventory_handler(
     message: BridgeInventoryDataSavedMessage,
-    job_service: JobServiceDependency,
+    job_service: JobServiceDependency = Context(),
+    # TODO Depends inventory_service: InventoryService = Depends(get_inventory_service),
+    inventory_service: InventoryService = Context(),
 ) -> None:
     jid = JID(message.jid)
 
     for mid in message.minions:
         result = await job_service.get_job_return_for_minion(jid, mid)
         if result is not None:
-            inventory = solve_path(message.path, result)
+            inventory = solve_path(message.path, result.model_dump(by_alias=True))
+            for inv_type, inv_list in inventory.items():
+                for inv_item in inv_list:
+                    ...
+                      #update = {'$addToSet': {'_minions': minion['_id']}}
+                      #ops.append(UpdateOne(filter=soft, update=update, upsert=True))
+
+                    obj = InventoryCreateSchema(
+                        **inv_item,
+                        object_type=inv_type,
+                        minions=[mid]
+                    )
+                    await inventory_service.create(obj)
         else:
             logger.warn('Not found inventory for minion %s, JID=%s', mid, jid)

@@ -283,7 +283,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
         if data is None:
             return None
         else:
-            return JobResult(**data)
+            return JobResult(**json.loads(data))
 
     async def get_job_returns(
         self,
