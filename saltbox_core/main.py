@@ -11,7 +11,6 @@ from saltbox_core.config import APP_DESC, APP_NAME, SETTINGS
 from saltbox_core.db.init_mongo_db import init_mongo_db
 from saltbox_core.jobs.routers.job_sc_router import router as job_schemas_router
 from saltbox_core.jobs.routers.jobs_router import router as jobs_router
-from saltbox_core.jobs.routers.jobs_router import ws_router as jobs_ws_router
 from saltbox_core.masters.routers.master_route import router as masters_router
 from saltbox_core.masters.routers.system_route import router as system_router
 from saltbox_core.minion_collections.routers.collections_router import router as collections_router
@@ -94,7 +93,6 @@ async def health_check() -> HealthCheckResponse:
 app.include_router(filters_router)
 app.include_router(jobs_router)
 app.include_router(job_schemas_router)
-app.include_router(jobs_ws_router)
 app.include_router(template_router)
 app.include_router(task_router)
 app.include_router(collections_router)
