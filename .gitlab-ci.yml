@@ -115,9 +115,7 @@ api-client-generate:
     untracked: true
     expire_in: 1 day
   script:
-      bash /usr/local/bin/docker-entrypoint.sh generate \
-        -i ./openapi.yaml \
-        -g typescript-axios \
+      openapi-generator-cli generate \
         -c ./openapi-generator-config.json \
         --additional-properties=npmName=@saltbox/${CI_PROJECT_NAME}-api-client \
         --additional-properties=npmVersion=${VERSION}
