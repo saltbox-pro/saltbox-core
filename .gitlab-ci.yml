@@ -4,7 +4,8 @@ stages:
   - lint
   - test
   - build
-  - generate
+  - generate-scheme
+  - generate-api-client
   - deploy
 
 variables:
@@ -81,7 +82,7 @@ pytest:
       - '$APK_CACHE_DIR'
 
 openapi-scheme-generate:
-  stage: generate
+  stage: generate-scheme
   variables:
     PIP_CACHE_DIR: '$CI_PROJECT_DIR/.cache/pip'
     APK_CACHE_DIR: '$CI_PROJECT_DIR/.cache/apk'
@@ -99,7 +100,7 @@ openapi-scheme-generate:
 
 api-client-generate:    
   image:  openapitools/openapi-generator-cli:v7.14.0
-  stage: generate
+  stage: generate-api-client
   dependencies:
     - openapi-scheme-generate
   artifacts:
