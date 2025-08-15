@@ -1,7 +1,7 @@
 {
   "generatorName": "typescript-fetch",
   "inputSpec": "./openapi.json",
-  "outputDir": "./api-client",
+  "outputDir": "./",
   "additionalProperties": {
     "modelPropertyNaming": "original",
     "useSingleRequestParameter": true,
