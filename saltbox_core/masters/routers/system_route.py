@@ -11,8 +11,8 @@ from saltbox_bridge_messages import (
     CoreTestBurstRequest,
 )
 from saltbox_core.config import SETTINGS
-from saltbox_core.event_bus.masters_bus import send_message_and_wait_response_to_master, send_message_to_master
-from saltbox_core.jobs.services.job_services import JobServiceDependency
+from saltbox_core.event_bus.redis.masters_bus import send_message_and_wait_response_to_master, send_message_to_master
+from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.masters.exceptions import UnknownUserException
 from saltbox_core.masters.schemas.system_schemas import (
     BurstJobsTestDeleteResponse,
@@ -87,7 +87,7 @@ async def burst_jobs_test_post(
 
 @router.delete('/burst_jobs_test')
 async def burst_jobs_test_delete(
-    job_service: JobServiceDependency,
+    job_service: Annotated[JobService, Depends(get_job_service)],
     id: Annotated[str | None, Query(description='Burst ID to delete selectively')] = None,
 ) -> BurstJobsTestDeleteResponse:
     deletions = await job_service.delete_fake_jobs(label=id)
@@ -96,7 +96,7 @@ async def burst_jobs_test_delete(
 
 @router.get('/burst_jobs_test')
 async def burst_jobs_test_get(
-    job_service: JobServiceDependency,
+    job_service: Annotated[JobService, Depends(get_job_service)],
     rdb: RedisDependency,
     id: Annotated[str, Query(description='Burst ID to delete selectively')],
 ) -> BurstJobsTestStatsResponse:

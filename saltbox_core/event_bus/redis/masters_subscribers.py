@@ -13,7 +13,7 @@ from saltbox_bridge_messages import (
     MasterStatus,
 )
 from saltbox_core.config import logger
-from saltbox_core.event_bus.master_bus_middlewares import MastersAuthMiddleware
+from saltbox_core.event_bus.redis.master_bus_middlewares import MastersAuthMiddleware
 from saltbox_core.masters.schemas.master_schemas import MasterCreateSchema, MasterModel
 from saltbox_core.masters.services.master_service import MasterService
 from saltbox_core.minion_collections.schemas.minion_schemas import (

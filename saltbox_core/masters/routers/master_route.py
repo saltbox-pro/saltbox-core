@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 
-from saltbox_core.event_bus.masters_bus import notify_master_on_repos_update
+from saltbox_core.event_bus.redis.masters_bus import notify_master_on_repos_update
 from saltbox_core.masters.schemas.master_schemas import MasterModel, MasterQueryParams, MasterViewSchema
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId

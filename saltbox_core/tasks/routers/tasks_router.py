@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, Query, Request
 from saltbox_core.config import logger
 from saltbox_core.jobs.exceptions import JobDoesNotExistsException
 from saltbox_core.jobs.schemas.job_schemas import JobModel, JobResult
-from saltbox_core.jobs.services.job_services import JobServiceDependency
+from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_core.tasks.schemas.task_schemas import (
     TaskCreateInputSchema,
@@ -106,7 +106,7 @@ async def task_retrieve(
 async def task_jobs(
     tid: PyObjectId,
     task_service: Annotated[TaskService, Depends(get_task_service)],
-    job_service: JobServiceDependency,
+    job_service: Annotated[JobService, Depends(get_job_service)],
 ) -> list[JobModel]:
     result: list[JobModel] = []
     task = await task_service.get(query=tid)
@@ -131,7 +131,7 @@ async def task_jobs(
 async def task_returns(
     tid: PyObjectId,
     task_service: Annotated[TaskService, Depends(get_task_service)],
-    job_service: JobServiceDependency,
+    job_service: Annotated[JobService, Depends(get_job_service)],
 ) -> list[JobResult]:
     result: list[JobResult] = []
 

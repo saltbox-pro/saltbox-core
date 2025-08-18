@@ -1,7 +1,7 @@
 from typing import Any
 
 from saltbox_bridge_messages import CoreUpdatePillarCacheRequest
-from saltbox_core.event_bus.masters_bus import send_message_and_wait_response_to_master
+from saltbox_core.event_bus.redis.masters_bus import send_message_and_wait_response_to_master
 from saltbox_core.tkq import broker
 
 

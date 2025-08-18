@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from saltbox_bridge_messages import CoreMessageBase
 from saltbox_core.config import logger
-from saltbox_core.event_bus.exceptions import CreateSignError
+from saltbox_core.event_bus.redis.exceptions import CreateSignError
 from saltbox_core.masters.repositories.master_repository import MasterRepository, get_master_repository
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_core.utilities.gpg import SaltBoxCrypt

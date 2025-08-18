@@ -1,12 +1,12 @@
 from typing import Annotated
 
 import pydantic
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 from pydantic import Field
 
 from saltbox_bridge_messages import BridgeNewJobResponse, CoreNewJobRequest
 from saltbox_core.config import SETTINGS
-from saltbox_core.event_bus.masters_bus import send_message_and_wait_response_to_master
+from saltbox_core.event_bus.redis.masters_bus import send_message_and_wait_response_to_master
 from saltbox_core.jobs.schemas.job_schemas import (
     CreateJobRequest,
     GetJobReturnResponse,
@@ -19,7 +19,7 @@ from saltbox_core.jobs.schemas.job_schemas import (
     JobsListResponse,
     JobSyncResponse,
 )
-from saltbox_core.jobs.services.job_services import JobServiceDependency
+from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.utilities.jid import JID
 from saltbox_sdk.db.schemas_base import CursoredResponse, PaginatedResponse
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
@@ -42,7 +42,7 @@ router = APIRouter(prefix='/jobs', tags=['Jobs'])
 async def jobs_list_cursor(
     request: Annotated[JobsListCursorRequest, Query()],
     # opa_query: Annotated[dict, Depends(get_opa_query)],
-    job_service: JobServiceDependency,
+    job_service: Annotated[JobService, Depends(get_job_service)],
 ) -> CursoredResponse[JobsListResponse]:
     matches = []
 
@@ -75,7 +75,7 @@ async def jobs_list_cursor(
 async def jobs_list(
     request: Annotated[JobsListRequest, Query()],
     # opa_query: Annotated[dict, Depends(get_opa_query)],
-    job_service: JobServiceDependency,
+    job_service: Annotated[JobService, Depends(get_job_service)],
 ) -> PaginatedResponse[JobsListResponse]:
     start_datetime = request.start_datetime if not request.desc else request.end_datetime
     end_datetime = request.end_datetime if not request.desc else request.start_datetime
@@ -102,7 +102,7 @@ async def jobs_list(
 )
 async def job_retrieve(
     jid: IntJid,
-    job_service: JobServiceDependency,
+    job_service: Annotated[JobService, Depends(get_job_service)],
 ) -> JobModel:
     _jid = JID(jid)
     return await job_service.get_job(_jid)
@@ -118,7 +118,7 @@ async def job_retrieve(
 )
 async def job_create(
     item: CreateJobRequest,
-    job_service: JobServiceDependency,
+    job_service: Annotated[JobService, Depends(get_job_service)],
 ) -> JobModel:
     return await job_service.create(
         JobCreateSchema.model_validate(
@@ -169,7 +169,7 @@ async def job_create_sync(
 )
 async def job_returns_count(
     jid: IntJid,
-    job_service: JobServiceDependency,
+    job_service: Annotated[JobService, Depends(get_job_service)],
 ) -> Annotated[int, Field(ge=0)]:
     """
     How many return data records for job at the moment.
@@ -189,7 +189,7 @@ async def job_returns_count(
 )
 async def job_returns_list(
     jid: IntJid,
-    job_service: JobServiceDependency,
+    job_service: Annotated[JobService, Depends(get_job_service)],
     count: Annotated[int, Field(gt=0, lt=SETTINGS.max_count)] = 10,
     cursor: pydantic.NonNegativeInt = 0,
 ) -> GetJobReturnResponse:

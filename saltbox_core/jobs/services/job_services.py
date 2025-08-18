@@ -1,5 +1,4 @@
 import json
-from collections.abc import AsyncGenerator
 from datetime import datetime
 from typing import Annotated, Any, overload
 
@@ -11,7 +10,7 @@ from redis import exceptions as redis_exceptions
 
 from saltbox_bridge_messages import CoreNewJobAsyncRequest, MasterStatus
 from saltbox_core.config import SETTINGS
-from saltbox_core.event_bus.masters_bus import send_message_to_master
+from saltbox_core.event_bus.redis.masters_bus import send_message_to_master
 from saltbox_core.jobs.exceptions import (
     JobCreateException,
     JobDoesNotExistsException,
@@ -371,11 +370,7 @@ async def get_job_service(
     job_repository: Annotated[JobRepository, Depends(get_job_repository)],
     job_schema_service: Annotated[JobSchemaService, Depends(get_job_schema_service)],
     master_service: Annotated[MasterService, Depends(get_master_service)],
-) -> AsyncGenerator[JobService, None]:
-    job_service = JobService(
+) -> JobService:
+    return JobService(
         rdb=rdb, job_repository=job_repository, job_schema_service=job_schema_service, master_service=master_service
     )
-    yield job_service
-
-
-JobServiceDependency = Annotated[JobService, Depends(get_job_service)]
