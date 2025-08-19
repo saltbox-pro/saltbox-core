@@ -4,6 +4,9 @@ stages:
   - lint
   - test
   - build
+  - generate-scheme
+  - generate-api-client
+  - deploy
 
 variables:
   # Set 0 to disable linting jobs
@@ -77,3 +80,61 @@ pytest:
     paths:
       - '$PIP_CACHE_DIR'
       - '$APK_CACHE_DIR'
+
+openapi-scheme-generate:
+  stage: generate-scheme
+  variables:
+    PIP_CACHE_DIR: '$CI_PROJECT_DIR/.cache/pip'
+    APK_CACHE_DIR: '$CI_PROJECT_DIR/.cache/apk'
+    SALTBOX_ENV_FILE: 'tests/test.env'
+  image: python:3.12-alpine
+  before_script:
+    - mkdir --parents "$APK_CACHE_DIR"
+    - apk add --cache-dir "$APK_CACHE_DIR" git
+    - pip3 install -e .[dev]
+  script:
+    - VERSION=$(python3 -c 'import saltbox_core; print(saltbox_core.__version__)')
+    - echo "PYTHON_VERSION=$VERSION" > build.env
+    - python ./saltbox_core/utilities/generate_openapi.py
+  artifacts:
+    reports:
+      dotenv: build.env
+    paths:
+      - openapi.json 
+    expire_in: 1 day
+  cache:
+    paths:
+      - '$PIP_CACHE_DIR'
+      - '$APK_CACHE_DIR'
+
+
+api-client-generate:    
+  image:  openapitools/openapi-generator-cli:v7.14.0
+  stage: generate-api-client
+  variables:
+    VERSION: "${PYTHON_VERSION}-${CI_COMMIT_SHA}"
+  dependencies:
+    - openapi-scheme-generate
+  artifacts:
+    untracked: true
+    expire_in: 1 day
+  script:
+    - bash /usr/local/bin/docker-entrypoint.sh generate 
+      --config ./openapi-generator-config.json
+      --additional-properties=npmName=@saltbox/${CI_PROJECT_NAME}-api-client
+      --additional-properties=npmVersion=${VERSION}
+
+      
+
+api-client-deploy:    
+  image:  node:22.18.0
+  variables:
+    GIT_STRATEGY: none
+  stage: deploy
+  dependencies:
+    - api-client-generate
+  script:
+    - echo "//${CI_SERVER_HOST}/api/v4/projects/${CI_PROJECT_ID}/packages/npm/:_authToken=${CI_JOB_TOKEN}">.npmrc
+    - npm install
+    - npm config set @saltbox:registry https://${CI_SERVER_HOST}/api/v4/projects/${CI_PROJECT_ID}/packages/npm/
+    - npm publish
