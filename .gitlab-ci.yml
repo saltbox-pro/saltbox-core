@@ -149,7 +149,8 @@ nightly-api-client-generate:
     - npm config set @saltbox:registry https://${CI_SERVER_HOST}/api/v4/projects/${CI_PROJECT_ID}/packages/npm/
     - npm publish
   rules:
-    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+      when: never
 
 release-api-client-deploy:    
   extends: .api-client-deploy
