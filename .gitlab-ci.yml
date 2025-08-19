@@ -135,7 +135,8 @@ nightly-api-client-generate:
     VERSION: "${PYTHON_VERSION}-${CI_COMMIT_SHA}"
   rules:
     - if: $CI_COMMIT_TAG =~ /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/
-      when: never 
+      when: never
+    - when: on_success 
 
 .api-client-deploy:    
   image:  node:22.18.0
@@ -164,4 +165,5 @@ nightly-api-client-deploy:
   rules:
     - if: $CI_COMMIT_TAG =~ /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/
       when: never 
+    - when: on_success
 
