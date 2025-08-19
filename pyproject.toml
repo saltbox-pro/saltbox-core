@@ -105,6 +105,7 @@ ignore = [
   "E722",  # do not use bare except
   "ERA",   # do not autoremove commented out code
   "N818",  # error-suffix-on-exception-name
+  "RUF029", # declared `async`, but doesn't `await`: is usual for async framework
   "S404",  # `subprocess` module is possibly insecure
   "TD001", # Invalid TODO tag
   "TD002", # Author name in TODO
@@ -112,7 +113,6 @@ ignore = [
   "TD004", # Missing colon in TODO
   "UP017", # Use datetime.UTC alias (not available for 3.10)
   "UP040", # type instead of TypeAlias PEP 695"
-  # "G004", # Logging statement uses string formatting
 ]
 fixable = ["ALL"]
 unfixable = [

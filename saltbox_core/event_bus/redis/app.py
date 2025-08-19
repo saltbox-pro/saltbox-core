@@ -51,18 +51,6 @@ def get_faststream_broker(middlewares: list[BrokerMiddleware] | None = None) -> 
     return RedisBroker(url=REDIS_SETTINGS.redis_url, security=security)
 
 
-from saltbox_core.event_bus.masters_subscribers import (  # FIXME (a.karmanov): Inadequate location
-    InventoryService,
-    get_inventory_repository,
-    get_inventory_service,
-)
-from saltbox_core.jobs.repositories.job_repository import get_job_repository
-from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
-from saltbox_core.jobs.repositories.job_sc_repository import get_job_schema_repository
-from saltbox_core.jobs.services.job_services import JobService, get_job_service
-from saltbox_sdk.db.redis.config import get_redis_now
-
-
 @asynccontextmanager
 async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
     mongo_db = get_mongo_db()
@@ -72,20 +60,9 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
     minion_repository: MinionRepository = get_minion_repository(db=mongo_db)
     minion_service: MinionService = get_minion_service(repo=minion_repository)
 
-    redis_db = get_redis_now()
-    job_service: JobService = await get_job_service(
-        rdb=redis_db,
-        job_schema_service=get_job_schema_service(get_job_schema_repository(db=mongo_db)),
-        job_repository=get_job_repository(db=redis_db),
-        master_service=master_service,
-    ).__anext__()
-    inventory_service: InventoryService = get_inventory_service(get_inventory_repository(db=mongo_db))
-
     context.set_global('master_service', master_service)
     context.set_global('minion_service', minion_service)
     context.set_global('saltbox_crypt', saltbox_crypt)
-    context.set_global('job_service', job_service)
-    context.set_global('inventory_service', inventory_service)
 
     yield
 

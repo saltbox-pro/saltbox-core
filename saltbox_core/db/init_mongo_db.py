@@ -2,8 +2,10 @@ import json
 
 import anyio
 import pymongo
+from pymongo.asynchronous.database import AsyncDatabase
 
 from saltbox_core.config import logger
+from saltbox_core.inventory.repositories import InventoryRepository
 from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository
 from saltbox_core.jobs.schemas.job_sc_schemas import JobSchemaCreateSchema
 from saltbox_core.masters.repositories.master_repository import MasterRepository
@@ -12,7 +14,6 @@ from saltbox_core.minion_collections.schemas.collection_schemas import Collectio
 from saltbox_core.settings.repository import SettingsSlsRepoRepository
 from saltbox_core.tasks.repositories.task_template_repository import TaskTemplateRepository
 from saltbox_sdk.db.mongo.config import get_mongo_db
-from pymongo.asynchronous.database import AsyncDatabase
 
 
 async def init_task_tpl(db: AsyncDatabase) -> None:
@@ -133,12 +134,8 @@ async def init_masters(db: AsyncDatabase) -> None:
     logger.debug('Indexes: %s', indexes)
 
 
-from saltbox_core.event_bus.masters_subscribers import (  # FIXME (a.karmanov): Inadequate location
-    get_inventory_repository)
-
-
 async def init_inventory(db: AsyncDatabase) -> None:
-    repo = get_inventory_repository(db)
+    repo = InventoryRepository(db)
     await repo.create_indices()
 
 

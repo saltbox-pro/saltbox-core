@@ -1,5 +1,4 @@
 from datetime import UTC, datetime
-from typing import Any
 
 from faststream import Context
 from faststream.redis import RedisRouter
@@ -16,7 +15,12 @@ from saltbox_bridge_messages import (
 )
 from saltbox_core.config import logger
 from saltbox_core.event_bus.redis.master_bus_middlewares import MastersAuthMiddleware
-from saltbox_core.jobs.services.job_services import JobServiceDependency
+from saltbox_core.inventory.faststream import (
+    FSInventoryServiceDependency,
+    FSJobServiceDependency,
+)
+from saltbox_core.inventory.schemas import InventoryCreateSchema
+from saltbox_core.inventory.utilities import solve_path
 from saltbox_core.masters.schemas.master_schemas import MasterCreateSchema, MasterModel
 from saltbox_core.masters.services.master_service import MasterService
 from saltbox_core.minion_collections.schemas.minion_schemas import (
@@ -27,7 +31,7 @@ from saltbox_core.minion_collections.schemas.minion_schemas import (
 )
 from saltbox_core.minion_collections.services.minion_service import MinionService
 from saltbox_core.utilities.gpg import SaltBoxCrypt
-from saltbox_core.utilities.jid import JID, JidError
+from saltbox_core.utilities.jid import JID
 from saltbox_sdk.exceptions import ObjectNotFoundException
 
 router_not_auth = RedisRouter(prefix='master_', middlewares=[])
@@ -121,85 +125,11 @@ async def burst_test_load_handler(message: BridgeTestBurstLoadMessage) -> None:
     ...
 
 
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-
-def solve_path(path: list[str | int], obj: object) -> Any:
-    current = obj
-    for key in path:
-        try:
-            if hasattr(current, '__getitem__'):
-                current = current[key]
-            else:
-                current = getattr(current, key)  # type: ignore[arg-type]
-        except (IndexError, KeyError, TypeError, AttributeError) as err:
-            path_repr = []
-            for i in path:
-                path_repr.append(f'[{i}]' if isinstance(i, int) else i)
-            logger.error('Failed to follow path "%s" on "%s"', '.'.join(path_repr), key)
-            raise ValueError(err) from err
-    return current
-
-import asyncio
-from typing import Annotated, ClassVar
-
-from faststream import Depends
-from pydantic import BaseModel, ConfigDict, Field
-from pymongo.asynchronous.database import AsyncDatabase
-
-from saltbox_sdk.db.mongo.config import get_mongo
-from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
-from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId
-from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
-from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
-
-
-class InventoryCreateSchema(BaseModel):
-    model_config = ConfigDict(extra='allow')
-
-    object_type: str = Field(description='Kind of inventory data')
-    minions: list[str] = Field(description='Relation with minions')
-
-
-class InventoryModel(InventoryCreateSchema, IDMixin, CreatedModifiedMixin):
-    model_config = ConfigDict(extra='allow')
-
-
-class InventoryRepository(BaseMongoRepository[InventoryModel]):
-    async def create_indices(self) -> None:
-        await self.collection.create_index('minions')
-        # TODO ??? await self.collection.create_index([('name', 1), ('version', 1)], unique=True)
-
-    class Meta:
-        collection_name = 'inventory'
-        auto_now_add_fields: ClassVar[list[str]] = ['created']
-        auto_now_fields: ClassVar[list[str]] = ['modified']
-
-    # TODO (a.karmanov): Implement handful methods
-    #async def get_by_type(self, value: str) -> list[InventoryModel]:
-        #return await self.get(query={'_type': value})
-
-
-class InventoryService(
-    MongoBaseService[InventoryRepository, InventoryModel, InventoryCreateSchema, InventoryCreateSchema]
-):
-    ...
-
-
-def get_inventory_repository(db: Annotated[AsyncDatabase, Depends(get_mongo)]) -> InventoryRepository:
-    return InventoryRepository(db)
-
-
-def get_inventory_service(repo: Annotated[InventoryRepository, Depends(get_inventory_repository)]) -> InventoryService:
-    return InventoryService(repo)
-
-
-
 @router.subscriber('inventory_saved')
-async def inventory_handler(
+async def extract_inventory(
     message: BridgeInventoryDataSavedMessage,
-    job_service: JobServiceDependency = Context(),
-    # TODO Depends inventory_service: InventoryService = Depends(get_inventory_service),
-    inventory_service: InventoryService = Context(),
+    job_service: FSJobServiceDependency,
+    inventory_service: FSInventoryServiceDependency,
 ) -> None:
     jid = JID(message.jid)
 

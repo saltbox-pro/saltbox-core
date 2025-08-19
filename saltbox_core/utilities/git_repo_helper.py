@@ -298,6 +298,7 @@ def create_sshfs_sync(file_path: Path, file_entry: ManifestSshfsFilesSchema) -> 
     return SshfsSyncPlainFile(file_path, file_entry)
 
 
+
 def is_ssh_repo_url(repo_url: str) -> bool:
     """Check if the repository URL is in SSH format"""
     return repo_url.startswith('git@') or repo_url.startswith('ssh://')
