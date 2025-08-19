@@ -164,4 +164,4 @@ async def init_mongo_db() -> None:
     await init_masters(db)
     logger.debug('Masters initialized')
 
-    await init_masters(db)
+    await init_inventory(db)
