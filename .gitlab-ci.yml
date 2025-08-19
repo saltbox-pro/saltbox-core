@@ -128,8 +128,6 @@ release-api-client-generate:
     VERSION: "${PYTHON_VERSION}"
   rules:
     - if: $CI_COMMIT_TAG =~ /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/
-    - when: on_success
-    
 
 nightly-api-client-generate:    
   extends: .api-client-generate
@@ -159,7 +157,6 @@ release-api-client-deploy:
     - release-api-client-generate
   rules:
     - if: $CI_COMMIT_TAG =~ /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/
-    - when: on_success  
 
 nightly-api-client-deploy:    
   extends: .api-client-deploy
