@@ -138,3 +138,6 @@ api-client-deploy:
     - npm install
     - npm config set @saltbox:registry https://${CI_SERVER_HOST}/api/v4/projects/${CI_PROJECT_ID}/packages/npm/
     - npm publish
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+
