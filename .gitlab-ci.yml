@@ -92,12 +92,16 @@ openapi-scheme-generate:
     - mkdir --parents "$APK_CACHE_DIR"
     - apk add --cache-dir "$APK_CACHE_DIR" git
     - pip3 install -e .[dev]
+  script:
+    - VERSION=$(python3 -c 'import saltbox_core; print(saltbox_core.__version__)')
+    - echo "PYTHON_VERSION=$VERSION" > build.env
+    - python ./saltbox_core/utilities/generate_openapi.py
   artifacts:
+    reports:
+      dotenv: build.env
     paths:
       - openapi.json 
     expire_in: 1 day
-  script:
-    - python ./saltbox_core/utilities/generate_openapi.py
   cache:
     paths:
       - '$PIP_CACHE_DIR'
@@ -108,7 +112,7 @@ api-client-generate:
   image:  openapitools/openapi-generator-cli:v7.14.0
   stage: generate-api-client
   variables:
-    VERSION: "0.0.1-${CI_COMMIT_REF_SLUG}.${CI_COMMIT_SHA}"
+    VERSION: "${PYTHON_VERSION}-${CI_COMMIT_SHA}"
   dependencies:
     - openapi-scheme-generate
   artifacts:
