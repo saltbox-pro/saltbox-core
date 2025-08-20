@@ -91,6 +91,10 @@ class Settings(BaseSettings):
     gog_key_name_real: str = 'Saltbox'
     gpg_key_email: str = 'gpg@saltbox.pro'
     gpg_key_comment: str = 'This is a certificate for saltbox services'
+    module_inventory_on: bool = Field(
+        default=False,
+        description='Provide data for Inventory extension module'
+    )
 
     model_config = SettingsConfigDict(env_file=ENV_FILE, extra='ignore')
 

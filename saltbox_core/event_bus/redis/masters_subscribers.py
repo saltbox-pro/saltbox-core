@@ -13,7 +13,7 @@ from saltbox_bridge_messages import (
     CoreAuthResponse,
     MasterStatus,
 )
-from saltbox_core.config import logger
+from saltbox_core.config import SETTINGS, logger
 from saltbox_core.event_bus.redis.master_bus_middlewares import MastersAuthMiddleware
 from saltbox_core.inventory.faststream import (
     FSInventoryServiceDependency,
@@ -131,6 +131,9 @@ async def extract_inventory(
     job_service: FSJobServiceDependency,
     inventory_service: FSInventoryServiceDependency,
 ) -> None:
+    if not SETTINGS.module_inventory_on:
+        return
+
     jid = JID(message.jid)
 
     for mid in message.minions:
