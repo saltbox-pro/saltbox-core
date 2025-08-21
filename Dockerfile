@@ -59,7 +59,7 @@ RUN \
 set -e
 mkdir --parents /var/cache/apt/archives/partial/ /var/lib/apt/lists/partial/
 apt-get update
-apt-get install -y ipython3
+apt-get install -y ipython3 uv
 EOF
 WORKDIR /mnt/saltbox-core/
 ENV DEV_MODE=1

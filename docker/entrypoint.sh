@@ -28,9 +28,9 @@ TASKIQ_BROKER_URL="${TASKIQ_BROKER_URL}/${REDIS_TASKIQ_DB}"
 export REDIS_PASSWORD MONGO_PASSWORD TASKIQ_BROKER_URL KEYCLOAK_CLIENT_SECRET
 
 if [ "$DEV_MODE" = 1 ]; then
-    pip3 install --editable .[reload]
-    pip3 install --editable "${SALTBOX_BRIDGE_MESSAGES_SRC_PATH}"
-    pip3 install --editable "${SALTBOX_SDK_SRC_PATH}"
+    uv --no-progress pip install --system --editable .[reload]
+    uv --no-progress pip install --system --editable "${SALTBOX_BRIDGE_MESSAGES_SRC_PATH}"
+    uv --no-progress pip install --system --editable "${SALTBOX_SDK_SRC_PATH}"
 fi
 
 cmd_uvicorn() {
