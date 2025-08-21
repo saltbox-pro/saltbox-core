@@ -20,6 +20,7 @@ from saltbox_core.inventory.faststream import (
     FSJobServiceDependency,
 )
 from saltbox_core.inventory.schemas import InventoryCreateSchema
+from saltbox_core.inventory.services import InventoryService
 from saltbox_core.inventory.utilities import solve_path
 from saltbox_core.masters.schemas.master_schemas import MasterCreateSchema, MasterModel
 from saltbox_core.masters.services.master_service import MasterService
@@ -125,6 +126,22 @@ async def burst_test_load_handler(message: BridgeTestBurstLoadMessage) -> None:
     ...
 
 
+async def _save_inventory(
+    inventory_service: InventoryService,
+    inventory: dict,
+    mid: str,
+) -> None:
+    objects = []
+    for inv_type, inv_list in inventory.items():
+        for inv_item in inv_list:
+            objects.append(InventoryCreateSchema(
+                **inv_item,
+                object_type=inv_type,
+                minions=[mid]
+            ))
+    await inventory_service.bulk_update_or_create(objects)
+
+
 @router.subscriber('inventory_saved')
 async def extract_inventory(
     message: BridgeInventoryDataSavedMessage,
@@ -137,20 +154,9 @@ async def extract_inventory(
     jid = JID(message.jid)
 
     for mid in message.minions:
-        result = await job_service.get_job_return_for_minion(jid, mid)
-        if result is not None:
-            inventory = solve_path(message.path, result.model_dump(by_alias=True))
-            for inv_type, inv_list in inventory.items():
-                for inv_item in inv_list:
-                    ...
-                      #update = {'$addToSet': {'_minions': minion['_id']}}
-                      #ops.append(UpdateOne(filter=soft, update=update, upsert=True))
-
-                    obj = InventoryCreateSchema(
-                        **inv_item,
-                        object_type=inv_type,
-                        minions=[mid]
-                    )
-                    await inventory_service.create(obj)
+        job_result = await job_service.get_job_return_for_minion(jid, mid)
+        if job_result is not None:
+            inventory = solve_path(message.path, job_result.model_dump(by_alias=True))
+            await _save_inventory(inventory=inventory, mid=mid, inventory_service=inventory_service)
         else:
             logger.warn('Not found inventory for minion %s, JID=%s', mid, jid)
