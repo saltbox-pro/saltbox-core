@@ -24,7 +24,7 @@ BulkOperation = UpdateOne
 class InventoryRepository(BaseMongoRepository[InventoryModel]):
     async def create_indices(self) -> None:
         # await self.collection.create_index('minions')
-        await self.collection.create_index('$**')
+        await self.collection.create_index(keys='$**', background=True)
         # TODO ??? await self.collection.create_index([('name', 1), ('version', 1)], unique=True)
 
     class Meta:

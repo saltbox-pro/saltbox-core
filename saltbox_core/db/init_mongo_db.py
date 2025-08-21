@@ -135,7 +135,7 @@ async def init_masters(db: AsyncDatabase) -> None:
 
 
 async def init_inventory(db: AsyncDatabase) -> None:
-    if SETTINGS.module_inventory_on:
+    if not SETTINGS.module_inventory_on:
         return
     repo = InventoryRepository(db)
     await repo.create_indices()
