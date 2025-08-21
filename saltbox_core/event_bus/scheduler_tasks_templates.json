@@ -21,7 +21,7 @@
           "type": "string",
           "default": "*"
         },
-        "target_type": {
+        "tgt_type": {
           "title": "Salt target type",
           "type": "string",
           "enum": [

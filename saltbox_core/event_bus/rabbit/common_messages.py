@@ -1,5 +1,6 @@
 import enum
-from typing import ClassVar
+
+from pydantic import Field
 
 from saltbox_sdk.event_bus.schemas import EventBusBaseMessage
 
@@ -19,8 +20,8 @@ class SyncTemplatesResponseEventBusMessage(EventBusBaseMessage):
 class RunTaskEventBusMessage(EventBusBaseMessage):
     process_id: str
     fun: str
-    task_args: ClassVar[list] = []
-    task_kwargs: ClassVar[dict] = {}
+    task_args: list = Field(title='Task arguments', default_factory=list)
+    task_kwargs: dict = Field(title='Task kwargs', default_factory=dict)
 
 
 class RunTaskStatus(enum.Enum):

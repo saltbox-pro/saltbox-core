@@ -106,7 +106,7 @@ async def run_task(
         'run_task': _run_task,
     }
 
-    if 'message.fun' in task_funcs:
+    if message.fun in task_funcs:
         try:
             result_data = await {
                 'run_job': _run_job,
