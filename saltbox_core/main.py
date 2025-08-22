@@ -8,11 +8,10 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from saltbox_core import __version__
 from saltbox_core.config import APP_DESC, APP_NAME, SETTINGS
-from saltbox_core.config import SETTINGS
 from saltbox_core.db.init_mongo_db import init_mongo_db
+from saltbox_core.inventory.routers import inventory_router
 from saltbox_core.jobs.routers.job_sc_router import router as job_schemas_router
 from saltbox_core.jobs.routers.jobs_router import router as jobs_router
-from saltbox_core.inventory.routers import inventory_router
 from saltbox_core.masters.routers.master_route import router as masters_router
 from saltbox_core.masters.routers.system_route import router as system_router
 from saltbox_core.minion_collections.routers.collections_router import router as collections_router
