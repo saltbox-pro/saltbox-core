@@ -3,7 +3,7 @@ from typing import ClassVar
 
 from pymongo.operations import UpdateOne
 
-from saltbox_core.inventory.schemas import InventoryCreateSchema, InventoryModel
+from saltbox_core.inventory.schemas import InventoryBaseModel, InventoryCreateSchema
 from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.exceptions import RepositoryException
@@ -21,7 +21,7 @@ class BulkOperationsFailedException(RepositoryException):
 BulkOperation = UpdateOne
 
 
-class InventoryRepository(BaseMongoRepository[InventoryModel]):
+class InventoryRepository(BaseMongoRepository[InventoryBaseModel]):
     async def create_indices(self) -> None:
         # await self.collection.create_index('minions')
         await self.collection.create_index(keys='$**', background=True)
@@ -33,10 +33,6 @@ class InventoryRepository(BaseMongoRepository[InventoryModel]):
         auto_now_add_fields: ClassVar[list[str]] = ['created']
         auto_now_fields: ClassVar[list[str]] = ['modified']
 
-    # TODO (a.karmanov): Implement handful methods
-    # async def get_by_type(self, value: str) -> list[InventoryModel]:
-        # return await self.get(query={'_type': value})
-
     async def commit(self, operations: Sequence[BulkOperation]) -> list[PyObjectId]:
         bulk_write_result = await self.collection.bulk_write(operations)
         if not bulk_write_result.acknowledged:
@@ -47,10 +43,7 @@ class InventoryRepository(BaseMongoRepository[InventoryModel]):
         else:
             return [PyObjectId(mongo_id) for mongo_id in upserted_ids.values()]
 
-    def bulk_op_update_or_create(
-        self,
-        data: InventoryCreateSchema,
-    ) -> BulkOperation:
+    def bulk_op_update_or_create(self, data: InventoryCreateSchema) -> BulkOperation:
         filter = data.model_dump(exclude={'id'}, exclude_unset=True)
         minions = filter.pop('minions')
         auto_fields: dict = {}
@@ -69,9 +62,6 @@ class InventoryRepository(BaseMongoRepository[InventoryModel]):
         update = [
             {
                 '$set': {
-                    'tag': {
-                        '$ifNull': ['$tag', 'fasion'],
-                    },
                     'minions': {
                         '$ifNull': [
                             {

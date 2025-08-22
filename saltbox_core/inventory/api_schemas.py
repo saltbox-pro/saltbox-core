@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from saltbox_core.inventory.schemas import InventoryModel
+from saltbox_core.inventory.schemas import InventoryBaseModel
 
 
 class GetMinionInventoryRequest(BaseModel):
@@ -9,4 +9,4 @@ class GetMinionInventoryRequest(BaseModel):
 
 
 class GetMinionInventoryResponse(BaseModel):
-    data: list[InventoryModel]
+    data: list[InventoryBaseModel]

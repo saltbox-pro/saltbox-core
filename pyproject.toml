@@ -102,6 +102,7 @@ select = [
 ]
 ignore = [
   # "E402",   # module level import not at top of file
+  "E701",   # Multiple statements on one line (colon)
   "E722",   # do not use bare except
   "ERA",    # do not autoremove commented out code
   "N818",   # error-suffix-on-exception-name
