@@ -19,7 +19,7 @@ from saltbox_core.inventory.faststream import (
     FSInventoryServiceDependency,
     FSJobServiceDependency,
 )
-from saltbox_core.inventory.schemas import get_model_for_category
+from saltbox_core.inventory.schemas import InventoryTypeFab, get_proto_for_category
 from saltbox_core.inventory.services import InventoryService
 from saltbox_core.inventory.utilities import solve_path
 from saltbox_core.masters.schemas.master_schemas import MasterCreateSchema, MasterModel
@@ -134,12 +134,13 @@ async def _save_inventory(
     objects = []
     for category, inv_list in inventory.items():
         try:
-            Schema = get_model_for_category(category).CreateSchema  # noqa: N806
+            proto = get_proto_for_category(category)
+            schema = InventoryTypeFab.get_create_schema(proto)
         except TypeError as err:
             logger.warning(err)
             continue
         for inv_item in inv_list:
-            objects.append(Schema(**inv_item, minions=[mid]))
+            objects.append(schema(**inv_item, category=category, minions=[mid]))
     await inventory_service.bulk_update_or_create(objects)
 
 

@@ -3,7 +3,7 @@ from typing import ClassVar
 
 from pymongo.operations import UpdateOne
 
-from saltbox_core.inventory.schemas import InventoryBaseModel, InventoryCreateSchema
+from saltbox_core.inventory.schemas import InventoryBaseCreateSchema, InventoryBaseModel
 from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.exceptions import RepositoryException
@@ -43,7 +43,7 @@ class InventoryRepository(BaseMongoRepository[InventoryBaseModel]):
         else:
             return [PyObjectId(mongo_id) for mongo_id in upserted_ids.values()]
 
-    def bulk_op_update_or_create(self, data: InventoryCreateSchema) -> BulkOperation:
+    def bulk_op_update_or_create(self, data: InventoryBaseCreateSchema) -> BulkOperation:
         filter = data.model_dump(exclude={'id'}, exclude_unset=True)
         minions = filter.pop('minions')
         auto_fields: dict = {}
