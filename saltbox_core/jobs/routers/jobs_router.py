@@ -87,6 +87,7 @@ async def jobs_list(
         desc=request.desc,
         projection_model=JobsListResponse,
     )
+    # Apply OPA query filtering
     # filtred_data = [item for item in jobs.data if match_query(item.model_dump(), opa_query)]
     # jobs.data = filtred_data
     return jobs

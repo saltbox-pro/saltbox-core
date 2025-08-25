@@ -1,3 +1,5 @@
+from enum import StrEnum
+
 from pydantic import BaseModel, Field
 
 from saltbox_sdk.db.mongo.schemas_base import IDMixin
@@ -26,3 +28,10 @@ class JobSchemaBaseSchema(BaseModel, ReadOnlyFieldsMixin): ...
 
 
 class JobSchemaModel(JobSchemaBaseSchema, CreatedModifiedMixin, IDMixin): ...
+
+
+class JobSchemasActions(StrEnum):
+    CLEAN = 'clean'
+    LIST = 'list'
+    SYNC = 'sync'
+    READ = 'read'

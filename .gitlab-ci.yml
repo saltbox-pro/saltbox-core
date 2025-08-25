@@ -100,7 +100,7 @@ openapi-scheme-generate:
     reports:
       dotenv: build.env
     paths:
-      - openapi.json 
+      - openapi.json
     expire_in: 1 day
   cache:
     paths:
@@ -108,7 +108,7 @@ openapi-scheme-generate:
       - '$APK_CACHE_DIR'
 
 
-.api-client-generate:    
+.api-client-generate:
   image:  openapitools/openapi-generator-cli:v7.14.0
   stage: generate-api-client
   dependencies:
@@ -117,28 +117,28 @@ openapi-scheme-generate:
     untracked: true
     expire_in: 1 day
   script:
-    - bash /usr/local/bin/docker-entrypoint.sh generate 
+    - bash /usr/local/bin/docker-entrypoint.sh generate
       --config ./openapi-generator-config.json
       --additional-properties=npmName=@saltbox/${CI_PROJECT_NAME}-api-client
       --additional-properties=npmVersion=${VERSION}
 
-release-api-client-generate:    
+release-api-client-generate:
   extends: .api-client-generate
   variables:
     VERSION: "${PYTHON_VERSION}"
   rules:
     - if: $CI_COMMIT_TAG =~ /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/
 
-nightly-api-client-generate:    
+nightly-api-client-generate:
   extends: .api-client-generate
   variables:
     VERSION: "${PYTHON_VERSION}-${CI_COMMIT_SHA}"
   rules:
     - if: $CI_COMMIT_TAG =~ /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/
       when: never
-    - when: on_success 
+    - when: on_success
 
-.api-client-deploy:    
+.api-client-deploy:
   image:  node:22.18.0
   variables:
     GIT_STRATEGY: none
@@ -152,19 +152,18 @@ nightly-api-client-generate:
     - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
       when: never
 
-release-api-client-deploy:    
+release-api-client-deploy:
   extends: .api-client-deploy
   dependencies:
     - release-api-client-generate
   rules:
     - if: $CI_COMMIT_TAG =~ /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/
 
-nightly-api-client-deploy:    
+nightly-api-client-deploy:
   extends: .api-client-deploy
   dependencies:
     - nightly-api-client-generate
   rules:
     - if: $CI_COMMIT_TAG =~ /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/
-      when: never 
+      when: never
     - when: on_success
-

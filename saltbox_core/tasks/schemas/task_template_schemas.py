@@ -1,3 +1,5 @@
+from enum import StrEnum
+
 from pydantic import BaseModel, ConfigDict, Field
 
 # from saltbox_core.config import logger
@@ -53,3 +55,8 @@ class TaskTemplateListQueryParams(SkipLimitParams):
     model_config = ConfigDict(
         extra='ignore',
     )
+
+
+class TaskTemplatesActions(StrEnum):
+    READ = 'read'
+    LIST = 'list'

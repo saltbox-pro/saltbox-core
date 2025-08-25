@@ -7,18 +7,29 @@ from saltbox_core.settings.services.sls_repo_service import SettingsSlsRepoServi
 from saltbox_core.tasks.schemas.task_template_schemas import (
     TaskTemplateListQueryParams,
     TaskTemplateModel,
+    TaskTemplatesActions,
     TaskTemplateShortSchema,
 )
 from saltbox_core.tasks.services.tasks_templates import TaskTemplateService, get_task_template_service
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse
+from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
+from saltbox_sdk.fastapi_utils.dependencies import get_opa_query
 
 router = APIRouter(prefix='/tasks/template', tags=['Task Templates'])
 
 
-@router.get('')
+@router.get(
+    '',
+    operation_id='task_templates_list',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.templates.list',
+        action=TaskTemplatesActions.LIST,
+    ).model_dump(by_alias=True),
+)
 async def task_template_list(
     params: Annotated[TaskTemplateListQueryParams, Query()],
+    opa_query: Annotated[dict, Depends(get_opa_query)],
     service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
     repo_settings_service: Annotated[SettingsSlsRepoService, Depends(get_sls_repo_service)],
 ) -> PaginatedResponse[TaskTemplateShortSchema]:
@@ -32,6 +43,7 @@ async def task_template_list(
         '$and': [
             {'repo_id': {'$in': active_repo_ids}},
             selected_repos_query,
+            opa_query,
         ]
     }
 
@@ -43,7 +55,14 @@ async def task_template_list(
     )
 
 
-@router.get('/{tpl_id}')
+@router.get(
+    '/{tpl_id}',
+    operation_id='task_template_retrieve',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.templates.read',
+        action=TaskTemplatesActions.READ,
+    ).model_dump(by_alias=True),
+)
 async def task_template_retrieve(
     tpl_id: PyObjectId,
     service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
