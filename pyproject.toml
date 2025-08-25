@@ -79,6 +79,7 @@ quote-style = "single"
 docstring-code-format = true
 
 [tool.ruff.lint]
+preview = true
 select = [
   "B",     # flake8-bugbear
   "C90",   # mccabe

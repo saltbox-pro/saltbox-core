@@ -86,7 +86,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
             raise JobCreateException(msg)
 
         try:
-            _data: dict[str, str] = {
+            data_: dict[str, str] = {
                 'jid': f'{jid}-{data.jid_postfix}' if data.jid_postfix else jid,
                 'fun': data.fun,
                 'tgt': data.tgt,
@@ -94,14 +94,14 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
             }
 
             if 'args' in validated_data:
-                _data['arg'] = json.dumps(validated_data['args'])
+                data_['arg'] = json.dumps(validated_data['args'])
             if 'kwargs' in validated_data:
-                _data['kwarg'] = json.dumps(validated_data['kwargs'])
+                data_['kwarg'] = json.dumps(validated_data['kwargs'])
 
             await self.rdb.hmset(
                 name=create_job_hash_name,
                 # TODO (i.moshkov): check and fix later
-                mapping=_data,  # type: ignore[arg-type]
+                mapping=data_,  # type: ignore[arg-type]
             )
             await self.rdb.expire(name=create_job_hash_name, time=60 * 10)
 

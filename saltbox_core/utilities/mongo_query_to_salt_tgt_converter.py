@@ -100,8 +100,8 @@ class MongoQueryToSaltTgtConverter:
                     query_op, query_item_value = next(iter(item_value.items()))
 
                     if query_op in cls.QUERY_UNSUPPORTED_LOOKUPS_OPERATORS:
-                        _msg = f'Operator "{query_op}" is not supported'
-                        raise MongoQueryToSaltTgtConverterUnsupportedOperator(_msg)
+                        msg = f'Operator "{query_op}" is not supported'
+                        raise MongoQueryToSaltTgtConverterUnsupportedOperator(msg)
 
                     if query_op == cls.QUERY_NOT_EQUAL_OPERATOR:
                         return f'not {process_key(query_key=item_key)}:{process_value(query_item_value)}'

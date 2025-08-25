@@ -105,8 +105,8 @@ async def job_retrieve(
     jid: IntJid,
     job_service: Annotated[JobService, Depends(get_job_service)],
 ) -> JobModel:
-    _jid = JID(jid)
-    return await job_service.get_job(_jid)
+    jid_ = JID(jid)
+    return await job_service.get_job(jid_)
 
 
 @router.post(

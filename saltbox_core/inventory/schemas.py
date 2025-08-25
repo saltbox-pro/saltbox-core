@@ -29,6 +29,8 @@ class InventoryBaseProto(BaseModel):
 
 class InventoryBaseModel(InventoryBaseProto, IDMixin, CreatedModifiedMixin):
     _is_proto = False
+
+
 class InventoryBaseCreateSchema(InventoryBaseProto):
     _is_proto = False
 
