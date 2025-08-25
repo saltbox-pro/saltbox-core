@@ -2,7 +2,6 @@ fastapi~=0.115.4
 faststream[redis]==0.5.34
 gitpython~=3.1.43
 httpx~=0.27.2
-jsonschema~=4.22.0
 pydantic-settings~=2.9.1
 pydantic~=2.11.5
 pyjwt[crypto]~=2.10.1
@@ -15,5 +14,4 @@ taskiq-aio-pika~=0.4.1
 taskiq-fastapi~=0.3.4
 taskiq-redis~=1.0.3
 taskiq~=0.11.14
-types-jsonschema~=4.22.0
 uvicorn[standard]~=0.32.0

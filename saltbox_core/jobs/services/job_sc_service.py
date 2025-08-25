@@ -14,9 +14,9 @@ from saltbox_core.jobs.schemas.job_sc_schemas import (
     JobSchemaUpdateSchema,
 )
 from saltbox_core.jobs.tasks import job_schemas_sync_task
-from saltbox_core.utilities.json_schema import Draft4ValidatorWithDefaults
 from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
+from saltbox_sdk.utilities.json_schema import Draft4ValidatorWithDefaults
 
 
 class JobSchemaService(

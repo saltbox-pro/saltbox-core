@@ -11,10 +11,10 @@ from saltbox_core.tasks.schemas.task_template_schemas import (
     TaskTemplateModel,
     TaskTemplateUpdateSchema,
 )
-from saltbox_core.utilities.json_schema import Draft4ValidatorWithDefaults
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
+from saltbox_sdk.utilities.json_schema import Draft4ValidatorWithDefaults
 
 
 class TaskTemplateService(
