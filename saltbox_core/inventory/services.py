@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Generator, Sequence
 from typing import cast
 
@@ -11,6 +12,8 @@ from saltbox_core.inventory.schemas import (
 )
 from saltbox_sdk.db.mongo import MongoAsyncDatabase
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
+
+logger = logging.getLogger(__name__)
 
 
 # TODO (a.karmanov): <US372> Cleanup of old data

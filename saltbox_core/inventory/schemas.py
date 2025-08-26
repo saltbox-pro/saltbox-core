@@ -1,11 +1,14 @@
+import logging
 import typing
 from functools import cache
-from typing import Any, ClassVar, Literal
+from typing import ClassVar, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, Field
 
 from saltbox_sdk.db.mongo.schemas_base import IDMixin
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin
+
+logger = logging.getLogger(__name__)
 
 # TODO () : <>
 #  - softwares
@@ -32,49 +35,56 @@ CategoryType = Literal[
 CATEGORIES: tuple[CategoryType, ...] = typing.get_args(CategoryType)
 
 
-class InventoryProtoBase(BaseModel):
-    # TODO (a.karmanov): <US327> FIXME Del
-    model_config = ConfigDict(extra='allow')
+class InventoryProtoBase:
+    # TODO (a.karmanov): <US373> Looks like related issue https://github.com/python/mypy/issues/11470
+    if typing.TYPE_CHECKING:
+        @classmethod
+        def __hash__(cls) -> int:
+            return hash(cls)
 
-    minions: list[str] = Field(description='Relation with minions')
+    @property
+    def category(self) -> CategoryType:
+        msg = f'Trying to use an instance of "abstract" {self.__class__.__name__}'
+        raise TypeError(msg)
+
+
+class InventoryModelBase(BaseModel, IDMixin, CreatedModifiedMixin):
     category: ClassVar[CategoryType]
-
-    _is_proto: ClassVar[bool] = True
-
-    @model_validator(mode='before')
-    @classmethod
-    def check_is_not_prototype(cls, data: Any) -> Any:
-        if cls._is_proto:
-            msg = 'Trying to init prototype of inventory model'
-            raise TypeError(msg)
-        return data
+    minions: list[str] = Field(description='Relation with minions')
 
 
-class InventoryModelBase(InventoryProtoBase, IDMixin, CreatedModifiedMixin):
-    _is_proto = False
-
-
-class InventoryCreateSchemaBase(InventoryProtoBase):
-    _is_proto = False
+class InventoryCreateSchemaBase(BaseModel):
+    category: ClassVar[CategoryType]
+    minions: list[str] = Field(description='Relation with minions')
 
 
 class InventoryModelFab:
+    PROTOTYPE_POSTFIX = 'Proto'
+
+    @classmethod
+    def _make_name(cls, proto: type, postfix: str) -> str:
+        orig = proto.__name__
+        if orig.endswith(cls.PROTOTYPE_POSTFIX):
+            orig = orig[:-len(cls.PROTOTYPE_POSTFIX)]
+        return orig + postfix
+
     @staticmethod
     def _make_type(name: str, bases: tuple[type, ...]) -> type:
         new_type = type(name, bases, {})
-        assert issubclass(new_type, InventoryProtoBase)  # noqa: S101
-        new_type._is_proto = False
+        assert issubclass(new_type, InventoryProtoBase)  # noqa
         return new_type
 
     @classmethod
     @cache
     def get_model(cls, proto: type[InventoryProtoBase]) -> type[InventoryModelBase]:
-        return cls._make_type('Model', (proto, IDMixin, CreatedModifiedMixin))
+        name = cls._make_name(proto, 'Model')
+        return cls._make_type(name, (InventoryModelBase, proto))
 
     @classmethod
     @cache
     def get_create_schema(cls, proto: type[InventoryProtoBase]) -> type[InventoryCreateSchemaBase]:
-        return cls._make_type('CreateSchema', (proto,))
+        name = cls._make_name(proto, 'CreateSchema')
+        return cls._make_type(name, (InventoryCreateSchemaBase, proto))
 
 
 class InventoryLocalGroupProto(InventoryProtoBase):

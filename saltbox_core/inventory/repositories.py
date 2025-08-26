@@ -1,3 +1,4 @@
+import logging
 from collections.abc import Sequence
 from functools import cache
 from typing import Any
@@ -10,6 +11,8 @@ from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.exceptions import RepositoryException
 from saltbox_sdk.utilities import status
 from saltbox_sdk.utilities.helpers import utc_now
+
+logger = logging.getLogger(__name__)
 
 
 class BulkOperationsFailedException(RepositoryException):
