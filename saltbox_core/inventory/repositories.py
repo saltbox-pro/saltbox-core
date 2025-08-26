@@ -26,6 +26,10 @@ BulkOperation = UpdateOne
 
 
 class InventoryRepositoryBase(BaseMongoRepository):
+    """
+    Do not use this class directly. Subclass it with:
+        class SubType(InventoryModelBase, model: InventoryModelBase = model)
+    """
     def __init_subclass__(cls, /, model: InventoryModelBase, **kwargs: dict[str, Any]) -> None:
         super().__init_subclass__(**kwargs)
         meta_members = {
@@ -37,10 +41,19 @@ class InventoryRepositoryBase(BaseMongoRepository):
         cls.default_model = model  # type: ignore[assignment]
 
     async def create_indices(self) -> None:
-        # TODO (a.karmanov): <US372> No glob, use model fields
-        # await self.collection.create_index('minions')
-        await self.collection.create_index(keys='$**', background=True)
-        # TODO ??? await self.collection.create_index([('name', 1), ('version', 1)], unique=True)
+        minions_field = 'minions'
+
+        fields = set(self.default_model.model_fields.keys())
+        fields.remove(minions_field)
+        fields.remove('id')
+        for autofield in [*self.Meta.auto_now_fields, *self.Meta.auto_now_add_fields]:
+            fields.remove(autofield)
+        sorted_fields = sorted(fields)
+
+        await self.collection.create_index([(f, 1) for f in sorted_fields], unique=True, background=True)
+        logger.info('Pended index creation for %s fields of %s', sorted_fields, self.Meta.collection_name)
+        await self.collection.create_index(minions_field, background=True)
+        logger.info('Pended index creation for %s field of %s', minions_field, self.Meta.collection_name)
 
     async def commit(self, operations: Sequence[BulkOperation]) -> list[PyObjectId]:
         bulk_write_result = await self.collection.bulk_write(operations)
