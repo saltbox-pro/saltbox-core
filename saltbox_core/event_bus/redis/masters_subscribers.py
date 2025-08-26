@@ -15,13 +15,10 @@ from saltbox_bridge_messages import (
 )
 from saltbox_core.config import SETTINGS, logger
 from saltbox_core.event_bus.redis.master_bus_middlewares import MastersAuthMiddleware
-from saltbox_core.inventory.faststream import (
-    FSInventoryServiceDependency,
-    FSJobServiceDependency,
-)
-from saltbox_core.inventory.schemas import InventoryTypeFab, get_proto_for_category
-from saltbox_core.inventory.services import InventoryService
+from saltbox_core.inventory.schemas import InventoryModelFab, get_proto_for_category
+from saltbox_core.inventory.services import CachedInventoryServices
 from saltbox_core.inventory.utilities import solve_path
+from saltbox_core.jobs.faststream import FSJobServiceDependency
 from saltbox_core.masters.schemas.master_schemas import MasterCreateSchema, MasterModel
 from saltbox_core.masters.services.master_service import MasterService
 from saltbox_core.minion_collections.schemas.minion_schemas import (
@@ -34,6 +31,7 @@ from saltbox_core.minion_collections.services.minion_service import MinionServic
 from saltbox_core.utilities.gpg import SaltBoxCrypt
 from saltbox_core.utilities.jid import JID
 from saltbox_sdk.exceptions import ObjectNotFoundException
+from saltbox_sdk.faststream_utils.dependencies import FSMongoDependency
 
 router_not_auth = RedisRouter(prefix='master_', middlewares=[])
 router = RedisRouter(prefix='master_', middlewares=[MastersAuthMiddleware])
@@ -126,39 +124,34 @@ async def burst_test_load_handler(message: BridgeTestBurstLoadMessage) -> None:
     ...
 
 
-async def _save_inventory(
-    inventory_service: InventoryService,
-    inventory: dict,
-    mid: str,
-) -> None:
-    objects = []
+async def _save_inventory(inventory_services: CachedInventoryServices, inventory: dict, mid: str) -> None:
     for category, inv_list in inventory.items():
         try:
             proto = get_proto_for_category(category)
-            schema = InventoryTypeFab.get_create_schema(proto)
+            schema = InventoryModelFab.get_create_schema(proto)
         except TypeError as err:
             logger.warning(err)
             continue
-        for inv_item in inv_list:
-            objects.append(schema(**inv_item, category=category, minions=[mid]))
-    await inventory_service.bulk_update_or_create(objects)
+        objects = [schema(**inv_item, minions=[mid]) for inv_item in inv_list]
+        await inventory_services.get(category).bulk_update_or_create(objects)
 
 
 @router.subscriber('inventory_saved')
 async def extract_inventory(
     message: BridgeInventoryDataSavedMessage,
     job_service: FSJobServiceDependency,
-    inventory_service: FSInventoryServiceDependency,
+    mdb: FSMongoDependency,
 ) -> None:
     if not SETTINGS.module_inventory_on:
         return
 
     jid = JID(message.jid)
+    inv_services = CachedInventoryServices(mdb)
 
     for mid in message.minions:
         job_result = await job_service.get_job_return_for_minion(jid, mid)
         if job_result is not None:
             inventory = solve_path(message.path, job_result.model_dump(by_alias=True))
-            await _save_inventory(inventory=inventory, mid=mid, inventory_service=inventory_service)
+            await _save_inventory(inventory=inventory, inventory_services=inv_services, mid=mid)
         else:
             logger.warn('Not found inventory for minion %s, JID=%s', mid, jid)

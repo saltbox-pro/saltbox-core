@@ -5,7 +5,8 @@ import pymongo
 from pymongo.asynchronous.database import AsyncDatabase
 
 from saltbox_core.config import SETTINGS, logger
-from saltbox_core.inventory.repositories import InventoryRepository
+from saltbox_core.inventory.schemas import CATEGORIES
+from saltbox_core.inventory.services import get_services_for_categories
 from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository
 from saltbox_core.jobs.schemas.job_sc_schemas import JobSchemaCreateSchema
 from saltbox_core.masters.repositories.master_repository import MasterRepository
@@ -137,8 +138,8 @@ async def init_masters(db: AsyncDatabase) -> None:
 async def init_inventory(db: AsyncDatabase) -> None:
     if not SETTINGS.module_inventory_on:
         return
-    repo = InventoryRepository(db)
-    await repo.create_indices()
+    for service in get_services_for_categories(categories=CATEGORIES, db=db):
+        await service.repo.create_indices()
 
 
 async def init_mongo_db() -> None:
