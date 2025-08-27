@@ -17,7 +17,7 @@ inventory_router = APIRouter(prefix='/inventory', tags=['Inventory'])
 async def get_inventory_for_minion(
     params: Annotated[GetMinionInventoryRequest, Query()],
     db: MongoDependency,
-) -> GetMinionInventoryResponse:
+) -> GetMinionInventoryResponse:  # type: ignore[valid-type]
     categories = params.categories if params.categories else CATEGORIES
     data = {}
 
@@ -26,7 +26,7 @@ async def get_inventory_for_minion(
         for service in get_services_for_categories(categories=categories, db=db)
     }
 
-    resp = GetMinionInventoryResponse(data=data)
+    resp = GetMinionInventoryResponse(**data)
     return resp
 
 

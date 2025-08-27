@@ -1,43 +1,41 @@
 import logging
-import typing
 from functools import cache
-from typing import ClassVar, Literal
+from typing import TYPE_CHECKING, ClassVar, Literal
+from typing import get_args as typing_get_args
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from saltbox_sdk.db.mongo.schemas_base import IDMixin
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin
 
 logger = logging.getLogger(__name__)
 
-# TODO () : <>
-#  - softwares
-#  - videos
-#  - bios
-#  - virtualmachines
-#  - users
-#  - networks
-#  - storages
-#  - ports
-#  - batteries
-#  - cpus
-#  - local_users
-#  - drives
-#  - sounds
-#  - hardware
-#  - controllers
-
 CategoryType = Literal[
+    # 'batteries',
+    # 'bios',
+    # 'controllers',
+    # 'cpus',
+    # 'drives',
+    # 'hardware',
     'inputs',
+    'softwares',
     'local_groups',
+    # 'local_users',
+    # 'networks',
+    # 'ports',
+    # 'sounds',
+    # 'storages',
+    # 'users',
+    # 'videos',
+    # 'virtualmachines',
 ]
 
-CATEGORIES: tuple[CategoryType, ...] = typing.get_args(CategoryType)
+CATEGORIES: tuple[CategoryType, ...] = typing_get_args(CategoryType)
 
 
 class InventoryProtoBase:
     # TODO (a.karmanov): <US373> Looks like related issue https://github.com/python/mypy/issues/11470
-    if typing.TYPE_CHECKING:
+    if TYPE_CHECKING:
         @classmethod
         def __hash__(cls) -> int:
             return hash(cls)
@@ -46,6 +44,11 @@ class InventoryProtoBase:
     def category(self) -> CategoryType:
         msg = f'Trying to use an instance of "abstract" {self.__class__.__name__}'
         raise TypeError(msg)
+
+    model_config = ConfigDict(validate_by_name=True, extra='forbid')
+
+    def get_category(self) -> str:
+        return self.category
 
 
 class InventoryModelBase(BaseModel, IDMixin, CreatedModifiedMixin):
@@ -100,8 +103,22 @@ class InventoryInputProto(InventoryProtoBase):
     description: str
 
 
+class InventorySoftwareProto(InventoryProtoBase):
+    category: ClassVar[CategoryType] = 'softwares'
+    arch: str
+    comments: str
+    filesize: int
+    from_: str = Field(alias='from')
+    installdate: str
+    name: str
+    publisher: str
+    system_category: str
+    version: str
+
+
 def get_proto_for_category(category: CategoryType) -> type[InventoryProtoBase]:
     match category:
         case InventoryInputProto.category: return InventoryInputProto
         case InventoryLocalGroupProto.category: return InventoryLocalGroupProto
+        case InventorySoftwareProto.category: return InventorySoftwareProto
         case _: raise TypeError(f'Unsupported category {category}')  # noqa: EM102

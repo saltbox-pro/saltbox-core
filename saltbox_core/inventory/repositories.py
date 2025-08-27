@@ -50,8 +50,13 @@ class InventoryRepositoryBase(BaseMongoRepository):
             fields.remove(autofield)
         sorted_fields = sorted(fields)
 
+        if not sorted_fields:
+            msg = 'Not found Inventory model fields to create an index'
+            raise TypeError(msg)
+
         await self.collection.create_index([(f, 1) for f in sorted_fields], unique=True, background=True)
         logger.info('Pended index creation for %s fields of %s', sorted_fields, self.Meta.collection_name)
+
         await self.collection.create_index(minions_field, background=True)
         logger.info('Pended index creation for %s field of %s', minions_field, self.Meta.collection_name)
 
