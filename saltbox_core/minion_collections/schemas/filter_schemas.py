@@ -1,3 +1,4 @@
+from enum import StrEnum
 from typing import TypedDict
 
 from fastapi.exceptions import RequestValidationError
@@ -89,3 +90,8 @@ class MinionFilterSchema(BaseModel):
     input_type: str | None = Field(serialization_alias='inputType', default=None)
     value_editor_type: str | None = Field(serialization_alias='valueEditorType', default=None)
     default_value: bool | None = Field(serialization_alias='defaultValue', default=None)
+
+
+class FiltersActions(StrEnum):
+    UNIQUE_GRAIN_VALUES = 'unique_grain_values'
+    GET_SCHEMA = 'get_schema'

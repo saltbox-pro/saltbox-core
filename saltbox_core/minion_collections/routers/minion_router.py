@@ -11,17 +11,26 @@ from saltbox_core.masters.services.master_service import MasterService, get_mast
 from saltbox_core.minion_collections.schemas.minion_schemas import (
     MinionDetailSchema,
     MinionListBody,
+    MinionsActions,
     MinionShortSchema,
 )
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse
+from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 
 router = APIRouter(prefix='/minions', tags=['Minions'])
 
 
-@router.post('', operation_id='minions_list')
+@router.post(
+    '',
+    operation_id='minions_list',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.minions.list',
+        action=MinionsActions.LIST,
+    ).model_dump(by_alias=True),
+)
 async def minions_list(
     body: Annotated[MinionListBody, Body()],
     minion_service: Annotated[MinionService, Depends(get_minion_service)],
@@ -42,7 +51,15 @@ async def minions_list(
     )
 
 
-@router.post('/export', operation_id='minions_export', response_class=FileResponse)
+@router.post(
+    '/export',
+    operation_id='minions_export',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.minions.export',
+        action=MinionsActions.EXPORT,
+    ).model_dump(by_alias=True),
+    response_class=FileResponse,
+)
 async def minions_export(
     body: Annotated[MinionListBody, Body()],
     minion_service: Annotated[MinionService, Depends(get_minion_service)],
@@ -66,7 +83,14 @@ async def minions_export(
     )
 
 
-@router.get('/gather')
+@router.get(
+    '/gather',
+    operation_id='minions_gather',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.minions.gather',
+        action=MinionsActions.GATHER,
+    ).model_dump(by_alias=True),
+)
 async def gather_minions(
     tgt: str,
     tgt_type: SaltTgtType,
@@ -87,7 +111,14 @@ async def gather_minions(
     return BridgeGatherMinionsResponse.model_validate(minions)
 
 
-@router.get('/{mid}')
+@router.get(
+    '/{mid}',
+    operation_id='minion_get',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.minions.read',
+        action=MinionsActions.READ,
+    ).model_dump(by_alias=True),
+)
 async def minion_retrieve(
     collection_slug: str,
     mid: PyObjectId,
@@ -111,6 +142,10 @@ async def minion_retrieve(
 @router.delete(
     '/{mid}',
     operation_id='minion_delete',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.minions.delete',
+        action=MinionsActions.DELETE,
+    ).model_dump(by_alias=True),
     status_code=status.HTTP_204_NO_CONTENT,
 )
 async def minion_delete(

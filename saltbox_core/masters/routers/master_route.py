@@ -18,7 +18,6 @@ router = APIRouter(prefix='/masters', tags=['Masters'])
     openapi_extra=GatewayEndpointConfig(
         policy='core.masters.base',
         action=MastersActions.LIST,
-        cache_ttl=0,
     ).model_dump(by_alias=True),
 )
 async def masters_list(
@@ -43,7 +42,6 @@ async def masters_list(
     openapi_extra=GatewayEndpointConfig(
         policy='core.masters.base',
         action=MastersActions.READ,
-        cache_ttl=0,
     ).model_dump(by_alias=True),
 )
 async def master_get(
@@ -60,7 +58,6 @@ async def master_get(
     openapi_extra=GatewayEndpointConfig(
         policy='core.masters.base',
         action=MastersActions.ACCEPT,
-        cache_ttl=0,
     ).model_dump(by_alias=True),
 )
 async def master_accept(
@@ -79,7 +76,6 @@ async def master_accept(
     openapi_extra=GatewayEndpointConfig(
         policy='core.masters.base',
         action=MastersActions.REJECT,
-        cache_ttl=0,
     ).model_dump(by_alias=True),
 )
 async def master_reject(

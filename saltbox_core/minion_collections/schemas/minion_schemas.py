@@ -1,4 +1,5 @@
 from datetime import datetime
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
@@ -194,3 +195,11 @@ class MinionListBody(SkipLimitParams):
         ],
         json_schema_extra={'example': {'grains.cpu_model': {'$not': {'$regex': 'Intel'}}}},
     )
+
+
+class MinionsActions(StrEnum):
+    LIST = 'list'
+    READ = 'read'
+    DELETE = 'delete'
+    EXPORT = 'export'
+    GATHER = 'gather'
