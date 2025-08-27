@@ -54,3 +54,13 @@ class PillarListQueryParams(BaseModel):
     master_id: str
     minion_id: str | None = None
     only_for_minion: bool = False
+
+
+class PillarsActions(StrEnum):
+    LIST = 'list'
+    CREATE = 'create'
+    UPDATE = 'update'
+    DELETE = 'delete'
+    EXPORT = 'export'
+    VALIDATE = 'validate'
+    IMPORT = 'import'
