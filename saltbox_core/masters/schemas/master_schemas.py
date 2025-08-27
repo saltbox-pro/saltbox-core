@@ -1,3 +1,5 @@
+from enum import StrEnum
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from saltbox_bridge_messages import MasterStatus, MasterSyncStatus, SshPubKeyModel
@@ -73,3 +75,10 @@ class MasterQueryParams(SkipLimitParams):
     status: MasterStatus | None = Field(title='Status', default=None)
 
     model_config = ConfigDict(extra='forbid')
+
+
+class MastersActions(StrEnum):
+    LIST = 'list'
+    READ = 'read'
+    ACCEPT = 'accept'
+    REJECT = 'reject'

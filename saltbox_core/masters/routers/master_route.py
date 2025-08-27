@@ -1,21 +1,26 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Query
 
 from saltbox_core.event_bus.redis.masters_bus import notify_master_on_repos_update
-from saltbox_core.masters.schemas.master_schemas import MasterModel, MasterQueryParams, MasterViewSchema
+from saltbox_core.masters.schemas.master_schemas import MasterModel, MasterQueryParams, MastersActions, MasterViewSchema
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse
+from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 
-router = APIRouter(
-    prefix='/masters',
-    tags=['Masters'],
-    responses={status.HTTP_404_NOT_FOUND: {'description': 'Not found'}},
+router = APIRouter(prefix='/masters', tags=['Masters'])
+
+
+@router.get(
+    '',
+    operation_id='masters_list',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.masters.base',
+        action=MastersActions.LIST,
+        cache_ttl=0,
+    ).model_dump(by_alias=True),
 )
-
-
-@router.get('', operation_id='masters_list')
 async def masters_list(
     params: Annotated[MasterQueryParams, Query()],
     master_service: Annotated[MasterService, Depends(get_master_service)],
@@ -32,7 +37,15 @@ async def masters_list(
     return master_list
 
 
-@router.get('/{master_id}', operation_id='master_get')
+@router.get(
+    '/{master_id}',
+    operation_id='master_get',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.masters.base',
+        action=MastersActions.READ,
+        cache_ttl=0,
+    ).model_dump(by_alias=True),
+)
 async def master_get(
     master_id: str,
     master_service: Annotated[MasterService, Depends(get_master_service)],
@@ -41,7 +54,15 @@ async def master_get(
     return MasterViewSchema.model_validate({'_id': master.id, **master.model_dump(by_alias=True)})
 
 
-@router.post('/{mid}/accept', operation_id='task_accept')
+@router.post(
+    '/{mid}/accept',
+    operation_id='task_accept',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.masters.base',
+        action=MastersActions.ACCEPT,
+        cache_ttl=0,
+    ).model_dump(by_alias=True),
+)
 async def master_accept(
     mid: PyObjectId,
     master_service: Annotated[MasterService, Depends(get_master_service)],
@@ -52,7 +73,15 @@ async def master_accept(
     return MasterViewSchema.model_validate({'_id': master.id, **master.model_dump(by_alias=True)})
 
 
-@router.post('/{mid}/reject', operation_id='task_reject')
+@router.post(
+    '/{mid}/reject',
+    operation_id='task_reject',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.masters.base',
+        action=MastersActions.REJECT,
+        cache_ttl=0,
+    ).model_dump(by_alias=True),
+)
 async def master_reject(
     mid: PyObjectId,
     master_service: Annotated[MasterService, Depends(get_master_service)],
