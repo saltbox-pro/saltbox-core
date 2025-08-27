@@ -10,7 +10,6 @@ from pydantic import (
     AfterValidator,
     BaseModel,
     ConfigDict,
-    Extra,
     Field,
     HttpUrl,
     SecretStr,
@@ -136,8 +135,7 @@ class ManifestSshfsFilesSchema(BaseModel):
     token: str | None = FIELD_SENTINEL
     unpack: bool = Field(default=False, description='Unpack arhive rather than processing as a regular file')
 
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra='forbid')
 
 
 class ManifestSchema(BaseModel):
@@ -146,8 +144,7 @@ class ManifestSchema(BaseModel):
     sshfs_files_checksum_type: ManifestDigestStr = DEFAULT_DIGEST.value
     sshfs_files_token: str | None = None
 
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra='forbid')
 
     @model_validator(mode='after')
     def _set_global_values(self) -> 'ManifestSchema':
@@ -162,3 +159,16 @@ class ManifestSchema(BaseModel):
 class SettingsSlsRepoModel(
     BaseModel, CreatedModifiedMixin, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin, IDMixin
 ): ...
+
+
+class SettingsSlsActions(StrEnum):
+    LIST = 'list'
+    READ = 'read'
+    CREATE = 'create'
+    UPDATE = 'update'
+    DELETE = 'delete'
+    SYNC = 'sync'
+    SYNC_ALL = 'sync_all'
+    SYNC_STATUS = 'sync_status'
+    ACTIVATE = 'activate'
+    DEACTIVATE = 'deactivate'
