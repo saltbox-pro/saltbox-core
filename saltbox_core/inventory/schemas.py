@@ -11,10 +11,10 @@ from saltbox_sdk.db.schemas_base import CreatedModifiedMixin
 logger = logging.getLogger(__name__)
 
 CategoryType = Literal[
-    # 'batteries',
-    # 'bios',
+    'batteries',
+    'bios',
     # 'controllers',
-    # 'cpus',
+    'cpus',
     # 'drives',
     # 'hardware',
     'inputs',
@@ -92,6 +92,7 @@ class InventoryModelFab:
 
 class InventoryLocalGroupProto(InventoryProtoBase):
     category: ClassVar[CategoryType] = 'local_groups'
+    id: int  # FIXME
     name: str
     member: str
 
@@ -116,9 +117,49 @@ class InventorySoftwareProto(InventoryProtoBase):
     version: str
 
 
+class InventoryBatteryProto(InventoryProtoBase):
+    category: ClassVar[CategoryType] = 'batteries'
+    capacity: str
+    chemistry: str
+    manufacturer: str
+    name: str
+    real_capacity: str
+    serial: str
+    voltage: str
+
+
+class InventoryBiosProto(InventoryProtoBase):
+    category: ClassVar[CategoryType] = 'bios'
+    assettag: str
+    bdate: str
+    bmanufacturer: str
+    bversion: str
+    mmanufacturer: str
+    mmodel: str
+    msn: str
+    smanufacturer: str
+    smodel: str
+    ssn: str
+
+
+class InventoryCpuProto(InventoryProtoBase):
+    category: ClassVar[CategoryType] = 'cpus'
+    arch: str
+    core: int
+    familynumber: int
+    manufacturer: str
+    model: str
+    name: str
+    stepping: int
+    thread: int
+
+
 def get_proto_for_category(category: CategoryType) -> type[InventoryProtoBase]:
     match category:
         case InventoryInputProto.category: return InventoryInputProto
         case InventoryLocalGroupProto.category: return InventoryLocalGroupProto
         case InventorySoftwareProto.category: return InventorySoftwareProto
+        case InventoryBatteryProto.category: return InventoryBatteryProto
+        case InventoryBiosProto.category: return InventoryBiosProto
+        case InventoryCpuProto.category: return InventoryCpuProto
         case _: raise TypeError(f'Unsupported category {category}')  # noqa: EM102
