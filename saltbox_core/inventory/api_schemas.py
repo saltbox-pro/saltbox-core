@@ -1,18 +1,24 @@
 from typing import Any
 
-from pydantic import BaseModel, create_model
+from pydantic import BaseModel, Field, create_model
 
 from saltbox_core.inventory.schemas import (
     CATEGORIES,
     CategoryType,
+    InventoryMinionSpec,
     InventoryModelFab,
     get_proto_for_category,
 )
 
 
 class GetMinionInventoryRequest(BaseModel):
-    minion: str
+    master_id: str
+    minion_id: str
     categories: None | list[CategoryType] = None
+
+    @property
+    def minion_spec(self) -> InventoryMinionSpec:
+        return InventoryMinionSpec(master_id=self.master_id, minion_id=self.minion_id)
 
 
 def _make_minion_inventory_resp(name: str) -> type[BaseModel]:
@@ -31,3 +37,10 @@ def _make_minion_inventory_resp(name: str) -> type[BaseModel]:
 
 
 GetMinionInventoryResponse = _make_minion_inventory_resp('GetMinionInventoryResponse')
+
+
+class DeleteInventoryRequest(BaseModel):
+    categories: None | list[CategoryType] = Field(
+        None,
+        description='Categories to drop, ALL if not specified',
+    )

@@ -15,7 +15,7 @@ from saltbox_bridge_messages import (
 )
 from saltbox_core.config import SETTINGS, logger
 from saltbox_core.event_bus.redis.master_bus_middlewares import MastersAuthMiddleware
-from saltbox_core.inventory.schemas import InventoryModelFab, get_proto_for_category
+from saltbox_core.inventory.schemas import InventoryMinionSpec, InventoryModelFab, get_proto_for_category
 from saltbox_core.inventory.services import CachedInventoryServices
 from saltbox_core.inventory.utilities import solve_path
 from saltbox_core.jobs.faststream import FSJobServiceDependency
@@ -124,7 +124,11 @@ async def burst_test_load_handler(message: BridgeTestBurstLoadMessage) -> None:
     ...
 
 
-async def _save_inventory(inventory_services: CachedInventoryServices, inventory: dict, mid: str) -> None:
+async def _save_inventory(
+    inventory_services: CachedInventoryServices,
+    inventory: dict,
+    minion_spec: InventoryMinionSpec,
+) -> None:
     for category, inv_list in inventory.items():
         try:
             proto = get_proto_for_category(category)
@@ -132,7 +136,7 @@ async def _save_inventory(inventory_services: CachedInventoryServices, inventory
         except TypeError as err:
             logger.warning(err)
             continue
-        objects = [schema(**inv_item, minions=[mid]) for inv_item in inv_list]
+        objects = [schema(**inv_item, minions=[minion_spec]) for inv_item in inv_list]
         await inventory_services.get(category).bulk_update_or_create(objects)
 
 
@@ -148,10 +152,11 @@ async def extract_inventory(
     jid = JID(message.jid)
     inv_services = CachedInventoryServices(mdb)
 
-    for mid in message.minions:
-        job_result = await job_service.get_job_return_for_minion(jid, mid)
+    for minion_id in message.minions:
+        minion_spec = InventoryMinionSpec(master_id=message.master, minion_id=minion_id)
+        job_result = await job_service.get_job_return_for_minion(jid, minion_id)
         if job_result is not None:
             inventory = solve_path(message.path, job_result.model_dump(by_alias=True))
-            await _save_inventory(inventory=inventory, inventory_services=inv_services, mid=mid)
+            await _save_inventory(inventory=inventory, inventory_services=inv_services, minion_spec=minion_spec)
         else:
-            logger.warn('Not found inventory for minion %s, JID=%s', mid, jid)
+            logger.warn('Not found inventory for minion %s, JID=%s', minion_spec, jid)

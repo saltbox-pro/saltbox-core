@@ -6,6 +6,7 @@ from saltbox_core.inventory.repositories import InventoryRepositoryBase, invento
 from saltbox_core.inventory.schemas import (
     CategoryType,
     InventoryCreateSchemaBase,
+    InventoryMinionSpec,
     InventoryModelBase,
     InventoryModelFab,
     get_proto_for_category,
@@ -24,8 +25,8 @@ class InventoryService(
         ops = [self.repo.bulk_op_update_or_create(obj) for obj in data]
         await self.repo.commit(ops)
 
-    async def get_for_minion(self, minion: str) -> list[InventoryModelBase]:
-        query = {'minions': {'$in': [minion]}}
+    async def get_for_minion(self, minion: InventoryMinionSpec) -> list[InventoryModelBase]:
+        query = {'minions': {'$in': [minion.model_dump()]}}
         return await self.get_list(query=query)
 
     @property

@@ -51,14 +51,21 @@ class InventoryProtoBase:
         return self.category
 
 
-class InventoryModelBase(BaseModel, IDMixin, CreatedModifiedMixin):
-    category: ClassVar[CategoryType]
-    minions: list[str] = Field(description='Relation with minions')
+class InventoryMinionSpec(BaseModel):
+    master_id: str
+    minion_id: str
+
+    def __str__(self) -> str:
+        return f'{self.master_id}:{self.minion_id}'
 
 
-class InventoryCreateSchemaBase(BaseModel):
+class InventoryCommonMixin:
     category: ClassVar[CategoryType]
-    minions: list[str] = Field(description='Relation with minions')
+    minions: list[InventoryMinionSpec] = Field(description='Relation with minions')
+
+
+class InventoryModelBase(BaseModel, InventoryCommonMixin, IDMixin, CreatedModifiedMixin): ...
+class InventoryCreateSchemaBase(BaseModel, InventoryCommonMixin): ...  # noqa: E302
 
 
 class InventoryModelFab:
@@ -92,7 +99,7 @@ class InventoryModelFab:
 
 class InventoryLocalGroupProto(InventoryProtoBase):
     category: ClassVar[CategoryType] = 'local_groups'
-    id: int  # FIXME
+    id: int  # TODO (a.karmanov): <US327> FIXME Overrided by std id of model
     name: str
     member: str
 
@@ -156,10 +163,10 @@ class InventoryCpuProto(InventoryProtoBase):
 
 def get_proto_for_category(category: CategoryType) -> type[InventoryProtoBase]:
     match category:
-        case InventoryInputProto.category: return InventoryInputProto
-        case InventoryLocalGroupProto.category: return InventoryLocalGroupProto
-        case InventorySoftwareProto.category: return InventorySoftwareProto
         case InventoryBatteryProto.category: return InventoryBatteryProto
         case InventoryBiosProto.category: return InventoryBiosProto
         case InventoryCpuProto.category: return InventoryCpuProto
+        case InventoryInputProto.category: return InventoryInputProto
+        case InventoryLocalGroupProto.category: return InventoryLocalGroupProto
+        case InventorySoftwareProto.category: return InventorySoftwareProto
         case _: raise TypeError(f'Unsupported category {category}')  # noqa: EM102

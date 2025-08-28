@@ -80,3 +80,6 @@ def get_minion_service(
     repo: Annotated[MinionRepository, Depends(get_minion_repository)],
 ) -> MinionService:
     return MinionService(repo)
+
+
+MinionServiceDependency = Annotated[MinionService, Depends(get_minion_service)]

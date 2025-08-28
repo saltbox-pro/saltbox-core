@@ -36,3 +36,6 @@ def get_collection_service(
     repo: Annotated[CollectionRepository, Depends(get_collection_repository)],
 ) -> CollectionService:
     return CollectionService(repo)
+
+
+CollectionServiceDependency = Annotated[CollectionService, Depends(get_collection_service)]
