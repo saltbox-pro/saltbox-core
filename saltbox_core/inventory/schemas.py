@@ -99,9 +99,9 @@ class InventoryModelFab:
 
 class InventoryLocalGroupProto(InventoryProtoBase):
     category: ClassVar[CategoryType] = 'local_groups'
-    id: int  # TODO (a.karmanov): <US327> FIXME Overrided by std id of model
+    gid: int
     name: str
-    member: str
+    members: list[str]
 
 
 class InventoryInputProto(InventoryProtoBase):
