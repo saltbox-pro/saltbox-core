@@ -136,8 +136,10 @@ async def _save_inventory(
         except TypeError as err:
             logger.warning(err)
             continue
+        service = inventory_services.get(category)
+        await service.delete_minion(minion_spec)
         objects = [schema(**inv_item, minions=[minion_spec]) for inv_item in inv_list]
-        await inventory_services.get(category).bulk_update_or_create(objects)
+        await service.bulk_update_or_create(objects)
 
 
 @router.subscriber('inventory_saved')

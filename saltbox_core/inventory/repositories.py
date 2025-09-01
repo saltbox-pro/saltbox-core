@@ -1,11 +1,10 @@
 import logging
-from collections.abc import Sequence
 from functools import cache
 from typing import Any
 
-from pymongo.operations import UpdateOne
+from pymongo.operations import DeleteMany, UpdateMany, UpdateOne
 
-from saltbox_core.inventory.schemas import InventoryCreateSchemaBase, InventoryModelBase
+from saltbox_core.inventory.schemas import InventoryCreateSchemaBase, InventoryMinionSpec, InventoryModelBase
 from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.exceptions import RepositoryException
@@ -22,7 +21,7 @@ class BulkOperationsFailedException(RepositoryException):
     detail = 'Multiple operations have being failed to commit'
 
 
-BulkOperation = UpdateOne
+BulkOperation = DeleteMany | UpdateMany | UpdateOne
 
 
 class InventoryRepositoryBase(BaseMongoRepository):
@@ -60,7 +59,12 @@ class InventoryRepositoryBase(BaseMongoRepository):
         await self.collection.create_index(minions_field, background=True)
         logger.info('Pended index creation for %s field of %s', minions_field, self.Meta.collection_name)
 
-    async def commit(self, operations: Sequence[BulkOperation]) -> list[PyObjectId]:
+    async def commit(self, operations: list[BulkOperation]) -> list[PyObjectId]:
+        """
+        Apply bulk MongoDB operations
+
+        :return: IDs of upserted objects
+        """
         bulk_write_result = await self.collection.bulk_write(operations)
         if not bulk_write_result.acknowledged:
             raise BulkOperationsFailedException()
@@ -103,6 +107,19 @@ class InventoryRepositoryBase(BaseMongoRepository):
         ]
 
         return UpdateOne(filter=filter, update=update, upsert=True)
+
+    async def delete_minion(self, minion: InventoryMinionSpec) -> None:
+        """
+        Remove all bindings to the minion in collection.
+        """
+
+        update = {'$pull': {'minions': minion.model_dump()}}
+        del_filter = {'minions': {'$size': 0}}
+
+        await self.commit([
+            UpdateMany(filter={}, update=update),
+            DeleteMany(filter=del_filter),
+        ])
 
 
 @cache
