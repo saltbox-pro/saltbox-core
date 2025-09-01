@@ -21,6 +21,10 @@ logger = logging.getLogger(__name__)
 class InventoryService(
     MongoBaseService[InventoryRepositoryBase, InventoryModelBase, InventoryCreateSchemaBase, InventoryCreateSchemaBase]
 ):
+    @property
+    def category(self) -> CategoryType:
+        return cast(CategoryType, self.repo.default_model.category)
+
     async def bulk_update_or_create(self, data: list[InventoryCreateSchemaBase]) -> None:
         ops = [self.repo.bulk_op_update_or_create(obj) for obj in data]
         await self.repo.commit(ops)
@@ -29,9 +33,11 @@ class InventoryService(
         query = {'minions': {'$in': [minion.model_dump()]}}
         return await self.get_list(query=query)
 
-    @property
-    def category(self) -> CategoryType:
-        return cast(CategoryType, self.repo.default_model.category)
+    async def delete_minion(self, minion: InventoryMinionSpec) -> None:
+        """
+        Remove all bindings to the minion in collection.
+        """
+        return await self.repo.delete_minion(minion)
 
 
 def get_service_for_category(category: CategoryType, db: MongoAsyncDatabase) -> InventoryService:
