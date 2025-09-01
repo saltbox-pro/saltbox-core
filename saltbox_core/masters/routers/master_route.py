@@ -16,7 +16,7 @@ router = APIRouter(prefix='/masters', tags=['Masters'])
     '',
     operation_id='masters_list',
     openapi_extra=GatewayEndpointConfig(
-        policy='core.masters.base',
+        policy='core.masters.list',
         action=MastersActions.LIST,
     ).model_dump(by_alias=True),
 )
