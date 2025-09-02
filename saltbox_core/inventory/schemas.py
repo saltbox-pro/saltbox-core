@@ -1,5 +1,7 @@
 import logging
+import sys
 from functools import cache
+from inspect import getmembers, isclass
 from typing import TYPE_CHECKING, ClassVar, Literal
 from typing import get_args as typing_get_args
 
@@ -13,7 +15,7 @@ logger = logging.getLogger(__name__)
 CategoryType = Literal[
     'batteries',
     'bios',
-    # 'controllers',
+    'controllers',
     'cpus',
     # 'drives',
     # 'hardware',
@@ -34,16 +36,13 @@ CATEGORIES: tuple[CategoryType, ...] = typing_get_args(CategoryType)
 
 
 class InventoryProtoBase:
+    category: ClassVar[CategoryType]
+
     # TODO (a.karmanov): <US373> Looks like related issue https://github.com/python/mypy/issues/11470
     if TYPE_CHECKING:
         @classmethod
         def __hash__(cls) -> int:
             return hash(cls)
-
-    @property
-    def category(self) -> CategoryType:
-        msg = f'Trying to use an instance of "abstract" {self.__class__.__name__}'
-        raise TypeError(msg)
 
     model_config = ConfigDict(validate_by_name=True, extra='forbid')
 
@@ -161,12 +160,36 @@ class InventoryCpuProto(InventoryProtoBase):
     thread: int
 
 
+class InventoryControllerProto(InventoryProtoBase):
+    category: ClassVar[CategoryType] = 'controllers'
+    manufacturer: str
+    name: str
+    pcislot: str
+    productid: str
+
+
+def _make_categories_mapping() -> dict[CategoryType, type[InventoryProtoBase]]:
+    mapping: dict[CategoryType, type[InventoryProtoBase]] = {}
+    module = sys.modules[__name__]
+    allowed_categories = set(CATEGORIES)
+
+    for name, obj in getmembers(module):
+        if isclass(obj) and issubclass(obj, InventoryProtoBase) and obj is not InventoryProtoBase:
+            logger.debug('Found %s inventory prototype', name)
+            if obj.category not in allowed_categories:
+                msg = f'Unexpected inventory category {obj.category}'
+                raise TypeError(msg)
+            mapping[obj.category] = obj
+
+    return mapping
+
+
+_CATEGORIES_MAPPING = _make_categories_mapping()
+
+
 def get_proto_for_category(category: CategoryType) -> type[InventoryProtoBase]:
-    match category:
-        case InventoryBatteryProto.category: return InventoryBatteryProto
-        case InventoryBiosProto.category: return InventoryBiosProto
-        case InventoryCpuProto.category: return InventoryCpuProto
-        case InventoryInputProto.category: return InventoryInputProto
-        case InventoryLocalGroupProto.category: return InventoryLocalGroupProto
-        case InventorySoftwareProto.category: return InventorySoftwareProto
-        case _: raise TypeError(f'Unsupported category {category}')  # noqa: EM102
+    proto_type = _CATEGORIES_MAPPING.get(category)
+    if not proto_type:
+        msg = f'Unsupported category {category}'
+        raise TypeError(msg)
+    return proto_type
