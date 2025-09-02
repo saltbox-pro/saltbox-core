@@ -65,9 +65,13 @@ class InventoryRepositoryBase(BaseMongoRepository):
 
         :return: IDs of upserted objects
         """
+        if not operations:
+            return []
+
         bulk_write_result = await self.collection.bulk_write(operations)
         if not bulk_write_result.acknowledged:
             raise BulkOperationsFailedException()
+
         upserted_ids = bulk_write_result.upserted_ids
         if not upserted_ids:
             return []
