@@ -65,12 +65,12 @@ async def run_task(
         job = await job_service.create(
             data=JobCreateSchema.model_validate(
                 {
-                    'salt_master': message.task_kwargs['salt_master'],
-                    'tgt': message.task_kwargs['tgt'],
-                    'tgt_type': message.task_kwargs['tgt_type'],
-                    'fun': message.task_kwargs['fun'],
+                    'salt_master': message.data['salt_master'],
+                    'tgt': message.data['tgt'],
+                    'tgt_type': message.data['tgt_type'],
+                    'fun': message.data['fun'],
                     'data': JobData.model_validate(
-                        {'args': message.task_kwargs['args'], 'kwargs': message.task_kwargs['kwargs']}
+                        {'args': message.data.get('args'), 'kwargs': message.data.get('kwargs')}
                     ),
                 }
             )
@@ -83,18 +83,18 @@ async def run_task(
             data=TaskCreateInputSchema.model_validate(
                 {
                     'user': UserShort.model_validate({'sub': 'system'}),  # TODO: get system user
-                    'task_template_id': message.task_kwargs.get('task_template_id'),
-                    'fun': message.task_kwargs.get('fun'),
-                    'salt_masters': message.task_kwargs['salt_masters'],
+                    'task_template_id': message.data.get('task_template_id'),
+                    'fun': message.data.get('fun'),
+                    'salt_masters': message.data['salt_masters'],
                     'data': TaskData.model_validate(
-                        {'args': message.task_kwargs['args'], 'kwargs': message.task_kwargs['kwargs']}
+                        {'args': message.data.get('args'), 'kwargs': message.data.get('kwargs')}
                     ),
-                    'collection_slug': message.task_kwargs['collection_slug'],
-                    'query': message.task_kwargs.get('query'),
-                    'minions': message.task_kwargs.get('minions'),
-                    'batch_size': message.task_kwargs.get('batch_size'),
-                    'max_jobs_count_at_same_time': message.task_kwargs.get('max_jobs_count_at_same_time', 1),
-                    'max_retries': message.task_kwargs.get('max_retries', 3),
+                    'collection_slug': message.data['collection_slug'],
+                    'query': message.data.get('query'),
+                    'minions': message.data.get('minions'),
+                    'batch_size': message.data.get('batch_size'),
+                    'max_jobs_count_at_same_time': message.data.get('max_jobs_count_at_same_time', 1),
+                    'max_retries': message.data.get('max_retries', 3),
                 }
             )
         )

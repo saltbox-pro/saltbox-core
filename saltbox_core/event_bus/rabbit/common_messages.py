@@ -20,8 +20,7 @@ class SyncTemplatesResponseEventBusMessage(EventBusBaseMessage):
 class RunTaskEventBusMessage(EventBusBaseMessage):
     process_id: str
     fun: str
-    task_args: list = Field(title='Task arguments', default_factory=list)
-    task_kwargs: dict = Field(title='Task kwargs', default_factory=dict)
+    data: dict = Field(title='Data', default_factory=dict)
 
 
 class RunTaskStatus(enum.Enum):
