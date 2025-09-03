@@ -2,10 +2,11 @@ import logging
 import sys
 from functools import cache
 from inspect import getmembers, isclass
-from typing import TYPE_CHECKING, ClassVar, Literal
+from typing import TYPE_CHECKING, Any, ClassVar, Literal
 from typing import get_args as typing_get_args
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, root_validator
+from pydantic.fields import FieldInfo
 
 from saltbox_sdk.db.mongo.schemas_base import IDMixin
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin
@@ -35,8 +36,14 @@ CategoryType = Literal[
 CATEGORIES: tuple[CategoryType, ...] = typing_get_args(CategoryType)
 
 
-class InventoryProtoBase:
+class _InventoryProtoBase:
+    """
+    For dynamic Inventory models. Not supposed to be used directly.
+    """
+
     category: ClassVar[CategoryType]
+    model_fields: ClassVar[dict[str, FieldInfo]]
+    _known_fields: ClassVar[set[str] | None] = None
 
     # TODO (a.karmanov): <US373> Looks like related issue https://github.com/python/mypy/issues/11470
     if TYPE_CHECKING:
@@ -44,10 +51,27 @@ class InventoryProtoBase:
         def __hash__(cls) -> int:
             return hash(cls)
 
-    model_config = ConfigDict(validate_by_name=True, extra='forbid')
+    model_config = ConfigDict(validate_by_name=True, extra='ignore')
 
     def get_category(self) -> str:
         return self.category
+
+    # @cache seems appropriate, but there is a risk of dangling references for dynamic types
+    @classmethod
+    def get_known_fields(cls) -> set[str]:
+        if cls._known_fields is None:
+            known_aliases = {field.alias for field in cls.model_fields.values() if field.alias}
+            cls._known_fields = set(cls.model_fields) | known_aliases
+        return cls._known_fields
+
+    @root_validator(pre=True)
+    def log_extra_fields(cls, values: dict[str, Any]) -> dict[str, Any]:  # noqa: N805
+        extra_fields = set(values) - cls.get_known_fields()
+
+        for ext_field in extra_fields:
+            logger.warning('Inventory model %s got extra field %s', __name__, ext_field)
+
+        return values
 
 
 class InventoryMinionSpec(BaseModel):
@@ -80,37 +104,37 @@ class InventoryModelFab:
     @staticmethod
     def _make_type(name: str, bases: tuple[type, ...]) -> type:
         new_type = type(name, bases, {})
-        assert issubclass(new_type, InventoryProtoBase)  # noqa
+        assert issubclass(new_type, _InventoryProtoBase)  # noqa
         return new_type
 
     @classmethod
     @cache
-    def get_model(cls, proto: type[InventoryProtoBase]) -> type[InventoryModelBase]:
+    def get_model(cls, proto: type[_InventoryProtoBase]) -> type[InventoryModelBase]:
         name = cls._make_name(proto, 'Model')
         return cls._make_type(name, (InventoryModelBase, proto))
 
     @classmethod
     @cache
-    def get_create_schema(cls, proto: type[InventoryProtoBase]) -> type[InventoryCreateSchemaBase]:
+    def get_create_schema(cls, proto: type[_InventoryProtoBase]) -> type[InventoryCreateSchemaBase]:
         name = cls._make_name(proto, 'CreateSchema')
         return cls._make_type(name, (InventoryCreateSchemaBase, proto))
 
 
-class InventoryLocalGroupProto(InventoryProtoBase):
+class InventoryLocalGroupProto(_InventoryProtoBase):
     category: ClassVar[CategoryType] = 'local_groups'
     gid: int
     name: str
     members: list[str]
 
 
-class InventoryInputProto(InventoryProtoBase):
+class InventoryInputProto(_InventoryProtoBase):
     category: ClassVar[CategoryType] = 'inputs'
     caption: str
     type: str
     description: str
 
 
-class InventorySoftwareProto(InventoryProtoBase):
+class InventorySoftwareProto(_InventoryProtoBase):
     category: ClassVar[CategoryType] = 'softwares'
     arch: str
     comments: str
@@ -123,7 +147,7 @@ class InventorySoftwareProto(InventoryProtoBase):
     version: str
 
 
-class InventoryBatteryProto(InventoryProtoBase):
+class InventoryBatteryProto(_InventoryProtoBase):
     category: ClassVar[CategoryType] = 'batteries'
     capacity: str
     chemistry: str
@@ -134,7 +158,7 @@ class InventoryBatteryProto(InventoryProtoBase):
     voltage: str
 
 
-class InventoryBiosProto(InventoryProtoBase):
+class InventoryBiosProto(_InventoryProtoBase):
     category: ClassVar[CategoryType] = 'bios'
     assettag: str
     bdate: str
@@ -148,7 +172,7 @@ class InventoryBiosProto(InventoryProtoBase):
     ssn: str
 
 
-class InventoryCpuProto(InventoryProtoBase):
+class InventoryCpuProto(_InventoryProtoBase):
     category: ClassVar[CategoryType] = 'cpus'
     arch: str
     core: int
@@ -160,7 +184,7 @@ class InventoryCpuProto(InventoryProtoBase):
     thread: int
 
 
-class InventoryControllerProto(InventoryProtoBase):
+class InventoryControllerProto(_InventoryProtoBase):
     category: ClassVar[CategoryType] = 'controllers'
     manufacturer: str
     name: str
@@ -168,13 +192,13 @@ class InventoryControllerProto(InventoryProtoBase):
     productid: str
 
 
-def _make_categories_mapping() -> dict[CategoryType, type[InventoryProtoBase]]:
-    mapping: dict[CategoryType, type[InventoryProtoBase]] = {}
+def _make_categories_mapping() -> dict[CategoryType, type[_InventoryProtoBase]]:
+    mapping: dict[CategoryType, type[_InventoryProtoBase]] = {}
     module = sys.modules[__name__]
     allowed_categories = set(CATEGORIES)
 
     for name, obj in getmembers(module):
-        if isclass(obj) and issubclass(obj, InventoryProtoBase) and obj is not InventoryProtoBase:
+        if isclass(obj) and issubclass(obj, _InventoryProtoBase) and obj is not _InventoryProtoBase:
             logger.debug('Found %s inventory prototype', name)
             if obj.category not in allowed_categories:
                 msg = f'Unexpected inventory category {obj.category}'
@@ -187,7 +211,7 @@ def _make_categories_mapping() -> dict[CategoryType, type[InventoryProtoBase]]:
 _CATEGORIES_MAPPING = _make_categories_mapping()
 
 
-def get_proto_for_category(category: CategoryType) -> type[InventoryProtoBase]:
+def get_proto_for_category(category: CategoryType) -> type[_InventoryProtoBase]:
     proto_type = _CATEGORIES_MAPPING.get(category)
     if not proto_type:
         msg = f'Unsupported category {category}'
