@@ -2,7 +2,7 @@ import logging
 import sys
 from functools import cache
 from inspect import getmembers, isclass
-from typing import TYPE_CHECKING, Any, ClassVar, Literal
+from typing import TYPE_CHECKING, Annotated, Any, ClassVar, Literal
 from typing import get_args as typing_get_args
 
 from pydantic import BaseModel, ConfigDict, Field, root_validator
@@ -34,6 +34,9 @@ CategoryType = Literal[
 ]
 
 CATEGORIES: tuple[CategoryType, ...] = typing_get_args(CategoryType)
+
+StrField = Annotated[str, Field('')]
+IntField = Annotated[int | None, Field(None)]
 
 
 class _InventoryProtoBase:
@@ -122,74 +125,74 @@ class InventoryModelFab:
 
 class InventoryLocalGroupProto(_InventoryProtoBase):
     category: ClassVar[CategoryType] = 'local_groups'
-    gid: int
-    name: str
-    members: list[str]
+    gid: IntField
+    name: StrField
+    members: list[str] = Field([])
 
 
 class InventoryInputProto(_InventoryProtoBase):
     category: ClassVar[CategoryType] = 'inputs'
-    caption: str
-    type: str
-    description: str
+    caption: StrField
+    type: StrField
+    description: StrField
 
 
 class InventorySoftwareProto(_InventoryProtoBase):
     category: ClassVar[CategoryType] = 'softwares'
-    arch: str
-    comments: str
-    filesize: int
-    from_: str = Field(alias='from')
-    installdate: str
-    name: str
-    publisher: str
-    system_category: str
-    version: str
+    arch: StrField
+    comments: StrField
+    filesize: IntField
+    from_: str = Field('', alias='from')
+    installdate: StrField
+    name: StrField
+    publisher: StrField
+    system_category: StrField
+    version: StrField
 
 
 class InventoryBatteryProto(_InventoryProtoBase):
     category: ClassVar[CategoryType] = 'batteries'
-    capacity: str
-    chemistry: str
-    manufacturer: str
-    name: str
-    real_capacity: str
-    serial: str
-    voltage: str
+    capacity: StrField
+    chemistry: StrField
+    manufacturer: StrField
+    name: StrField
+    real_capacity: StrField
+    serial: StrField
+    voltage: StrField
 
 
 class InventoryBiosProto(_InventoryProtoBase):
     category: ClassVar[CategoryType] = 'bios'
-    assettag: str
-    bdate: str
-    bmanufacturer: str
-    bversion: str
-    mmanufacturer: str
-    mmodel: str
-    msn: str
-    smanufacturer: str
-    smodel: str
-    ssn: str
+    assettag: StrField
+    bdate: StrField
+    bmanufacturer: StrField
+    bversion: StrField
+    mmanufacturer: StrField
+    mmodel: StrField
+    msn: StrField
+    smanufacturer: StrField
+    smodel: StrField
+    ssn: StrField
 
 
 class InventoryCpuProto(_InventoryProtoBase):
     category: ClassVar[CategoryType] = 'cpus'
-    arch: str
-    core: int
-    familynumber: int
-    manufacturer: str
-    model: str
-    name: str
-    stepping: int
-    thread: int
+    arch: StrField
+    core: IntField
+    familynumber: IntField
+    manufacturer: StrField
+    model: StrField
+    name: StrField
+    stepping: IntField
+    thread: IntField
 
 
 class InventoryControllerProto(_InventoryProtoBase):
     category: ClassVar[CategoryType] = 'controllers'
-    manufacturer: str
-    name: str
-    pcislot: str
-    productid: str
+    manufacturer: StrField
+    name: StrField
+    pcislot: StrField
+    productid: StrField
 
 
 def _make_categories_mapping() -> dict[CategoryType, type[_InventoryProtoBase]]:
