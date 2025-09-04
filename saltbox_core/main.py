@@ -9,7 +9,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from saltbox_core import __version__
 from saltbox_core.config import APP_DESC, APP_NAME, SETTINGS
 from saltbox_core.db.init_mongo_db import init_mongo_db
-from saltbox_core.inventory.routers import inventory_router
 from saltbox_core.jobs.routers.job_sc_router import router as job_schemas_router
 from saltbox_core.jobs.routers.jobs_router import router as jobs_router
 from saltbox_core.masters.routers.master_route import router as masters_router
@@ -102,8 +101,5 @@ app.include_router(masters_router)
 app.include_router(system_router)
 app.include_router(pillars_router)
 app.include_router(router=settings_sls_router, prefix='/settings', tags=['Settings'])
-
-if SETTINGS.module_inventory_on:
-    app.include_router(inventory_router)
 
 app.openapi = partial(custom_openapi, app, app_config, servers=[{'url': SETTINGS.base_url_root_path}])  # type: ignore[method-assign]

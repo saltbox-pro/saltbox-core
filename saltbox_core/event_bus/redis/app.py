@@ -8,10 +8,15 @@ from faststream import ContextRepo, FastStream
 from faststream.broker.types import BrokerMiddleware
 from faststream.redis import RedisBroker
 from faststream.security import SASLPlaintext
+from redis import asyncio as aioredis
 
 from saltbox_core.config import logger
 from saltbox_core.event_bus.redis.masters_subscribers import router as masters_router
 from saltbox_core.event_bus.redis.masters_subscribers import router_not_auth as masters_router_not_auth
+from saltbox_core.jobs.repositories.job_repository import JobRepository, get_job_repository
+from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository, get_job_schema_repository
+from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
+from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.masters.repositories.master_repository import MasterRepository, get_master_repository
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_core.minion_collections.repositories.minion_repository import MinionRepository, get_minion_repository
@@ -54,15 +59,27 @@ def get_faststream_broker(middlewares: list[BrokerMiddleware] | None = None) -> 
 @asynccontextmanager
 async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
     mongo_db = get_mongo_db()
+    redis_db = await aioredis.from_url(REDIS_SETTINGS.redis_url, **REDIS_SETTINGS.redis_connection_kwargs)
     saltbox_crypt = SaltBoxCrypt()
     master_repository: MasterRepository = get_master_repository(db=mongo_db)
     master_service: MasterService = get_master_service(repo=master_repository)
     minion_repository: MinionRepository = get_minion_repository(db=mongo_db)
     minion_service: MinionService = get_minion_service(repo=minion_repository)
+    job_schema_repository: JobSchemaRepository = get_job_schema_repository(db=mongo_db)
+    job_schema_service: JobSchemaService = get_job_schema_service(repo=job_schema_repository)
+    job_repository: JobRepository = get_job_repository(db=redis_db)
+    job_service: JobService = await get_job_service(
+        rdb=redis_db,
+        job_repository=job_repository,
+        job_schema_service=job_schema_service,
+        master_service=master_service
+    )
 
     context.set_global('master_service', master_service)
     context.set_global('minion_service', minion_service)
     context.set_global('saltbox_crypt', saltbox_crypt)
+    context.set_global('job_schema_repository', job_schema_repository)
+    context.set_global('job_service', job_service)
 
     yield
 

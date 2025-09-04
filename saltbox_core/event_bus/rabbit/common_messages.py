@@ -1,6 +1,7 @@
 import enum
+from typing import Any
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from saltbox_sdk.event_bus.schemas import EventBusBaseMessage
 
@@ -32,3 +33,17 @@ class RunTaskResultEventBusMessage(EventBusBaseMessage):
     process_id: str
     status: RunTaskStatus
     data: dict
+
+
+class InventoryPutForMinion(BaseModel):
+    minion_id: str
+    master_id: str
+    job_return: dict[str, Any]
+
+
+class InventoryPutEventBusMessage(EventBusBaseMessage):
+    minions: list[InventoryPutForMinion] = Field(title='Minions', default_factory=list)
+    path: list[str | int] = Field(
+        description='Path to data in job return, str for field, int for list index',
+        examples=['return', 'module name', 'chages', 'ret'],
+    )
