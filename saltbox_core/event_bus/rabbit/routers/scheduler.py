@@ -79,6 +79,7 @@ async def run_task(
         return {'jid': job.jid}
 
     async def _run_task() -> dict:
+        task_data = message.data.get('data', {})
         task = await task_service.create(
             data=TaskCreateInputSchema.model_validate(
                 {
@@ -87,7 +88,7 @@ async def run_task(
                     'fun': message.data.get('fun'),
                     'salt_masters': message.data['salt_masters'],
                     'data': TaskData.model_validate(
-                        {'args': message.data.get('args'), 'kwargs': message.data.get('kwargs')}
+                        {'args': task_data.get('args'), 'kwargs': task_data.get('kwargs')}
                     ),
                     'collection_slug': message.data['collection_slug'],
                     'query': message.data.get('query'),
