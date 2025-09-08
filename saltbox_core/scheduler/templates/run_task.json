@@ -1,0 +1,6 @@
+{
+  "name": "Run task",
+  "fun": "run_task",
+  "json_schema": {},
+  "ui_schema": {}
+}

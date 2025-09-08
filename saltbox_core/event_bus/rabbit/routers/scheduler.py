@@ -1,7 +1,3 @@
-import json
-from typing import Any
-
-import anyio
 from faststream import Context
 from faststream.rabbit import RabbitRouter
 
@@ -10,10 +6,10 @@ from saltbox_core.event_bus.rabbit.common_messages import (
     RunTaskResultEventBusMessage,
     RunTaskStatus,
     SyncTemplatesRequestEventBusMessage,
-    SyncTemplatesResponseEventBusMessage,
 )
 from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobData
 from saltbox_core.jobs.services.job_services import JobService
+from saltbox_core.scheduler.sync import sync_scheduler_templates
 from saltbox_core.tasks.schemas.task_schemas import TaskCreateInputSchema, TaskData
 from saltbox_core.tasks.services.tasks import TaskService
 from saltbox_sdk.db.schemas_base import UserShort
@@ -29,27 +25,7 @@ async def sync_templates(
     if message.target is not None and message.target not in ['core', '*']:
         return
 
-    templates: list[dict[str, Any]] = []
-
-    async with (
-        await anyio.Path(__file__).parent.parent.parent.joinpath('scheduler_tasks_templates.json').open('r') as f
-    ):
-        templates = json.loads(await f.read())
-
-    for template in templates:
-        await send_message(
-            message=SyncTemplatesResponseEventBusMessage.model_validate(
-                {
-                    'target': 'scheduler',
-                    'task_target': template.get('target', 'core'),
-                    'fun': template['fun'],
-                    'name': template['name'],
-                    'json_schema': template.get('json_schema', {}),
-                    'ui_schema': template.get('ui_schema', {}),
-                }
-            ),
-            queue=f'{router.prefix}send_template',
-        )
+    await sync_scheduler_templates()
 
 
 @router.subscriber('run_task')
