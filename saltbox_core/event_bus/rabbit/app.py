@@ -66,6 +66,8 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
         redis_client=redis_db, minion_service=minion_service, master_service=master_service
     )
 
+    context.set_global('redis_db', redis_db)
+    context.set_global('mongo_db', mongo_db)
     context.set_global('master_service', master_service)
     context.set_global('collection_service', collection_service)
     context.set_global('minion_service', minion_service)
