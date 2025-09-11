@@ -113,7 +113,7 @@ OpenAPI scheme:
   image:  openapitools/openapi-generator-cli:v7.14.0
   stage: generate-api-client
   dependencies:
-    - openapi-scheme-generate
+    - 'OpenAPI scheme'
   artifacts:
     untracked: true
     expire_in: 1 day
@@ -132,7 +132,7 @@ API Client:
     - if: $CI_COMMIT_TAG =~ /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/
 
 
-API Client Nightliy:
+API Client Nightly:
   extends: .api-client-generate
   variables:
     VERSION: "${PYTHON_VERSION}-${CI_COMMIT_SHA}"
@@ -160,7 +160,7 @@ API Client Nightliy:
 release-api-client-deploy:
   extends: .api-client-deploy
   dependencies:
-    - release-api-client-generate
+    - 'API Client'
   rules:
     - if: $CI_COMMIT_TAG =~ /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/
 
@@ -168,7 +168,7 @@ release-api-client-deploy:
 nightly-api-client-deploy:
   extends: .api-client-deploy
   dependencies:
-    - nightly-api-client-generate
+    - 'API Client Nightly'
   rules:
     - if: $CI_COMMIT_TAG =~ /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/
       when: never
