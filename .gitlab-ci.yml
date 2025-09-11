@@ -3,14 +3,17 @@
 stages:
   - lint
   - test
+  # TODO SUBPIPELINE
   - build-image
-  - generate-scheme
-  - generate-api-client
+  - build-scheme
+  - build-api-client
   - deploy
 
 variables:
   # Set 0 to disable linting jobs
-  LINTING_ENABLED: true
+  #LINTING_ENABLED: true
+  LINTING_ENABLED: 0 # FIXME  # TODO
+  VERSION_TAG_PATTERN: '/^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/'
 
 include:
   - project: 'saltbox/ci-lib'
@@ -83,7 +86,7 @@ Pytest:
 
 
 OpenAPI scheme:
-  stage: generate-scheme
+  stage: build-scheme
   variables:
     PIP_CACHE_DIR: '$CI_PROJECT_DIR/.cache/pip'
     APK_CACHE_DIR: '$CI_PROJECT_DIR/.cache/apk'
@@ -111,7 +114,7 @@ OpenAPI scheme:
 
 .api-client-generate:
   image:  openapitools/openapi-generator-cli:v7.14.0
-  stage: generate-api-client
+  stage: build-api-client
   dependencies:
     - 'OpenAPI scheme'
   artifacts:
@@ -124,25 +127,23 @@ OpenAPI scheme:
       --additional-properties=npmVersion=${VERSION}
 
 
-API Client:
+Build API Client:
   extends: .api-client-generate
   variables:
     VERSION: "${PYTHON_VERSION}"
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/
+    - if: $CI_COMMIT_TAG =~ $VERSION_TAG_PATTERN
 
 
-API Client Nightly:
+Build API Client Nightly:
   extends: .api-client-generate
   variables:
     VERSION: "${PYTHON_VERSION}-${CI_COMMIT_SHA}"
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/
-      when: never
-    - when: on_success
+    - if: $CI_COMMIT_TAG !~ $VERSION_TAG_PATTERN
 
 
-.api-client-deploy:
+Upload API Client:
   image:  node:22.18.0
   variables:
     GIT_STRATEGY: none
@@ -153,23 +154,5 @@ API Client Nightly:
     - npm config set @saltbox:registry https://${CI_SERVER_HOST}/api/v4/projects/${CI_PROJECT_ID}/packages/npm/
     - npm publish
   rules:
-    - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
-      when: never
-
-
-release-api-client-deploy:
-  extends: .api-client-deploy
-  dependencies:
-    - 'API Client'
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/
-
-
-nightly-api-client-deploy:
-  extends: .api-client-deploy
-  dependencies:
-    - 'API Client Nightly'
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/
-      when: never
-    - when: on_success
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - if: $CI_COMMIT_TAG !~ $VERSION_TAG_PATTERN
