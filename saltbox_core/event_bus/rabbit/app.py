@@ -2,8 +2,11 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from anyio import Path
 from faststream import ContextRepo
 
+from saltbox_core.event_bus.rabbit.exchanges import exchanges
+from saltbox_core.event_bus.rabbit.routers.jobs import router as job_router
 from saltbox_core.event_bus.rabbit.routers.scheduler import router as scheduler_router
 from saltbox_core.jobs.repositories.job_repository import JobRepository, get_job_repository
 from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository, get_job_schema_repository
@@ -29,7 +32,8 @@ from saltbox_core.tasks.services.tasks_templates import TaskTemplateService, get
 from saltbox_sdk.config.logger_config import logger
 from saltbox_sdk.db.mongo.config import get_mongo_db
 from saltbox_sdk.db.redis.config import get_redis_now
-from saltbox_sdk.event_bus.faststream_app import get_faststream_app
+from saltbox_sdk.event_bus.faststream_app import get_faststream_app, get_faststream_broker
+from saltbox_sdk.scheduler.handler import sync_scheduler_templates
 
 
 @asynccontextmanager
@@ -97,7 +101,19 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
 
 
 async def async_main() -> None:
-    app = get_faststream_app(lifespan=lifespan, routers=[scheduler_router])
+    broker = get_faststream_broker()
+    app = get_faststream_app(broker=broker, lifespan=lifespan, routers=[job_router, scheduler_router])
+
+    @app.after_startup
+    async def declare_exchanges() -> None:
+        for exchange in exchanges.values():
+            await broker.declare_exchange(exchange)
+
+    await sync_scheduler_templates(
+        templates_path=Path(__file__).parent.parent.parent.joinpath('scheduler/templates'),
+        default_target='core',
+    )
+
     logger.info('Starting faststream app')
     await app.run()
 

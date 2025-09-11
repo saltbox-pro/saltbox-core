@@ -1,51 +1,29 @@
+from anyio import Path
 from faststream.rabbit import RabbitRouter
 from faststream.rabbit.annotations import ContextRepo
 
-from saltbox_core.event_bus.rabbit.common_messages import (
-    RunTaskEventBusMessage,
-    RunTaskResultEventBusMessage,
-    RunTaskStatus,
-    SyncTemplatesRequestEventBusMessage,
-)
+from saltbox_core.event_bus.rabbit.exchanges import exchanges
 from saltbox_core.scheduler.handlers import scheduler_handlers
-from saltbox_core.scheduler.sync import sync_scheduler_templates
-from saltbox_sdk.config.logger_config import logger
-from saltbox_sdk.event_bus.utils import send_message
+from saltbox_sdk.scheduler.handler import run_scheduled_task, sync_scheduler_templates
+from saltbox_sdk.scheduler.messages import RunTaskEventBusMessage, SyncTemplatesRequestEventBusMessage
 
 router = RabbitRouter(prefix='scheduler_')
 
 
-@router.subscriber('sync_templates')
+@router.subscriber('sync_templates.core', exchange=exchanges['scheduler_sync_templates'])
 async def sync_templates(message: SyncTemplatesRequestEventBusMessage) -> None:
     if message.target is not None and message.target not in ['core', '*']:
         return
 
-    await sync_scheduler_templates()
+    await sync_scheduler_templates(
+        templates_path=Path(__file__).parent.parent.parent.parent.joinpath('scheduler/templates'),
+        default_target='core',
+    )
 
 
-@router.subscriber('run_task')
-async def run_scheduled_task(message: RunTaskEventBusMessage, context: ContextRepo) -> None:
+@router.subscriber('run_task.core', exchange=exchanges['scheduler_run_task'])
+async def run_task(message: RunTaskEventBusMessage, context: ContextRepo) -> None:
     if message.target is not None and message.target not in ['core', '*']:
         return
 
-    result_status = RunTaskStatus.FAILURE
-
-    if message.fun in scheduler_handlers:
-        try:
-            result_data = await scheduler_handlers[message.fun](message=message, context=context)
-
-            result_status = RunTaskStatus.SUCCESS
-        except Exception as e:
-            logger.error(e)
-            result_data = {'error': str(e)}
-    else:
-        result_data = {'error': f'Unknown function `{message.fun}`'}
-
-    result_message = RunTaskResultEventBusMessage(
-        target='scheduler',
-        process_id=message.process_id,
-        status=result_status,
-        data=result_data,
-    )
-
-    await send_message(message=result_message, queue=f'{router.prefix}run_task_result')
+    await run_scheduled_task(message=message, context=context, scheduler_handlers=scheduler_handlers)

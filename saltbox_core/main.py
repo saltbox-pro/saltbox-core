@@ -17,7 +17,6 @@ from saltbox_core.minion_collections.routers.collections_router import router as
 from saltbox_core.minion_collections.routers.filters_router import router as filters_router
 from saltbox_core.minion_collections.routers.minion_router import router as minions_router
 from saltbox_core.pillars.routers.pillar_route import router as pillars_router
-from saltbox_core.scheduler.sync import sync_scheduler_templates
 from saltbox_core.settings.routers.sls_repos_router import router as settings_sls_router
 from saltbox_core.tasks.routers.tasks_router import router as task_router
 from saltbox_core.tasks.routers.template_router import router as template_router
@@ -41,8 +40,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator:
 
     await init_mongo_db()
     if not broker.is_worker_process:
-        await sync_scheduler_templates()
-
         await broker.startup()
 
         discovery_client = DiscoveryClient(

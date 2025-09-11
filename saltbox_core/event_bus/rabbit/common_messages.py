@@ -1,38 +1,13 @@
-import enum
 from typing import Any
 
 from pydantic import BaseModel, Field
 
+from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema
 from saltbox_sdk.event_bus.schemas import EventBusBaseMessage
 
 
-class SyncTemplatesRequestEventBusMessage(EventBusBaseMessage): ...
-
-
-class SyncTemplatesResponseEventBusMessage(EventBusBaseMessage):
-    name: str
-    task_target: str
-    fun: str
-
-    json_schema: dict
-    ui_schema: dict
-
-
-class RunTaskEventBusMessage(EventBusBaseMessage):
-    process_id: str
-    fun: str
-    data: dict = Field(title='Data', default_factory=dict)
-
-
-class RunTaskStatus(enum.Enum):
-    SUCCESS = 'success'
-    FAILURE = 'failure'
-
-
-class RunTaskResultEventBusMessage(EventBusBaseMessage):
-    process_id: str
-    status: RunTaskStatus
-    data: dict
+class RunJobRequestEventBusMessage(EventBusBaseMessage):
+    data: JobCreateSchema
 
 
 class InventoryPutForMinion(BaseModel):
