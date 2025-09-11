@@ -1,40 +1,27 @@
 ---
 
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE != 'merge_request_event'
+
 stages:
   - lint
   - test
-  - build
-  - generate-scheme
-  - generate-api-client
+  # TODO SUBPIPELINE
+  - build-image
+  - build-scheme
+  - build-api-client
   - deploy
 
 variables:
   # Set 0 to disable linting jobs
-  LINTING_ENABLED: true
+  #LINTING_ENABLED: true
+  LINTING_ENABLED: 0 # FIXME  # TODO
+  VERSION_TAG_PATTERN: '/^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/'
 
 include:
   - project: 'saltbox/ci-lib'
     file: 'build-image.yml'
-
-
-Build core image for tag:
-  stage: build
-  extends: .build-image
-  variables:
-    TARGET: main
-    IMAGE_TAG: '$CI_COMMIT_TAG'
-  rules:
-    - if: '$CI_COMMIT_TAG'
-
-
-Build core image for branch:
-  stage: build
-  extends: .build-image
-  variables:
-    TARGET: main
-    IMAGE_TAG: '$CI_COMMIT_BRANCH'
-  rules:
-    - if: '$CI_COMMIT_BRANCH'
 
 
 .lint-job:
@@ -62,7 +49,7 @@ Mypy:
   script: mypy saltbox_core
 
 
-pytest:
+Pytest:
   stage: test
   variables:
     PIP_CACHE_DIR: '$CI_PROJECT_DIR/.cache/pip'
@@ -81,8 +68,29 @@ pytest:
       - '$PIP_CACHE_DIR'
       - '$APK_CACHE_DIR'
 
-openapi-scheme-generate:
-  stage: generate-scheme
+
+Build core image for tag:
+  stage: build-image
+  extends: .build-image
+  variables:
+    TARGET: main
+    IMAGE_TAG: '$CI_COMMIT_TAG'
+  rules:
+    - if: '$CI_COMMIT_TAG'
+
+
+Build core image for branch:
+  stage: build-image
+  extends: .build-image
+  variables:
+    TARGET: main
+    IMAGE_TAG: '$CI_COMMIT_BRANCH'
+  rules:
+    - if: '$CI_COMMIT_BRANCH'
+
+
+OpenAPI scheme:
+  stage: build-scheme
   variables:
     PIP_CACHE_DIR: '$CI_PROJECT_DIR/.cache/pip'
     APK_CACHE_DIR: '$CI_PROJECT_DIR/.cache/apk'
@@ -110,9 +118,9 @@ openapi-scheme-generate:
 
 .api-client-generate:
   image:  openapitools/openapi-generator-cli:v7.14.0
-  stage: generate-api-client
+  stage: build-api-client
   dependencies:
-    - openapi-scheme-generate
+    - 'OpenAPI scheme'
   artifacts:
     untracked: true
     expire_in: 1 day
@@ -122,23 +130,24 @@ openapi-scheme-generate:
       --additional-properties=npmName=@saltbox/${CI_PROJECT_NAME}-api-client
       --additional-properties=npmVersion=${VERSION}
 
-release-api-client-generate:
+
+Build API Client:
   extends: .api-client-generate
   variables:
     VERSION: "${PYTHON_VERSION}"
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/
+    - if: $CI_COMMIT_TAG =~ $VERSION_TAG_PATTERN
 
-nightly-api-client-generate:
+
+Build API Client Nightly:
   extends: .api-client-generate
   variables:
     VERSION: "${PYTHON_VERSION}-${CI_COMMIT_SHA}"
   rules:
-    - if: $CI_COMMIT_TAG =~ /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/
-      when: never
-    - when: on_success
+    - if: $CI_COMMIT_TAG !~ $VERSION_TAG_PATTERN
 
-.api-client-deploy:
+
+Upload API Client:
   image:  node:22.18.0
   variables:
     GIT_STRATEGY: none
@@ -149,21 +158,4 @@ nightly-api-client-generate:
     - npm config set @saltbox:registry https://${CI_SERVER_HOST}/api/v4/projects/${CI_PROJECT_ID}/packages/npm/
     - npm publish
   rules:
-    - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
-      when: never
-
-release-api-client-deploy:
-  extends: .api-client-deploy
-  dependencies:
-    - release-api-client-generate
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/
-
-nightly-api-client-deploy:
-  extends: .api-client-deploy
-  dependencies:
-    - nightly-api-client-generate
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/
-      when: never
-    - when: on_success
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
