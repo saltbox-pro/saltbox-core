@@ -611,8 +611,7 @@ class SlsReposServeUpdater:
 
     @classmethod
     def _is_ignored(cls, path: Path) -> bool:
-        for ignore in cls.IGNORE_LIST:
-            ignore = Path(ignore)
+        for ignore in (Path(i) for i in cls.IGNORE_LIST):
             if path == ignore or ignore in path.parents:
                 return True
         return False
