@@ -22,7 +22,7 @@ class AsyncMockCollection:
         self._inserted_docs[result.inserted_id] = document
         return self.mocker.MagicMock(inserted_id=result.inserted_id)
 
-    def find(self, filter=None, projection=None, limit=0, skip=0):
+    def find(self, filter=None, projection=None, limit=0, skip=0, sort=None):
         """Эмуляция метода find"""
         cursor_results = []
 
@@ -38,6 +38,9 @@ class AsyncMockCollection:
                 cursor_results = cursor_results[skip:]
             if limit > 0:
                 cursor_results = cursor_results[:limit]
+            if sort:
+                for field, direction in reversed(sort):
+                    cursor_results.sort(key=lambda x: x.get(field), reverse=(direction == -1))
 
         mock_cursor = self.mocker.MagicMock()
         mock_cursor.to_list = self.mocker.AsyncMock(return_value=cursor_results)

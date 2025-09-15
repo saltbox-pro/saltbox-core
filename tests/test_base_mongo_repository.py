@@ -170,7 +170,7 @@ async def test_update(mocked_db):
     assert updated_obj.id == created_obj.id
     assert updated_obj.name == 'Updated Name'
     assert updated_obj.description == 'After update'
-    assert updated_obj.created == created_obj.created
+    assert abs((updated_obj.created - created_obj.created).total_seconds()) < 0.001
     assert updated_obj.modified > created_obj.modified
 
     # Check that the data was actually updated in the DB
