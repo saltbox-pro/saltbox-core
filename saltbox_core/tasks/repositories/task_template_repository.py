@@ -20,7 +20,14 @@ class TaskTemplateRepository(BaseMongoRepository[TaskTemplateModel]):
         auto_now_fields: ClassVar[list[str]] = ['modified']
 
     @overload
-    async def get_list(self, query: dict[str, Any] | None, limit: int, skip: int) -> list[TaskTemplateModel]: ...
+    async def get_list(
+        self,
+        query: dict[str, Any] | None,
+        limit: int,
+        skip: int,
+        *,
+        sort: list[tuple[str, int | str | None]] | None = None,
+    ) -> list[TaskTemplateModel]: ...
 
     @overload
     async def get_list(
@@ -29,6 +36,8 @@ class TaskTemplateRepository(BaseMongoRepository[TaskTemplateModel]):
         limit: int,
         skip: int,
         projection_model: type[ProjectionModel],
+        *,
+        sort: list[tuple[str, int | str | None]] | None = None,
     ) -> list[ProjectionModel]: ...
 
     @override
@@ -38,6 +47,8 @@ class TaskTemplateRepository(BaseMongoRepository[TaskTemplateModel]):
         limit: int = 0,
         skip: int = 0,
         projection_model: type[ProjectionModel] | None = None,
+        *,
+        sort: list[tuple[str, int | str | None]] | None = None,
     ) -> list[TaskTemplateModel] | list[ProjectionModel]:
         projection = self._get_projection_from_model(projection_model) if projection_model else None
         # result = self.collection.find(filter=query, projection=projection, limit=limit, skip=skip)
@@ -58,6 +69,8 @@ class TaskTemplateRepository(BaseMongoRepository[TaskTemplateModel]):
             pipeline.append({'$skip': skip})
         if limit:
             pipeline.append({'$limit': limit})
+        if sort:
+            pipeline.append({'$sort': dict(sort)})
 
         if projection:
             pipeline.append({'$project': projection})

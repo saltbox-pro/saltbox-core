@@ -38,7 +38,12 @@ class SettingsSlsRepoService(
 
     @overload
     async def get_list_paginated(
-        self, query: dict[str, Any] | None, limit: int, skip: int
+        self,
+        query: dict[str, Any] | None,
+        limit: int,
+        skip: int,
+        *,
+        sort: list[tuple[str, int | str | None]] | None = None,
     ) -> PaginatedResponse[SettingsSlsRepoModel]: ...
 
     @overload
@@ -48,6 +53,8 @@ class SettingsSlsRepoService(
         limit: int,
         skip: int,
         projection_model: type[ProjectionModel],
+        *,
+        sort: list[tuple[str, int | str | None]] | None = None,
     ) -> PaginatedResponse[ProjectionModel]: ...
 
     @override
@@ -57,13 +64,15 @@ class SettingsSlsRepoService(
         limit: int = 0,
         skip: int = 0,
         projection_model: type[ProjectionModel] | None = None,
+        *,
+        sort: list[tuple[str, int | str | None]] | None = None,
     ) -> PaginatedResponse[SettingsSlsRepoModel] | PaginatedResponse[ProjectionModel]:
         total = await self.repo.count(query)
 
         lockers = await self._get_repo_lockers()
 
         data = await self.repo.get_list(
-            query, limit=limit, skip=skip, projection_model=projection_model or SettingsSlsRepoModel
+            query, limit=limit, skip=skip, projection_model=projection_model or SettingsSlsRepoModel, sort=sort
         )
         for item in data:
             if hasattr(item, 'repo_url') and hasattr(item, 'locked'):
