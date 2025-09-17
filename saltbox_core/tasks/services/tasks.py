@@ -97,7 +97,6 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
 
         return TaskCreateSchema.model_validate(
             {
-                'parent_task_id': data.parent_task_id,
                 'task_template': TaskTemplateShort(**task_template.model_dump()) if task_template else None,
                 'fun': fun,
                 'task_args': task_args,
@@ -111,6 +110,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
                 'max_retries': data.max_retries,
                 'max_jobs_count_at_same_time': data.max_jobs_count_at_same_time,
                 'user': data.user,
+                'source': data.source,
             }
         )
 

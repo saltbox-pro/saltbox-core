@@ -1,6 +1,6 @@
 from faststream.rabbit.annotations import ContextRepo
 
-from saltbox_core.tasks.schemas.task_schemas import TaskCreateInputSchema, TaskData
+from saltbox_core.tasks.schemas.task_schemas import TaskCreateInputSchema, TaskData, TaskSource
 from saltbox_core.tasks.services.tasks import TaskService
 from saltbox_core.tasks.services.tasks_lifespan import TaskLifespanService, get_task_lifespan_service
 from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER
@@ -18,7 +18,7 @@ async def run_task(message: RunTaskEventBusMessage, context: ContextRepo) -> dic
     task = await task_service.create(
         data=TaskCreateInputSchema.model_validate(
             {
-                'user': SYSTEM_SHORT_USER,
+                'user': message.user if message.user else SYSTEM_SHORT_USER,
                 'task_template_id': message.data.get('task_template_id'),
                 'fun': message.data.get('fun'),
                 'salt_masters': message.data['salt_masters'],
@@ -29,6 +29,7 @@ async def run_task(message: RunTaskEventBusMessage, context: ContextRepo) -> dic
                 'batch_size': message.data.get('batch_size'),
                 'max_jobs_count_at_same_time': message.data.get('max_jobs_count_at_same_time', 1),
                 'max_retries': message.data.get('max_retries', 3),
+                'source': TaskSource.model_validate({'type': 'scheduler', 'id': message.task_id}),
             }
         )
     )

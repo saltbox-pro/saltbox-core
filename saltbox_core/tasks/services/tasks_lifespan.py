@@ -22,6 +22,7 @@ from saltbox_core.tasks.schemas.task_schemas import (
     TaskMinionStatus,
     TaskModel,
     TaskPostProcessingType,
+    TaskSource,
     TaskStatus,
     TaskUpdateSchema,
 )
@@ -94,9 +95,9 @@ class TaskLifespanService:
         if task.status in [TaskStatus.created, TaskStatus.stopped] or force:
             await self.update_task(status=TaskStatus.running)
 
-            if task.parent_task_id:
+            if task.source and task.source.type == 'task' and task.source.id:
                 try:
-                    parent_task = await self.task_service.get(task.parent_task_id)
+                    parent_task = await self.task_service.get(PyObjectId(task.source.id))
 
                     await self.task_service.update(
                         query=parent_task.id,
@@ -108,7 +109,7 @@ class TaskLifespanService:
                         },
                     )
                 except ObjectNotFoundException:
-                    await self.update_task(parent_task_id=None)
+                    await self.update_task(sourse__id=None)
 
     async def __stop_jobs(self) -> None:
         task = await self.get_task()
@@ -463,7 +464,7 @@ class TaskLifespanService:
                         {
                             **task.postprocessing.task_create_request.model_dump(by_alias=True),
                             'user': task.user,
-                            'parent_task_id': task.id,
+                            'source': TaskSource.model_validate({'type': 'task', 'id': task.id}),
                         }
                     )
                 )

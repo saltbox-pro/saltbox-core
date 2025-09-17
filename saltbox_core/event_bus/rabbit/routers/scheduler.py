@@ -17,7 +17,7 @@ async def sync_templates(message: SyncTemplatesRequestEventBusMessage) -> None:
 
     await sync_scheduler_templates(
         templates_path=Path(__file__).parent.parent.parent.parent.joinpath('scheduler/templates'),
-        default_target='core',
+        service_name='core',
     )
 
 

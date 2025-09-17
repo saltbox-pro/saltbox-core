@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query
 
 from saltbox_core.config import logger
 from saltbox_core.jobs.exceptions import JobDoesNotExistsException
@@ -14,6 +14,7 @@ from saltbox_core.tasks.schemas.task_schemas import (
     TaskListResponseSchema,
     TaskModel,
     TasksActions,
+    TaskSource,
 )
 from saltbox_core.tasks.services.tasks import TaskService, get_task_service
 from saltbox_core.tasks.services.tasks_lifespan import TaskLifespanService, get_task_lifespan_service
@@ -65,19 +66,19 @@ async def tasks_list(
     ).model_dump(by_alias=True),
 )
 async def task_create(
-    request: Request,
     item: TaskCreateRequestSchema,
     user: Annotated[UserShort, Depends(get_current_user)],
     task_service: Annotated[TaskService, Depends(get_task_service)],
 ) -> TaskModel:
-    # TODO (i.moshkov): remove this
-    if item.query == {'$and': [{'$expr': True}]}:
-        item.query = {}
-
-    logger.debug(f'User {user}')
-
-    create_data = TaskCreateInputSchema(**{'user': user.model_dump(), **item.model_dump(by_alias=True)})
-    return await task_service.create(data=create_data)
+    return await task_service.create(
+        data=TaskCreateInputSchema(
+            **{
+                'user': user.model_dump(),
+                'source': TaskSource.model_validate({'type': 'rest', 'id': user.sub}),
+                **item.model_dump(by_alias=True),
+            }
+        )
+    )
 
 
 @router.get(

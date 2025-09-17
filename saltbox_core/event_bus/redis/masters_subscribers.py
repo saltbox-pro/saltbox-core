@@ -127,13 +127,12 @@ async def extract_inventory(
     message: BridgeInventoryDataSavedMessage,
     job_service: JobService = Context(),  # noqa: B008
 ) -> None:
-
     if not SETTINGS.module_inventory_on:
         return
 
     jid = JID(message.jid)
 
-    message_to_inventory = InventoryPutEventBusMessage(target='inventory', path=message.path)
+    message_to_inventory = InventoryPutEventBusMessage(sender='core', target='inventory', path=message.path)
 
     for minion_id in message.minions:
         job_result = await job_service.get_job_return_for_minion(jid, minion_id)
@@ -148,4 +147,4 @@ async def extract_inventory(
         else:
             logger.warn('Not found inventory for minion %s on master %s, JID=%s', minion_id, message.master, jid)
 
-    await send_message(message=message_to_inventory, queue="inventory_put_data")
+    await send_message(message=message_to_inventory, queue='inventory_put_data')

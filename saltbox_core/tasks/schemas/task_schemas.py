@@ -135,6 +135,11 @@ class TaskData(BaseModel):  # type: ignore[no-redef]
     kwargs: dict | None = Field(default=None)
 
 
+class TaskSource(BaseModel):
+    type: str = Field(title='Source type')
+    id: str | None = Field(title='Source id', default=None)
+
+
 class TaskTemplateShort(BaseModel):
     id: PyObjectId
     title: str
@@ -150,7 +155,6 @@ class CollectionShort(BaseModel):
 
 
 class TaskReadOnlyFieldsMixin:
-    parent_task_id: PyObjectId | None = Field(title='Parent task id', default=None)
     task_template: TaskTemplateShort | None = Field(title='Task template', default=None)
 
     fun: str = Field(title='Salt fun')
@@ -164,9 +168,10 @@ class TaskReadOnlyFieldsMixin:
 
     batch_size: int | None = Field(title='Batch size', default=None)
     max_jobs_count_at_same_time: int = Field(title='Max jobs count at some time', ge=1, default=1)
-    max_retries: int = Field(title='Max retries', ge=1, default=3)
+    max_retries: int = Field(title='Max retries', ge=1, default=1)
 
     user: UserShort
+    source: TaskSource | None = Field(title='Source', default=None)
 
 
 class TaskEditableFieldsMixinPart:
@@ -212,7 +217,7 @@ class TaskCreateRequestSchema(BaseModel):
 
     batch_size: int | None = Field(title='Batch size', default=None)
     max_jobs_count_at_same_time: int = Field(title='Max jobs count at some time', ge=1, default=1)
-    max_retries: int = Field(title='Max retries', default=3)
+    max_retries: int = Field(title='Max retries', default=1)
 
     postprocessing: TaskPostProcessingCreate | None = Field(title='Postprocessing', default=None)
 
@@ -231,7 +236,7 @@ class TaskCreateRequestSchema(BaseModel):
 
 class TaskCreateInputSchema(TaskCreateRequestSchema):
     user: UserShort
-    parent_task_id: PyObjectId | None = Field(title='Parent task id', default=None)
+    source: TaskSource
 
 
 class TaskListResponseSchema(

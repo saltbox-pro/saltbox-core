@@ -70,6 +70,7 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
         redis_client=redis_db, minion_service=minion_service, master_service=master_service
     )
 
+    context.set_global('service_name', 'core')
     context.set_global('redis_db', redis_db)
     context.set_global('mongo_db', mongo_db)
     context.set_global('master_service', master_service)
@@ -111,7 +112,7 @@ async def async_main() -> None:
 
     await sync_scheduler_templates(
         templates_path=Path(__file__).parent.parent.parent.joinpath('scheduler/templates'),
-        default_target='core',
+        service_name='core',
     )
 
     logger.info('Starting faststream app')
