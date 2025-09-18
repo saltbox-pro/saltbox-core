@@ -149,13 +149,6 @@ class JobsListRequest(SkipLimitParams, StartEndDatetimeMixin):
     desc: bool = True
 
 
-class JobsListCursorRequest(StartEndDatetimeMixin):
-    cursor: int | None = Field(default=None, ge=0)
-    count: int = Field(gt=0, lt=1000, default=100)
-    fun: str | None = None
-    minion: str | None = None
-
-
 class JobsListResponse(BaseModel):
     jid: str
     tgt: str
