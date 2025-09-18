@@ -4,9 +4,7 @@ import pydantic
 from fastapi import APIRouter, Depends, Query
 from pydantic import Field
 
-from saltbox_bridge_messages import BridgeNewJobResponse, CoreNewJobRequest
 from saltbox_core.config import SETTINGS
-from saltbox_core.event_bus.redis.masters_bus import send_message_and_wait_response_to_master
 from saltbox_core.jobs.schemas.job_schemas import (
     CreateJobRequest,
     GetJobReturnResponse,
@@ -17,7 +15,6 @@ from saltbox_core.jobs.schemas.job_schemas import (
     JobsListCursorRequest,
     JobsListRequest,
     JobsListResponse,
-    JobSyncResponse,
 )
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.utilities.jid import JID
@@ -128,36 +125,6 @@ async def job_create(
             }
         )
     )
-
-
-@router.post(
-    '/sync_run',
-    operation_id='job_create_sync',
-    openapi_extra=GatewayEndpointConfig(
-        policy='core.jobs.base',
-        action=JobsActions.RUN,
-    ).model_dump(by_alias=True),
-)
-async def job_create_sync(
-    item: CreateJobRequest,
-) -> JobSyncResponse:
-    msg = CoreNewJobRequest(
-        tgt=item.tgt,
-        tgt_type=item.tgt_type,
-        fun=item.fun,
-        master=item.salt_master,
-        arg=item.data.data_args or [] if item.data else [],
-        kwarg=item.data.data_kwargs or {} if item.data else {},
-    )
-    job_res = BridgeNewJobResponse(
-        **await send_message_and_wait_response_to_master(
-            message=msg,
-            message_tag='run_job_sync',
-            response_timeout=10.0,
-        )
-    )
-
-    return JobSyncResponse(**job_res.model_dump())
 
 
 @router.get(

@@ -15,7 +15,7 @@ from pydantic import (
 )
 from pydantic.functional_validators import AfterValidator
 
-from saltbox_bridge_messages import JobReturnSchema
+from saltbox_bridge_messages import SaltTgtType
 from saltbox_core.utilities.jid import JID, JidError
 from saltbox_core.utilities.salt import fill_salt_kwarg_from_arg
 from saltbox_sdk.db.schemas_base import SkipLimitParams
@@ -170,20 +170,10 @@ class JobsListResponse(BaseModel):
 
 class CreateJobRequest(BaseModel):
     tgt: str = '*'
-    tgt_type: str = 'glob'
+    tgt_type: SaltTgtType = 'glob'
     fun: str = 'test.ping'
     salt_master: str = 'salt-master'
     data: JobData | None = None
-
-
-class JobSyncResponse(BaseModel):
-    jid: str
-    tgt: str
-    tgt_type: str
-    fun: str
-    arg: list
-    kwarg: dict
-    returns: dict[str, JobReturnSchema]
 
 
 class GetJobReturnResponse(BaseModel):
