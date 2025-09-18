@@ -9,6 +9,7 @@ from saltbox_core.tasks.schemas.task_template_schemas import TaskTemplateModel
 # from saltbox_core.config import logger
 from saltbox_sdk.db.mongo.config import get_mongo
 from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
+from saltbox_sdk.db.mongo.schemas_base import SortOrder
 
 ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
 
@@ -26,7 +27,7 @@ class TaskTemplateRepository(BaseMongoRepository[TaskTemplateModel]):
         limit: int,
         skip: int,
         *,
-        sort: list[tuple[str, int | str | None]] | None = None,
+        sort: dict[str, SortOrder] | None = None,
     ) -> list[TaskTemplateModel]: ...
 
     @overload
@@ -37,7 +38,7 @@ class TaskTemplateRepository(BaseMongoRepository[TaskTemplateModel]):
         skip: int,
         projection_model: type[ProjectionModel],
         *,
-        sort: list[tuple[str, int | str | None]] | None = None,
+        sort: dict[str, SortOrder] | None = None,
     ) -> list[ProjectionModel]: ...
 
     @override
@@ -48,7 +49,7 @@ class TaskTemplateRepository(BaseMongoRepository[TaskTemplateModel]):
         skip: int = 0,
         projection_model: type[ProjectionModel] | None = None,
         *,
-        sort: list[tuple[str, int | str | None]] | None = None,
+        sort: dict[str, SortOrder] | None = None,
     ) -> list[TaskTemplateModel] | list[ProjectionModel]:
         projection = self._get_projection_from_model(projection_model) if projection_model else None
         # result = self.collection.find(filter=query, projection=projection, limit=limit, skip=skip)

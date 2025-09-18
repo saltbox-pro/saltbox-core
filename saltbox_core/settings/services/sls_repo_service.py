@@ -19,7 +19,7 @@ from saltbox_core.settings.schemas.sls_repos_schemas import (
 )
 from saltbox_core.settings.tasks import sync_sls_repo_task, sync_sls_repos_to_serve_dir
 from saltbox_core.tasks.services.tasks_templates import TaskTemplateService
-from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
 from saltbox_sdk.db.schemas_base import PaginatedResponse
 from saltbox_sdk.fastapi_utils.dependencies import get_redis_dep
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
@@ -43,7 +43,7 @@ class SettingsSlsRepoService(
         limit: int,
         skip: int,
         *,
-        sort: list[tuple[str, int | str | None]] | None = None,
+        sort: dict[str, SortOrder] | None = None,
     ) -> PaginatedResponse[SettingsSlsRepoModel]: ...
 
     @overload
@@ -54,7 +54,7 @@ class SettingsSlsRepoService(
         skip: int,
         projection_model: type[ProjectionModel],
         *,
-        sort: list[tuple[str, int | str | None]] | None = None,
+        sort: dict[str, SortOrder] | None = None,
     ) -> PaginatedResponse[ProjectionModel]: ...
 
     @override
@@ -65,7 +65,7 @@ class SettingsSlsRepoService(
         skip: int = 0,
         projection_model: type[ProjectionModel] | None = None,
         *,
-        sort: list[tuple[str, int | str | None]] | None = None,
+        sort: dict[str, SortOrder] | None = None,
     ) -> PaginatedResponse[SettingsSlsRepoModel] | PaginatedResponse[ProjectionModel]:
         total = await self.repo.count(query)
 
