@@ -61,7 +61,7 @@ async def tasks_list_new(
 
 @router.get(
     '/filter-schema',
-    operation_id='filter_schema',
+    operation_id='tasks_filter_schema',
     openapi_extra=GatewayEndpointConfig(
         policy='core.tasks.list',
         action=FiltersActions.GET_SCHEMA,
