@@ -136,11 +136,12 @@ def analyze_field(field: Any) -> tuple[type[BaseModel] | None, bool, Any]:  # no
     try:
         if type(field) is FieldInfo:
             field_annotations = get_args(field.annotation)
+            field_annotations = (field.annotation,) if not field_annotations else field_annotations
         elif type(field) is ComputedFieldInfo:
             field_annotations = get_args(field.return_type)
+            field_annotations = (field.return_type,) if not field_annotations else field_annotations
         else:
             raise UnsupportedSchemaTypeException()
-        field_annotations = (field.annotation,) if not field_annotations else field_annotations
 
         for field_class in field_annotations:
             if field_class is type(None):

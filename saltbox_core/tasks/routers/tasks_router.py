@@ -1,16 +1,19 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends
 
-from saltbox_core.config import logger
+# from saltbox_core.config import logger
 from saltbox_core.jobs.exceptions import JobDoesNotExistsException
 from saltbox_core.jobs.schemas.job_schemas import JobModel, JobResult
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
-from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
+from saltbox_core.minion_collections.schemas.filter_schemas import (
+    FiltersActions,
+    MinionFilterSchema,
+)
 from saltbox_core.tasks.schemas.task_schemas import (
     TaskCreateInputSchema,
     TaskCreateRequestSchema,
-    TaskListQueryParams,
+    TaskListBody,
     TaskListResponseSchema,
     TaskModel,
     TasksActions,
@@ -19,6 +22,7 @@ from saltbox_core.tasks.schemas.task_schemas import (
 from saltbox_core.tasks.services.tasks import TaskService, get_task_service
 from saltbox_core.tasks.services.tasks_lifespan import TaskLifespanService, get_task_lifespan_service
 from saltbox_core.utilities.jid import JID
+from saltbox_core.utilities.model_schema import get_model_schema
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
@@ -27,34 +31,44 @@ from saltbox_sdk.fastapi_utils.dependencies import get_current_user, get_opa_que
 router = APIRouter(prefix='/tasks', tags=['Tasks'])
 
 
-@router.get(
-    '',
+@router.post(
+    '/list',
     operation_id='tasks_list',
     openapi_extra=GatewayEndpointConfig(
         policy='core.tasks.list',
         action=TasksActions.LIST,
     ).model_dump(by_alias=True),
 )
-async def tasks_list(
-    params: Annotated[TaskListQueryParams, Query()],
+async def tasks_list_new(
     opa_query: Annotated[dict, Depends(get_opa_query)],
+    body: Annotated[TaskListBody, Body()],
     task_service: Annotated[TaskService, Depends(get_task_service)],
-    collection_service: Annotated[CollectionService, Depends(get_collection_service)],
 ) -> PaginatedResponse[TaskListResponseSchema]:
-    logger.info(f'OPA query: {opa_query}')
-
-    collection = await collection_service.get_by_slug(params.collection_slug)
-    query = {'target_collection.id': PyObjectId(collection.id)}
+    query = body.query
     if opa_query:
-        query.update(opa_query)
+        query = {'$and': [query, opa_query]}
+
     task_list = await task_service.get_list_paginated(
         query=query,
-        limit=params.limit,
-        skip=params.skip,
+        limit=body.limit,
+        skip=body.skip,
         projection_model=TaskListResponseSchema,
+        sort=body.sort,
     )
 
     return task_list
+
+
+@router.get(
+    '/filter-schema',
+    operation_id='filter_schema',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.list',
+        action=FiltersActions.GET_SCHEMA,
+    ).model_dump(by_alias=True),
+)
+async def filter_schema() -> list[MinionFilterSchema]:
+    return [MinionFilterSchema(**field) for field in get_model_schema(TaskModel)]
 
 
 @router.post(
