@@ -97,7 +97,6 @@ class JobResult(BaseModel):
     model_config = ConfigDict(extra='allow')
 
     id: str
-    success: bool
     salt_master: str
     return_: Any = Field(alias='return')
     retcode: int
@@ -107,6 +106,17 @@ class JobResult(BaseModel):
     fun_kwarg: dict | None = None
     user: str | None = None
     stamp: str = Field(alias='_stamp')
+
+    @property
+    def success(self) -> bool:
+        """
+        Does job finished successfully
+
+        Field exists in an Event Bus object, but not for all cases. E.g. field is
+        missing on `salt.call` return. For convenience in the model it is True when
+        retcode is zero and vice versa.
+        """
+        return not self.retcode
 
     @model_validator(mode='before')
     @classmethod
