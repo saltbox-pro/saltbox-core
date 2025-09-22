@@ -58,7 +58,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
     @overload
     async def create(self, data: JobCreateSchema, projection_model: type[ProjectionModel]) -> ProjectionModel: ...
 
-    async def create(
+    async def create(  # noqa: C901
         self, data: JobCreateSchema, projection_model: type[ProjectionModel] | None = None
     ) -> JobModel | ProjectionModel:
         if not data.jid:
@@ -96,7 +96,11 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
             if 'args' in validated_data:
                 data_['arg'] = json.dumps(validated_data['args'])
             if 'kwargs' in validated_data:
-                data_['kwarg'] = json.dumps(validated_data['kwargs'])
+                kwargs = validated_data['kwargs']
+                for k, v in kwargs.items():
+                    if isinstance(v, str):
+                        kwargs[k] = v.strip()
+                data_['kwarg'] = json.dumps(kwargs)
 
             await self.rdb.hmset(
                 name=create_job_hash_name,
