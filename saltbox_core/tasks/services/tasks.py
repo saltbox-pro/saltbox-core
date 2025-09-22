@@ -8,7 +8,11 @@ from redis.asyncio import Redis
 
 from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
-from saltbox_core.tasks.exceptions import TaskObjectDoesNotExistException, TaskServiceException
+from saltbox_core.tasks.exceptions import (
+    TaskCreateSchemaValidationException,
+    TaskObjectDoesNotExistException,
+    TaskServiceException,
+)
 from saltbox_core.tasks.repositories.task_repository import TaskRepository, get_task_repository
 from saltbox_core.tasks.schemas.task_schemas import (
     CollectionShort,
@@ -74,7 +78,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
                     name=task_template.name, sid=task_template.repo_id, data=task_data
                 )
             except JsonSchemaValidationError as err:
-                raise TaskServiceException(str(err)) from err
+                raise TaskCreateSchemaValidationException(str(err)) from None
 
         elif data.fun:
             fun = data.fun
