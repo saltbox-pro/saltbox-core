@@ -18,6 +18,7 @@ async def run_job(message: RunTaskEventBusMessage, context: ContextRepo) -> dict
                 'data': JobData.model_validate(
                     {'args': message.data.get('args'), 'kwargs': message.data.get('kwargs')}
                 ),
+                'user': message.user,
             }
         )
     )

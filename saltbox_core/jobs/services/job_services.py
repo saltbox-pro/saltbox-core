@@ -91,6 +91,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
                 'fun': data.fun,
                 'tgt': data.tgt,
                 'tgt_type': data.tgt_type,
+                'user': data.user.model_dump_json(),
             }
 
             if 'args' in validated_data:

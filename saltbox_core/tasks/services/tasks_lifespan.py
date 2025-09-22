@@ -265,6 +265,7 @@ class TaskLifespanService:
                         'kwargs': task.task_kwargs,
                     },
                     'salt_master': master,
+                    'user': task.user,
                 }
             )
         )

@@ -18,7 +18,7 @@ from pydantic.functional_validators import AfterValidator
 from saltbox_bridge_messages import SaltTgtType
 from saltbox_core.utilities.jid import JID, JidError
 from saltbox_core.utilities.salt import fill_salt_kwarg_from_arg
-from saltbox_sdk.db.schemas_base import SkipLimitParams
+from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER, SkipLimitParams, UserShort
 
 
 def jidable[JID_T: str | int](value: JID_T) -> JID_T:
@@ -46,12 +46,14 @@ class JobModel(BaseModel):
     jid: StrJid
     tgt: str | list[str]
     tgt_type: str
-    user: str | None = None
+    user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
+    system_user: str | None = None
     fun: str
     arg: list | None = None
     kwarg: dict | None = None
     minions: list[str] = []
     missing: list[str] = []
+    returning: dict[str, bool | None] | None = None
     stamp: str | None = Field(alias='_stamp', default=None)
     status: JobStatus = JobStatus.started
 
@@ -79,6 +81,7 @@ class JobCreateSchema(BaseModel):
     jid: str | None = None
     jid_postfix: str | None = None
     salt_master: str
+    user: UserShort
 
 
 class JobUpdateSchema(BaseModel): ...
@@ -154,7 +157,8 @@ class JobsListResponse(BaseModel):
     tgt: str
     tgt_type: str
     fun: str
-    user: str | None = None
+    user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
+    system_user: str | None = None
 
     @computed_field(title='Timestamp decoded from JID')
     def fms_jid_timestamp(self) -> Annotated[datetime, PastDatetime]:

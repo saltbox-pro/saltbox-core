@@ -17,8 +17,9 @@ from saltbox_core.jobs.schemas.job_schemas import (
 )
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.utilities.jid import JID
-from saltbox_sdk.db.schemas_base import PaginatedResponse
+from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
+from saltbox_sdk.fastapi_utils.dependencies import get_current_user
 
 # from saltbox_sdk.fastapi_utils.dependencies import get_opa_query
 # from saltbox_sdk.utilities.helpers import match_query
@@ -81,11 +82,13 @@ async def job_retrieve(
 )
 async def job_create(
     item: CreateJobRequest,
+    user: Annotated[UserShort, Depends(get_current_user)],
     job_service: Annotated[JobService, Depends(get_job_service)],
 ) -> JobModel:
     return await job_service.create(
         JobCreateSchema.model_validate(
             {
+                'user': user.model_dump(),
                 **item.model_dump(by_alias=True),
             }
         )
