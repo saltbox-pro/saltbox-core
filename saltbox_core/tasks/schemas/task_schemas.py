@@ -53,8 +53,8 @@ class TaskJob(BaseModel):
 
 
 class TaskTargetMinion(BaseModel):
-    minion_id: str
-    master: str
+    minion_id: str = Field(title='Target minion ID')
+    master: str = Field(title='Target minion master')
 
 
 class TaskMinionStatus(StrEnum):
@@ -74,10 +74,10 @@ class TaskMinionJobStatus(StrEnum):
 
 class TaskMinion(BaseModel):
     id: PyObjectId | None = Field(title='Minion id', default=None)
-    minion_id: str
-    master: str
+    minion_id: str = Field(title='Minion ID')
+    master: str = Field(title='Minion master')
 
-    status: TaskMinionStatus = Field(title='status', default=TaskMinionStatus.pending)
+    status: TaskMinionStatus = Field(title='Status', default=TaskMinionStatus.pending)
 
     jobs: dict[str, TaskMinionJobStatus] = Field(title='Jobs', default={})
 
@@ -142,16 +142,16 @@ class TaskSource(BaseModel):
 
 class TaskTemplateShort(BaseModel):
     id: PyObjectId
-    title: str
-    name: str
-    repo_id: PyObjectId
-    commit_hash: str
+    title: str = Field(title='Template title')
+    name: str = Field(title='Template name')
+    repo_id: PyObjectId = Field(title='Repository id')
+    commit_hash: str = Field(title='Repository commit hash')
 
 
 class CollectionShort(BaseModel):
     id: PyObjectId
-    slug: str
-    title: str
+    slug: str = Field(title='Collection slug')
+    title: str = Field(title='Collection title')
 
 
 class TaskReadOnlyFieldsMixin:

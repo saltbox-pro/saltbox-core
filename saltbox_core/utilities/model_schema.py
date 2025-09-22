@@ -125,6 +125,7 @@ def get_model_schema(model: type[BaseModel], pre_path: str | None = None) -> lis
         else:
             schema.append(create_field_schema(full_field_name, field, nullable_field, computed_field_class))
 
+    schema.sort(key=lambda x: x['label'])
     return schema
 
 
@@ -141,6 +142,7 @@ def analyze_field(field: Any) -> tuple[type[BaseModel] | None, bool, Any]:  # no
             field_annotations = get_args(field.return_type)
             field_annotations = (field.return_type,) if not field_annotations else field_annotations
         else:
+            logger.warning(f'Unsupported field type: {type(field)}')
             raise UnsupportedSchemaTypeException()
 
         for field_class in field_annotations:
@@ -152,15 +154,16 @@ def analyze_field(field: Any) -> tuple[type[BaseModel] | None, bool, Any]:  # no
                     if field_class in [list[str], list[int], list[Any]]:
                         computed_field_class = list
                         continue
-                    raise UnsupportedSchemaTypeException()
+                    msg = f'GenericAlias {field_class} not supported for field {field.title}'
+                    raise UnsupportedSchemaTypeException(msg)
             if isclass(field_class) and issubclass(field_class, BaseModel):
                 sub_model = field_class
                 break
             if field_class:
                 computed_field_class = field_class
 
-    except UnsupportedSchemaTypeException:
-        logger.warning('Unsupported schema type for field')
+    except UnsupportedSchemaTypeException as e:
+        logger.warning(str(e))
 
     return sub_model, nullable_field, computed_field_class
 
@@ -176,6 +179,8 @@ def create_field_schema(
 
     field_schema_lookups_computed = [schema_lookups_js_values[lookup] for lookup in field_schema_lookups]
 
+    if not field.title:
+        logger.debug(f'Field: {full_field_name}, title: {field.title}')
     field_schema = {
         'name': full_field_name,
         'label': field.title if field.title else full_field_name,
