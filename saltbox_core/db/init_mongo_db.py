@@ -103,6 +103,16 @@ async def init_collections(db: AsyncDatabase) -> None:
         logger.debug('Index created: %s', result)
         logger.debug('Indexes: %s', indexes)
 
+    # Create unique index for parent_id + title if not exists
+    if 'parent_id_title_unique_index_asc' not in indexes:
+        result = await collections_repo.collection.create_index(
+            [('parent_id', pymongo.ASCENDING), ('title', pymongo.ASCENDING)],
+            name='parent_id_title_unique_index_asc',
+            unique=True,
+        )
+        logger.debug('Index created: %s', result)
+        logger.debug('Indexes: %s', indexes)
+
     # Create root collection if not exists
     root_collection_exist = await collections_repo.collection.count_documents({'slug': 'root'})
     if not root_collection_exist:

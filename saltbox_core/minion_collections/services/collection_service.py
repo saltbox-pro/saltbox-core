@@ -1,6 +1,8 @@
-from typing import Annotated
+from typing import Annotated, TypeVar, overload, override
+from uuid import uuid4
 
 from fastapi import Depends
+from pydantic import BaseModel
 
 from saltbox_core.minion_collections.repositories.collection_repository import (
     CollectionRepository,
@@ -12,6 +14,8 @@ from saltbox_core.minion_collections.schemas.collection_schemas import (
     CollectionUpdateSchema,
 )
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
+
+ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
 
 
 class CollectionService(
@@ -30,6 +34,27 @@ class CollectionService(
     async def delete_by_slug(self, slug: str) -> int:
         result = await self.delete({'slug': slug})
         return result
+
+    @overload
+    async def create(self, data: CollectionCreateSchema) -> CollectionModel: ...
+
+    @overload
+    async def create(
+        self, data: CollectionCreateSchema, projection_model: type[ProjectionModel]
+    ) -> ProjectionModel: ...
+
+    @override
+    async def create(
+        self, data: CollectionCreateSchema, projection_model: type[ProjectionModel] | None = None
+    ) -> CollectionModel | ProjectionModel:
+        while True:
+            existing = await self.exists({'slug': data.slug})
+            if not existing:
+                break
+            data.slug = f'{data.slug.split("-")[0]}-{uuid4().hex[:8]}'
+        if projection_model:
+            return await super().create(data, projection_model)
+        return await super().create(data)
 
 
 def get_collection_service(
