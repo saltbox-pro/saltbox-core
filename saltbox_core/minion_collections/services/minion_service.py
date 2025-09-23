@@ -61,16 +61,34 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
         file_path = f'./reports/minions_{current_datetime}.csv'
 
         minion_keys = MinionModel.model_fields
-        grains_keys = GrainsSchema.model_fields
 
-        keys = [key for key in minion_keys.keys() if key != 'grains'] + [f'grains.{key}' for key in grains_keys.keys()]
+        # Get all unique grains keys via pipeline
+        grains_pipeline: list[dict] = [
+            {'$project': {'grains': 1}},
+            {'$replaceRoot': {'newRoot': '$grains'}},
+            {'$project': {'keys': {'$objectToArray': '$$ROOT'}}},
+            {'$unwind': '$keys'},
+            {'$group': {'_id': None, 'all_keys': {'$addToSet': '$keys.k'}}},
+        ]
+        grains_keys_result = await self.repo.aggregate(grains_pipeline)
+        if grains_keys_result and grains_keys_result[0].get('all_keys'):
+            all_grains_keys = grains_keys_result[0]['all_keys']
+            logger.debug('Grains + custom: %s', all_grains_keys)
+        else:
+            # fallback: only standard
+            all_grains_keys = list(getattr(GrainsSchema, 'model_fields', {}).keys())
+            logger.debug('Grains (standard only): %s', all_grains_keys)
+
+        keys = [key for key in minion_keys.keys() if key != 'grains'] + [f'grains.{key}' for key in all_grains_keys]
 
         with Path(file_path).open(mode='w', newline='') as file:  # noqa: ASYNC230
             writer = csv.DictWriter(file, fieldnames=keys)
             writer.writeheader()
             for item in data:
                 row = item.model_dump(exclude={'grains', 'last_activity_seconds'})
-                row.update({f'grains.{key}': item.grains.model_dump()[key] for key in grains_keys.keys()})
+                grains_dict = item.grains.model_dump() if hasattr(item.grains, 'model_dump') else dict(item.grains)
+                for key in all_grains_keys:
+                    row[f'grains.{key}'] = grains_dict.get(key)
                 writer.writerow(row)
 
         return file_path

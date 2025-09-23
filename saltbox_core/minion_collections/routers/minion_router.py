@@ -4,7 +4,8 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Response, status
 from fastapi.responses import FileResponse
 
 from saltbox_bridge_messages import BridgeGatherMinionsResponse, CoreGatherMinionsRequest, MasterStatus, SaltTgtType
-from saltbox_core.config import logger
+
+# from saltbox_core.config import logger
 from saltbox_core.event_bus.redis.masters_bus import send_message_and_wait_response_to_master
 from saltbox_core.masters.schemas.master_schemas import MasterModel
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
@@ -43,8 +44,6 @@ async def minions_list(
         query = {'$and': [collection.full_query, search]}
     else:
         query = collection.full_query if collection.full_query else search
-
-    logger.debug('query: %s', query)
 
     return await minion_service.get_list_paginated(
         query=query, skip=body.skip, limit=body.limit, projection_model=MinionShortSchema
