@@ -85,7 +85,7 @@ class GrainsSchema(BaseModel):
     serialnumber: str | None = Field(title='Serial number', default=None)
 
     virtual: str | None = Field(title='Virtual', default=None)
-    ps: str | None = Field(title='ps', default=None)
+    ps: str | None = Field(title='Process supervisor', default=None)
     osmajorrelease: int | None = Field(title='OS major release', default=None)
     path: str | None = Field(title='Path', default=None)
     systempath: list[str] | None = Field(title='System paths list', default=None)
