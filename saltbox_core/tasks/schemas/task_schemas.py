@@ -190,6 +190,21 @@ class TaskEditableFieldsMixin(TaskEditableFieldsMixinPart):
     postprocessing: TaskPostProcessing | None = Field(title='Postprocessing', default=None)
 
 
+class TaskComputedFieldsMixin:
+    @computed_field(title='Total minions')
+    def total_minions(self) -> int:
+        return len(self.minions)  # type: ignore
+
+    @computed_field(title='Minions count by status')
+    def minions_count_by_status(self) -> dict[TaskMinionStatus, int]:
+        result: dict[TaskMinionStatus, int] = dict.fromkeys(TaskMinionStatus, 0)
+
+        for minion in self.minions.values():  # type: ignore
+            result[minion.status] += 1
+
+        return result
+
+
 class TaskCreateSchema(BaseModel, TaskEditableFieldsMixin, TaskReadOnlyFieldsMixin):
     pass
 
@@ -200,7 +215,9 @@ class TaskUpdateSchema(BaseModel, TaskEditableFieldsMixin):
     )
 
 
-class TaskModel(BaseModel, CreatedModifiedMixin, TaskEditableFieldsMixin, TaskReadOnlyFieldsMixin, IDMixin):
+class TaskModel(
+    BaseModel, CreatedModifiedMixin, TaskEditableFieldsMixin, TaskReadOnlyFieldsMixin, TaskComputedFieldsMixin, IDMixin
+):
     pass
 
 
@@ -240,9 +257,14 @@ class TaskCreateInputSchema(TaskCreateRequestSchema):
 
 
 class TaskListResponseSchema(
-    BaseModel, CreatedModifiedMixin, TaskEditableFieldsMixinPart, TaskReadOnlyFieldsMixin, IDMixin
+    BaseModel,
+    CreatedModifiedMixin,
+    TaskEditableFieldsMixinPart,
+    TaskReadOnlyFieldsMixin,
+    TaskComputedFieldsMixin,
+    IDMixin,
 ):
-    pass
+    minions: dict[str, TaskMinion] = Field(exclude=True, default={})
 
 
 class TaskListQueryParams(SkipLimitParams):
