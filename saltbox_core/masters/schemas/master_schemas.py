@@ -26,10 +26,6 @@ class MasterReadOnlyFieldsMixin:
     master_id: str = Field(title='Master ID', min_length=3)
 
 
-class MasterPubkeyMixin:
-    pubkey: str = Field(description='Crypto public key of the Master')
-
-
 class MasterSshPubkeysMixin:
     salt_conf_pubkey: SshPubKeyModel
     sshfs_pubkey: SshPubKeyModel
@@ -46,12 +42,11 @@ class MasterCreateSchema(
     BaseModel,
     MasterEditableFieldsMixin,
     MasterReadOnlyFieldsMixin,
-    MasterPubkeyMixin,
     MasterSshPubkeysMixin,
 ): ...
 
 
-class MasterUpdateSchema(BaseModel, MasterEditableFieldsMixin, MasterPubkeyMixin):
+class MasterUpdateSchema(BaseModel, MasterEditableFieldsMixin):
     model_config = ConfigDict(extra='ignore')
 
 
@@ -60,7 +55,6 @@ class MasterModel(
     CreatedModifiedMixin,
     MasterEditableFieldsMixin,
     MasterReadOnlyFieldsMixin,
-    MasterPubkeyMixin,
     MasterSshPubkeysMixin,
     IDMixin,
 ): ...

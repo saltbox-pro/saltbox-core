@@ -26,7 +26,6 @@ from saltbox_core.minion_collections.schemas.minion_schemas import (
     MinionUpdateSchema,
 )
 from saltbox_core.minion_collections.services.minion_service import MinionService
-from saltbox_core.utilities.gpg import SaltBoxCrypt
 from saltbox_core.utilities.jid import JID
 from saltbox_sdk.event_bus.utils import send_message
 from saltbox_sdk.exceptions import ObjectNotFoundException
@@ -39,7 +38,6 @@ router = RedisRouter(prefix='master_', middlewares=[MastersAuthMiddleware])
 async def auth(
     message: BridgeAuthRequest,
     master_service: MasterService = Context(),  # noqa: B008
-    saltbox_crypt: SaltBoxCrypt = Context(),  # noqa: B008
 ) -> CoreAuthResponse:
     try:
         master: MasterModel = await master_service.get_by_master_id(message.master)
@@ -49,20 +47,17 @@ async def auth(
             title=message.master,
             salt_conf_pubkey=message.salt_conf_pubkey,
             sshfs_pubkey=message.sshfs_pubkey,
-            pubkey=message.crypt_pubkey,
         )
         master = await master_service.create(create)
     else:
         if master.status is MasterStatus.KEYS_STALE:
             master.status = MasterStatus.NEW
-            master.pubkey = message.crypt_pubkey
             master.salt_conf_pubkey = message.salt_conf_pubkey
             master.sshfs_pubkey = message.sshfs_pubkey
             master = await master_service.update(query=master.id, data=master.model_dump())
 
     return CoreAuthResponse(
         master=master.master_id,
-        crypt_pubkey=saltbox_crypt.pubkey,
         status=master.status,
     )
 

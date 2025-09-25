@@ -21,7 +21,6 @@ from saltbox_core.masters.repositories.master_repository import MasterRepository
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_core.minion_collections.repositories.minion_repository import MinionRepository, get_minion_repository
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
-from saltbox_core.utilities.gpg import SaltBoxCrypt
 from saltbox_sdk.config.redis_config import REDIS_SETTINGS
 from saltbox_sdk.db.mongo.config import get_mongo_db
 
@@ -60,7 +59,6 @@ def get_faststream_broker(middlewares: list[BrokerMiddleware] | None = None) -> 
 async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
     mongo_db = get_mongo_db()
     redis_db = await aioredis.from_url(REDIS_SETTINGS.redis_url, **REDIS_SETTINGS.redis_connection_kwargs)
-    saltbox_crypt = SaltBoxCrypt()
     master_repository: MasterRepository = get_master_repository(db=mongo_db)
     master_service: MasterService = get_master_service(repo=master_repository)
     minion_repository: MinionRepository = get_minion_repository(db=mongo_db)
@@ -72,12 +70,11 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
         rdb=redis_db,
         job_repository=job_repository,
         job_schema_service=job_schema_service,
-        master_service=master_service
+        master_service=master_service,
     )
 
     context.set_global('master_service', master_service)
     context.set_global('minion_service', minion_service)
-    context.set_global('saltbox_crypt', saltbox_crypt)
     context.set_global('job_schema_repository', job_schema_repository)
     context.set_global('job_service', job_service)
 

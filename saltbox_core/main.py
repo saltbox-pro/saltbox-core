@@ -21,7 +21,6 @@ from saltbox_core.settings.routers.sls_repos_router import router as settings_sl
 from saltbox_core.tasks.routers.tasks_router import router as task_router
 from saltbox_core.tasks.routers.template_router import router as template_router
 from saltbox_core.tkq import broker
-from saltbox_core.utilities.gpg import SaltBoxCrypt
 from saltbox_core.utilities.httpx_client import get_httpx_async_client
 from saltbox_core.utilities.redis_cache import CustomRedisCache
 from saltbox_sdk.config.discovery_config import DISCOVERY_SETTINGS
@@ -36,8 +35,6 @@ from saltbox_sdk.fastapi_utils.promethes_metrics.exporter import PrometheusExpor
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator:
-    SaltBoxCrypt()
-
     await init_mongo_db()
     if not broker.is_worker_process:
         await broker.startup()
