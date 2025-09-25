@@ -67,6 +67,9 @@ class Settings(BaseSettings):
     opa_url: str = ''
     salt_func_repo_url: str = 'https://dev.saltbox.pro/saltbox/salt-func-schemas.git'
     salt_func_local_repo_name: str = 'salt-func-schemas'
+    gitlab_token: str | None = None
+    gitlab_base_url: str = 'https://dev.saltbox.pro'
+    gitlab_group_id: int | None = None
     local_repos_dir: MakeDirectoryPath = Field(
         Path('/var/lib/saltbox-core/repos/'),
         description='Salt modules cloned repos location',
@@ -91,10 +94,7 @@ class Settings(BaseSettings):
     gog_key_name_real: str = 'Saltbox'
     gpg_key_email: str = 'gpg@saltbox.pro'
     gpg_key_comment: str = 'This is a certificate for saltbox services'
-    module_inventory_on: bool = Field(
-        default=False,
-        description='Provide data for Inventory extension module'
-    )
+    module_inventory_on: bool = Field(default=False, description='Provide data for Inventory extension module')
 
     model_config = SettingsConfigDict(env_file=ENV_FILE, extra='ignore')
 

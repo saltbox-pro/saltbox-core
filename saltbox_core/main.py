@@ -17,6 +17,7 @@ from saltbox_core.minion_collections.routers.collections_router import router as
 from saltbox_core.minion_collections.routers.filters_router import router as filters_router
 from saltbox_core.minion_collections.routers.minion_router import router as minions_router
 from saltbox_core.pillars.routers.pillar_route import router as pillars_router
+from saltbox_core.settings.routers.gitlab_router import router as gitlab_router
 from saltbox_core.settings.routers.sls_repos_router import router as settings_sls_router
 from saltbox_core.tasks.routers.tasks_router import router as task_router
 from saltbox_core.tasks.routers.template_router import router as template_router
@@ -99,5 +100,6 @@ app.include_router(masters_router)
 app.include_router(system_router)
 app.include_router(pillars_router)
 app.include_router(router=settings_sls_router, prefix='/settings', tags=['Settings'])
+app.include_router(router=gitlab_router, prefix='/settings')
 
 app.openapi = partial(custom_openapi, app, app_config, servers=[{'url': SETTINGS.base_url_root_path}])  # type: ignore[method-assign]
