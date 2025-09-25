@@ -1,54 +1,70 @@
-from collections.abc import AsyncGenerator
+# from collections.abc import AsyncGenerator
 
 import httpx
-from httpx import BasicAuth
 
+# from httpx import BasicAuth
 from saltbox_core.config import SETTINGS, logger
 
 
-class AsyncHttpxClientSingleton:
-    """Singleton for HTTPX AsyncClient."""
+class HttpxClientSingletoneFactory:
+    _instance: httpx.AsyncClient | None = None
 
-    httpx_client: httpx.AsyncClient | None = None
-
-    def __new__(cls) -> 'AsyncHttpxClientSingleton':
-        if not hasattr(cls, 'instance'):
-            cls.instance = super().__new__(cls)
+    @classmethod
+    def get_instance(cls) -> httpx.AsyncClient:
+        """Get a singleton instance of httpx.AsyncClient."""
+        if cls._instance is None:
             auth = None
             if SETTINGS.basic_auth_username != '' and SETTINGS.basic_auth_password != '':
-                auth = BasicAuth(SETTINGS.basic_auth_username, SETTINGS.basic_auth_password)
-            cls.instance.httpx_client = httpx.AsyncClient(auth=auth, verify=False)  # noqa: S501
+                auth = httpx.BasicAuth(SETTINGS.basic_auth_username, SETTINGS.basic_auth_password)
+            cls._instance = httpx.AsyncClient(auth=auth, verify=False)  # noqa: S501
             logger.debug('HTTPX AsyncClient initialized.')
-        return cls.instance
+
+        return cls._instance
 
 
-def get_httpx_async_client() -> httpx.AsyncClient:
-    """Get the HTTPX AsyncClient singleton instance."""
+# class AsyncHttpxClientSingleton:
+#     """Singleton for HTTPX AsyncClient."""
 
-    httpx_client = AsyncHttpxClientSingleton().httpx_client
+#     httpx_client: httpx.AsyncClient | None = None
 
-    if httpx_client is None:
-        msg = 'HTTPX client is not initialized.'
-        raise RuntimeError(msg)
-    return httpx_client
+#     def __new__(cls) -> 'AsyncHttpxClientSingleton':
+#         if not hasattr(cls, 'instance'):
+#             cls.instance = super().__new__(cls)
+#             auth = None
+#             if SETTINGS.basic_auth_username != '' and SETTINGS.basic_auth_password != '':
+#                 auth = BasicAuth(SETTINGS.basic_auth_username, SETTINGS.basic_auth_password)
+#             cls.instance.httpx_client = httpx.AsyncClient(auth=auth, verify=False)
+#             logger.debug('HTTPX AsyncClient initialized.')
+#         return cls.instance
 
 
-async def get_async_client() -> AsyncGenerator[httpx.AsyncClient, None]:
-    """Get an HTTPX AsyncClient instance.
+# def get_httpx_async_client() -> httpx.AsyncClient:
+#     """Get the HTTPX AsyncClient singleton instance."""
 
-    This function is intended to be used as a dependency in FastAPI routes.
-    It ensures that the client is properly instantiated and closed.
+#     httpx_client = AsyncHttpxClientSingleton().httpx_client
 
-    Yields:
-        AsyncClient: The HTTPX AsyncClient instance.
+#     if httpx_client is None:
+#         msg = 'HTTPX client is not initialized.'
+#         raise RuntimeError(msg)
+#     return httpx_client
 
-    Raises:
-        RuntimeError: If the HTTPX client cannot be instantiated.
-    """
-    client = None
-    try:
-        client = get_httpx_async_client()
-        logger.debug('Yielding HTTPX client.')
-        yield client
-    finally:
-        pass
+
+# async def get_async_client() -> AsyncGenerator[httpx.AsyncClient, None]:
+#     """Get an HTTPX AsyncClient instance.
+
+#     This function is intended to be used as a dependency in FastAPI routes.
+#     It ensures that the client is properly instantiated and closed.
+
+#     Yields:
+#         AsyncClient: The HTTPX AsyncClient instance.
+
+#     Raises:
+#         RuntimeError: If the HTTPX client cannot be instantiated.
+#     """
+#     client = None
+#     try:
+#         client = get_httpx_async_client()
+#         logger.debug('Yielding HTTPX client.')
+#         yield client
+#     finally:
+#         pass

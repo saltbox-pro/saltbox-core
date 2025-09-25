@@ -21,7 +21,7 @@ from saltbox_core.settings.routers.sls_repos_router import router as settings_sl
 from saltbox_core.tasks.routers.tasks_router import router as task_router
 from saltbox_core.tasks.routers.template_router import router as template_router
 from saltbox_core.tkq import broker
-from saltbox_core.utilities.httpx_client import get_httpx_async_client
+from saltbox_core.utilities.httpx_client import HttpxClientSingletoneFactory
 from saltbox_core.utilities.redis_cache import CustomRedisCache
 from saltbox_sdk.config.discovery_config import DISCOVERY_SETTINGS
 from saltbox_sdk.db.redis.config import POOL, get_redis_now
@@ -41,7 +41,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator:
 
         discovery_client = DiscoveryClient(
             openapi_schema=app.openapi(),
-            httpx_client=get_httpx_async_client(),
+            httpx_client=HttpxClientSingletoneFactory.get_instance(),
         )
         await discovery_client.register()
 
