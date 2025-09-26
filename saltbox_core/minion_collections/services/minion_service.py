@@ -1,8 +1,8 @@
 import csv
 from datetime import UTC, datetime
-from pathlib import Path
 from typing import Annotated, Any, overload
 
+from anyio import Path
 from fastapi import Depends
 
 from saltbox_core.config import logger
@@ -56,7 +56,7 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
     async def export_to_csv(self, query: dict[str, Any], skip: int = 0, limit: int = 0) -> str:
         data = await self.get_list(query, skip=skip, limit=limit)
 
-        Path('./reports').mkdir(parents=True, exist_ok=True)
+        await Path('./reports').mkdir(parents=True, exist_ok=True)
         current_datetime = datetime.now(UTC).strftime('%Y%m%d_%H%M%S')
         file_path = f'./reports/minions_{current_datetime}.csv'
 
@@ -81,7 +81,7 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
 
         keys = [key for key in minion_keys.keys() if key != 'grains'] + [f'grains.{key}' for key in all_grains_keys]
 
-        with Path(file_path).open(mode='w', newline='') as file:  # noqa: ASYNC230
+        async with await Path(file_path).open(mode='w', newline='') as file:
             writer = csv.DictWriter(file, fieldnames=keys)
             writer.writeheader()
             for item in data:

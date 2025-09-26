@@ -358,7 +358,7 @@ class GitRepoService:
             try:
                 return Repo(self.local_path)
             except Exception as e:
-                logger.error('Failed to access repo: %s', str(e))
+                logger.error('Failed to access repo: %s', e)
                 return None
         return None
 
