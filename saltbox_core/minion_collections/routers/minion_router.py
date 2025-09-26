@@ -138,6 +138,27 @@ async def minion_retrieve(
     return minion
 
 
+@router.get(
+    '/{master_id}/{minion_id}',
+    operation_id='minion_get_by_master_and_id',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.minions.read',
+        action=MinionsActions.READ,
+    ).model_dump(by_alias=True),
+)
+async def minion_retrieve_by_master_and_id(
+    master_id: str,
+    minion_id: str,
+    minion_service: Annotated[MinionService, Depends(get_minion_service)],
+) -> MinionDetailSchema:
+    minion = await minion_service.get_by_master_and_id(master=master_id, minion_id=minion_id)
+
+    # TODO (a.baikov): doing like this because of additional_grains. Need to find a better way
+    minion = MinionDetailSchema(**minion.model_dump(exclude={'id'}), _id=minion.id)
+
+    return minion
+
+
 @router.delete(
     '/{mid}',
     operation_id='minion_delete',
