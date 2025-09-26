@@ -95,6 +95,9 @@ class Settings(BaseSettings):
     gpg_key_email: str = 'gpg@saltbox.pro'
     gpg_key_comment: str = 'This is a certificate for saltbox services'
     module_inventory_on: bool = Field(default=False, description='Provide data for Inventory extension module')
+    tasks_job_create_cooldown: int = Field(
+        default=5, description='Number of seconds to wait from tasks job creation to new job'
+    )
 
     model_config = SettingsConfigDict(env_file=ENV_FILE, extra='ignore')
 

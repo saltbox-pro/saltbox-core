@@ -177,6 +177,7 @@ class TaskReadOnlyFieldsMixin:
 class TaskEditableFieldsMixinPart:
     status: TaskStatus = Field(title='Status', default=TaskStatus.created)
 
+    last_rub_job_dt: TimezoneAwareDatetime | None = Field(title='Last run job datetime', default=None)
     run_dt: TimezoneAwareDatetime | None = Field(title='Run datetime', default=None)
     stopped_dt: TimezoneAwareDatetime | None = Field(title='Stopped datetime', default=None)
     postprocessing_dt: TimezoneAwareDatetime | None = Field(title='Postprocessing datetime', default=None)
@@ -184,6 +185,8 @@ class TaskEditableFieldsMixinPart:
 
 
 class TaskEditableFieldsMixin(TaskEditableFieldsMixinPart):
+    is_ignore_limits_on_current_loop: bool = Field(title='Ignore limits on current loop', default=False)
+
     jobs: dict[str, TaskJob] = Field(title='Jobs', default={})
     minions: dict[str, TaskMinion] = Field(title='Minions failed', default={})
 

@@ -1,9 +1,10 @@
+from datetime import timedelta
 from typing import Annotated, Any
 
 from fastapi import Depends
 from redis.asyncio import Redis
 
-from saltbox_core.config import logger
+from saltbox_core.config import SETTINGS, logger
 from saltbox_core.jobs.exceptions import JobCreateException, JobDoesNotExistsException
 from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
@@ -132,7 +133,9 @@ class TaskLifespanService:
                 if minion.status == TaskMinionStatus.failed:
                     minion.status = TaskMinionStatus.pending
 
-            await self.__create_jobs(ignore_limits=True)
+            task.is_ignore_limits_on_current_loop = True
+
+            await self.__create_jobs()
             await self.run(force=True)
 
     async def restart_failed_on_minion(self, master: str, minion_id: str) -> None:
@@ -151,8 +154,9 @@ class TaskLifespanService:
             return
 
         minion.status = TaskMinionStatus.pending
+        task.is_ignore_limits_on_current_loop = True
 
-        await self.__create_jobs(ignore_limits=True)
+        await self.__create_jobs()
         await self.update_task(status=TaskStatus.running)
 
     async def __can_start_job(self, master: str | None = None) -> bool:
@@ -160,7 +164,7 @@ class TaskLifespanService:
         running_job_count: int = 0
 
         for job in task.jobs.values():
-            if job.status == TaskJobStatus.running:
+            if job.status in [TaskJobStatus.running, TaskJobStatus.pending]:
                 if master and master != job.target.master:
                     continue
 
@@ -248,10 +252,13 @@ class TaskLifespanService:
                 except JobCreateException:
                     continue
 
-    async def __create_job(self, master: str, minions: list[str], compound: str | None = None) -> None:
+    async def __create_job(self, master: str, minions: list[str], compound: str | None = None) -> bool:
         task = await self.get_task()
         tgt = compound if compound else ','.join(minions)
         tgt_type = TaskJobTargetType.compound if compound else TaskJobTargetType.list
+
+        if not await self.__can_start_job(master=master):
+            return True
 
         job = await self.job_service.create(
             JobCreateSchema.model_validate(
@@ -283,13 +290,23 @@ class TaskLifespanService:
             minion.jobs[str(job.jid)] = TaskMinionJobStatus.created
             minion.start_last_dt = task.jobs[str(job.jid)].created_dt
 
-    async def __create_jobs(self, ignore_limits: bool = True) -> None:
+        task.last_rub_job_dt = utc_now()
+
+        return False
+
+    async def __create_jobs(self, force: bool = False) -> bool:  # noqa: C901
         task = await self.get_task()
         minions_queue: dict[str, list[list[str]]] = {}
 
+        if task.last_rub_job_dt and utc_now() - task.last_rub_job_dt < timedelta(
+            seconds=SETTINGS.tasks_job_create_cooldown
+        ):
+            if not force:
+                return True
+
         for minion in task.minions.values():
             if minion.status == TaskMinionStatus.pending:
-                if len(minion.jobs) >= task.max_retries and not ignore_limits:
+                if len(minion.jobs) >= task.max_retries and not task.is_ignore_limits_on_current_loop:
                     minion.status = TaskMinionStatus.failed
                     continue
 
@@ -300,17 +317,21 @@ class TaskLifespanService:
 
                 minions_queue[minion.master][-1].append(minion.minion_id)
 
+        is_job_created = False
+
         for master, master_tgt_list in minions_queue.items():
             for tgt in master_tgt_list:
                 if not await self.__can_start_job(master=master):
                     continue
 
                 try:
-                    await self.__create_job(minions=tgt, master=master)
+                    is_job_created = await self.__create_job(minions=tgt, master=master) or is_job_created
                 except JobCreateException as e:
                     msg = f'Creating job failed for task {task.id}:\n{e}'
                     logger.info(msg)
                     continue
+
+        return is_job_created
 
     async def __check_jobs(self) -> None:
         task = await self.get_task()
@@ -492,7 +513,7 @@ class TaskLifespanService:
         else:
             task.status = TaskStatus.finished
 
-    async def process(self) -> None:
+    async def process(self) -> None:  # noqa: C901
         task = await self.get_task()
 
         if task.status not in [TaskStatus.running, TaskStatus.stopping, TaskStatus.postprocessing]:
@@ -502,20 +523,24 @@ class TaskLifespanService:
             await self.__fill_minions_by_targeting()
         elif task.status in [TaskStatus.running, TaskStatus.stopping]:
             await self.__check_jobs()
+            is_waiting_jobs = False
 
             if task.status == TaskStatus.running:
-                await self.__create_jobs()
+                is_waiting_jobs = await self.__create_jobs()
 
-            for job in task.jobs.values():
-                if job.status in [TaskJobStatus.pending, TaskJobStatus.running]:
-                    break
-            else:
-                if task.status == TaskStatus.stopping:
-                    task.status = TaskStatus.stopped
-                elif task.postprocessing:
-                    task.status = TaskStatus.postprocessing
+            if not is_waiting_jobs:
+                for job in task.jobs.values():
+                    if job.status in [TaskJobStatus.pending, TaskJobStatus.running]:
+                        break
                 else:
-                    task.status = TaskStatus.finished
+                    if task.status == TaskStatus.stopping:
+                        task.status = TaskStatus.stopped
+                    elif task.postprocessing:
+                        task.status = TaskStatus.postprocessing
+                    else:
+                        task.status = TaskStatus.finished
+
+                    task.is_ignore_limits_on_current_loop = False
         elif task.status == TaskStatus.postprocessing:
             await self.__postprocessing()
 
