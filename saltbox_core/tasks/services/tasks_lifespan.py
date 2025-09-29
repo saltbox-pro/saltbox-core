@@ -128,7 +128,7 @@ class TaskLifespanService:
     async def restart_failed(self) -> None:
         task = await self.get_task()
 
-        if task.status == TaskStatus.finished:
+        if task.status in [TaskStatus.finished, TaskStatus.stopped]:
             for minion in task.minions.values():
                 if minion.status == TaskMinionStatus.failed:
                     minion.status = TaskMinionStatus.pending
