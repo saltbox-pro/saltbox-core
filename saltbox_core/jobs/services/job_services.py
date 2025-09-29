@@ -91,6 +91,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
                 'fun': data.fun,
                 'tgt': data.tgt,
                 'tgt_type': data.tgt_type,
+                'salt_master': data.salt_master,
                 'user': data.user.model_dump_json(),
             }
 
@@ -146,6 +147,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
                 'jid': job_data[b'jid'].decode()[:20],
                 'tgt': job_data[b'tgt'].decode(),
                 'tgt_type': job_data[b'tgt_type'].decode(),
+                'salt_master': job_data[b'salt_master'].decode(),
                 'fun': job_data[b'fun'].decode(),
                 'arg': json.loads(job_data[b'arg']) if b'arg' in job_data else None,
                 'kwarg': json.loads(job_data[b'kwarg']) if b'kwarg' in job_data else None,
