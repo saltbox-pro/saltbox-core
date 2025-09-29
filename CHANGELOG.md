@@ -9,35 +9,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `SALTBOX_ENV_FILE` environment variable support to override dotenv location.
-- Allow running jobs as tasks
-- Base support for tree structures
-- Add tree structure to collections
-- Master `last_sync_status` and `last_sync_timestamp` fields
-- Add `/pillar/validate` endpoint for validating import pillars data
-- `salt_modules_allow_duplicating_dirs` boolean option to allow directory
-duplicates among SLS packages.
+- Add `salt_master` to jobs
+- Add allow restart failed task on tasks with status `stopped`
+- Add GET endpoint to retrieve a minion by master ID and minion ID for master-scoped lookup.
+- Add GitLab API client, routes and configuration (token, base URL, group ID) with dedicated exceptions.
+- Add computed Task fields `total_minions` and `minions_count_by_status`.
+- Add CSV export support for custom grains and update Grains schema field titles.
+- Add unique index on collections for the (`parent_id`, `title`) pair and logging for index creation.
+- Add `TaskCreateSchemaValidationException` to surface task create validation errors.
+- Add `source` field to Task model.
+- Add RabbitMQ-based event bus and support for syncing scheduler templates over the bus.
+- Add initial Inventory persistence to MongoDB: polymorphic models, inventory prototypes, bulk_update_and_create, precise indices and signal-based extraction; make inventory fields optional and warn on ignored extra fields.
+- Add FastAPI metrics export endpoint.
+- Create default job template during repository initialization.
 
 ### Changed
 
-- Default value for `salt_func_repo_url` in config
-- `end_datetime` field is required in job schemas
-- `LOG_LEVEL` setting instead of `DEBUG` flag
-- Rsync based synchronization of SLS files
-- Common Core-Bridge message classes moved to `saltbox-bridge-messages` library
-- Shorten Master authentication process
-- Better errors handling for synchronizing of SLS packages.
+- Add cooldown when creating jobs linked to task lifespan and refactor related task/job logic.
+- Replace `get_httpx_async_client` with `HttpxClientSingletoneFactory` (singleton AsyncClient) and update authentication handling for HTTPX clients.
+- Refactor job creation: trim whitespace in job data and add `user` and `returning` fields; set JobReturn.success based on retcode.
+- Refactor task schemas and list endpoints: improved field titles, POST-based list filtering, filter schema endpoint and sortable get_list methods.
+- Move faststream scheduler handlers to the SDK and refactor scheduler task creation/run flow.
+- Refactor collection and OpenAPI configuration, simplify routers and improve OpenAPI integration for job and collection endpoints.
 
 ### Fixed
 
-- More straight init of `sshfs_tmp_dir`: respect `cache_dir` value and delete
-  only old files (currently older than 1 day).
-- Possibly incorrect state name on directory names duplicates in an SLS file
-path.
-- Task Templates respect Manifest root value.
+- Fix operation_id and OpenAPI/schema inconsistencies for filter and collection endpoints.
+- Fix task creation path from scheduler and prevent stale minion data during Inventory updates.
+- Fix CSV export error handling and correct inventory model/index issues causing broken hierarchy.
+- Fix multiple tests and apply linter (ruff) fixes.
+- Fix route parameter naming and other small API parameter bugs.
 
 ### Removed
 
+- Remove `SaltBoxCrypt` implementation.
+- Remove obsolete endpoints `jobs_list_cursor` and `job_create_sync`.
 ## [0.0.1] - 2025-05-16
 
 ## Added
