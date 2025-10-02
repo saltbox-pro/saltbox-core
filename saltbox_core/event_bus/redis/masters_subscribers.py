@@ -73,7 +73,7 @@ async def sync_saltbox_done(
     await master_service.update(query=master.id, data=master.model_dump())
 
 
-@router.subscriber('grains')
+@router.subscriber('grains', no_reply=True)
 async def grains_handler(
     message: BridgeMinionGrainsMessage,
     minion_service: MinionService = Context(),  # noqa: B008
@@ -95,7 +95,7 @@ async def grains_handler(
             await minion_service.create(MinionCreateSchema(**minion_obj))
 
 
-@router.subscriber('presence')
+@router.subscriber('presence', no_reply=True)
 async def presence_handler(
     message: BridgeMinionPresenceMessage,
     minion_service: MinionService = Context(),  # noqa: B008
@@ -117,7 +117,7 @@ async def burst_test_load_handler(message: BridgeTestBurstLoadMessage) -> None:
     ...
 
 
-@router.subscriber('inventory_saved')
+@router.subscriber('inventory_saved', no_reply=True)
 async def extract_inventory(
     message: BridgeInventoryDataSavedMessage,
     job_service: JobService = Context(),  # noqa: B008
