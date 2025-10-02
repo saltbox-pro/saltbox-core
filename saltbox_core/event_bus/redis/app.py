@@ -11,6 +11,7 @@ from faststream.security import SASLPlaintext
 from redis import asyncio as aioredis
 
 from saltbox_core.config import logger
+from saltbox_core.event_bus.redis.master_bus_middlewares import MastersAuthMiddleware
 from saltbox_core.event_bus.redis.masters_subscribers import router as masters_router
 from saltbox_core.event_bus.redis.masters_subscribers import router_not_auth as masters_router_not_auth
 from saltbox_core.jobs.repositories.job_repository import JobRepository, get_job_repository
@@ -53,6 +54,9 @@ def get_faststream_broker(middlewares: list[BrokerMiddleware] | None = None) -> 
         return RedisBroker(url=REDIS_SETTINGS.redis_url, security=security, middlewares=middlewares)
 
     return RedisBroker(url=REDIS_SETTINGS.redis_url, security=security)
+
+
+default_master_broker = get_faststream_broker(middlewares=[MastersAuthMiddleware])
 
 
 @asynccontextmanager

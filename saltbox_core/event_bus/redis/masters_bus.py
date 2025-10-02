@@ -3,7 +3,6 @@ from typing import Any
 from faststream.redis import RedisBroker, RedisMessage
 
 from saltbox_bridge_messages import CoreEmptyMessage, CoreMessageBase, MasterStatus
-from saltbox_core.event_bus.redis.master_bus_middlewares import MastersAuthMiddleware
 from saltbox_core.masters.exceptions import TimeoutResponseToMasterException
 from saltbox_core.masters.repositories.master_repository import MasterRepository
 from saltbox_core.masters.schemas.master_schemas import MasterModel
@@ -12,10 +11,10 @@ from saltbox_sdk.db.mongo.config import get_mongo_db
 
 
 async def send_message_to_master(message: CoreMessageBase, message_tag: str, broker: RedisBroker | None = None) -> None:
-    from saltbox_core.event_bus.redis.app import get_faststream_broker
-
     if not broker:
-        broker = get_faststream_broker(middlewares=[MastersAuthMiddleware])
+        from saltbox_core.event_bus.redis.app import default_master_broker
+
+        broker = default_master_broker
 
     async with broker as br:
         await br.publish(message=message, channel=f'master_{message_tag}')
@@ -24,10 +23,10 @@ async def send_message_to_master(message: CoreMessageBase, message_tag: str, bro
 async def send_message_and_wait_response_to_master(
     message: CoreMessageBase, message_tag: str, response_timeout: float = 3.0, broker: RedisBroker | None = None
 ) -> Any:
-    from saltbox_core.event_bus.redis.app import get_faststream_broker
-
     if not broker:
-        broker = get_faststream_broker(middlewares=[MastersAuthMiddleware])
+        from saltbox_core.event_bus.redis.app import default_master_broker
+
+        broker = default_master_broker
 
     async with broker as br:
         try:
