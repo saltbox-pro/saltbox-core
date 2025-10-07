@@ -8,9 +8,8 @@ from pydantic import Field, NonNegativeInt, PastDatetime
 from pydantic import ValidationError as PydanticValidationError
 from redis import exceptions as redis_exceptions
 
-from saltbox_bridge_messages import CoreNewJobAsyncRequest, MasterStatus
+from saltbox_bridge_messages import MasterStatus
 from saltbox_core.config import SETTINGS
-from saltbox_core.event_bus.redis.masters_bus import send_message_to_master
 from saltbox_core.jobs.exceptions import (
     JobCreateException,
     JobDoesNotExistsException,
@@ -31,7 +30,7 @@ from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.fastapi_utils.dependencies import RedisDependency
 from saltbox_sdk.serivces.redis_sortedset_base_service import RedisSortedsetBaseService
 
-JOB_CREATE_HASH_NAME: str = 'job_create:{jid}'
+JOBS_TO_CREATE_SET_NAME: str = 'jobs:to_create'
 
 JobData = dict[str, Any]
 
@@ -58,21 +57,21 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
     @overload
     async def create(self, data: JobCreateSchema, projection_model: type[ProjectionModel]) -> ProjectionModel: ...
 
-    async def create(  # noqa: C901
+    async def create(
         self, data: JobCreateSchema, projection_model: type[ProjectionModel] | None = None
     ) -> JobModel | ProjectionModel:
         if not data.jid:
-            jid = str(JID.generate())
-        else:
-            jid = data.jid
-
-        create_job_hash_name: str = JOB_CREATE_HASH_NAME.format(jid=jid)
+            data.jid = str(JID.generate())
 
         try:
-            validated_data: dict = await self.job_schema_service.get_validated_data(
-                name=data.fun,
-                data=data.data.model_dump(exclude_none=True, by_alias=True) if data.data else {},
-            )
+            data_to_validate: dict[str, Any] = {}
+            if data.arg:
+                data_to_validate['args'] = data.arg
+            if data.kwarg:
+                data_to_validate['kwargs'] = data.kwarg
+            validated_data = await self.job_schema_service.get_validated_data(name=data.fun, data=data_to_validate)
+            data.arg = validated_data.get('args')
+            data.kwarg = validated_data.get('kwargs')
         except JsonSchemaValidationError as e:
             raise JobCreateException(str(e)) from e
 
@@ -85,41 +84,17 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
             msg = 'Master is not accepted'
             raise JobCreateException(msg)
 
+        job: JobModel | ProjectionModel
         try:
-            data_: dict[str, str] = {
-                'jid': f'{jid}-{data.jid_postfix}' if data.jid_postfix else jid,
-                'fun': data.fun,
-                'tgt': data.tgt,
-                'tgt_type': data.tgt_type,
-                'salt_master': data.salt_master,
-                'user': data.user.model_dump_json(),
-            }
-
-            if 'args' in validated_data:
-                data_['arg'] = json.dumps(validated_data['args'])
-            if 'kwargs' in validated_data:
-                kwargs = validated_data['kwargs']
-                for k, v in kwargs.items():
-                    if isinstance(v, str):
-                        kwargs[k] = v.strip()
-                data_['kwarg'] = json.dumps(kwargs)
-
-            await self.rdb.hmset(
-                name=create_job_hash_name,
-                # TODO (i.moshkov): check and fix later
-                mapping=data_,  # type: ignore[arg-type]
-            )
-            await self.rdb.expire(name=create_job_hash_name, time=60 * 10)
-
-            message = CoreNewJobAsyncRequest(hash_name=create_job_hash_name, master=master.master_id)
-            await send_message_to_master(message=message, message_tag='run_job')
+            if projection_model:
+                job = await self.repo.create(data, projection_model=projection_model)
+            else:
+                job = await self.repo.create(data)
         except redis_exceptions.RedisError as e:
             raise JobCreateException(str(e)) from e
 
-        if projection_model:
-            return await self.get_job(jid=JID(jid), projection_model=projection_model)
-        else:
-            return await self.get_job(jid=JID(jid))
+        await self.rdb.sadd(JOBS_TO_CREATE_SET_NAME, data.jid)
+        return job
 
     async def stop_job(self, jid: JID) -> None: ...  # TODO (i.moshkov): stop jobs
 
@@ -133,35 +108,15 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
                 raise JobMultipleReturnsException(msg)
 
             res: dict[str, Any] = json.loads(job_data[0])
-            res['status'] = JobModel.JobStatus.started
 
             return res
 
-        return None
-
-    async def _get_job_data_from_queue(self, job_hash_name: str) -> dict[str, Any] | None:
-        job_data: dict[bytes, bytes] = await self.rdb.hgetall(job_hash_name)
-
-        if job_data:
-            return {
-                'jid': job_data[b'jid'].decode()[:20],
-                'tgt': job_data[b'tgt'].decode(),
-                'tgt_type': job_data[b'tgt_type'].decode(),
-                'salt_master': job_data[b'salt_master'].decode(),
-                'fun': job_data[b'fun'].decode(),
-                'arg': json.loads(job_data[b'arg']) if b'arg' in job_data else None,
-                'kwarg': json.loads(job_data[b'kwarg']) if b'kwarg' in job_data else None,
-                'status': JobModel.JobStatus.in_queue,
-            }
         return None
 
     async def get_job(
         self, jid: JID, projection_model: type[ProjectionModel] | None = None
     ) -> JobModel | ProjectionModel:
         job_data = await self._get_job_data_from_store(jid)
-
-        if not job_data:
-            job_data = await self._get_job_data_from_queue(JOB_CREATE_HASH_NAME.format(jid=str(jid)))
 
         if not job_data:
             msg = 'Job not found'

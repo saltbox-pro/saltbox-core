@@ -6,7 +6,7 @@ from redis.asyncio import Redis
 
 from saltbox_core.config import SETTINGS, logger
 from saltbox_core.jobs.exceptions import JobCreateException, JobDoesNotExistsException
-from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel
+from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel, JobSource
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
@@ -267,12 +267,11 @@ class TaskLifespanService:
                     'tgt': tgt,
                     'tgt_type': tgt_type,
                     'fun': task.fun,
-                    'data': {
-                        'args': task.task_args,
-                        'kwargs': task.task_kwargs,
-                    },
+                    'arg': task.task_args,
+                    'kwarg': task.task_kwargs,
                     'salt_master': master,
                     'user': task.user,
+                    'source': JobSource(type='task', id=str(task.id)),
                 }
             )
         )

@@ -14,6 +14,7 @@ from saltbox_core.jobs.schemas.job_schemas import (
     JobsActions,
     JobsListRequest,
     JobsListResponse,
+    JobSource,
 )
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.utilities.jid import JID
@@ -89,6 +90,9 @@ async def job_create(
         JobCreateSchema.model_validate(
             {
                 'user': user.model_dump(),
+                'source': JobSource(type='rest'),
+                'arg': item.data.data_args if item.data else [],
+                'kwarg': item.data.data_kwargs if item.data else {},
                 **item.model_dump(by_alias=True),
             }
         )

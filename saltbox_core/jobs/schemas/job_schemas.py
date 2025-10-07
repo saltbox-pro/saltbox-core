@@ -38,14 +38,22 @@ class JobData(BaseModel):  # type: ignore[no-redef]
     data_kwargs: dict | None = Field(alias='kwargs', default=None)
 
 
+class JobSource(BaseModel):
+    type: str = Field(title='Source type')
+    id: str | None = Field(title='Source id', default=None)
+
+
 class JobModel(BaseModel):
     class JobStatus(StrEnum):
         in_queue = 'in_queue'
         started = 'started'
+        running = 'running'
+        waiting_returns = 'waiting_returns'
+        finished = 'finished'
 
     jid: StrJid
     tgt: str | list[str]
-    tgt_type: str
+    tgt_type: SaltTgtType
     salt_master: str
     user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
     system_user: str | None = None
@@ -56,7 +64,8 @@ class JobModel(BaseModel):
     missing: list[str] = []
     returning: dict[str, bool | None] | None = None
     stamp: str | None = Field(alias='_stamp', default=None)
-    status: JobStatus = JobStatus.started
+    status: JobStatus = JobStatus.in_queue
+    source: JobSource | None = None
 
     @computed_field(title='Timestamp decoded from JID')
     def fms_jid_timestamp(self) -> Annotated[datetime, PastDatetime]:
@@ -76,13 +85,14 @@ class JobModel(BaseModel):
 
 class JobCreateSchema(BaseModel):
     tgt: str
-    tgt_type: str
+    tgt_type: SaltTgtType
     fun: str
-    data: JobData | None = None
-    jid: str | None = None
-    jid_postfix: str | None = None
+    arg: list | None = None
+    kwarg: dict | None = None
+    jid: StrJid | None = None
     salt_master: str
     user: UserShort
+    source: JobSource | None = None
 
 
 class JobUpdateSchema(BaseModel): ...
