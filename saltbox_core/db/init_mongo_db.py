@@ -5,6 +5,7 @@ import pymongo
 from pymongo.asynchronous.database import AsyncDatabase
 
 from saltbox_core.config import logger
+from saltbox_core.jobs.repositories.job_repository import JobRepository
 from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository
 from saltbox_core.jobs.schemas.job_sc_schemas import JobSchemaCreateSchema
 from saltbox_core.masters.repositories.master_repository import MasterRepository
@@ -143,6 +144,29 @@ async def init_masters(db: AsyncDatabase) -> None:
     logger.debug('Indexes: %s', indexes)
 
 
+async def init_jobs(db: AsyncDatabase) -> None:
+    jobs_repo = JobRepository(db)
+
+    # Check existing indexes
+    indexes = sorted(await jobs_repo.collection.index_information())
+
+    # Create index for jid if not exists
+    if 'job_jid_index_asc' not in indexes:
+        result = await jobs_repo.collection.create_index([('jid', pymongo.ASCENDING)], name='job_jid_index_asc')
+        logger.debug('Index created: %s', result)
+
+    # Create unique index for jid and master_id if not exists
+    if 'jid_and_master_id_unique_index_asc' not in indexes:
+        result = await jobs_repo.collection.create_index(
+            [('jid', pymongo.ASCENDING), ('master_id', pymongo.ASCENDING)],
+            name='jid_and_master_id_unique_index_asc',
+            unique=True,
+        )
+        logger.debug('Index created: %s', result)
+
+    logger.debug('Indexes: %s', indexes)
+
+
 async def init_mongo_db() -> None:
     """Initialize MongoDB collections"""
 
@@ -167,3 +191,7 @@ async def init_mongo_db() -> None:
     # Initialize masters collection
     await init_masters(db)
     logger.debug('Masters initialized')
+
+    # Initialize jobs collection
+    await init_jobs(db)
+    logger.debug('Jobs initialized')

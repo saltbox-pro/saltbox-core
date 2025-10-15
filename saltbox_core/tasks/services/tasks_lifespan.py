@@ -6,7 +6,8 @@ from redis.asyncio import Redis
 
 from saltbox_core.config import SETTINGS, logger
 from saltbox_core.jobs.exceptions import JobCreateException, JobDoesNotExistsException
-from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel, JobSource
+from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel, JobStatus
+from saltbox_core.jobs.services.job_return_service import JobReturnService, get_job_return_service
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
@@ -32,6 +33,7 @@ from saltbox_core.utilities.jid import JID
 from saltbox_core.utilities.mongo_query_to_salt_tgt_converter import MongoQueryToSaltTgtConverter
 from saltbox_sdk.db.mongo.config import get_mongo_db
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.schemas_base import Source
 from saltbox_sdk.exceptions import MultipleObjectsFoundException, ObjectNotFoundException
 from saltbox_sdk.fastapi_utils.dependencies import RedisDependency
 from saltbox_sdk.utilities.helpers import utc_now
@@ -43,6 +45,7 @@ class TaskLifespanService:
         rdb: Redis,
         task_service: TaskService,
         job_service: JobService,
+        job_return_service: JobReturnService,
         minion_service: MinionService,
         collection_service: CollectionService,
         task_id: PyObjectId | None = None,
@@ -51,6 +54,7 @@ class TaskLifespanService:
         self.rdb = rdb
         self.task_service = task_service
         self.job_service = job_service
+        self.job_return_service = job_return_service
         self.minion_service = minion_service
         self.collection_service = collection_service
         self._mongo_db = get_mongo_db()
@@ -261,7 +265,7 @@ class TaskLifespanService:
             return True
 
         job = await self.job_service.create(
-            JobCreateSchema.model_validate(
+            data=JobCreateSchema.model_validate(
                 {
                     'jid_postfix': f't{task.id}',
                     'tgt': tgt,
@@ -271,9 +275,10 @@ class TaskLifespanService:
                     'kwarg': task.task_kwargs,
                     'salt_master': master,
                     'user': task.user,
-                    'source': JobSource(type='task', id=str(task.id)),
+                    'source': Source(type='task', id=str(task.id)),
                 }
-            )
+            ),
+            notify=True,
         )
 
         task.jobs[str(job.jid)] = TaskJob(
@@ -340,13 +345,13 @@ class TaskLifespanService:
                 continue
 
             try:
-                job_data = await self.job_service.get_job(JID(task_job.jid))
+                job_data = await self.job_service.get(query={'jid': task_job.jid})
 
             except JobDoesNotExistsException:
                 task_job.status = TaskJobStatus.failed
                 continue
 
-            if job_data.status == JobModel.JobStatus.in_queue:
+            if job_data.status == JobStatus.in_queue:
                 continue
 
             if not task_job.minions_from_salt:
@@ -394,11 +399,11 @@ class TaskLifespanService:
 
     async def __check_job_returns(self, task_job: TaskJob, jid: JID) -> None:
         task = await self.get_task()
-        job_returns = await self.job_service.get_job_all_returns(jid)
+        job_returns = await self.job_return_service.get_list(query={'jid': str(jid)})
         now = utc_now()
 
         for job_return in job_returns:
-            minion_id = job_return.id
+            minion_id = job_return.minion_id
             master = job_return.salt_master
             minion_key = self.__get_minion_key(master=master, minion_id=minion_id)
             returns_status = task_job.returns_statuses.get(minion_id, TaskJobReturnStatus.waiting)
@@ -546,10 +551,11 @@ class TaskLifespanService:
         await self.update_task(notify=True)
 
 
-async def get_task_lifespan_service(
+def get_task_lifespan_service(
     rdb: RedisDependency,
     task_service: Annotated[TaskService, Depends(get_task_service)],
     job_service: Annotated[JobService, Depends(get_job_service)],
+    job_return_service: Annotated[JobReturnService, Depends(get_job_return_service)],
     minion_service: Annotated[MinionService, Depends(get_minion_service)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
     tid: PyObjectId | None = None,
@@ -558,6 +564,7 @@ async def get_task_lifespan_service(
         rdb=rdb,
         task_service=task_service,
         job_service=job_service,
+        job_return_service=job_return_service,
         minion_service=minion_service,
         collection_service=collection_service,
         task_id=tid,

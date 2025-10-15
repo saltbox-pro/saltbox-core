@@ -1,7 +1,8 @@
 from faststream.rabbit.annotations import ContextRepo
 
-from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobSource
+from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema
 from saltbox_core.jobs.services.job_services import JobService
+from saltbox_sdk.db.schemas_base import Source
 from saltbox_sdk.scheduler.messages import RunTaskEventBusMessage
 
 
@@ -18,9 +19,10 @@ async def run_job(message: RunTaskEventBusMessage, context: ContextRepo) -> dict
                 'arg': message.data.get('args'),
                 'kwarg': message.data.get('kwargs'),
                 'user': message.user,
-                'source': JobSource(type='scheduler', id=message.task_id),
+                'source': Source(type='scheduler', id=message.task_id),
             }
-        )
+        ),
+        notify=True,
     )
 
     return {'jid': job.jid}

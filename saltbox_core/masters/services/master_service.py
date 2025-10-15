@@ -17,6 +17,9 @@ class MasterService(MongoBaseService[MasterRepository, MasterModel, MasterCreate
     async def get_by_master_id(self, master_id: str) -> MasterModel:
         return await self.repo.get({'master_id': master_id})
 
+    async def get_accepted_by_master_id(self, master_id: str) -> MasterModel:
+        return await self.repo.get({'status': MasterStatus.ACCEPTED, 'master_id': master_id})
+
     async def accept(self, query: dict[str, Any] | PyObjectId) -> MasterModel:
         return await self.update(query=query, data={'status': MasterStatus.ACCEPTED})
 

@@ -49,13 +49,14 @@ cmd_taskiq_worker() {
   # -w - number of workers
   # --max-fails - max number of failed tasks before stopping the worker
   cmd='/usr/bin/taskiq worker saltbox_core.tkq:broker'
-  cmd="${cmd} saltbox_core.jobs saltbox_core.settings -w 1 --max-fails 1"
+#  cmd="${cmd} saltbox_core.jobs saltbox_core.settings saltbox_core.salt -w 1 --max-fails 1"
+  cmd="${cmd} -fsd -w 1 --max-fails 1"
   if [ "$DEV_MODE" = 1 ]; then
     cmd="$cmd --reload"
   fi
 }
 
-cmd_taskiq_sheduler() {
+cmd_taskiq_scheduler() {
   # -fsd - autodiscover tasks in all modules
   # -fp - file pattern for autodiscover (default: **/tasks.py)
   # --skip-first-run - scheduler will wait until the start of the next minute and then start executing tasks
@@ -78,7 +79,7 @@ wrong_cmd() {
 case $1 in
   uvicorn) cmd_uvicorn ;;
   taskiq-worker) cmd_taskiq_worker ;;
-  taskiq-scheduler) cmd_taskiq_sheduler ;;
+  taskiq-scheduler) cmd_taskiq_scheduler ;;
   shell) cmd_shell "$@" ;;
   *) wrong_cmd "$@" ;;
 esac

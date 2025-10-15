@@ -9,7 +9,9 @@ from saltbox_core.event_bus.rabbit.exchanges import exchanges
 from saltbox_core.event_bus.rabbit.routers.jobs import router as job_router
 from saltbox_core.event_bus.rabbit.routers.scheduler import router as scheduler_router
 from saltbox_core.jobs.repositories.job_repository import JobRepository, get_job_repository
+from saltbox_core.jobs.repositories.job_return_repository import JobReturnRepository, get_job_return_repository
 from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository, get_job_schema_repository
+from saltbox_core.jobs.services.job_return_service import JobReturnService, get_job_return_service
 from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.masters.repositories.master_repository import MasterRepository, get_master_repository
@@ -49,17 +51,19 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
     minion_service: MinionService = get_minion_service(repo=minion_repository)
     job_schema_repository: JobSchemaRepository = get_job_schema_repository(db=mongo_db)
     job_schema_service: JobSchemaService = get_job_schema_service(repo=job_schema_repository)
-    job_repository: JobRepository = get_job_repository(db=redis_db)
-    job_service: JobService = await get_job_service(
+    job_repository: JobRepository = get_job_repository(db=mongo_db)
+    job_service: JobService = get_job_service(
         rdb=redis_db,
         job_repository=job_repository,
         job_schema_service=job_schema_service,
         master_service=master_service,
     )
+    job_return_repository: JobReturnRepository = get_job_return_repository(db=mongo_db, rdb=redis_db)
+    job_return_service: JobReturnService = get_job_return_service(rdb=redis_db, repo=job_return_repository)
     task_template_repository: TaskTemplateRepository = get_task_template_repository(db=mongo_db)
-    task_template_service: TaskTemplateService = await get_task_template_service(repo=task_template_repository)
+    task_template_service: TaskTemplateService = get_task_template_service(repo=task_template_repository)
     task_repository: TaskRepository = get_task_repository(db=mongo_db)
-    task_service: TaskService = await get_task_service(
+    task_service: TaskService = get_task_service(
         repo=task_repository,
         rdb=redis_db,
         task_template_service=task_template_service,
@@ -78,6 +82,7 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
     context.set_global('minion_service', minion_service)
     context.set_global('job_schema_service', job_schema_service)
     context.set_global('job_service', job_service)
+    context.set_global('job_return_service', job_return_service)
     context.set_global('task_template_service', task_template_service)
     context.set_global('task_service', task_service)
     context.set_global('pillar_service', pillar_service)
@@ -89,6 +94,8 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
     del task_repository
     del task_template_service
     del task_template_repository
+    del job_return_service
+    del job_return_repository
     del job_service
     del job_repository
     del job_schema_service

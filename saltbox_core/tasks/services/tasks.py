@@ -237,7 +237,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
         return json.dumps(data)
 
 
-async def get_task_service(
+def get_task_service(
     repo: Annotated[TaskRepository, Depends(get_task_repository)],
     rdb: RedisDependency,
     task_template_service: Annotated[TaskTemplateService, Depends(get_task_template_service)],

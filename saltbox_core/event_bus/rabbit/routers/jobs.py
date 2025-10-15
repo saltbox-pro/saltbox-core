@@ -16,7 +16,7 @@ async def create(message: RunJobRequestEventBusMessage, context: ContextRepo) ->
     job_service: JobService = context.get('job_service')
 
     try:
-        job = await job_service.create(message.data)
+        job = await job_service.create(data=message.data, notify=True)
     except JobCreateException as e:
         return {'error': str(e)}
 

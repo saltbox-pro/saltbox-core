@@ -5,7 +5,9 @@ from redis import asyncio as aioredis
 from saltbox_core.config import logger
 from saltbox_core.db.init_mongo_db import init_mongo_db
 from saltbox_core.jobs.repositories.job_repository import JobRepository
+from saltbox_core.jobs.repositories.job_return_repository import JobReturnRepository
 from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository
+from saltbox_core.jobs.services.job_return_service import JobReturnService
 from saltbox_core.jobs.services.job_sc_service import JobSchemaService
 from saltbox_core.jobs.services.job_services import JobService
 from saltbox_core.masters.repositories.master_repository import MasterRepository
@@ -29,6 +31,7 @@ class TasksWatcher:
         self.redis: aioredis.Redis | None = None
         self.db = get_mongo_db()
 
+        self.job_repository = JobRepository(database=self.db)
         self.job_schema_repository = JobSchemaRepository(self.db)
         self.master_repository = MasterRepository(self.db)
         self.collections_repository: CollectionRepository = CollectionRepository(self.db)
@@ -47,12 +50,13 @@ class TasksWatcher:
     async def process(self) -> None:
         redis: aioredis.Redis = await self.get_redis()
 
-        job_repository = JobRepository(redis)
+        job_return_repository = JobReturnRepository(database=self.db, rdb=redis)
+        job_return_service = JobReturnService(repo=job_return_repository, rdb=redis)
         job_schema_service: JobSchemaService = JobSchemaService(repo=self.job_schema_repository)
         master_service: MasterService = MasterService(repo=self.master_repository)
         job_service: JobService = JobService(
             rdb=redis,
-            job_repository=job_repository,
+            job_repository=self.job_repository,
             job_schema_service=job_schema_service,
             master_service=master_service,
         )
@@ -81,6 +85,7 @@ class TasksWatcher:
                     rdb=redis,
                     task_service=task_service,
                     job_service=job_service,
+                    job_return_service=job_return_service,
                     minion_service=minion_service,
                     collection_service=collection_service,
                     task=task,

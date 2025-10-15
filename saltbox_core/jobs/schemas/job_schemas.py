@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from datetime import datetime
 from enum import StrEnum
 from typing import Annotated, Any
@@ -18,7 +16,8 @@ from pydantic.functional_validators import AfterValidator
 from saltbox_bridge_messages import SaltTgtType
 from saltbox_core.utilities.jid import JID, JidError
 from saltbox_core.utilities.salt import fill_salt_kwarg_from_arg
-from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER, SkipLimitParams, UserShort
+from saltbox_sdk.db.mongo.schemas_base import IDMixin
+from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER, CreatedModifiedMixin, SkipLimitParams, Source, UserShort
 
 
 def jidable[JID_T: str | int](value: JID_T) -> JID_T:
@@ -29,47 +28,48 @@ def jidable[JID_T: str | int](value: JID_T) -> JID_T:
     return value
 
 
-IntJid = Annotated[int, AfterValidator(jidable)]
 StrJid = Annotated[str, AfterValidator(jidable)]
 
 
-class JobData(BaseModel):  # type: ignore[no-redef]
-    data_args: list | None = Field(alias='args', default=None)
-    data_kwargs: dict | None = Field(alias='kwargs', default=None)
+# Jobs
 
 
-class JobSource(BaseModel):
-    type: str = Field(title='Source type')
-    id: str | None = Field(title='Source id', default=None)
+class JobStatus(StrEnum):
+    in_queue = 'in_queue'
+    started = 'started'
+    waiting_returns = 'waiting_returns'
+    finished = 'finished'
 
 
-class JobModel(BaseModel):
-    class JobStatus(StrEnum):
-        in_queue = 'in_queue'
-        started = 'started'
-        running = 'running'
-        waiting_returns = 'waiting_returns'
-        finished = 'finished'
-
-    jid: StrJid
+class JobReadOnlyFieldsMixin:
     tgt: str | list[str]
     tgt_type: SaltTgtType
     salt_master: str
-    user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
     system_user: str | None = None
     fun: str
     arg: list | None = None
     kwarg: dict | None = None
-    minions: list[str] = []
-    missing: list[str] = []
-    returning: dict[str, bool | None] | None = None
-    stamp: str | None = Field(alias='_stamp', default=None)
-    status: JobStatus = JobStatus.in_queue
-    source: JobSource | None = None
 
+    user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
+    source: Source | None = None
+
+
+class JobEditableFieldsMixin:
+    minions: list[str] = Field(default=[])
+    missing: list[str] = Field(default=[])
+    returning: dict[str, bool | None] = Field(default={})
+    stamp: str | None = Field(default=None)
+    status: JobStatus = JobStatus.in_queue
+
+
+class JobComputedFieldsMixin:
     @computed_field(title='Timestamp decoded from JID')
     def fms_jid_timestamp(self) -> Annotated[datetime, PastDatetime]:
-        return JID(self.jid).to_datetime()
+        return JID(self.jid).to_datetime()  # type: ignore
+
+
+class JobCreateSchema(BaseModel, JobReadOnlyFieldsMixin, JobEditableFieldsMixin):
+    jid: StrJid | None = Field(default=None)
 
     @model_validator(mode='before')
     @classmethod
@@ -83,69 +83,19 @@ class JobModel(BaseModel):
         return data
 
 
-class JobCreateSchema(BaseModel):
-    tgt: str
-    tgt_type: SaltTgtType
-    fun: str
-    arg: list | None = None
-    kwarg: dict | None = None
-    jid: StrJid | None = None
-    salt_master: str
-    user: UserShort
-    source: JobSource | None = None
-
-
-class JobUpdateSchema(BaseModel): ...
-
-
-class JobResult(BaseModel):
-    """
-    Describes return data for a job
-    """
-
-    # Officially obligatory fields are only [ id, jid, retcode, fun, return ]
-    # https://docs.saltproject.io/en/latest/topics/event/master_events.html#job-events
-    model_config = ConfigDict(extra='allow')
-
-    id: str
-    salt_master: str
-    return_: Any = Field(alias='return')
-    retcode: int
+class JobUpdateSchema(BaseModel, JobEditableFieldsMixin):
     jid: StrJid
-    fun: str
-    fun_args: list | None = None
-    fun_kwarg: dict | None = None
-    user: str | None = None
-    stamp: str = Field(alias='_stamp')
 
-    @property
-    def success(self) -> bool:
-        """
-        Does job finished successfully
-
-        Field exists in an Event Bus object, but not for all cases. E.g. field is
-        missing on `salt.call` return. For convenience in the model it is True when
-        retcode is zero and vice versa.
-        """
-        return not self.retcode
-
-    @model_validator(mode='before')
-    @classmethod
-    def _extract_kwargs[T](cls, data: T) -> T:
-        # data may be an instantiated Job or potentially any object
-        if not isinstance(data, dict):
-            return data
-
-        data['fun_args'], data['fun_kwarg'] = fill_salt_kwarg_from_arg(data.get('fun_args'), data.get('fun_kwarg'))
-
-        return data
+    model_config = ConfigDict(extra='ignore')
 
 
-class PubData(BaseModel):
-    """Salt LocalClient.run_job response representation"""
-
+class JobModel(
+    BaseModel, CreatedModifiedMixin, JobReadOnlyFieldsMixin, JobEditableFieldsMixin, JobComputedFieldsMixin, IDMixin
+):
     jid: StrJid
-    minions: list[str] = Field(min_length=1)
+
+
+# Rest
 
 
 class StartEndDatetimeMixin(BaseModel):
@@ -161,7 +111,7 @@ class StartEndDatetimeMixin(BaseModel):
         return datetime.fromisoformat(v) if isinstance(v, str) else v
 
     @model_validator(mode='after')
-    def dt_validate(self) -> StartEndDatetimeMixin:
+    def dt_validate(self) -> 'StartEndDatetimeMixin':
         if self.start_datetime > self.end_datetime:
             msg = '`end_datetime` must be before `start_datetime`'
             raise ValueError(msg)
@@ -175,7 +125,7 @@ class JobsListRequest(SkipLimitParams, StartEndDatetimeMixin):
 
 class JobsListResponse(BaseModel):
     jid: str
-    tgt: str
+    tgt: str | list[str]
     tgt_type: str
     salt_master: str
     fun: str
@@ -188,17 +138,15 @@ class JobsListResponse(BaseModel):
 
 
 class CreateJobRequest(BaseModel):
-    tgt: str = '*'
+    tgt: str | list[str] = '*'
     tgt_type: SaltTgtType = 'glob'
     fun: str = 'test.ping'
     salt_master: str = 'salt-master'
-    data: JobData | None = None
+    arg: list | None = None
+    kwarg: dict | None = None
 
 
-class GetJobReturnResponse(BaseModel):
-    result: list[JobResult]
-    cursor: int = Field(description='Pointer to get next portion of data, 0 when no more data')
-    length: int
+# Permissions
 
 
 class JobsActions(StrEnum):

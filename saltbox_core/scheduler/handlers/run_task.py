@@ -11,6 +11,7 @@ async def run_task(message: RunTaskEventBusMessage, context: ContextRepo) -> dic
     redis_db = context.get('redis_db')
     task_service: TaskService = context.get('task_service')
     job_service = context.get('job_service')
+    job_return_service = context.get('job_return_service')
     minion_service = context.get('minion_service')
     collection_service = context.get('collection_service')
 
@@ -34,10 +35,11 @@ async def run_task(message: RunTaskEventBusMessage, context: ContextRepo) -> dic
         )
     )
 
-    task_lifespan_service: TaskLifespanService = await get_task_lifespan_service(
+    task_lifespan_service: TaskLifespanService = get_task_lifespan_service(
         rdb=redis_db,
         task_service=task_service,
         job_service=job_service,
+        job_return_service=job_return_service,
         minion_service=minion_service,
         collection_service=collection_service,
         tid=task.id,

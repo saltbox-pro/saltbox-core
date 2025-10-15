@@ -69,8 +69,8 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
     minion_service: MinionService = get_minion_service(repo=minion_repository)
     job_schema_repository: JobSchemaRepository = get_job_schema_repository(db=mongo_db)
     job_schema_service: JobSchemaService = get_job_schema_service(repo=job_schema_repository)
-    job_repository: JobRepository = get_job_repository(db=redis_db)
-    job_service: JobService = await get_job_service(
+    job_repository: JobRepository = get_job_repository(db=mongo_db)
+    job_service: JobService = get_job_service(
         rdb=redis_db,
         job_repository=job_repository,
         job_schema_service=job_schema_service,

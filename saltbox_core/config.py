@@ -52,6 +52,7 @@ LogLevelStr = Annotated[str, AfterValidator(validate_log_level)]
 
 class Settings(BaseSettings):
     var_dir: MakeDirectoryPath = Path('/var/lib/saltbox-core/')
+    cache_dir: MakeDirectoryPath = Path('/var/cache/saltbox-core/')
     taskiq_broker_url: str = ''
     log_level: LogLevelStr = 'info'
     basic_auth_username: str = ''
@@ -59,12 +60,19 @@ class Settings(BaseSettings):
     base_url_root_path: str = '/'
     max_count: int = Field(default=1000, description='Max array length to request')
     origins: list[str] = Field(['*'], description='CORS allowed resources')
+    rabbitmq_url: str = 'amqp://guest:guest@rabbitmq:5672'
+    is_module_inventory_on: bool = Field(default=False, description='Provide data for Inventory extension module')
+    is_module_metric_on: bool = Field(default=False, description='Provide data for Metric extension module')
+
+    # Auth and AuthZ
     keycloak_server_url: str = ''
     keycloak_front_url: str = ''
     keycloak_realm: str = ''
     keycloak_client: str = ''
     keycloak_client_secret: str = ''
     opa_url: str = ''
+
+    # SLS and jobs repos
     salt_func_repo_url: str = 'https://dev.saltbox.pro/saltbox/salt-func-schemas.git'
     salt_func_local_repo_name: str = 'salt-func-schemas'
     gitlab_token: str | None = None
@@ -87,16 +95,29 @@ class Settings(BaseSettings):
         default=Path('/srv/sshfs/'),
         description='Path to store of files served by sshfs',
     )
-    cache_dir: MakeDirectoryPath = Path('/var/cache/saltbox-core/')
     local_repo_sync_timeout_sec: int = 3600
-    rabbitmq_url: str = 'amqp://guest:guest@rabbitmq:5672'
+
+    # GPG
     gpg_key_length: int = 4096
     gog_key_name_real: str = 'Saltbox'
     gpg_key_email: str = 'gpg@saltbox.pro'
     gpg_key_comment: str = 'This is a certificate for saltbox services'
-    module_inventory_on: bool = Field(default=False, description='Provide data for Inventory extension module')
+
+    # TASKS
     tasks_job_create_cooldown: int = Field(
         default=5, description='Number of seconds to wait from tasks job creation to new job'
+    )
+
+    # JOBS
+    jobs_return_data_expire_ttl: int = Field(
+        default=60 * 60 * 24 * 30, description='Job return data expiration time in seconds'
+    )
+
+    # SALT BUFFER
+    salt_buffer_manager_timeout: float = Field(default=0.1, description='Buffer manager timeout in seconds')
+    salt_buffer_manager_batch_size: int = Field(default=100, description='Buffer manager batch size in bytes')
+    salt_buffer_manager_event_process_retries: int = Field(
+        default=3, description='Number of retries to process buffer manager event'
     )
 
     model_config = SettingsConfigDict(env_file=ENV_FILE, extra='ignore')

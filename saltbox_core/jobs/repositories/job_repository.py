@@ -1,36 +1,19 @@
-from typing import Annotated, Any
+from typing import Annotated, ClassVar
 
 from fastapi import Depends
-from redis.asyncio import Redis
+from pymongo.asynchronous.database import AsyncDatabase
 
-from saltbox_core.config import logger
 from saltbox_core.jobs.schemas.job_schemas import JobModel
-from saltbox_core.utilities.jid import JID
-from saltbox_sdk.db.redis.config import get_redis
-from saltbox_sdk.db.redis.repository_sortedset_base import SortedsetRedisRepository
-from saltbox_sdk.db.redis.schemas_base import SortedSetId
+from saltbox_sdk.db.mongo.config import get_mongo
+from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
 
 
-class JobRepository(SortedsetRedisRepository[JobModel]):
+class JobRepository(BaseMongoRepository[JobModel]):
     class Meta:
         collection_name = 'jobs'
-        id_field_name = 'jid'
-
-    @classmethod
-    def _generate_id(cls, data: JobModel | dict[str, Any]) -> SortedSetId:
-        logger.debug('!!!!_generate_id!!!!')
-        jid = None
-
-        if isinstance(data, dict):
-            if 'jid' not in data:
-                jid = JID.generate()
-            else:
-                jid = JID(data['jid'])
-        elif isinstance(data, JobModel):
-            jid = JID(data.jid)
-
-        return jid.to_timestamp()
+        auto_now_add_fields: ClassVar[list[str]] = ['created']
+        auto_now_fields: ClassVar[list[str]] = ['modified']
 
 
-def get_job_repository(db: Annotated[Redis, Depends(get_redis)]) -> JobRepository:
+def get_job_repository(db: Annotated[AsyncDatabase, Depends(get_mongo)]) -> JobRepository:
     return JobRepository(db)

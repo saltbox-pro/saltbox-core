@@ -4,7 +4,9 @@ from fastapi import APIRouter, Body, Depends
 
 # from saltbox_core.config import logger
 from saltbox_core.jobs.exceptions import JobDoesNotExistsException
-from saltbox_core.jobs.schemas.job_schemas import JobModel, JobResult
+from saltbox_core.jobs.schemas.job_return_schemas import JobReturnModel
+from saltbox_core.jobs.schemas.job_schemas import JobModel
+from saltbox_core.jobs.services.job_return_service import JobReturnService, get_job_return_service
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.minion_collections.schemas.filter_schemas import (
     FiltersActions,
@@ -21,7 +23,6 @@ from saltbox_core.tasks.schemas.task_schemas import (
 )
 from saltbox_core.tasks.services.tasks import TaskService, get_task_service
 from saltbox_core.tasks.services.tasks_lifespan import TaskLifespanService, get_task_lifespan_service
-from saltbox_core.utilities.jid import JID
 from saltbox_core.utilities.model_schema import get_model_schema
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
@@ -128,7 +129,7 @@ async def task_jobs(
 
     for task_job in task.jobs.values():
         try:
-            job = await job_service.get_job(JID(task_job.jid))
+            job = await job_service.get(query={'jid': task_job.jid, 'salt_master': task_job.target.master})
             result.append(job)
         except JobDoesNotExistsException:
             continue
@@ -146,15 +147,17 @@ async def task_jobs(
 async def task_returns(
     tid: PyObjectId,
     task_service: Annotated[TaskService, Depends(get_task_service)],
-    job_service: Annotated[JobService, Depends(get_job_service)],
-) -> list[JobResult]:
-    result: list[JobResult] = []
+    job_return_service: Annotated[JobReturnService, Depends(get_job_return_service)],
+) -> list[JobReturnModel]:
+    result: list[JobReturnModel] = []
 
     task = await task_service.get(query=tid)
 
     for task_job in task.jobs.values():
         try:
-            job_returns = await job_service.get_job_all_returns(JID(task_job.jid))
+            job_returns = await job_return_service.get_list(
+                query={'jid': task_job.jid, 'salt_master': task_job.target.master}
+            )
             result.extend(job_returns)
         except JobDoesNotExistsException:
             continue

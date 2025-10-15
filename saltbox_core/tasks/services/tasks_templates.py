@@ -34,7 +34,7 @@ class TaskTemplateService(
         return data
 
 
-async def get_task_template_service(
+def get_task_template_service(
     repo: Annotated[TaskTemplateRepository, Depends(get_task_template_repository)],
 ) -> TaskTemplateService:
     return TaskTemplateService(repo)

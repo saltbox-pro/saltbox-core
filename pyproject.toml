@@ -39,6 +39,7 @@ reload = [
 saltbox-faststream-redis = "saltbox_core.event_bus.redis.app:main"
 saltbox-faststream-rabbit = "saltbox_core.event_bus.rabbit.app:main"
 saltbox-tasks-watcher = "saltbox_core.tasks.tasks_watcher:main"
+saltbox-salt-buffer-manager = "saltbox_core.salt.buffer_manager:main"
 
 # [metadata]
 # url = "https://gitlab.com/saltbox/saltbox-core"
