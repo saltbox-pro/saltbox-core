@@ -33,8 +33,8 @@ from saltbox_core.utilities.jid import JID
 from saltbox_core.utilities.mongo_query_to_salt_tgt_converter import MongoQueryToSaltTgtConverter
 from saltbox_sdk.db.mongo.config import get_mongo_db
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
-from saltbox_sdk.db.schemas_base import Source
 from saltbox_sdk.db.redis.config import get_redis
+from saltbox_sdk.db.schemas_base import Source
 from saltbox_sdk.exceptions import MultipleObjectsFoundException, ObjectNotFoundException
 from saltbox_sdk.utilities.helpers import utc_now
 

@@ -9,7 +9,7 @@ from saltbox_core.jobs.schemas.job_return_schemas import JobReturnModel
 from saltbox_sdk.db.mongo import MongoAsyncDatabase
 from saltbox_sdk.db.mongo.config import get_mongo
 from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
-from saltbox_sdk.fastapi_utils.dependencies import RedisDependency
+from saltbox_sdk.db.redis.config import get_redis
 
 
 class JobReturnRepository(BaseMongoRepository[JobReturnModel]):
@@ -36,6 +36,6 @@ class JobReturnRepository(BaseMongoRepository[JobReturnModel]):
 
 def get_job_return_repository(
     db: Annotated[AsyncDatabase, Depends(get_mongo)],
-    rdb: RedisDependency,
+    rdb: Annotated[Redis, Depends(get_redis)],
 ) -> JobReturnRepository:
     return JobReturnRepository(database=db, rdb=rdb)

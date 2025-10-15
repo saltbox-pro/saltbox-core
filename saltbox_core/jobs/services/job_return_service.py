@@ -2,11 +2,12 @@ from typing import Annotated
 
 from fastapi import Depends
 from redis import exceptions as redis_exceptions
+from redis.asyncio import Redis
 
 from saltbox_core.config import logger
 from saltbox_core.jobs.repositories.job_return_repository import JobReturnRepository, get_job_return_repository
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnCreateSchema, JobReturnModel, JobReturnUpdateSchema
-from saltbox_sdk.fastapi_utils.dependencies import RedisDependency
+from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.serivces.mongo_base_service import ProjectionModel
 from saltbox_sdk.serivces.mongo_base_with_notify_service import MongoBaseWithNotifyService
 
@@ -53,7 +54,7 @@ class JobReturnService(
 
 
 def get_job_return_service(
-    rdb: RedisDependency,
+    rdb: Annotated[Redis, Depends(get_redis)],
     repo: Annotated[JobReturnRepository, Depends(get_job_return_repository)],
 ) -> JobReturnService:
     return JobReturnService(repo=repo, rdb=rdb)

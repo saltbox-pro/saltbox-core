@@ -14,6 +14,7 @@ from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_core.utilities.context import replace_raised
 from saltbox_core.utilities.jid import JID
+from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_service import ProjectionModel
 from saltbox_sdk.serivces.mongo_base_with_notify_service import MongoBaseWithNotifyService
@@ -195,7 +196,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
                 return deletions
 
 
-async def get_job_service(
+def get_job_service(
     rdb: Annotated[Redis, Depends(get_redis)],
     job_repository: Annotated[JobRepository, Depends(get_job_repository)],
     job_schema_service: Annotated[JobSchemaService, Depends(get_job_schema_service)],
