@@ -22,8 +22,8 @@ from saltbox_core.utilities.git_repo_helper import (
     create_sshfs_sync,
     repository_lock,
 )
+from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.exceptions import ObjectNotFoundException
-from saltbox_sdk.fastapi_utils.dependencies import get_redis_dep
 
 SETTINGS = Settings()
 SYNC_SERVE_DIR_LOCK_EXPIRATION_SEC = 300
@@ -79,7 +79,7 @@ async def sync_sls_repo_task(
     progress: ProgressTracker[Any] = TaskiqDepends(),
     repo: TaskTemplateRepository = TaskiqDepends(get_task_template_repository),
     sls_repo_of_repo: SettingsSlsRepoRepository = TaskiqDepends(get_sls_repo_repository),
-    redis: Redis = TaskiqDepends(get_redis_dep),
+    redis: Redis = TaskiqDepends(get_redis),
 ) -> dict:
     """Task for synchronizing job schemas from a Git repository."""
     try:

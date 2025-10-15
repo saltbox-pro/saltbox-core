@@ -34,8 +34,8 @@ from saltbox_core.utilities.mongo_query_to_salt_tgt_converter import MongoQueryT
 from saltbox_sdk.db.mongo.config import get_mongo_db
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import Source
+from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.exceptions import MultipleObjectsFoundException, ObjectNotFoundException
-from saltbox_sdk.fastapi_utils.dependencies import RedisDependency
 from saltbox_sdk.utilities.helpers import utc_now
 
 
@@ -552,7 +552,7 @@ class TaskLifespanService:
 
 
 def get_task_lifespan_service(
-    rdb: RedisDependency,
+    rdb: Annotated[Redis, Depends(get_redis)],
     task_service: Annotated[TaskService, Depends(get_task_service)],
     job_service: Annotated[JobService, Depends(get_job_service)],
     job_return_service: Annotated[JobReturnService, Depends(get_job_return_service)],
