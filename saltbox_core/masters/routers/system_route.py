@@ -3,6 +3,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import PlainTextResponse
+from redis.asyncio import Redis
 
 from saltbox_bridge_messages import (
     BridgeTestBurstResponse,
@@ -20,8 +21,8 @@ from saltbox_core.masters.schemas.system_schemas import (
     BurstJobsTestStatsResponse,
 )
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
+from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.exceptions import NotFoundException
-from saltbox_sdk.fastapi_utils.dependencies import RedisDependency
 
 BURST_JOBS_TEST_REPORT_HASH_NAME = 'burst_jobs_test'
 
@@ -97,7 +98,7 @@ async def burst_jobs_test_delete(
 @router.get('/burst_jobs_test')
 async def burst_jobs_test_get(
     job_service: Annotated[JobService, Depends(get_job_service)],
-    rdb: RedisDependency,
+    rdb: Annotated[Redis, Depends(get_redis)],
     id: Annotated[str, Query(description='Burst ID to delete selectively')],
 ) -> BurstJobsTestStatsResponse:
     bridge_stats_raw = await rdb.hget(name=BURST_JOBS_TEST_REPORT_HASH_NAME, key=id)

@@ -20,8 +20,8 @@ from saltbox_core.settings.schemas.sls_repos_schemas import (
 from saltbox_core.settings.tasks import sync_sls_repo_task, sync_sls_repos_to_serve_dir
 from saltbox_core.tasks.services.tasks_templates import TaskTemplateService
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
+from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.db.schemas_base import PaginatedResponse
-from saltbox_sdk.fastapi_utils.dependencies import get_redis_dep
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 
 ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
@@ -155,6 +155,6 @@ class SettingsSlsRepoService(
 
 def get_sls_repo_service(
     repo: Annotated[SettingsSlsRepoRepository, Depends(get_sls_repo_repository)],
-    redis: Annotated[Redis, Depends(get_redis_dep)],
+    redis: Annotated[Redis, Depends(get_redis)],
 ) -> SettingsSlsRepoService:
     return SettingsSlsRepoService(repo=repo, redis=redis)

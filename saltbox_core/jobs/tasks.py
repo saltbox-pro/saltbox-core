@@ -10,8 +10,8 @@ from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository
 from saltbox_core.jobs.schemas.job_sc_schemas import JobSchemaCreateSchema, JobSchemaUpdateSchema
 from saltbox_core.tkq import broker
 from saltbox_core.utilities.git_repo_helper import GitRepoService, parse_schemas, repository_lock
+from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.exceptions import ObjectNotFoundException, TaskiqException, TaskiqTimeoutException
-from saltbox_sdk.fastapi_utils.dependencies import get_redis_dep
 
 
 async def sync_schemas(
@@ -51,7 +51,7 @@ async def job_schemas_sync_task(
     repo_url: str,
     progress: ProgressTracker[Any] = TaskiqDepends(),
     repo: JobSchemaRepository = TaskiqDepends(get_job_schema_repository),
-    redis: Redis = TaskiqDepends(get_redis_dep),
+    redis: Redis = TaskiqDepends(get_redis),
 ) -> dict:
     """Task for synchronizing job schemas from a Git repository."""
     try:

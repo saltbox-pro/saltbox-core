@@ -29,8 +29,8 @@ from saltbox_core.tasks.schemas.task_template_schemas import (
 )
 from saltbox_core.tasks.services.tasks_templates import TaskTemplateService, get_task_template_service
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.exceptions import ObjectNotFoundException
-from saltbox_sdk.fastapi_utils.dependencies import RedisDependency
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 from saltbox_sdk.utilities.helpers import utc_now
 
@@ -239,7 +239,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
 
 async def get_task_service(
     repo: Annotated[TaskRepository, Depends(get_task_repository)],
-    rdb: RedisDependency,
+    rdb: Annotated[Redis, Depends(get_redis)],
     task_template_service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
     job_schema_service: Annotated[JobSchemaService, Depends(get_job_schema_service)],
     collections_service: Annotated[CollectionService, Depends(get_collection_service)],

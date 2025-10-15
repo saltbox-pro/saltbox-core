@@ -7,6 +7,7 @@ from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 from pydantic import Field, NonNegativeInt, PastDatetime
 from pydantic import ValidationError as PydanticValidationError
 from redis import exceptions as redis_exceptions
+from redis.asyncio import Redis
 
 from saltbox_bridge_messages import MasterStatus
 from saltbox_core.config import SETTINGS
@@ -24,10 +25,10 @@ from saltbox_core.masters.schemas.master_schemas import MasterModel
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_core.utilities.context import replace_raised
 from saltbox_core.utilities.jid import JID, JidError
+from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.db.redis.repository_sortedset_base import ProjectionModel
 from saltbox_sdk.db.schemas_base import CursoredResponse, PaginatedResponse
 from saltbox_sdk.exceptions import ObjectNotFoundException
-from saltbox_sdk.fastapi_utils.dependencies import RedisDependency
 from saltbox_sdk.serivces.redis_sortedset_base_service import RedisSortedsetBaseService
 
 JOBS_TO_CREATE_SET_NAME: str = 'jobs:to_create'
@@ -41,7 +42,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
 
     def __init__(
         self,
-        rdb: RedisDependency,
+        rdb: Redis,
         job_repository: JobRepository,
         job_schema_service: JobSchemaService,
         master_service: MasterService,
@@ -341,7 +342,7 @@ class JobService(RedisSortedsetBaseService[JobRepository, JobModel, JobCreateSch
 
 
 async def get_job_service(
-    rdb: RedisDependency,
+    rdb: Annotated[Redis, Depends(get_redis)],
     job_repository: Annotated[JobRepository, Depends(get_job_repository)],
     job_schema_service: Annotated[JobSchemaService, Depends(get_job_schema_service)],
     master_service: Annotated[MasterService, Depends(get_master_service)],
