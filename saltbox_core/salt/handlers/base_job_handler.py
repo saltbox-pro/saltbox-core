@@ -32,7 +32,7 @@ class BaseJobMessageHandler(BaseMessageHandler, abc.ABC):
         process_metrics_task = None
         if self.can_process_metrics():
             process_metrics_task = asyncio.create_task(
-                self.process_metrics(match=match, master_id=master_id, tag=tag, data=data, tid=tid)
+                self.process_metrics(match=match, master_id=master_id, tag=tag, data={**data}, tid=tid)
             )
 
         await self.process(match=match, master_id=master_id, data=data, job=job, tid=tid)

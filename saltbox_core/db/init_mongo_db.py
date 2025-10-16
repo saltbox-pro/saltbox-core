@@ -3,9 +3,11 @@ import json
 import anyio
 import pymongo
 from pymongo.asynchronous.database import AsyncDatabase
+from redis.asyncio import Redis
 
 from saltbox_core.config import logger
 from saltbox_core.jobs.repositories.job_repository import JobRepository
+from saltbox_core.jobs.repositories.job_return_repository import JobReturnRepository
 from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository
 from saltbox_core.jobs.schemas.job_sc_schemas import JobSchemaCreateSchema
 from saltbox_core.masters.repositories.master_repository import MasterRepository
@@ -14,6 +16,7 @@ from saltbox_core.minion_collections.schemas.collection_schemas import Collectio
 from saltbox_core.settings.repository import SettingsSlsRepoRepository
 from saltbox_core.tasks.repositories.task_template_repository import TaskTemplateRepository
 from saltbox_sdk.db.mongo.config import get_mongo_db
+from saltbox_sdk.db.redis.config import get_redis_now
 
 
 async def init_task_tpl(db: AsyncDatabase) -> None:
@@ -156,10 +159,51 @@ async def init_jobs(db: AsyncDatabase) -> None:
         logger.debug('Index created: %s', result)
 
     # Create unique index for jid and master_id if not exists
-    if 'jid_and_master_id_unique_index_asc' not in indexes:
+    if 'jid_and_salt_master_unique_index_asc' not in indexes:
         result = await jobs_repo.collection.create_index(
-            [('jid', pymongo.ASCENDING), ('master_id', pymongo.ASCENDING)],
-            name='jid_and_master_id_unique_index_asc',
+            [('jid', pymongo.ASCENDING), ('salt_master', pymongo.ASCENDING)],
+            name='jid_and_salt_master_unique_index_asc',
+            unique=True,
+        )
+        logger.debug('Index created: %s', result)
+
+    logger.debug('Indexes: %s', indexes)
+
+
+async def init_job_returns(db: AsyncDatabase, rdb: Redis) -> None:
+    job_reurnss_repo = JobReturnRepository(db, rdb=rdb)
+
+    # Check existing indexes
+    indexes = sorted(await job_reurnss_repo.collection.index_information())
+
+    # Create index for jid if not exists
+    if 'job_return_jid_index_asc' not in indexes:
+        result = await job_reurnss_repo.collection.create_index(
+            [('jid', pymongo.ASCENDING)], name='job_return_jid_index_asc'
+        )
+        logger.debug('Index created: %s', result)
+
+    # Create index for jid and salt_master if not exists
+    if 'job_return_jid_salt_master_index_asc' not in indexes:
+        result = await job_reurnss_repo.collection.create_index(
+            [('jid', pymongo.ASCENDING), ('salt_master', pymongo.ASCENDING)],
+            name='job_return_jid_salt_master_index_asc',
+        )
+        logger.debug('Index created: %s', result)
+
+    # Create index for jid and minion_id if not exists
+    if 'job_return_jid_minion_id_index_asc' not in indexes:
+        result = await job_reurnss_repo.collection.create_index(
+            [('jid', pymongo.ASCENDING), ('minion_id', pymongo.ASCENDING)],
+            name='job_return_jid_minion_id_index_asc',
+        )
+        logger.debug('Index created: %s', result)
+
+    # Create unique index for jid, salt_master and minion_id if not exists
+    if 'job_return_unique_index_asc' not in indexes:
+        result = await job_reurnss_repo.collection.create_index(
+            [('jid', pymongo.ASCENDING), ('salt_master', pymongo.ASCENDING), ('minion_id', pymongo.ASCENDING)],
+            name='job_return_unique_index_asc',
             unique=True,
         )
         logger.debug('Index created: %s', result)
@@ -171,6 +215,7 @@ async def init_mongo_db() -> None:
     """Initialize MongoDB collections"""
 
     db = get_mongo_db()
+    rdb = get_redis_now()
 
     # Initialize minion_collections collection
     await init_collections(db)
@@ -195,3 +240,7 @@ async def init_mongo_db() -> None:
     # Initialize jobs collection
     await init_jobs(db)
     logger.debug('Jobs initialized')
+
+    # Initialize job returns collection
+    await init_job_returns(db, rdb)
+    logger.debug('Job returns initialized')
