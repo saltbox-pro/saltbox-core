@@ -52,8 +52,8 @@ class SettingsSlsRepoService(
         query: dict[str, Any] | None,
         limit: int,
         skip: int,
-        projection_model: type[ProjectionModel],
         *,
+        projection_model: type[ProjectionModel],
         sort: dict[str, SortOrder] | None = None,
     ) -> PaginatedResponse[ProjectionModel]: ...
 
@@ -63,8 +63,8 @@ class SettingsSlsRepoService(
         query: dict[str, Any] | None = None,
         limit: int = 0,
         skip: int = 0,
-        projection_model: type[ProjectionModel] | None = None,
         *,
+        projection_model: type[ProjectionModel] | None = None,
         sort: dict[str, SortOrder] | None = None,
     ) -> PaginatedResponse[SettingsSlsRepoModel] | PaginatedResponse[ProjectionModel]:
         total = await self.repo.count(query)

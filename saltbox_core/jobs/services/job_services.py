@@ -1,5 +1,5 @@
 import json
-from typing import Annotated, Any, overload
+from typing import Annotated, Any, overload, override
 
 from fastapi import Depends
 from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
@@ -76,10 +76,11 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         except redis_exceptions.RedisError as e:
             logger.error(e)
 
-    @overload  # type: ignore
+    @overload
     async def create(
         self,
         data: JobCreateSchema,
+        *,
         notify: bool = True,
     ) -> JobModel: ...
 
@@ -87,13 +88,16 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
     async def create(
         self,
         data: JobCreateSchema,
+        *,
         projection_model: type[ProjectionModel],
         notify: bool = True,
     ) -> ProjectionModel: ...
 
-    async def create(  # type: ignore
+    @override
+    async def create(
         self,
         data: JobCreateSchema,
+        *,
         projection_model: type[ProjectionModel] | None = None,
         notify: bool = True,
     ) -> JobModel | ProjectionModel:

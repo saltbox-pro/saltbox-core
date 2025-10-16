@@ -1,5 +1,5 @@
 import json
-from typing import Annotated, Any, TypeVar, overload
+from typing import Annotated, Any, TypeVar, overload, override
 
 from fastapi import Depends
 from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
@@ -122,6 +122,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
     async def create(
         self,
         data: TaskCreateInputSchema,
+        *,
         projection_model: None = None,
         notify: bool = True,
     ) -> TaskModel: ...
@@ -130,15 +131,18 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
     async def create(
         self,
         data: TaskCreateInputSchema,
+        *,
         projection_model: type[ProjectionModel],
         notify: bool = True,
     ) -> ProjectionModel: ...
 
+    @override
     async def create(
         self,
         data: TaskCreateInputSchema,
+        *,
         projection_model: type[ProjectionModel] | None = None,
-        notify: bool | None = None,
+        notify: bool = True,
     ) -> TaskModel | ProjectionModel:
         creation_data: TaskCreateSchema = await self.__parse_input_create_schema(data=data)
 
@@ -160,6 +164,8 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
         self,
         query: dict[str, Any] | PyObjectId,
         data: TaskUpdateSchema | dict[str, Any],
+        exclude_unset: bool = True,
+        *,
         notify: bool = True,
     ) -> TaskModel: ...
 
@@ -168,18 +174,21 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
         self,
         query: dict[str, Any] | PyObjectId,
         data: TaskUpdateSchema | dict[str, Any],
-        notify: bool = True,
+        exclude_unset: bool = True,
         *,
         projection_model: type[ProjectionModel],
+        notify: bool = True,
     ) -> ProjectionModel: ...
 
+    @override
     async def update(
         self,
         query: dict[str, Any] | PyObjectId,
         data: TaskUpdateSchema | dict[str, Any],
-        notify: bool = True,
+        exclude_unset: bool = True,
         *,
         projection_model: type[ProjectionModel] | None = None,
+        notify: bool = True,
     ) -> TaskModel | ProjectionModel:
         try:
             obj = await self.get(query=query, projection_model=TaskModel)
@@ -197,7 +206,10 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
 
             if projection_model:
                 updated_obj: TaskModel | ProjectionModel = await self.repo.update(
-                    query=query, data=data, projection_model=projection_model
+                    query=query,
+                    data=data,
+                    exclude_unset=exclude_unset,
+                    projection_model=projection_model,
                 )
             else:
                 updated_obj = await self.repo.update(query=query, data=data)
@@ -205,7 +217,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
             msg = 'Object does not found'
             raise TaskObjectDoesNotExistException(msg) from e
 
-        if isinstance(notify, bool) and notify and hasattr(updated_obj, 'id'):
+        if notify and hasattr(updated_obj, 'id'):
             await self.rdb.publish(
                 channel=f'task:{updated_obj.id}:update', message=self.__prepare_pub_message(updated_obj)
             )
@@ -218,11 +230,12 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
     @overload
     async def delete(self, query: dict[str, Any] | PyObjectId, notify: bool = True) -> int: ...
 
-    async def delete(self, query: dict[str, Any] | PyObjectId, notify: bool | None = None) -> int:
+    @override
+    async def delete(self, query: dict[str, Any] | PyObjectId, notify: bool = True) -> int:
         obj = await self.get(query=query)
         deleted_count = await super().delete(query=query)
 
-        if isinstance(notify, bool) and notify:
+        if notify:
             await self.rdb.publish(channel=f'task:{obj.id}:delete', message=self.__prepare_pub_message(obj))
 
         return deleted_count

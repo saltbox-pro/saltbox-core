@@ -26,11 +26,11 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
 
     @overload
     async def get_by_master_and_id(
-        self, master: str, minion_id: str, projection_model: type[ProjectionModel]
+        self, master: str, minion_id: str, *, projection_model: type[ProjectionModel]
     ) -> ProjectionModel: ...
 
     async def get_by_master_and_id(
-        self, master: str, minion_id: str, projection_model: type[ProjectionModel] | None = None
+        self, master: str, minion_id: str, *, projection_model: type[ProjectionModel] | None = None
     ) -> MinionModel | ProjectionModel:
         query = {'master': master, 'minion_id': minion_id}
 
