@@ -85,20 +85,21 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         else:
             logger.info('Job %s return for %s, function %s', jid, mid, function)
 
-        await self._send_presence(master_id=master_id, mid=mid, data=data)
-        await self._process_return(
-            master_id=master_id, jid=jid, mid=mid, function=function, job=job, data=data, return_data=return_data
+        job_return = await self._save_job_return(
+            master_id=master_id, jid=jid, mid=mid, job=job, data=data, return_data=return_data
         )
+
+        await self._send_presence(master_id=master_id, mid=mid, data=data)
+        await self._process_return(job_return=job_return)
 
         raise StopProcessing()
 
     @classmethod
-    def _inventory_state_predicate(cls, data: dict[str, Any]) -> bool:
-        fun = data['fun']
-        if fun not in ('state.apply', 'state.sls'):
+    def _inventory_state_predicate(cls, job_return: JobReturnModel) -> bool:
+        if job_return.fun not in ('state.apply', 'state.sls'):
             return False
 
-        fun_args = data['fun_args']
+        fun_args = job_return.fun_args or []
         if cls.INVENTORY_STATE in fun_args:
             return True
 
@@ -111,20 +112,14 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
 
         return False
 
-    async def _process_return(
-        self, master_id: str, jid: str, mid: str, function: str, job: JobModel, data: dict, return_data: Any
-    ) -> None:
-        job_return = await self._save_job_return(
-            master_id=master_id, jid=jid, mid=mid, job=job, data=data, return_data=return_data
-        )
-
-        if function == 'grains.items':
+    async def _process_return(self, job_return: JobReturnModel) -> None:
+        if job_return.fun == 'grains.items':
             await self._process_grains(job_return=job_return)
-        elif function == 'inventory.get':
-            logger.debug('Got inventory.get return for %s', mid)
+        elif job_return.fun == 'inventory.get':
+            logger.debug('Got inventory.get return for %s', job_return.minion_id)
             await self._notify_on_inventory_fun(job_return=job_return)
-        elif self._inventory_state_predicate(data):
-            logger.debug('Got inventory state return for %s', mid)
+        elif self._inventory_state_predicate(job_return=job_return):
+            logger.debug('Got inventory state return for %s', job_return.minion_id)
             await self._notify_on_inventory_state(job_return=job_return)
 
     async def _save_job_return(
@@ -180,10 +175,10 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
             )
             return
 
-        if not job_return.return_:
+        if not job_return.data:
             return
 
-        for _mod, mod_data in job_return.return_.items():
+        for _mod, mod_data in job_return.data.items():
             if mod_data['name'] == 'inventory.get':
                 if mod_data['result'] is not True:
                     logger.warning(
@@ -208,11 +203,11 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
 
     async def _process_grains(self, job_return: JobReturnModel) -> None:
         logger.debug('Processing grains for %s', job_return.minion_id)
-        if not job_return.return_:
+        if not job_return.data:
             return
 
         await self.minion_service.process_grains(
-            master_id=job_return.salt_master, minion_id=job_return.minion_id, grains=job_return.return_
+            master_id=job_return.salt_master, minion_id=job_return.minion_id, grains=job_return.data
         )
 
     async def _send_presence(self, master_id: str, mid: str, data: dict[str, Any]) -> None:

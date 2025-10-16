@@ -48,7 +48,7 @@ class JobReturnUpdateSchema(BaseModel, JobReturnEditableFieldsMixin):
 class JobReturnModel(
     BaseModel, CreatedModifiedMixin, JobReturnReadOnlyFieldsMixin, JobReturnEditableFieldsMixin, IDMixin
 ):
-    return_: Any | None = Field(alias='return', default=None)
+    data: Any | None = Field(default=None)
 
     @property
     def success(self) -> bool:

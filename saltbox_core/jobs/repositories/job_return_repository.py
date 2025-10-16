@@ -28,7 +28,7 @@ class JobReturnRepository(BaseMongoRepository[JobReturnModel]):
         )
 
         if raw_return:
-            data['return'] = json.loads(raw_return)
+            data['data'] = json.loads(raw_return)
 
         return data
 
