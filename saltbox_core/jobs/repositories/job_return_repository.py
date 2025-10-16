@@ -6,7 +6,6 @@ from pymongo.asynchronous.database import AsyncDatabase
 from redis.asyncio import Redis
 
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnModel
-from saltbox_sdk.db.mongo import MongoAsyncDatabase
 from saltbox_sdk.db.mongo.config import get_mongo
 from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
 from saltbox_sdk.db.redis.config import get_redis
@@ -18,7 +17,7 @@ class JobReturnRepository(BaseMongoRepository[JobReturnModel]):
         auto_now_add_fields: ClassVar[list[str]] = ['created']
         auto_now_fields: ClassVar[list[str]] = ['modified']
 
-    def __init__(self, database: MongoAsyncDatabase, rdb: Redis):
+    def __init__(self, database: AsyncDatabase, rdb: Redis):
         self.rdb = rdb
         super().__init__(database=database)
 
