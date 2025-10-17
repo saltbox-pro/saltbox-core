@@ -5,7 +5,7 @@ from redis import asyncio as aioredis
 from taskiq.exceptions import SendTaskError
 
 from saltbox_core.config import SETTINGS, logger
-from saltbox_core.salt.tasks import process_salt_event_task
+from saltbox_core.salt.tiq_tasks import process_salt_event_task
 from saltbox_core.tkq import broker
 from saltbox_sdk.config.redis_config import REDIS_SETTINGS
 

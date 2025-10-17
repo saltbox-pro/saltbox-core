@@ -1,8 +1,8 @@
 import httpx
 
+from saltbox_core.config import SETTINGS
 from saltbox_core.settings.exceptions import MissingGroupIdException
 from saltbox_core.settings.schemas.gitlab_schemas import GitlabProjectSchema, PaginatedGitlabProjects
-from saltbox_core.settings.tasks import SETTINGS
 from saltbox_core.utilities.httpx_client import HttpxClientSingletoneFactory
 
 

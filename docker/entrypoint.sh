@@ -50,7 +50,7 @@ cmd_taskiq_worker() {
   # --max-fails - max number of failed tasks before stopping the worker
   cmd='/usr/bin/taskiq worker saltbox_core.tkq:broker'
 #  cmd="${cmd} saltbox_core.jobs saltbox_core.settings saltbox_core.salt -w 1 --max-fails 1"
-  cmd="${cmd} -fsd -w 1 --max-fails 1"
+  cmd="${cmd} -fsd -t **/tiq_tasks.py -w 1 --max-fails 1"
   if [ "$DEV_MODE" = 1 ]; then
     cmd="$cmd --reload"
   fi
