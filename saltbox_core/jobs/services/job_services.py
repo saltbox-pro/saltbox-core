@@ -141,8 +141,8 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
                     'tgt': data.tgt,
                     'tgt_type': data.tgt_type,
                     'fun': data.fun,
-                    'args': data.arg,
-                    'kwargs': data.kwarg,
+                    'arg': data.arg,
+                    'kwarg': data.kwarg,
                 }
             ),
         )
