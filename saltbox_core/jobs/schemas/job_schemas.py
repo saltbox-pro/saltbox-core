@@ -96,18 +96,17 @@ class JobListBody(SkipLimitParams, QueryParams, SortParams):
     )
 
 
-class JobsListResponse(BaseModel):
-    jid: str
+class JobsListResponse(BaseModel, JobComputedFieldsMixin):
+    jid: StrJid
     tgt: str | list[str]
-    tgt_type: str
+    tgt_type: SaltTgtType
     salt_master: str
-    fun: str
-    user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
     system_user: str | None = None
+    fun: str
+    status: JobStatus
 
-    @computed_field(title='Timestamp decoded from JID')
-    def fms_jid_timestamp(self) -> Annotated[datetime, PastDatetime]:
-        return JID(self.jid).to_datetime()
+    user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
+    source: Source | None = None
 
 
 class CreateJobRequest(BaseModel):
