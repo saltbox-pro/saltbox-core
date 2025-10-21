@@ -92,7 +92,7 @@ class SaltEventsHandler:
             )
 
     async def process_event(self, master_id: str, tag: str, data: dict, retries: int) -> None:
-        logger.debug('Processing salt event for master "%s" with tag "%s": %s', master_id, tag, data)
+        logger.debug('Processing salt event for master "%s" with tag "%s"', master_id, tag)
 
         for handler in self.salt_handlers:
             try:

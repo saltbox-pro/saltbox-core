@@ -38,13 +38,13 @@ class SaltBufferManager:
 
                 for _event in salt_events:
                     event = json.loads(_event.decode())
-                    logger.debug('Received salt event: %s', event)
-
                     try:
                         master_id = event['master_id']
                         tag = event['tag']
                         data = event['data']
                         retries = event.get('retries', 0)
+
+                        logger.debug(f'Received salt event "{tag}" from master "{master_id}". Retries: {retries}')
                     except KeyError:
                         logger.debug('Unknown event format: %s', event)
                         continue

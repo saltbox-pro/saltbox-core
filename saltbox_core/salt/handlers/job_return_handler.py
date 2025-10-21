@@ -16,7 +16,7 @@ from saltbox_core.salt.exceptions import StopProcessing
 from saltbox_core.salt.handlers.base_handler import MessageDataType
 from saltbox_core.salt.handlers.base_job_handler import BaseJobMessageHandler
 from saltbox_sdk.event_bus.utils import send_message
-from saltbox_sdk.exceptions import ObjectNotFoundException
+from saltbox_sdk.exceptions import DuplicateKeyException
 
 
 class JobReturnMessageHandler(BaseJobMessageHandler):
@@ -103,14 +103,19 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         if cls.INVENTORY_STATE in fun_args:
             return True
 
+        def check_kwargs(ret_kwargs: dict[str, Any]) -> bool:
+            mods = ret_kwargs.get('mods')
+            if mods == cls.INVENTORY_STATE or (isinstance(mods, list) and cls.INVENTORY_STATE in mods):
+                return True
+
+            return False
+
         # Check inventory in kwargs
         for arg in fun_args:
-            if isinstance(arg, dict) and arg.get('__kwarg__'):
-                mods = arg.get('mods')
-                if mods == cls.INVENTORY_STATE or (isinstance(mods, list) and cls.INVENTORY_STATE in mods):
-                    return True
+            if isinstance(arg, dict) and arg.get('__kwarg__') and check_kwargs(arg):
+                return True
 
-        return False
+        return check_kwargs(job_return.fun_kwarg or {})
 
     async def _process_return(self, job_return: JobReturnModel) -> None:
         if job_return.fun == 'grains.items':
@@ -132,30 +137,30 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
                 pipe = pipe.expire(name=hash_name, time=SETTINGS.jobs_return_data_expire_ttl)
             await pipe.execute()
 
-        return await self.job_return_service.create(
-            data=JobReturnCreateSchema.model_validate({'source': job.source, **data}),
-            notify=True,
-        )
+        try:
+            return await self.job_return_service.create(
+                data=JobReturnCreateSchema.model_validate({'source': job.source, **data}),
+                notify=True,
+            )
+        except DuplicateKeyException:
+            return await self.job_return_service.get(
+                query={'jid': str(jid), 'salt_master': str(master_id), 'minion_id': mid}
+            )
 
-    async def _send_inventory_data(self, master_id: str, jid: str, minions: list[str], path: list[str | int]) -> None:
+    @staticmethod
+    async def _send_inventory_data(job_return: JobReturnModel, path: list[str | int]) -> None:
         if not SETTINGS.is_module_inventory_on:
             return
 
         message_to_inventory = InventoryPutEventBusMessage(sender='core', target='inventory', path=path)
 
-        for minion_id in minions:
-            try:
-                job_result = await self.job_return_service.get(query={'jid': jid, 'minion_id': minion_id})
-                if job_result is not None:
-                    message_to_inventory.minions.append(
-                        InventoryPutForMinion(
-                            minion_id=minion_id,
-                            master_id=master_id,
-                            job_return=job_result.model_dump(by_alias=True),
-                        )
-                    )
-            except ObjectNotFoundException:
-                logger.warn('Not found inventory for minion %s on master %s, JID=%s', minion_id, master_id, jid)
+        message_to_inventory.minions.append(
+            InventoryPutForMinion(
+                minion_id=job_return.minion_id,
+                master_id=job_return.salt_master,
+                job_return={'return': job_return.data},
+            )
+        )
 
         await send_message(message=message_to_inventory, queue='inventory_put_data')
 
@@ -164,9 +169,7 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
             logger.warning('inventory.get failed for JID=%s, minion=%s', job_return.jid, job_return.minion_id)
             return
 
-        await self._send_inventory_data(
-            master_id=job_return.salt_master, jid=job_return.jid, minions=[job_return.minion_id], path=['return']
-        )
+        await self._send_inventory_data(job_return=job_return, path=['return'])
 
     async def _notify_on_inventory_state(self, job_return: JobReturnModel) -> None:
         if job_return.retcode != 0:
@@ -194,12 +197,7 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
             )
             return
 
-        await self._send_inventory_data(
-            master_id=job_return.salt_master,
-            jid=job_return.jid,
-            minions=[job_return.minion_id],
-            path=['return', _mod, 'changes', 'ret'],
-        )
+        await self._send_inventory_data(job_return=job_return, path=['return', _mod, 'changes', 'ret'])
 
     async def _process_grains(self, job_return: JobReturnModel) -> None:
         logger.debug('Processing grains for %s', job_return.minion_id)
