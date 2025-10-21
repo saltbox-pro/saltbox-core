@@ -15,7 +15,7 @@ class MinionStartedMessageHandler(BaseMessageHandler):
     A message handler for salt minion started messages
     """
 
-    tag_patterns: ClassVar[list[re.Pattern[str]]] = [re.compile(r'salt/minion/(?P<mid>.+)/start')]
+    tag_patterns: ClassVar[list[re.Pattern[str]]] = [re.compile(r'^salt/minion/(?P<mid>.+)/start$')]
 
     def __init__(self, redis_client: aioredis.Redis, job_service: JobService) -> None:
         super().__init__(redis_client)
@@ -32,7 +32,7 @@ class MinionStartedMessageHandler(BaseMessageHandler):
                     'tgt_type': 'glob',
                     'salt_master': master_id,
                     'fun': 'grains.items',
-                    'system_user': SYSTEM_SHORT_USER,
+                    'user': SYSTEM_SHORT_USER,
                 }
             )
         )
