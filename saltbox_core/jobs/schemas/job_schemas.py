@@ -16,7 +16,7 @@ from pydantic.functional_validators import AfterValidator
 from saltbox_bridge_messages import SaltTgtType
 from saltbox_core.utilities.jid import JID, JidError
 from saltbox_core.utilities.salt import fill_salt_kwarg_from_arg
-from saltbox_sdk.db.mongo.schemas_base import IDMixin
+from saltbox_sdk.db.mongo.schemas_base import IDMixin, QueryParams, SortParams
 from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER, CreatedModifiedMixin, SkipLimitParams, Source, UserShort
 
 
@@ -98,29 +98,10 @@ class JobModel(
 # Rest
 
 
-class StartEndDatetimeMixin(BaseModel):
-    start_datetime: Annotated[datetime, PastDatetime]
-    end_datetime: datetime
-
-    @field_validator('start_datetime', 'end_datetime', mode='before')
-    @classmethod
-    def forbid_year_only(cls, v: Any) -> datetime:
-        if isinstance(v, str) and v.isdigit():
-            msg = '`start_datetime` and `end_datetime` must be in full datetime format (YYYY-MM-DD)'
-            raise ValueError(msg)
-        return datetime.fromisoformat(v) if isinstance(v, str) else v
-
-    @model_validator(mode='after')
-    def dt_validate(self) -> 'StartEndDatetimeMixin':
-        if self.start_datetime > self.end_datetime:
-            msg = '`end_datetime` must be before `start_datetime`'
-            raise ValueError(msg)
-
-        return self
-
-
-class JobsListRequest(SkipLimitParams, StartEndDatetimeMixin):
-    desc: bool = True
+class JobListBody(SkipLimitParams, QueryParams, SortParams):
+    model_config = ConfigDict(
+        extra='ignore',
+    )
 
 
 class JobsListResponse(BaseModel):

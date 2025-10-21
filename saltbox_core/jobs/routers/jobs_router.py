@@ -1,7 +1,7 @@
 from typing import Annotated
 
 import pydantic
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends
 from pydantic import Field
 
 from saltbox_core.config import SETTINGS
@@ -9,15 +9,14 @@ from saltbox_core.jobs.schemas.job_return_schemas import GetJobReturnResponse
 from saltbox_core.jobs.schemas.job_schemas import (
     CreateJobRequest,
     JobCreateSchema,
+    JobListBody,
     JobModel,
     JobsActions,
-    JobsListRequest,
     JobsListResponse,
     StrJid,
 )
 from saltbox_core.jobs.services.job_return_service import JobReturnService, get_job_return_service
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
-from saltbox_sdk.db.mongo.schemas_base import SortOrder
 from saltbox_sdk.db.schemas_base import PaginatedResponse, Source, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 from saltbox_sdk.fastapi_utils.dependencies import get_current_user
@@ -28,8 +27,8 @@ from saltbox_sdk.fastapi_utils.dependencies import get_current_user
 router = APIRouter(prefix='/jobs', tags=['Jobs'])
 
 
-@router.get(
-    '',
+@router.post(
+    '/list',
     operation_id='jobs_list',
     openapi_extra=GatewayEndpointConfig(
         policy='core.jobs.list',
@@ -37,23 +36,23 @@ router = APIRouter(prefix='/jobs', tags=['Jobs'])
     ).model_dump(by_alias=True),
 )
 async def jobs_list(
-    request: Annotated[JobsListRequest, Query()],
     # opa_query: Annotated[dict, Depends(get_opa_query)],
+    body: Annotated[JobListBody, Body()],
     job_service: Annotated[JobService, Depends(get_job_service)],
 ) -> PaginatedResponse[JobsListResponse]:
-    query = {'created': {'$gte': request.start_datetime, '$lte': request.end_datetime}}
-    sort = {'created': SortOrder.DESC if request.desc else SortOrder.ASC}
+    query = body.query
+
+    # TODO (@): Apply OPA query filtering
+    # if opa_query:
+    #     query = {'$and': [query, opa_query]}
 
     jobs = await job_service.get_list_paginated(
         query=query,
-        skip=request.skip,
-        limit=request.limit,
-        sort=sort,
+        skip=body.skip,
+        limit=body.limit,
         projection_model=JobsListResponse,
+        sort=body.sort,
     )
-    # Apply OPA query filtering
-    # filtred_data = [item for item in jobs.data if match_query(item.model_dump(), opa_query)]
-    # jobs.data = filtred_data
     return jobs
 
 

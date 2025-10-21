@@ -3,7 +3,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, model_validator
 
-from saltbox_sdk.db.mongo.schemas_base import IDMixin, MongoQuery, PyObjectId, SortOrder
+from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId, QueryParams, SortParams
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams, UserShort
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
 from saltbox_sdk.utilities.helpers import utc_now
@@ -277,18 +277,7 @@ class TaskListQueryParams(SkipLimitParams):
     )
 
 
-class TaskListBody(SkipLimitParams):
-    query: MongoQuery = Field(
-        default_factory=dict,
-        title='MongoDB Query',
-        description='A valid MongoDB query dictionary',
-        examples=[
-            {'task_template.name': 'states.test.random_with_timeout'},
-            {'fun': {'$regex': 'state'}},
-        ],
-        json_schema_extra={'example': {'task_template.name': {'$not': {'$regex': 'states.test'}}}},
-    )
-    sort: dict[str, SortOrder] | None = None
+class TaskListBody(SkipLimitParams, QueryParams, SortParams):
     model_config = ConfigDict(
         extra='ignore',
     )
