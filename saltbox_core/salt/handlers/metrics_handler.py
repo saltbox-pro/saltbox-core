@@ -1,6 +1,7 @@
+import json
 import re
 import sys
-from typing import ClassVar
+from typing import Any, ClassVar
 
 from saltbox_core.salt.handlers.base_handler import BaseMessageHandler, MessageDataType
 
@@ -11,37 +12,36 @@ class SaltMessageMetricMessageHandler(BaseMessageHandler):
     """
 
     METRIC_TAG = 'metrics:salt_message'
-    AVAILABLE_TAG_NAME_TO_REGEX: ClassVar[dict[str, re.Pattern]] = {
-        'salt/job/ret': re.compile(r'salt/job/(?P<jid>\d{20})/ret/(?P<mid>.+)'),
-        'salt/job/new': re.compile(r'^salt/job/(?P<jid>\d{20})/new$'),
-        'minion/refresh': re.compile(r'^minion/refresh/[a-z-]+-[a-f0-9]{12}$'),
-        'salt/minion/start': re.compile(r'^salt/minion/(?P<mid>.+)/start$'),
-        'minion_start': re.compile(r'^minion_start$'),
-        'salt/auth': re.compile(r'^salt/auth$'),
-        'salt/presence/present': re.compile(r'^salt/presence/present$'),
-        'salt/presence/change': re.compile(r'^salt/presence/change$'),
+    AVAILABLE_TAG_PATTERNS_TO_TAG_NAME: ClassVar[dict[re.Pattern, str]] = {
+        re.compile(r'salt/job/(?P<jid>\d{20})/ret/(?P<mid>.+)'): 'salt/job/ret',
+        re.compile(r'^salt/job/(?P<jid>\d{20})/new$'): 'salt/job/new',
+        re.compile(r'salt/run/(?P<jid>\d{20})/ret$'): 'salt/run/ret',
+        re.compile(r'^salt/run/(?P<jid>\d{20})/new$'): 'salt/run/new',
+        re.compile(r'^minion/refresh/[a-z-]+-[a-f0-9]{12}$'): 'minion/refresh',
+        re.compile(r'^salt/minion/(?P<mid>.+)/start$'): 'salt/minion/start',
+        re.compile(r'^minion_start$'): 'salt/minion/start',
+        re.compile(r'^salt/auth$'): 'salt/auth',
+        re.compile(r'^salt/presence/present$'): 'salt/presence',
+        re.compile(r'^salt/presence/change$'): 'salt/presence',
     }
-    tag_patterns: ClassVar[list[re.Pattern[str]]] = list(AVAILABLE_TAG_NAME_TO_REGEX.values())
+    OTHER_TAG_NAME = 'other'
+    tag_patterns: ClassVar[list[re.Pattern[str]]] = list(AVAILABLE_TAG_PATTERNS_TO_TAG_NAME.keys())
 
-    async def process(self, match: re.Match, master_id: str, data: MessageDataType) -> None: ...
-
-    async def _prepare_metrics_data(self, match: re.Match, master_id: str, tag: str, data: MessageDataType) -> dict:
-        metrics_data = await super()._prepare_metrics_data(match=match, master_id=master_id, tag=tag, data=data)
-        tag_name = None
-
-        for _tag_name, tag_pattern in self.AVAILABLE_TAG_NAME_TO_REGEX.items():
-            if re.match(tag_pattern, tag):
+    async def handle(self, master_id: str, tag: str, data: MessageDataType) -> None:
+        tag_name: str | None = None
+        for tag_pattern, _tag_name in self.AVAILABLE_TAG_PATTERNS_TO_TAG_NAME.items():
+            if tag_pattern.match(tag):
                 tag_name = _tag_name
                 break
 
-        if tag_name:
-            metrics_data['tag_name'] = tag_name
-
-        metrics_data.update(
-            {
+        if self.can_process_metrics():
+            metrics_data: dict[str, Any] = {
+                'master_id': master_id,
                 'payload_size': sys.getsizeof(data),
                 'tag': tag,
+                'tag_name': tag_name if tag_name else self.OTHER_TAG_NAME,
             }
-        )
 
-        return metrics_data
+            await self.redis_client.publish(channel=self.METRIC_TAG, message=json.dumps(metrics_data))
+
+    async def process(self, match: re.Match, master_id: str, data: MessageDataType) -> None: ...
