@@ -26,6 +26,19 @@ class JobReturnReadOnlyFieldsMixin:
 class JobReturnEditableFieldsMixin: ...
 
 
+class JobReturnComputedFieldsMixin:
+    @property
+    def success(self) -> bool:
+        """
+        Does job finished successfully
+
+        Field exists in an Event Bus object, but not for all cases. E.g. field is
+        missing on `salt.call` return. For convenience in the model it is True when
+        retcode is zero and vice versa.
+        """
+        return not self.retcode  # type: ignore
+
+
 class JobReturnCreateSchema(BaseModel, JobReturnReadOnlyFieldsMixin, JobReturnEditableFieldsMixin):
     model_config = ConfigDict(extra='allow')
 
@@ -46,26 +59,24 @@ class JobReturnUpdateSchema(BaseModel, JobReturnEditableFieldsMixin):
 
 
 class JobReturnModel(
-    BaseModel, CreatedModifiedMixin, JobReturnReadOnlyFieldsMixin, JobReturnEditableFieldsMixin, IDMixin
+    BaseModel,
+    JobReturnComputedFieldsMixin,
+    CreatedModifiedMixin,
+    JobReturnReadOnlyFieldsMixin,
+    JobReturnEditableFieldsMixin,
+    IDMixin,
 ):
     data: Any = Field(default=None)
-
-    @property
-    def success(self) -> bool:
-        """
-        Does job finished successfully
-
-        Field exists in an Event Bus object, but not for all cases. E.g. field is
-        missing on `salt.call` return. For convenience in the model it is True when
-        retcode is zero and vice versa.
-        """
-        return not self.retcode
 
 
 # REST
 
 
-class GetJobReturnResponse(BaseModel):
-    result: list[JobReturnModel]
-    cursor: int = Field(description='Pointer to get next portion of data, 0 when no more data')
-    length: int
+class JobReturnListResponse(
+    BaseModel,
+    JobReturnComputedFieldsMixin,
+    CreatedModifiedMixin,
+    JobReturnReadOnlyFieldsMixin,
+    JobReturnEditableFieldsMixin,
+    IDMixin,
+): ...

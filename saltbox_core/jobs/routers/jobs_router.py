@@ -1,11 +1,9 @@
 from typing import Annotated
 
-import pydantic
 from fastapi import APIRouter, Body, Depends
 from pydantic import Field
 
-from saltbox_core.config import SETTINGS
-from saltbox_core.jobs.schemas.job_return_schemas import GetJobReturnResponse
+from saltbox_core.jobs.schemas.job_return_schemas import JobReturnListResponse
 from saltbox_core.jobs.schemas.job_schemas import (
     CreateJobRequest,
     JobCreateSchema,
@@ -53,6 +51,7 @@ async def jobs_list(
         projection_model=JobsListResponse,
         sort=body.sort,
     )
+
     return jobs
 
 
@@ -118,8 +117,8 @@ async def job_returns_count(
     return await job_return_service.count(query={'jid': jid})
 
 
-@router.get(
-    '/{jid}/return',
+@router.post(
+    '/returns-list',
     operation_id='job_returns_list',
     openapi_extra=GatewayEndpointConfig(
         policy='core.jobs.base',
@@ -127,19 +126,22 @@ async def job_returns_count(
     ).model_dump(by_alias=True),
 )
 async def job_returns_list(
-    jid: StrJid,
+    # opa_query: Annotated[dict, Depends(get_opa_query)],
+    body: Annotated[JobListBody, Body()],
     job_return_service: Annotated[JobReturnService, Depends(get_job_return_service)],
-    count: Annotated[int, Field(gt=0, lt=SETTINGS.max_count)] = 10,
-    cursor: pydantic.NonNegativeInt = 0,
-) -> GetJobReturnResponse:
-    """
-    Get list of returned by minions data.
+) -> PaginatedResponse[JobReturnListResponse]:
+    query = body.query
 
-    Amount is not guaranteed to be exactly count.
-    """
+    # TODO (@): Apply OPA query filtering
+    # if opa_query:
+    #     query = {'$and': [query, opa_query]}
 
-    returns = await job_return_service.get_list(query={'jid': jid}, skip=cursor, limit=count)
-    returns_count = len(returns)
-    next_cursor = cursor + count if returns_count >= count else 0
+    jobs = await job_return_service.get_list_paginated(
+        query=query,
+        skip=body.skip,
+        limit=body.limit,
+        projection_model=JobReturnListResponse,
+        sort=body.sort,
+    )
 
-    return GetJobReturnResponse(cursor=next_cursor, result=returns, length=returns_count)
+    return jobs
