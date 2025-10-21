@@ -12,9 +12,14 @@ class SaltMessageMetricMessageHandler(BaseMessageHandler):
 
     METRIC_TAG = 'metrics:salt_message'
     AVAILABLE_TAG_NAME_TO_REGEX: ClassVar[dict[str, re.Pattern]] = {
-        'job_ret': re.compile(r'salt/job/(?P<jid>\d{20})/ret/(?P<mid>.+)'),
-        'job_new': re.compile(r'^salt/job/(?P<jid>\d{20})/new$'),
+        'salt/job/ret': re.compile(r'salt/job/(?P<jid>\d{20})/ret/(?P<mid>.+)'),
+        'salt/job/new': re.compile(r'^salt/job/(?P<jid>\d{20})/new$'),
         'minion/refresh': re.compile(r'^minion/refresh/[a-z-]+-[a-f0-9]{12}$'),
+        'salt/minion/start': re.compile(r'^salt/minion/(?P<mid>.+)/start$'),
+        'minion_start': re.compile(r'^minion_start$'),
+        'salt/auth': re.compile(r'^salt/auth$'),
+        'salt/presence/present': re.compile(r'^salt/presence/present$'),
+        'salt/presence/change': re.compile(r'^salt/presence/change$'),
     }
     tag_patterns: ClassVar[list[re.Pattern[str]]] = list(AVAILABLE_TAG_NAME_TO_REGEX.values())
 

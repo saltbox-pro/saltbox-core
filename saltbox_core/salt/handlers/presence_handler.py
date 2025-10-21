@@ -14,7 +14,7 @@ class PresenceMessageHandler(BaseMessageHandler):
     A message handler for salt presence messages
     """
 
-    tag_patterns: ClassVar[list[re.Pattern[str]]] = [re.compile(r'salt/presence/present')]
+    tag_patterns: ClassVar[list[re.Pattern[str]]] = [re.compile(r'^salt/presence/present$')]
 
     def __init__(self, redis_client: aioredis.Redis, minion_service: MinionService) -> None:
         super().__init__(redis_client)
