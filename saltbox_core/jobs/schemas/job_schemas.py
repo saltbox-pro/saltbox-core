@@ -96,7 +96,7 @@ class JobListBody(SkipLimitParams, QueryParams, SortParams):
     )
 
 
-class JobsListResponse(BaseModel, JobComputedFieldsMixin):
+class JobsListResponse(BaseModel, CreatedModifiedMixin, JobComputedFieldsMixin, IDMixin):
     jid: StrJid
     tgt: str | list[str]
     tgt_type: SaltTgtType
