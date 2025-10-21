@@ -82,4 +82,3 @@ RUN \
   --mount=type=bind,target=/mnt/saltbox-core/,readwrite \
   --mount=type=cache,target=/root/.cache/pip/ \
   pip3 install /mnt/saltbox-core/
-WORKDIR /usr/lib/python3/site-packages

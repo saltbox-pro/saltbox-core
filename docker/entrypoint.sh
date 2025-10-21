@@ -1,4 +1,4 @@
-#! /bin/sh
+#! /bin/bash
 
 set -e
 
@@ -33,42 +33,38 @@ if [ "$DEV_MODE" = 1 ]; then
     uv --no-progress pip install --system --editable "${SALTBOX_SDK_SRC_PATH}"
 fi
 
+declare -r tiq_tasks_pattern='saltbox_core/**/tiq_tasks.py'
+workdir="$PWD"
+
 cmd_uvicorn() {
-  cmd='/usr/bin/uvicorn saltbox_core.main:app'
-  cmd="${cmd} --host=0.0.0.0 --port=8000"
-  cmd="${cmd} --timeout-graceful-shutdown=${TIMEOUT_GRACEFUL_SHUTDOWN}"
+  cmd=(/usr/bin/uvicorn saltbox_core.main:app --host=0.0.0.0 --port=8000)
+  cmd+=(--timeout-graceful-shutdown="${TIMEOUT_GRACEFUL_SHUTDOWN}")
   if [ "$DEV_MODE" = 1 ]; then
-    cmd="$cmd --reload"
+    cmd+=(--reload)
   fi
 }
 
 cmd_taskiq_worker() {
-  # -fsd - autodiscover tasks in all modules
-  # -tp - file pattern for autodiscover (default: **/tasks.py)
-  # -r - autoreload for dev
-  # -w - number of workers
-  # --max-fails - max number of failed tasks before stopping the worker
-  cmd='/usr/bin/taskiq worker saltbox_core.tkq:broker'
-#  cmd="${cmd} saltbox_core.jobs saltbox_core.settings saltbox_core.salt -w 1 --max-fails 1"
-  cmd="${cmd} -fsd -tp **/tiq_tasks.py -w 1 --max-fails 1"
+  cmd=(/usr/bin/taskiq worker saltbox_core.tkq:broker --fs-discover)
+  cmd+=("--tasks-pattern=${tiq_tasks_pattern}" --workers=1 --max-fails=1)
   if [ "$DEV_MODE" = 1 ]; then
-    cmd="$cmd --reload"
+    cmd+=(--reload)
+    workdir='/mnt/saltbox-core/'
+  else
+    workdir='/usr/lib/python3/site-packages/'
   fi
 }
 
 cmd_taskiq_scheduler() {
-  # -fsd - autodiscover tasks in all modules
-  # -fp - file pattern for autodiscover (default: **/tasks.py)
-  # --skip-first-run - scheduler will wait until the start of the next minute and then start executing tasks
-  # cmd="taskiq scheduler -tp **/tasksq.py saltbox_core.tkq_sched:scheduler saltbox_core.async_tasks" # bad
-  # cmd="taskiq scheduler -tp **/tasksq.py saltbox_core.tkq_sched:scheduler saltbox_core.async_tasks.tasksq" # good
-
-  cmd="/usr/bin/taskiq scheduler saltbox_core.tkq_sched:scheduler -fsd -tp **/tiq_tasks.py"
+  cmd=(/usr/bin/taskiq scheduler saltbox_core.tkq_sched:scheduler)
+  cmd+=(--fs-discover "--tasks-pattern=${tiq_tasks_pattern}")
+  if [ "$DEV_MODE" != 1 ]; then
+    workdir='/usr/lib/python3/site-packages/'
+  fi
 }
 
 cmd_shell() {
-  shift
-  cmd="$*"
+  cmd=("${@:2}")
 }
 
 wrong_cmd() {
@@ -84,5 +80,7 @@ case $1 in
   *) wrong_cmd "$@" ;;
 esac
 
-echo "$ ${cmd}"
-exec $cmd
+cd "$workdir"
+echo "Current working directory is '$PWD'"
+echo "$ ${cmd[*]}"
+exec "${cmd[@]}"
