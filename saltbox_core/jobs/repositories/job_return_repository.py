@@ -5,9 +5,10 @@ from fastapi import Depends
 from pymongo.asynchronous.database import AsyncDatabase
 from redis.asyncio import Redis
 
+from saltbox_core.config import logger
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnModel
 from saltbox_sdk.db.mongo.config import get_mongo
-from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
+from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository, ProjectionModel
 from saltbox_sdk.db.redis.config import get_redis
 
 
@@ -21,14 +22,26 @@ class JobReturnRepository(BaseMongoRepository[JobReturnModel]):
         self.rdb = rdb
         super().__init__(database=database)
 
-    async def prepare_object_data(self, data: dict[str, Any]) -> dict[str, Any]:
-        data = await super().prepare_object_data(data=data)
-        raw_return: bytes | None = await self.rdb.hget(
-            name=f'master:{data["salt_master"]}:job:{data["jid"]}:return-data', key=data['minion_id']
-        )
+    async def prepare_object_data(
+        self, data: dict[str, Any], projection_model: type[ProjectionModel] | None = None
+    ) -> dict[str, Any]:
+        data = await super().prepare_object_data(data=data, projection_model=projection_model)
+        projection_model_class = projection_model if projection_model is not None else JobReturnModel
 
-        if raw_return:
-            data['data'] = json.loads(raw_return)
+        if 'data' in projection_model_class.model_fields:
+            return_data: Any = None
+
+            try:
+                raw_return: bytes | None = await self.rdb.hget(
+                    name=f'master:{data["salt_master"]}:job:{data["jid"]}:return-data', key=data['minion_id']
+                )
+
+                if raw_return:
+                    return_data = json.loads(raw_return)
+            except Exception as e:
+                logger.info(f'Failed to retrieve job return data: {e}')
+
+            data['data'] = return_data
 
         return data
 

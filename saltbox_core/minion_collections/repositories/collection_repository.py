@@ -6,7 +6,7 @@ from pymongo.asynchronous.database import AsyncDatabase
 
 from saltbox_core.minion_collections.schemas.collection_schemas import CollectionBaseTreeModel, CollectionModel
 from saltbox_sdk.db.mongo.config import get_mongo
-from saltbox_sdk.db.mongo.repository_base import ModelType
+from saltbox_sdk.db.mongo.repository_base import ModelType, ProjectionModel
 from saltbox_sdk.db.mongo.repository_tree_base import BaseTreeMongoRepository, OnDelete
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.exceptions import ObjectNotFoundException
@@ -19,7 +19,9 @@ class CollectionRepository(BaseTreeMongoRepository[CollectionModel]):
         auto_now_fields: ClassVar[list[str]] = ['modified']
         on_delete = OnDelete.cascade
 
-    async def prepare_object_data(self, data: dict[str, Any]) -> dict[str, Any]:
+    async def prepare_object_data(
+        self, data: dict[str, Any], projection_model: type[ProjectionModel] | None = None
+    ) -> dict[str, Any]:
         parent = await self.get_parent(PyObjectId(data['_id']), projection_model=CollectionBaseTreeModel)
         query = data['query'] if 'query' in data else {}
 
