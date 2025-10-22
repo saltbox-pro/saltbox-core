@@ -79,4 +79,7 @@ class JobReturnListResponse(
     JobReturnReadOnlyFieldsMixin,
     JobReturnEditableFieldsMixin,
     IDMixin,
-): ...
+):
+    data: Any = Field(
+        default=None
+    )  # TODO @: Temporary. Remove this after front will be get this from job return endpoint
