@@ -20,18 +20,18 @@ class JobReturnService(
             return None
 
         channels: dict[str, str] = {
-            'create': f'job:{obj.jid}:return:create',
-            'update': f'job:{obj.jid}:return:update',
-            'delete': f'job:{obj.jid}:return:delete',
+            'create': f'job-return:{obj.jid}:create',
+            'update': f'job-return:{obj.jid}:update',
+            'delete': f'job-return:{obj.jid}:delete',
         }
 
         if hasattr(obj, 'source') and obj.source:
             if obj.source.type == 'task':
                 channels.update(
                     {
-                        'create_task': f'task:{obj.source.id}:job:{obj.jid}:return:create',
-                        'update_task': f'task:{obj.source.id}:job:{obj.jid}:return:update',
-                        'delete_task': f'task:{obj.source.id}:job:{obj.jid}:return:delete',
+                        'create_task': f'task:{obj.source.id}:job-return:{obj.jid}:create',
+                        'update_task': f'task:{obj.source.id}:job-return:{obj.jid}:update',
+                        'delete_task': f'task:{obj.source.id}:job-return:{obj.jid}:delete',
                     }
                 )
 
