@@ -10,7 +10,7 @@ class AsyncMockCollection:
         self._inserted_docs = {}  # for storing inserted documents
         self.mocker = mocker
 
-    async def insert_one(self, document):
+    async def insert_one(self, document, session=None):
         # Check if the document already exists in the collection
         if 'slug' in document and any(doc.get('slug') == document['slug'] for doc in self._inserted_docs.values()):
             from pymongo.errors import DuplicateKeyError as MongoDuplicateKeyError
@@ -22,7 +22,7 @@ class AsyncMockCollection:
         self._inserted_docs[result.inserted_id] = document
         return self.mocker.MagicMock(inserted_id=result.inserted_id)
 
-    def find(self, filter=None, projection=None, limit=0, skip=0, sort=None):
+    def find(self, filter=None, projection=None, limit=0, skip=0, sort=None, session=None):
         """Эмуляция метода find"""
         cursor_results = []
 
@@ -46,10 +46,10 @@ class AsyncMockCollection:
         mock_cursor.to_list = self.mocker.AsyncMock(return_value=cursor_results)
         return mock_cursor
 
-    async def count_documents(self, filter, limit=0):
+    async def count_documents(self, filter, limit=0, session=None):
         return self.collection.count_documents(filter)
 
-    async def update_one(self, filter, update, upsert=False):
+    async def update_one(self, filter, update, upsert=False, session=None):
         """Эмуляция метода update_one"""
         # Проверяем, если в фильтре есть _id
         if '_id' in filter:
@@ -68,7 +68,7 @@ class AsyncMockCollection:
         result = self.collection.update_one(filter, update, upsert=upsert)
         return self.mocker.MagicMock(modified_count=result.modified_count)
 
-    async def delete_one(self, filter):
+    async def delete_one(self, filter, session=None):
         """Эмуляция метода delete_one"""
         # Если в фильтре есть _id
         if '_id' in filter:
@@ -84,7 +84,7 @@ class AsyncMockCollection:
         result = self.collection.delete_one(filter)
         return self.mocker.MagicMock(deleted_count=result.deleted_count)
 
-    async def delete_many(self, filter):
+    async def delete_many(self, filter, session=None):
         """Эмуляция метода delete_many"""
         # Удаляем документы из нашего внутреннего хранилища, если они соответствуют фильтру
         to_delete = []
