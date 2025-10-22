@@ -108,6 +108,12 @@ class JobsListResponse(BaseModel, CreatedModifiedMixin, JobComputedFieldsMixin, 
     user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
     source: Source | None = None
 
+    returning: dict[str, bool | None] = Field(default={}, exclude=True)
+
+    @computed_field()
+    def has_failed_job_returns(self) -> bool:
+        return not all(res for res in self.returning.values())
+
 
 class CreateJobRequest(BaseModel):
     tgt: str | list[str] = '*'
