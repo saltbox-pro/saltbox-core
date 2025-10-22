@@ -2,6 +2,7 @@ from typing import Annotated, Any, ClassVar, TypeVar, overload, override
 
 from fastapi import Depends
 from pydantic import BaseModel
+from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
 from pymongo.asynchronous.database import AsyncDatabase
 
 from saltbox_core.tasks.schemas.task_template_schemas import TaskTemplateModel
@@ -27,6 +28,7 @@ class TaskTemplateRepository(BaseMongoRepository[TaskTemplateModel]):
         limit: int,
         skip: int,
         *,
+        session: MongoAsyncClientSession | None = None,
         sort: dict[str, SortOrder] | None = None,
     ) -> list[TaskTemplateModel]: ...
 
@@ -36,8 +38,9 @@ class TaskTemplateRepository(BaseMongoRepository[TaskTemplateModel]):
         query: dict[str, Any] | None,
         limit: int,
         skip: int,
-        projection_model: type[ProjectionModel],
         *,
+        session: MongoAsyncClientSession | None = None,
+        projection_model: type[ProjectionModel],
         sort: dict[str, SortOrder] | None = None,
     ) -> list[ProjectionModel]: ...
 
@@ -47,8 +50,9 @@ class TaskTemplateRepository(BaseMongoRepository[TaskTemplateModel]):
         query: dict[str, Any] | None = None,
         limit: int = 0,
         skip: int = 0,
-        projection_model: type[ProjectionModel] | None = None,
         *,
+        session: MongoAsyncClientSession | None = None,
+        projection_model: type[ProjectionModel] | None = None,
         sort: dict[str, SortOrder] | None = None,
     ) -> list[TaskTemplateModel] | list[ProjectionModel]:
         projection = self._get_projection_from_model(projection_model) if projection_model else None
@@ -66,16 +70,17 @@ class TaskTemplateRepository(BaseMongoRepository[TaskTemplateModel]):
             },
             {'$unwind': '$repo_info'},
         ]
+
         if skip:
             pipeline.append({'$skip': skip})
         if limit:
             pipeline.append({'$limit': limit})
         if sort:
             pipeline.append({'$sort': dict(sort)})
-
         if projection:
             pipeline.append({'$project': projection})
-        result = await self.collection.aggregate(pipeline)
+
+        result = await self.collection.aggregate(pipeline=pipeline, session=session)
 
         if projection_model:
             return [projection_model.model_validate(doc) for doc in await result.to_list()]

@@ -3,6 +3,7 @@ from typing import Annotated, Any, overload, override
 
 from fastapi import Depends
 from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
+from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
 from redis import exceptions as redis_exceptions
 from redis.asyncio import Redis
 
@@ -81,6 +82,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         self,
         data: JobCreateSchema,
         *,
+        session: MongoAsyncClientSession | None = None,
         notify: bool = True,
     ) -> JobModel: ...
 
@@ -89,6 +91,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         self,
         data: JobCreateSchema,
         *,
+        session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel],
         notify: bool = True,
     ) -> ProjectionModel: ...
@@ -98,6 +101,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         self,
         data: JobCreateSchema,
         *,
+        session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel] | None = None,
         notify: bool = True,
     ) -> JobModel | ProjectionModel:
@@ -105,7 +109,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
             data.jid = str(JID.generate())
 
         try:
-            await self.master_service.get_accepted_by_master_id(data.salt_master)
+            await self.master_service.get_accepted_by_master_id(master_id=data.salt_master, session=session)
         except ObjectNotFoundException as e:
             raise JobCreateException(str(e)) from e
 
@@ -129,7 +133,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
             if notify:
                 create_args['notify'] = notify
 
-            job = await super().create(**create_args)
+            job = await super().create(**create_args, session=session)
         except redis_exceptions.RedisError as e:
             raise JobCreateException(str(e)) from e
 

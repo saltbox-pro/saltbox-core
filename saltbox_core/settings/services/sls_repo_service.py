@@ -5,6 +5,7 @@ from typing import Annotated, Any, TypeVar, overload, override
 
 from fastapi import Depends
 from pydantic import BaseModel
+from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
 from redis.asyncio import Redis
 
 from saltbox_core.config import SETTINGS, logger
@@ -43,6 +44,7 @@ class SettingsSlsRepoService(
         limit: int,
         skip: int,
         *,
+        session: MongoAsyncClientSession | None = None,
         sort: dict[str, SortOrder] | None = None,
     ) -> PaginatedResponse[SettingsSlsRepoModel]: ...
 
@@ -53,6 +55,7 @@ class SettingsSlsRepoService(
         limit: int,
         skip: int,
         *,
+        session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel],
         sort: dict[str, SortOrder] | None = None,
     ) -> PaginatedResponse[ProjectionModel]: ...
@@ -64,6 +67,7 @@ class SettingsSlsRepoService(
         limit: int = 0,
         skip: int = 0,
         *,
+        session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel] | None = None,
         sort: dict[str, SortOrder] | None = None,
     ) -> PaginatedResponse[SettingsSlsRepoModel] | PaginatedResponse[ProjectionModel]:
@@ -72,7 +76,12 @@ class SettingsSlsRepoService(
         lockers = await self._get_repo_lockers()
 
         data = await self.repo.get_list(
-            query, limit=limit, skip=skip, projection_model=projection_model or SettingsSlsRepoModel, sort=sort
+            query,
+            limit=limit,
+            skip=skip,
+            projection_model=projection_model or SettingsSlsRepoModel,
+            sort=sort,
+            session=session,
         )
         for item in data:
             if hasattr(item, 'repo_url') and hasattr(item, 'locked'):
@@ -92,22 +101,42 @@ class SettingsSlsRepoService(
         logger.debug('Locked repositories: %s', lockers)
         return lockers
 
-    async def set_activity_state(self, sid: PyObjectId, state: bool) -> SettingsSlsRepoModel:
+    async def set_activity_state(
+        self,
+        sid: PyObjectId,
+        state: bool,
+        *,
+        session: MongoAsyncClientSession | None = None,
+    ) -> SettingsSlsRepoModel:
         document = await self.get(sid)
         if document.is_active == state:
             return document
-        result = await self.update(query=sid, data={'is_active': state})
+        result = await self.update(query=sid, data={'is_active': state}, session=session)
         await self.sync_to_serve_dir()
         return result
 
-    async def activate(self, sid: PyObjectId) -> SettingsSlsRepoModel:
-        return await self.set_activity_state(sid=sid, state=True)
+    async def activate(
+        self,
+        sid: PyObjectId,
+        *,
+        session: MongoAsyncClientSession | None = None,
+    ) -> SettingsSlsRepoModel:
+        return await self.set_activity_state(sid=sid, state=True, session=session)
 
-    async def deactivate(self, sid: PyObjectId) -> SettingsSlsRepoModel:
-        return await self.set_activity_state(sid=sid, state=False)
+    async def deactivate(
+        self,
+        sid: PyObjectId,
+        *,
+        session: MongoAsyncClientSession | None = None,
+    ) -> SettingsSlsRepoModel:
+        return await self.set_activity_state(sid=sid, state=False, session=session)
 
-    async def sync_all(self) -> list[str]:
-        active_repos = await self.get_list(query={'is_active': True}, skip=0, limit=0)
+    async def sync_all(
+        self,
+        *,
+        session: MongoAsyncClientSession | None = None,
+    ) -> list[str]:
+        active_repos = await self.get_list(query={'is_active': True}, skip=0, limit=0, session=session)
         task_ids = []
         for repo in active_repos:
             try:
@@ -119,11 +148,17 @@ class SettingsSlsRepoService(
                 raise
         return task_ids
 
-    async def delete_and_clean(self, sid: PyObjectId, tpl_service: TaskTemplateService) -> None:
+    async def delete_and_clean(
+        self,
+        sid: PyObjectId,
+        tpl_service: TaskTemplateService,
+        *,
+        session: MongoAsyncClientSession | None = None,
+    ) -> None:
         repo_settings = await self.get(sid)
         # Remove all templates from this repo
         try:
-            deleted_count = await tpl_service.delete_many({'repo_id': sid})
+            deleted_count = await tpl_service.delete_many(query={'repo_id': sid}, session=session)
             logger.debug('deleted_count: %s', deleted_count)
         except Exception as e:
             msg = f'{e!s}'

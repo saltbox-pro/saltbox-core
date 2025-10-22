@@ -4,6 +4,7 @@ from typing import Annotated, Any, TypeVar, overload, override
 from fastapi import Depends
 from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
 from pydantic import BaseModel
+from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
 from redis.asyncio import Redis
 
 from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
@@ -123,6 +124,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
         self,
         data: TaskCreateInputSchema,
         *,
+        session: MongoAsyncClientSession | None = None,
         projection_model: None = None,
         notify: bool = True,
     ) -> TaskModel: ...
@@ -132,6 +134,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
         self,
         data: TaskCreateInputSchema,
         *,
+        session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel],
         notify: bool = True,
     ) -> ProjectionModel: ...
@@ -141,6 +144,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
         self,
         data: TaskCreateInputSchema,
         *,
+        session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel] | None = None,
         notify: bool = True,
     ) -> TaskModel | ProjectionModel:
@@ -150,9 +154,11 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
             creation_data.postprocessing = TaskPostProcessing.model_validate(data.postprocessing.model_dump())
 
         if projection_model:
-            task: TaskModel | ProjectionModel = await self.repo.create(creation_data, projection_model=projection_model)
+            task: TaskModel | ProjectionModel = await self.repo.create(
+                data=creation_data, projection_model=projection_model, session=session
+            )
         else:
-            task = await self.repo.create(creation_data)
+            task = await self.repo.create(data=creation_data, session=session)
 
         if notify and hasattr(task, 'id'):
             await self.rdb.publish(channel=f'task:{task.id}:create', message=self.__prepare_pub_message(task))
@@ -166,6 +172,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
         data: TaskUpdateSchema | dict[str, Any],
         exclude_unset: bool = True,
         *,
+        session: MongoAsyncClientSession | None = None,
         notify: bool = True,
     ) -> TaskModel: ...
 
@@ -176,6 +183,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
         data: TaskUpdateSchema | dict[str, Any],
         exclude_unset: bool = True,
         *,
+        session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel],
         notify: bool = True,
     ) -> ProjectionModel: ...
@@ -187,11 +195,12 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
         data: TaskUpdateSchema | dict[str, Any],
         exclude_unset: bool = True,
         *,
+        session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel] | None = None,
         notify: bool = True,
     ) -> TaskModel | ProjectionModel:
         try:
-            obj = await self.get(query=query, projection_model=TaskModel)
+            obj = await self.get(query=query, projection_model=TaskModel, session=session)
 
             if hasattr(data, 'status') and obj.status != data.status:
                 stamp_field_name = {
@@ -210,9 +219,15 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
                     data=data,
                     exclude_unset=exclude_unset,
                     projection_model=projection_model,
+                    session=session,
                 )
             else:
-                updated_obj = await self.repo.update(query=query, data=data)
+                updated_obj = await self.repo.update(
+                    query=query,
+                    data=data,
+                    exclude_unset=exclude_unset,
+                    session=session,
+                )
         except ObjectNotFoundException as e:
             msg = 'Object does not found'
             raise TaskObjectDoesNotExistException(msg) from e
@@ -225,15 +240,32 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
         return updated_obj
 
     @overload
-    async def delete(self, query: dict[str, Any] | PyObjectId) -> int: ...
+    async def delete(
+        self,
+        query: dict[str, Any] | PyObjectId,
+        *,
+        session: MongoAsyncClientSession | None = None,
+    ) -> int: ...
 
     @overload
-    async def delete(self, query: dict[str, Any] | PyObjectId, notify: bool = True) -> int: ...
+    async def delete(
+        self,
+        query: dict[str, Any] | PyObjectId,
+        *,
+        session: MongoAsyncClientSession | None = None,
+        notify: bool = True,
+    ) -> int: ...
 
     @override
-    async def delete(self, query: dict[str, Any] | PyObjectId, notify: bool = True) -> int:
+    async def delete(
+        self,
+        query: dict[str, Any] | PyObjectId,
+        *,
+        session: MongoAsyncClientSession | None = None,
+        notify: bool = True,
+    ) -> int:
         obj = await self.get(query=query)
-        deleted_count = await super().delete(query=query)
+        deleted_count = await super().delete(query=query, session=session)
 
         if notify:
             await self.rdb.publish(channel=f'task:{obj.id}:delete', message=self.__prepare_pub_message(obj))
