@@ -28,6 +28,7 @@ from saltbox_core.settings.schemas.sls_repos_schemas import (
     SettingsSlsRepoModel,
 )
 from saltbox_core.utilities.filesystem import get_latest_ctime, recursive_force_remove
+from saltbox_core.utilities.profile import log_duration
 
 logger = logging.getLogger(__name__)
 yaml = YAML()
@@ -69,6 +70,12 @@ class SlsReposDuplicatesException(SlsReposValidationException):
 
 
 class SshfsSyncBase(ABC):
+    """
+    Attrubutes:
+        file_entry (ManifestSshfsFilesSchema): file related part of Manifest
+        dest_path (Path): where the file expected
+        dest_digest_path (Path): where the digest file expected
+    """
     TMP_DIR = SETTINGS.sshfs_tmp_dir
 
     def __init__(self, file_path: Path, file_entry: ManifestSshfsFilesSchema) -> None:
@@ -571,7 +578,7 @@ class SlsReposServeUpdater:
     #  - Items will be checked on being equal or being a subpass of a value on conlicts check.
     #  - Items will be passed to rsync `--exclude` as is. Trailing `/` is significant.
     # Rsync excludes to not to sync to serve location.
-    IGNORE_LIST: ClassVar = ('.git', '.gitignore', 'README.md', *MANIFEST_FILE_ALLOWED_NAMES)
+    IGNORE_LIST: ClassVar[tuple[str, ...]] = ('.git', '.gitignore', 'README.md', *MANIFEST_FILE_ALLOWED_NAMES,)
     ALLOW_DUPLICATING_DIRS = SETTINGS.salt_modules_allow_duplicating_dirs
 
     def __init__(self, repos: list[SettingsSlsRepoModel]) -> None:
@@ -677,6 +684,95 @@ class SlsReposServeUpdater:
             src_list.append(src_path)
         self._check_conflicts(src_list)
         self._rsync(src_list, dst)
+
+
+class OrphanAuxFilesCleaner:
+    """
+    Delete ALL file in SSHFS dir EXCEPT listed in keep_for_repos Manifests.
+
+    Prefer to not run directly, beter use cleanup_orphan_aux_files() task which is
+    safe from concurrent runs.
+    """
+    SSHFS_DIR = SETTINGS.sshfs_dir
+    DRY_RUN = SETTINGS.orphan_aux_files_cleanup_dry_run
+
+    # Following entries in SSHFS_DIR will be kept anyway
+    IGNORE_LIST: ClassVar[tuple[str | Path, ...]] = ('.ssh',)
+
+    @classmethod
+    def _rm_rf(cls, path: Path) -> None:
+        if not cls.DRY_RUN:
+            recursive_force_remove(path)
+        else:
+            type_pref = 'Directory' if path.is_dir() else 'File'
+            l_tpl = '%s "%s" will be deleted when dry run option will be disabled'
+            logger.info(l_tpl, type_pref, path)
+
+    @classmethod
+    def get_parented_files(cls, repos: list[SettingsSlsRepoModel]) -> set[Path]:
+        keep_list = set()
+        for repo in repos:
+            manifest = SlsRepoService(repo).manifest
+            repo_keep_list: list[Path] = []
+
+            for file_path, file_entry in manifest.sshfs_files.items():
+                sync = create_sshfs_sync(file_path, file_entry)
+                repo_keep_list.append(sync.dest_path)
+                repo_keep_list.append(sync.dest_digest_path)
+
+            # Checking on Path.exists() does not affect cleanup() result
+            # but may optimize matching a bit.
+            keep_list |= {path for path in repo_keep_list if path.exists()}
+
+        return keep_list
+
+    @classmethod
+    @log_duration()
+    def cleanup(cls, keep_for_repos: list[SettingsSlsRepoModel]) -> None:
+        fun_name = f'{cls.cleanup.__name__}()'
+        logger.debug('%s has been called', fun_name)
+
+        root = cls.SSHFS_DIR
+        keep_list = cls.get_parented_files(repos=keep_for_repos)
+        keep_list |= {root / entry for entry in cls.IGNORE_LIST}
+        logger.debug('%s ingore list: %s', fun_name, cls.IGNORE_LIST)
+
+        par_list = set()
+        for i in keep_list:
+            par_list |= set(i.parents)
+        par_list -= set(cls.SSHFS_DIR.parents)
+
+        stack = sorted(root.iterdir(), reverse=True)
+        while stack:
+            path = stack.pop()
+            if path in keep_list:
+                logger.debug('%s keeps %s', fun_name, path)
+            elif path in par_list:  # entry contains some of keep_list items
+                if not cls.is_outbounding_symlink(path):
+                    l_tpl = '%s found symlink "%s" which leads upper, skipping'
+                    logger.warning(l_tpl, fun_name, path)
+                    continue
+                try:
+                    logger.debug('%s goes deep into %s', fun_name, path)
+                    stack.extend(sorted(path.iterdir(), reverse=True))
+                except NotADirectoryError:
+                    l_tpl = '%s expected "%s" to be a directory, but it is not, deleting now'
+                    logger.warning(l_tpl, fun_name, path)
+                    cls._rm_rf(path)
+            else:
+                logger.info('%s deletes %s', fun_name, path)
+                cls._rm_rf(path)
+
+    @classmethod
+    def is_outbounding_symlink(cls, path: Path) -> bool:
+        if not path.is_absolute():
+            msg = f'The {cls.is_outbounding_symlink.__name__}() works with absolute paths only'
+            raise ValueError(msg)
+        if not path.is_symlink():
+            return True
+        if path.parent not in path.resolve().parents:
+            return False
+        return True
 
 
 @asynccontextmanager

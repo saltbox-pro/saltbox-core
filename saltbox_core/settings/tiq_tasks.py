@@ -17,6 +17,7 @@ from saltbox_core.tasks.repositories.task_template_repository import (
 from saltbox_core.tasks.schemas.task_template_schemas import TaskTemplateCreateSchema, TaskTemplateUpdateSchema
 from saltbox_core.tkq import ConcurrencyLocker, broker
 from saltbox_core.utilities.git_repo_helper import (
+    OrphanAuxFilesCleaner,
     SlsRepoService,
     SlsReposServeUpdater,
     create_sshfs_sync,
@@ -27,6 +28,7 @@ from saltbox_sdk.exceptions import ObjectNotFoundException
 
 SETTINGS = Settings()
 SYNC_SERVE_DIR_LOCK_EXPIRATION_SEC = 300
+CLEANUP_ORPHAN_AUX_FILES_LOCK_EXPIRATION_SEC = 15
 
 
 async def sync_schemas(
@@ -119,6 +121,8 @@ async def sync_sls_repo_task(
 
             await progress.set_progress(TaskState.SUCCESS, 'Sync successful')
 
+            await cleanup_orphan_aux_files.kiq()
+
             return {
                 'created': created,
                 'updated': updated,
@@ -149,3 +153,12 @@ async def sync_sls_repos_to_serve_dir(
     salt_modules_serve_updater = SlsReposServeUpdater(active_repos)
     salt_modules_serve_updater.update()
     await notify_accepted_masters_on_repos_update()
+
+
+@broker.task()
+async def cleanup_orphan_aux_files(
+    sls_repo_model: SettingsSlsRepoRepository = TaskiqDepends(get_sls_repo_repository),
+    limiter: None = TaskiqDepends(ConcurrencyLocker(expire=CLEANUP_ORPHAN_AUX_FILES_LOCK_EXPIRATION_SEC)),
+) -> None:
+    all_repos = await sls_repo_model.get_list(query={}, skip=0, limit=0)
+    OrphanAuxFilesCleaner.cleanup(all_repos)

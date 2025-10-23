@@ -32,6 +32,10 @@ class ConcurrencyLocker:
 
     If task will be "kiqed" again while executing, it will be queued to execute only once
     after the current run.
+
+    Attrubutes:
+        name (str | None): optional explicit task name
+        expire (int | None): optional expiration time for every retry
     """
 
     REQUEUE_DELAY_SEC = 1
