@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, ClassVar
 
 import redis.asyncio as aioredis
+from pymongo.asynchronous.client_session import AsyncClientSession
 from pymongo.errors import OperationFailure
 
 from saltbox_core.config import SETTINGS, logger
@@ -55,32 +56,32 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         return data
 
     async def get_job(self, jid: str, master_id: str, data: MessageDataType) -> JobModel:
+        async def _get_job(_session: AsyncClientSession | None = None) -> JobModel:
+            existed_job = await self.job_service.get(
+                query={'jid': str(jid), 'salt_master': str(master_id)}, session=_session
+            )
+
+            existed_job.returning[data['minion_id']] = data['retcode'] == 0
+            is_finished = all(mid in existed_job.returning.keys() for mid in existed_job.minions)
+            existed_job.status = JobStatus.finished if is_finished else JobStatus.waiting_returns
+
+            return await self.job_service.update(
+                query=existed_job.id, data=JobUpdateSchema.model_validate(existed_job.model_dump()), session=session
+            )
+
         async with self.job_service.repo.client.start_session() as session:
-            await session.start_transaction()
             try:
-                existed_job = await self.job_service.get(
-                    query={'jid': str(jid), 'salt_master': str(master_id)}, session=session
-                )
-
-                existed_job.returning[data['minion_id']] = data['retcode'] == 0
-                is_finished = all(mid in existed_job.returning.keys() for mid in existed_job.minions)
-                existed_job.status = JobStatus.finished if is_finished else JobStatus.waiting_returns
-
-                job = await self.job_service.update(
-                    query=existed_job.id, data=JobUpdateSchema.model_validate(existed_job.model_dump()), session=session
-                )
-                await session.commit_transaction()
+                return await session.with_transaction(_get_job)
             except OperationFailure as e:
-                await session.abort_transaction()
                 if e.has_error_label('TransientTransactionError'):
-                    logger.debug('Transaction with job updating is failed: %s\nRetrying...', e)
+                    logger.debug('Transaction with getting job is failed: %s\nRetrying...', e)
                     return await self.get_job(jid=jid, master_id=master_id, data=data)
-                raise e
-            except Exception as e:
-                await session.abort_transaction()
-                raise e
 
-        return job
+                if e.code == 20:
+                    logger.error('Mongo transaction may be unavailable. Try get job without transaction.')
+                    return await _get_job()
+
+                raise e
 
     async def process(
         self,
