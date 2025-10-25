@@ -7,7 +7,7 @@
 
 
 FROM registry.altlinux.org/alt/alt:p11 AS base
-LABEL version='1.2'
+LABEL version='1.3'
 EXPOSE 8000
 
 RUN \
@@ -35,11 +35,14 @@ ENV BASE_URL_ROOT_PATH=/
 ENV TIMEOUT_GRACEFUL_SHUTDOWN=5
 ENV KEYCLOAK_CLIENT_SECRET_FILE=/run/secrets/keycloak_client_saltbox_core_password
 
-ENV REDIS_TASKIQ_PASSWORD_SECRET=/run/secrets/redis_taskiq_password
-ENV REDIS_TASKIQ_USERNAME=
-ENV REDIS_TASKIQ_HOST=
-ENV REDIS_TASKIQ_PORT=6379
+ENV MONGO_USER=
+ENV MONGO_USER_PASSWORD_FILE=
 ENV REDIS_TASKIQ_DB=0
+ENV REDIS_TASKIQ_HOST=
+ENV REDIS_TASKIQ_PASSWORD_SECRET=/run/secrets/redis_taskiq_password
+ENV REDIS_TASKIQ_PORT=6379
+ENV REDIS_TASKIQ_USERNAME=
+ENV REDIS_USER_PASSWORD_FILE=
 
 WORKDIR /
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
@@ -50,7 +53,7 @@ ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 ################
 
 FROM base AS dev
-LABEL name='saltbox-core-dev' version='1.3'
+LABEL name='saltbox-core-dev' version='1.4'
 # Install Core as an editable package
 RUN \
   --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -76,7 +79,7 @@ ENV SALTBOX_SDK_SRC_PATH /mnt/saltbox-sdk/
 ################
 
 FROM base AS main
-LABEL name='saltbox-core' version='1.2'
+LABEL name='saltbox-core' version='1.3'
 # Install Core as a normal package
 RUN \
   --mount=type=bind,target=/mnt/saltbox-core/,readwrite \

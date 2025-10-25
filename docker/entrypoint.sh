@@ -10,8 +10,8 @@ err() {
   warn "$@" && exit 1
 }
 
-REDIS_PASSWORD="$(cat /run/secrets/redis_salt_password)"
-MONGO_PASSWORD="$(cat /run/secrets/mongo_admin_password)"
+REDIS_PASSWORD="$(cat "$REDIS_USER_PASSWORD_FILE")"
+MONGO_PASSWORD="$(cat "$MONGO_USER_PASSWORD_FILE")"
 KEYCLOAK_CLIENT_SECRET="$(cat "$KEYCLOAK_CLIENT_SECRET_FILE")"
 
 TASKIQ_BROKER_URL="redis://${REDIS_TASKIQ_USERNAME}"
