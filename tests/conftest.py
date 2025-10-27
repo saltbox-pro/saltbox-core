@@ -68,7 +68,7 @@ class AsyncMockCollection:
         result = self.collection.update_one(filter, update, upsert=upsert)
         return self.mocker.MagicMock(modified_count=result.modified_count)
 
-    async def find_one_and_update(self, filter, update, upsert=False, session=None):
+    async def find_one_and_update(self, filter, update, upsert=False, return_document=None, session=None):
         return await self.update_one(filter=filter, update=update, upsert=upsert, session=session)
 
     async def delete_one(self, filter, session=None):
