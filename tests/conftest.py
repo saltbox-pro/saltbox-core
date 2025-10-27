@@ -68,10 +68,33 @@ class AsyncMockCollection:
         result = self.collection.update_one(filter, update, upsert=upsert)
         return self.mocker.MagicMock(modified_count=result.modified_count)
 
+    # TODO @: check and fix this
     async def find_one_and_update(
         self, filter, update, upsert=False, return_document=None, session=None, projection=None
     ):
-        return await self.update_one(filter=filter, update=update, upsert=upsert, session=session)
+        """Эмуляция метода find_one_and_update"""
+        # Проверяем, если в фильтре есть _id
+        if '_id' in filter:
+            doc_id = filter['_id']
+            if doc_id in self._inserted_docs:
+                # Обновляем документ в нашем внутреннем хранилище
+                if '$set' in update:
+                    for key, value in update['$set'].items():
+                        self._inserted_docs[doc_id][key] = value
+
+                # Обновляем документ в mongomock
+                result = self.collection.find_one_and_update(
+                    filter, update, upsert=upsert, return_document=return_document, projection=projection
+                )
+                return result
+                # return self.mocker.MagicMock(modified_count=result)
+
+        # Если не нашли документ по _id, пробуем обновить через mongomock
+        result = self.collection.find_one_and_update(
+            filter, update, upsert=upsert, return_document=return_document, projection=projection
+        )
+        return result
+        # return self.mocker.MagicMock(modified_count=result)
 
     async def delete_one(self, filter, session=None):
         """Эмуляция метода delete_one"""
