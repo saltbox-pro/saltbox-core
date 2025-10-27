@@ -32,7 +32,7 @@ from saltbox_core.tasks.services.tasks import TaskService, get_task_service
 from saltbox_core.utilities.jid import JID
 from saltbox_core.utilities.mongo_query_to_salt_tgt_converter import MongoQueryToSaltTgtConverter
 from saltbox_sdk.db.mongo.config import get_mongo_db
-from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
 from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.db.schemas_base import Source
 from saltbox_sdk.exceptions import MultipleObjectsFoundException, ObjectNotFoundException
@@ -112,6 +112,7 @@ class TaskLifespanService:
                             ),
                             'status': TaskStatus.running,
                         },
+                        projection_model=EmptyModel,
                     )
                 except ObjectNotFoundException:
                     await self.update_task(sourse__id=None)
@@ -495,8 +496,7 @@ class TaskLifespanService:
                     )
                 )
                 await self.task_service.update(
-                    query=created_task.id,
-                    data=TaskUpdateSchema.model_validate({**created_task.model_dump(), 'status': TaskStatus.running}),
+                    query=created_task.id, data={'status': TaskStatus.running}, projection_model=EmptyModel
                 )
                 task.postprocessing.task_create_id = created_task.id
 

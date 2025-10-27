@@ -16,6 +16,7 @@ from saltbox_core.minion_collections.schemas.minion_schemas import (
     MinionUpdateSchema,
 )
 from saltbox_core.minion_collections.services.pipeline_builder import MongoPipelineBuilder
+from saltbox_sdk.db.mongo.schemas_base import EmptyModel
 from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService, ProjectionModel
 
@@ -61,22 +62,28 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
             try:
                 minion: MinionModel = await self.get_by_master_and_id(master=master_id, minion_id=minion_id)
                 minion.last_activity = last_activity_dt
-                await self.update(minion.id, MinionUpdateSchema(**minion.model_dump()))
+                await self.update(
+                    query={'master': master_id, 'minion_id': minion_id},
+                    data={'last_activity': last_activity_dt},
+                    projection_model=EmptyModel,
+                )
             except ObjectNotFoundException:
                 logger.info('Minion "%s" from presence not found in DB', minion_id)
 
     async def process_grains(self, master_id: str, minion_id: str, grains: dict[str, Any]) -> None:
         try:
-            minion: MinionModel = await self.get_by_master_and_id(master=master_id, minion_id=minion_id)
-            minion.grains = GrainsSchema(**grains)
-            await self.update(minion.id, MinionUpdateSchema(**minion.model_dump()))
+            await self.update(
+                query={'master': master_id, 'minion_id': minion_id},
+                data={'grains': GrainsSchema(**grains).model_dump()},
+                projection_model=EmptyModel,
+            )
         except ObjectNotFoundException:
             minion_obj = {
                 'minion_id': minion_id,
                 'master': master_id,
                 'grains': grains,
             }
-            await self.create(MinionCreateSchema(**minion_obj))
+            await self.create(data=MinionCreateSchema(**minion_obj), projection_model=EmptyModel)
 
     async def export_to_csv(self, query: dict[str, Any], skip: int = 0, limit: int = 0) -> str:
         data = await self.get_list(query, skip=skip, limit=limit)

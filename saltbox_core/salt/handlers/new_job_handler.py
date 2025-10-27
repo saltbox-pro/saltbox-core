@@ -2,7 +2,7 @@ import re
 from typing import ClassVar
 
 from saltbox_core.config import logger
-from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel, JobStatus, JobUpdateSchema
+from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel, JobStatus
 from saltbox_core.salt.exceptions import StopProcessing
 from saltbox_core.salt.handlers.base_handler import MessageDataType
 from saltbox_core.salt.handlers.base_job_handler import BaseJobMessageHandler
@@ -33,14 +33,15 @@ class JobNewMessageHandler(BaseJobMessageHandler):
         try:
             existed_job = await self.job_service.get(query={'jid': str(jid), 'salt_master': str(master_id)})
 
-            existed_job.status = JobStatus.started
-            existed_job.minions = data.get('minions', [])
-            existed_job.missing = data.get('missing', [])
-            existed_job.stamp = data.get('stamp')
-            existed_job.system_user = data.get('system_user')
-
             return await self.job_service.update(
-                existed_job.id, JobUpdateSchema.model_validate(existed_job.model_dump())
+                query=existed_job.id,
+                data={
+                    'status': JobStatus.started,
+                    'minions': data.get('minions', []),
+                    'missing': data.get('missing', []),
+                    'stamp': data.get('stamp'),
+                    'system_user': data.get('system_user'),
+                },
             )
         except ObjectNotFoundException:
             return await self.job_service.create(

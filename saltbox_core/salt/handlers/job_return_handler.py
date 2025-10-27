@@ -10,7 +10,7 @@ from pymongo.errors import OperationFailure
 from saltbox_core.config import SETTINGS, logger
 from saltbox_core.event_bus.rabbit.common_messages import InventoryPutEventBusMessage, InventoryPutForMinion
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnCreateSchema, JobReturnModel
-from saltbox_core.jobs.schemas.job_schemas import JobModel, JobStatus, JobUpdateSchema
+from saltbox_core.jobs.schemas.job_schemas import JobModel, JobStatus
 from saltbox_core.jobs.services.job_return_service import JobReturnService
 from saltbox_core.jobs.services.job_services import JobService
 from saltbox_core.minion_collections.services.minion_service import MinionService
@@ -61,11 +61,12 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
 
             job.returning[data['minion_id']] = data['retcode'] == 0
             is_finished = all(mid in job.returning.keys() for mid in job.minions)
-            job.status = JobStatus.finished if is_finished else JobStatus.waiting_returns
+            updating_data: dict[str, Any] = {
+                'returning': job.returning,
+                'status': JobStatus.finished if is_finished else JobStatus.waiting_returns,
+            }
 
-            return await self.job_service.update(
-                query=job.id, data=JobUpdateSchema.model_validate(job.model_dump()), session=session, notify=True
-            )
+            return await self.job_service.update(query=job.id, data=updating_data, session=session, notify=True)
 
         async with self.job_service.repo.client.start_session() as session:
             try:

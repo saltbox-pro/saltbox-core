@@ -7,6 +7,7 @@ from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema
 from saltbox_core.jobs.services.job_services import JobService
 from saltbox_core.salt.exceptions import StopProcessing
 from saltbox_core.salt.handlers.base_handler import BaseMessageHandler, MessageDataType
+from saltbox_sdk.db.mongo.schemas_base import EmptyModel
 from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER
 
 
@@ -34,7 +35,8 @@ class MinionStartedMessageHandler(BaseMessageHandler):
                     'fun': 'grains.items',
                     'user': SYSTEM_SHORT_USER,
                 }
-            )
+            ),
+            projection_model=EmptyModel,
         )
 
         raise StopProcessing()
