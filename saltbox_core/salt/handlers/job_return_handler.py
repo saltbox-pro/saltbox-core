@@ -57,16 +57,14 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
 
     async def get_job(self, jid: str, master_id: str, data: MessageDataType) -> JobModel:
         async def _get_job(_session: AsyncClientSession | None = None) -> JobModel:
-            existed_job = await self.job_service.get(
-                query={'jid': str(jid), 'salt_master': str(master_id)}, session=_session
-            )
+            job = await self.job_service.get(query={'jid': str(jid), 'salt_master': str(master_id)}, session=_session)
 
-            existed_job.returning[data['minion_id']] = data['retcode'] == 0
-            is_finished = all(mid in existed_job.returning.keys() for mid in existed_job.minions)
-            existed_job.status = JobStatus.finished if is_finished else JobStatus.waiting_returns
+            job.returning[data['minion_id']] = data['retcode'] == 0
+            is_finished = all(mid in job.returning.keys() for mid in job.minions)
+            job.status = JobStatus.finished if is_finished else JobStatus.waiting_returns
 
             return await self.job_service.update(
-                query=existed_job.id, data=JobUpdateSchema.model_validate(existed_job.model_dump()), session=session
+                query=job.id, data=JobUpdateSchema.model_validate(job.model_dump()), session=session, notify=True
             )
 
         async with self.job_service.repo.client.start_session() as session:

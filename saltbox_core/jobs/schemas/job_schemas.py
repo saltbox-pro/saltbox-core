@@ -37,7 +37,6 @@ class JobReadOnlyFieldsMixin:
     tgt: str | list[str]
     tgt_type: SaltTgtType
     salt_master: str
-    system_user: str | None = None
     fun: str
     arg: list | None = None
     kwarg: dict | None = None
@@ -47,6 +46,7 @@ class JobReadOnlyFieldsMixin:
 
 
 class JobEditableFieldsMixin:
+    system_user: str | None = None
     minions: list[str] = Field(default=[])
     missing: list[str] = Field(default=[])
     returning: dict[str, bool | None] = Field(default={})

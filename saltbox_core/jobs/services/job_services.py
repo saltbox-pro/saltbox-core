@@ -69,9 +69,9 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
 
             async with self.rdb.pipeline() as pipe:
                 if channel:
-                    await self.rdb.publish(channel=channel, message=self._prepare_pub_message(obj=obj))
+                    pipe.publish(channel=channel, message=self._prepare_pub_message(obj=obj))
                 if task_channel:
-                    await self.rdb.publish(channel=task_channel, message=self._prepare_pub_message(obj=obj))
+                    pipe.publish(channel=task_channel, message=self._prepare_pub_message(obj=obj))
 
                 await pipe.execute()
         except redis_exceptions.RedisError as e:
