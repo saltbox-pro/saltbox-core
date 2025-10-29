@@ -1,6 +1,7 @@
 import httpx
 
 from saltbox_core.config import SETTINGS
+from saltbox_core.exceptions import GitlabApiException
 from saltbox_core.settings.exceptions import MissingGroupIdException
 from saltbox_core.settings.schemas.gitlab_schemas import GitlabProjectSchema, PaginatedGitlabProjects
 from saltbox_core.utilities.httpx_client import HttpxClientSingletoneFactory
@@ -35,8 +36,14 @@ class GitlabApiClient:
             'order_by': 'id',
             'sort': 'asc',
         }  # per_page=20 is GitLab default
+
         response = await self._httpx_client.get(url, headers=headers, params=query_params)
-        response.raise_for_status()
+
+        if not response.is_success:
+            raise GitlabApiException(
+                status_code=response.status_code, detail=f'GitLab API request failed: {response.text}'
+            )
+
         projects_data = response.json()
 
         total = response.headers.get('x-total')

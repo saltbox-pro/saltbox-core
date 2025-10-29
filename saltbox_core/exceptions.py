@@ -15,3 +15,10 @@ class UnsupportedSchemaTypeException(CoreException):
 
     status_code: int = status.HTTP_400_BAD_REQUEST
     detail: str = 'Unsupported schema type provided.'
+
+
+class GitlabApiException(CoreException):
+    """Exception raised for GitLab API related errors."""
+
+    status_code: int = status.HTTP_502_BAD_GATEWAY
+    detail: str = 'An error occurred while communicating with the GitLab API.'
