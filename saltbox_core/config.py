@@ -96,6 +96,10 @@ class Settings(BaseSettings):
         description='Path to store of files served by sshfs',
     )
     local_repo_sync_timeout_sec: int = 3600
+    orphan_aux_files_cleanup_dry_run: bool = Field(
+        default=False,
+        description='Do not delete files in SSHFS_DIR on cleanup, only write to log',
+    )
 
     # GPG
     gpg_key_length: int = 4096

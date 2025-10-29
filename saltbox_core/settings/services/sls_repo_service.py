@@ -18,7 +18,7 @@ from saltbox_core.settings.schemas.sls_repos_schemas import (
     SettingsSlsRepoModel,
     SettingsSlsRepoUpdateSchema,
 )
-from saltbox_core.settings.tiq_tasks import sync_sls_repo_task, sync_sls_repos_to_serve_dir
+from saltbox_core.settings.tiq_tasks import cleanup_orphan_aux_files, sync_sls_repo_task, sync_sls_repos_to_serve_dir
 from saltbox_core.tasks.services.tasks_templates import TaskTemplateService
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
 from saltbox_sdk.db.redis.config import get_redis
@@ -179,6 +179,7 @@ class SettingsSlsRepoService(
 
         # Delete from serve directory
         await self.sync_to_serve_dir()
+        await self.cleanup_orphan_aux_files()
 
     async def sync(self, sid: PyObjectId) -> str:
         task = await sync_sls_repo_task.kiq(str(sid))
@@ -186,6 +187,9 @@ class SettingsSlsRepoService(
 
     async def sync_to_serve_dir(self) -> None:
         await sync_sls_repos_to_serve_dir.kiq()
+
+    async def cleanup_orphan_aux_files(self) -> None:
+        await cleanup_orphan_aux_files.kiq()
 
 
 def get_sls_repo_service(
