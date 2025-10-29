@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Cleanup AUX files not specified in existing SLS repo manifests.
+
+## [0.1.0] - 2025-09-29
+
+### Added
+
 - Add `salt_master` to jobs
 - Add allow restart failed task on tasks with status `stopped`
 - Add GET endpoint to retrieve a minion by master ID and minion ID for master-scoped lookup.
