@@ -2,7 +2,7 @@
 
 ## SLS repository syncing
 
-The sequence is actual for Jul 2025.
+> The sequence is actual on Oct 2025
 
 ```mermaid
 sequenceDiagram
@@ -19,6 +19,7 @@ sequenceDiagram
   Note over Core: AUX files are in /srv/sshfs/
   Core ->> Core: Merge repos to serve dir
   Note over Core: Repos merged to /srv/salt/
+  Core -) Core: Cleanup orphaned AUX files
 
   Core -) User: [200] Sync is done
 
