@@ -77,6 +77,7 @@ class SshfsSyncBase(ABC):
         dest_digest_path (Path): where the digest file expected
     """
     TMP_DIR = SETTINGS.sshfs_tmp_dir
+    TMP_FILENAME_DIGEST_SIZE = 16
 
     def __init__(self, file_path: Path, file_entry: ManifestSshfsFilesSchema) -> None:
         self.TMP_DIR.mkdir(exist_ok=True)
@@ -124,20 +125,6 @@ class SshfsSyncBase(ABC):
         :return bool: does donwnloading data required
         """
 
-    def get_origin_filename(self, response: httpx.Response) -> str:
-        cont_disp_hdr = 'content-disposition'
-        content_dispos = response.headers.get(cont_disp_hdr)
-        logger.debug('Content-Disposition header was %s for %s', content_dispos, response.url)
-        message = Message()
-        message[cont_disp_hdr] = content_dispos
-        if message.get_content_disposition() != 'attachment':
-            logger.warning('Content-Disposition header is not attachment for %s', response.url)
-        if (filename := message.get_filename()) is not None:
-            return filename
-        else:
-            msg = f'Failed to obtain origin filename from content-disposal header for {response.url}'
-            raise GitRepoSshfsFileSyncException(msg)
-
     @abstractmethod
     def move_to_destination(self, file_path: Path) -> None:
         """Handle donwnloaded file to put expected data to destination"""
@@ -171,6 +158,7 @@ class SshfsSyncBase(ABC):
 
         :raises OSError: on filesystem operations errors
         :raises SshfsFileSync:
+        :raises ValueError: on URL processing
         """
         self.purge_type_mismatched_checksums()
 
@@ -190,8 +178,12 @@ class SshfsSyncBase(ABC):
                 client.stream('GET', str(self.file_entry.url), headers=headers) as response,
             ):
                 response.raise_for_status()
-                origin_filename = self.get_origin_filename(response)
-                download_path = self.TMP_DIR / origin_filename
+
+                url_digest = hashlib.blake2b(
+                    str(response.url).encode(),
+                    digest_size=self.TMP_FILENAME_DIGEST_SIZE,
+                ).hexdigest()
+                download_path = self.TMP_DIR / f'{url_digest}.download'
 
                 chunk_size = self._get_chunk_size(response)
 
@@ -208,7 +200,7 @@ class SshfsSyncBase(ABC):
             msg = f'Response {err.response.status_code} for {err.request.url!r}'
             raise GitRepoSshfsFileSyncException(msg) from None
 
-        logger.debug('Downloaded %s to %s', origin_filename, download_path)
+        logger.debug('Downloaded: "%s"', download_path)
 
         new_checksum = self.make_checksum(download_path)
 
