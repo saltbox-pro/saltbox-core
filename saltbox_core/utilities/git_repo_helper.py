@@ -7,7 +7,6 @@ import subprocess
 import uuid
 from abc import ABC, abstractmethod
 from contextlib import asynccontextmanager
-from email.message import Message
 from functools import cached_property
 from pathlib import Path
 from typing import Any, ClassVar
