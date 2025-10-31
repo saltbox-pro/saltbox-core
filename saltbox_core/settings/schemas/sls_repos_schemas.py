@@ -120,16 +120,21 @@ def validate_digest(value: str) -> str:
     return ManifestDigest(value).value
 
 
+def validate_str_to_lower(value: str) -> str:
+    return value.lower()
+
+
 NotAbsolutePath = Annotated[Path, AfterValidator(validate_path_is_not_absolute)]
 SafeNotAbsoultePath = Annotated[
     Path, AfterValidator(validate_path_bounds), AfterValidator(validate_path_is_not_absolute)
 ]
 ManifestDigestStr = Annotated[str, AfterValidator(validate_digest)]
+ForcedLowerCaseStr = Annotated[str, AfterValidator(validate_str_to_lower)]
 
 
 class ManifestSshfsFilesSchema(BaseModel):
     url: HttpUrl
-    checksum: str
+    checksum: ForcedLowerCaseStr
     checksum_type: ManifestDigestStr = FIELD_SENTINEL
     token: str | None = FIELD_SENTINEL
     unpack: bool = Field(default=False, description='Unpack arhive rather than processing as a regular file')
