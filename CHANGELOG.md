@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Cleanup AUX files not specified in existing SLS repo manifests.
 
+### Changed
+
+- Downloading AUX files not depends on `content-disposition` header.
+
+### Fixed
+
+- Unmatched AUX file checksum if `checksum` in Manifest has upper-case letters.
+- More collision-safe temporary file names while downloading.
+
 ## [0.1.0] - 2025-09-29
 
 ### Added
