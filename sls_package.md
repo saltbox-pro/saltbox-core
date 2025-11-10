@@ -52,11 +52,10 @@ sshfs_files:
     url: 'https://example.com/files/v0.0.1/altos-efi.zip'
     checksum: daff000000000000000000000000000000000000000000000000000000000000
     # Unpack file after downloding.
-    # `tar`, `tar.gz`, `tar.bz2`, `zip  archives are supported.
-    # Check Python shutil.unpack_archive docs for precise list of formats.
-    #  Archive will be unpacked to location in identifier upper.
-    #  Location MUST NOT be shared with other files or archives.
-    unpack: true
+    # MUST be one of ['bztar', 'gztar', 'tar', 'xztar', 'zip'] or null (by default).
+    # Archive will be unpacked to location in identifier upper.
+    # Location MUST NOT be shared with other files or archives.
+    unpack_as: zip
 ```
 
 The example supposed repository hierarchy like following:

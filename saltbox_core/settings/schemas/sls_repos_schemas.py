@@ -3,7 +3,7 @@ import os
 import uuid
 from enum import StrEnum
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal, Self
 
 from git.types import PathLike
 from pydantic import (
@@ -98,6 +98,8 @@ class ManifestDigest(StrEnum):
 
 DEFAULT_DIGEST = ManifestDigest.SHA256
 FIELD_SENTINEL: Any = object()
+# Archive formats should match `[i[0] for i in shutil.get_unpack_formats()]`
+UNPACK_AS_FORMATS = Literal['bztar', 'gztar', 'tar', 'xztar', 'zip']
 
 
 def validate_path_is_not_absolute(value: Path) -> Path:
@@ -137,9 +139,26 @@ class ManifestSshfsFilesSchema(BaseModel):
     checksum: ForcedLowerCaseStr
     checksum_type: ManifestDigestStr = FIELD_SENTINEL
     token: str | None = FIELD_SENTINEL
-    unpack: bool = Field(default=False, description='Unpack arhive rather than processing as a regular file')
+    # TODO (a.karmanov): Delete in few releases
+    unpack: bool = Field(
+        default=False,
+        description='Unpack arhive rather than processing as a regular file',
+        deprecated='Set "unpack_as" field to archive format instead',
+    )
+    unpack_as: UNPACK_AS_FORMATS | None = Field(
+        default=None,
+        description='Unpack as arhive of specified format rather than place as is',
+    )
 
     model_config = ConfigDict(extra='forbid')
+
+    # TODO (a.karmanov): Delete with `unpack` field
+    @model_validator(mode='after')
+    def ensure_unpack_as(self) -> Self:
+        if self.unpack and self.unpack_as is None:
+            dosa = 'Field "unpack_as" is obligatory when "unpack" is True'
+            raise ValueError(dosa)
+        return self
 
 
 class ManifestSchema(BaseModel):

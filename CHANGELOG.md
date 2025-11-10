@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Downloading AUX files not depends on `content-disposition` header.
+- Manifest `sshfs_files` archive entry requires `unpack_as` field to contain an 
+archive format string. `unpack` field is deprecated.
 
 ### Fixed
 

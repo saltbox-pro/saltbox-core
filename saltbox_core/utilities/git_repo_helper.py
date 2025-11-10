@@ -283,15 +283,20 @@ class SshfsSyncArchive(SshfsSyncBase):
         return True
 
     def move_to_destination(self, file_path: Path) -> None:
+        assert self.file_entry.unpack_as is not None, 'Archive format is missing for archive entry'  # noqa: S101
         digest_path = self.make_digest_path(file_path)
-        shutil.unpack_archive(file_path, extract_dir=self.dest_path)
+        try:
+            shutil.unpack_archive(file_path, format=self.file_entry.unpack_as, extract_dir=self.dest_path)
+        except shutil.ReadError as err:
+            msg = f'Failed to unpack file by URL "{self.file_entry.url}" as "{self.file_entry.unpack_as}"'
+            raise GitRepoSshfsFileSyncException(msg) from err
         file_path.unlink()
         shutil.move(digest_path, self.dest_digest_path)
-        logger.debug('Umpacked %s to %s', file_path, self.dest_path)
+        logger.info('Unpacked %s to %s', file_path, self.dest_path)
 
 
 def create_sshfs_sync(file_path: Path, file_entry: ManifestSshfsFilesSchema) -> SshfsSyncBase:
-    if file_entry.unpack:
+    if file_entry.unpack_as is not None:
         return SshfsSyncArchive(file_path, file_entry)
     return SshfsSyncPlainFile(file_path, file_entry)
 
