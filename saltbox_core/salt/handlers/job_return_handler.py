@@ -50,6 +50,7 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
 
     async def normalize_data(self, match: re.Match, master_id: str, tag: str, data: MessageDataType) -> MessageDataType:
         data = await super().normalize_data(match=match, master_id=master_id, tag=tag, data=data)
+        data['system_user'] = data.pop('user')
         data['minion_id'] = data.pop('id', match.group('mid'))
         data['salt_master'] = data.pop('master_id', master_id)
         data['stamp'] = data.pop('_stamp')
@@ -157,7 +158,9 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
 
         try:
             return await self.job_return_service.create(
-                data=JobReturnCreateSchema.model_validate({'source': job.source, **data}),
+                data=JobReturnCreateSchema.model_validate(
+                    {'source': job.source, 'user': job.user, 'stamp_job': job.stamp, **data}
+                ),
                 notify=True,
             )
         except DuplicateKeyException:

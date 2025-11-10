@@ -5,7 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from saltbox_core.jobs.schemas.job_schemas import StrJid
 from saltbox_core.utilities.salt import fill_salt_kwarg_from_arg
 from saltbox_sdk.db.mongo.schemas_base import IDMixin
-from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, Source
+from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER, CreatedModifiedMixin, Source, UserShort
 
 # Job returns
 
@@ -18,8 +18,10 @@ class JobReturnReadOnlyFieldsMixin:
     fun: str
     fun_args: list | None = None
     fun_kwarg: dict | None = None
-    user: str | None = None
+    system_user: str | None = None
+    user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
     stamp: str
+    stamp_job: str | None = Field(default=None)
     source: Source | None = None
 
 
