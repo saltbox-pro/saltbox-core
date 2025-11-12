@@ -13,6 +13,7 @@ from saltbox_core.jobs.routers.job_sc_router import router as job_schemas_router
 from saltbox_core.jobs.routers.jobs_router import router as jobs_router
 from saltbox_core.masters.routers.master_route import router as masters_router
 from saltbox_core.masters.routers.system_route import router as system_router
+from saltbox_core.masters.routers.file_route import router as file_router
 from saltbox_core.minion_collections.routers.collections_router import router as collections_router
 from saltbox_core.minion_collections.routers.filters_router import router as filters_router
 from saltbox_core.minion_collections.routers.minion_router import router as minions_router
@@ -99,6 +100,7 @@ app.include_router(minions_router)
 app.include_router(masters_router)
 app.include_router(system_router)
 app.include_router(pillars_router)
+app.include_router(file_router)
 app.include_router(router=settings_sls_router, prefix='/settings', tags=['Settings'])
 app.include_router(router=gitlab_router, prefix='/settings')
 
