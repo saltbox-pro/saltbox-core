@@ -11,9 +11,9 @@ from saltbox_core.config import APP_DESC, APP_NAME, SETTINGS
 from saltbox_core.db.init_mongo_db import init_mongo_db
 from saltbox_core.jobs.routers.job_sc_router import router as job_schemas_router
 from saltbox_core.jobs.routers.jobs_router import router as jobs_router
+from saltbox_core.masters.routers.file_route import router as file_router
 from saltbox_core.masters.routers.master_route import router as masters_router
 from saltbox_core.masters.routers.system_route import router as system_router
-from saltbox_core.masters.routers.file_route import router as file_router
 from saltbox_core.minion_collections.routers.collections_router import router as collections_router
 from saltbox_core.minion_collections.routers.filters_router import router as filters_router
 from saltbox_core.minion_collections.routers.minion_router import router as minions_router

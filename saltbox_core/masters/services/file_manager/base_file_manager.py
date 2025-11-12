@@ -2,6 +2,8 @@ import abc
 from abc import abstractmethod
 from pathlib import Path
 
+from fastapi.responses import FileResponse
+
 from saltbox_core.masters.schemas.file_manage_schemas import (
     FileOperationResponse,
     FileRequest,
@@ -19,7 +21,7 @@ class BaseFileManager(abc.ABC):
     async def create_folder(self, *, request: FileRequest) -> FileOperationResponse: ...
 
     @abstractmethod
-    async def preview(self, *, request: FileRequest) -> FileOperationResponse: ...
+    async def preview(self, *, request: FileRequest) -> FileResponse: ...
 
     @abstractmethod
     async def upload(self, *, request: UploadRequest) -> FileOperationResponse: ...
@@ -31,7 +33,7 @@ class BaseFileManager(abc.ABC):
     async def deleate(self, *, request: FileRequest) -> FileOperationResponse: ...
 
     def _get_minion_root(self, mid: PyObjectId) -> Path:
-        minion_root: Path = self._SSHFS_ROOT / str(mid) / 'data'
+        minion_root: Path = self._SSHFS_ROOT / str(mid)
         minion_root.mkdir(parents=True, exist_ok=True)
         return minion_root
 

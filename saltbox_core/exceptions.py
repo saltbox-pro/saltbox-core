@@ -22,3 +22,8 @@ class GitlabApiException(CoreException):
 
     status_code: int = status.HTTP_502_BAD_GATEWAY
     detail: str = 'An error occurred while communicating with the GitLab API.'
+
+
+class FileNotFoundException(CoreException):
+    status_code: int = status.HTTP_404_NOT_FOUND
+    detail: str = 'File not found'

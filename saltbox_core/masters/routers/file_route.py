@@ -1,8 +1,9 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, File, Form, UploadFile
+from fastapi.responses import FileResponse
 
-from saltbox_core.masters.schemas.file_manage_schemas import FileAction, MoveRequest
+from saltbox_core.masters.schemas.file_manage_schemas import FileAction
 from saltbox_core.masters.schemas.master_schemas import MastersActions
 from saltbox_core.masters.services.file_manager.base_file_manager import (
     BaseFileManager,
@@ -12,6 +13,7 @@ from saltbox_core.masters.services.file_manager.base_file_manager import (
     UploadRequest,
 )
 from saltbox_core.masters.services.file_manager.sshfs_file_manager import get_file_manager
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 
 router = APIRouter(prefix='/file', tags=['File'])
@@ -31,21 +33,22 @@ async def create_folder(
     return await manager.create_folder(request=request)
 
 
-@router.get(
-    '/preview/{file_path:path}',
+@router.post(
+    '/preview',
     openapi_extra=GatewayEndpointConfig(
         policy='core.masters.base',  # TODO: deleate opa fields
         action=MastersActions.ACCEPT,
-    ).model_dump(by_alias=True)
+    ).model_dump(by_alias=True),
+    response_class=FileResponse
 )
 async def preview(
         request: FileRequest,
         manager: Annotated[BaseFileManager, Depends(get_file_manager)]
-    ) -> FileOperationResponse:
+    ) -> FileResponse:
     return await manager.preview(request=request)
 
 
-@router.get(
+@router.post(
     '/upload',
     openapi_extra=GatewayEndpointConfig(
         policy='core.masters.base',  # TODO: deleate opa fields
@@ -53,9 +56,12 @@ async def preview(
     ).model_dump(by_alias=True)
 )
 async def upload_file(
-        request: UploadRequest,
-        manager: Annotated[BaseFileManager, Depends(get_file_manager)]
+        manager: Annotated[BaseFileManager, Depends(get_file_manager)],
+        mid: Annotated[PyObjectId, Form(...)],
+        file: Annotated[UploadFile, File(...)],
+        dst: Annotated[str, Form("")]
     ) -> FileOperationResponse:
+    request = UploadRequest(mid=mid, path=dst, file=file, mode=None)
     return await manager.upload(request=request)
 
 
@@ -67,12 +73,13 @@ async def upload_file(
     ).model_dump(by_alias=True)
 )
 async def transfer(
-        action: FileAction,
-        body: MoveRequest,
+        action: str,
+        src: str,
+        dst: str,
         manager: Annotated[BaseFileManager, Depends(get_file_manager)]
     ) -> FileOperationResponse:
-    request = TransferRequest(**body.model_dump(), action=action)
-    return await manager.transfer(request=request)
+    transfer_request = TransferRequest(src=src, dst=dst, action=FileAction(action))
+    return await manager.transfer(request=transfer_request)
 
 
 @router.delete(
