@@ -115,13 +115,13 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
 
         async with await Path(file_path).open(mode='w', newline='') as file:
             writer = csv.DictWriter(file, fieldnames=keys)
-            writer.writeheader()
+            await writer.writeheader()
             for item in data:
                 row = item.model_dump(exclude={'grains', 'last_activity_seconds'})
                 grains_dict = item.grains.model_dump() if hasattr(item.grains, 'model_dump') else dict(item.grains)
                 for key in all_grains_keys:
                     row[f'grains.{key}'] = grains_dict.get(key)
-                writer.writerow(row)
+                await writer.writerow(row)
 
         return file_path
 
