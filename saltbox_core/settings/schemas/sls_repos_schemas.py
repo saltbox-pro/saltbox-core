@@ -14,23 +14,15 @@ from pydantic import (
     HttpUrl,
     SecretStr,
     StrictBool,
-    UrlConstraints,
     field_serializer,
     model_validator,
 )
-from pydantic_core import Url
 
 from saltbox_sdk.db.mongo.schemas_base import IDMixin
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
 
 logger = logging.getLogger(__name__)
-
-
-GitRepoUrl = Annotated[
-    Url,
-    UrlConstraints(max_length=2083, allowed_schemes=['http', 'https', 'git'], host_required=True),
-]
 
 
 class ReadOnlyFieldsShortMixin:
@@ -56,6 +48,7 @@ class EditableFieldsShortMixin:
 
 
 class EditableFieldsFullMixin(EditableFieldsShortMixin):
+    # TODO (a.karmanov): Are credentials obsolete due to in-URL credentials?
     repo_user: str | None
     repo_pass: SecretStr | None
     branch: str | None = Field(default='master', max_length=100)
