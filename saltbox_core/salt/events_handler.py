@@ -28,6 +28,7 @@ from saltbox_core.tasks.services.tasks import get_task_service
 from saltbox_core.tasks.services.tasks_templates import get_task_template_service
 from saltbox_sdk.db.mongo.config import get_mongo_db
 from saltbox_sdk.db.redis.config import get_redis_now
+from saltbox_sdk.event_bus.faststream_app import get_faststream_broker
 
 
 class SaltEventsHandler:
@@ -63,6 +64,7 @@ class SaltEventsHandler:
             job_schema_service=self.job_schema_service,
             collections_service=self.collection_service,
         )
+        self.broker = get_faststream_broker()
 
         self.salt_handlers: list[BaseMessageHandler] = [
             SaltMessageMetricMessageHandler(redis_client=self.redis),
@@ -72,6 +74,7 @@ class SaltEventsHandler:
                 job_service=self.job_service,
                 job_return_service=self.job_return_service,
                 minion_service=self.minion_service,
+                broker=self.broker,
             ),
             PresenceMessageHandler(redis_client=self.redis, minion_service=self.minion_service),
             MinionStartedMessageHandler(redis_client=self.redis, job_service=self.job_service),

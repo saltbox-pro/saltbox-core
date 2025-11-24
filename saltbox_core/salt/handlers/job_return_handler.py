@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import Any, ClassVar
 
 import redis.asyncio as aioredis
+from faststream.rabbit import RabbitBroker
 from pymongo.asynchronous.client_session import AsyncClientSession
 from pymongo.errors import OperationFailure
 
@@ -42,11 +43,13 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         job_service: JobService,
         job_return_service: JobReturnService,
         minion_service: MinionService,
+        broker: RabbitBroker,
     ) -> None:
         super().__init__(redis_client=redis_client, job_service=job_service)
 
         self.job_return_service = job_return_service
         self.minion_service = minion_service
+        self.broker = broker
 
     async def normalize_data(self, match: re.Match, master_id: str, tag: str, data: MessageDataType) -> MessageDataType:
         data = await super().normalize_data(match=match, master_id=master_id, tag=tag, data=data)
@@ -157,12 +160,17 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
             await pipe.execute()
 
         try:
-            return await self.job_return_service.create(
+            job_return = await self.job_return_service.create(
                 data=JobReturnCreateSchema.model_validate(
                     {'source': job.source, 'user': job.user, 'stamp_job': job.stamp, **data}
                 ),
                 notify=True,
             )
+            if job.source and job.source.type == 'migration':
+                await self.broker.connect()
+                job_return.data = return_data
+                await self.broker.publish(job_return, 'migration_job_return')
+            return job_return
         except DuplicateKeyException:
             return await self.job_return_service.get(
                 query={'jid': str(jid), 'salt_master': str(master_id), 'minion_id': mid}
