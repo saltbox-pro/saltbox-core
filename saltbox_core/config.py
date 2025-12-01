@@ -8,7 +8,7 @@ from typing import Annotated
 from pydantic import AfterValidator, BaseModel, DirectoryPath, Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from saltbox_core.utilities.filesystem import remove_older_than
+from saltbox_core.utilities.filesystem import TreePermissions, remove_older_than
 
 APP_NAME = 'Salt.Box Core'
 APP_DESC = 'Salt.Box Core API'
@@ -94,6 +94,10 @@ class Settings(BaseSettings):
     sshfs_dir: MakeDirectoryPath = Field(
         default=Path('/srv/sshfs/'),
         description='Path to store of files served by sshfs',
+    )
+    sshfs_permissions: TreePermissions | None = Field(
+        default=None,
+        description='Optional specification to force owner and permissions of Manifest.sshfs_files'
     )
     local_repo_sync_timeout_sec: int = 3600
     orphan_aux_files_cleanup_dry_run: bool = Field(

@@ -26,7 +26,7 @@ from saltbox_core.settings.schemas.sls_repos_schemas import (
     ManifestSshfsFilesSchema,
     SettingsSlsRepoModel,
 )
-from saltbox_core.utilities.filesystem import get_latest_ctime, recursive_force_remove
+from saltbox_core.utilities.filesystem import TreePermissionsApplicator, get_latest_ctime, recursive_force_remove
 from saltbox_core.utilities.profile import log_duration
 
 logger = logging.getLogger(__name__)
@@ -66,6 +66,14 @@ class SlsReposDuplicatesException(SlsReposValidationException):
             self.detail = detail
         self.dups = dups.copy()
         super().__init__(self.detail)
+
+
+def update_sshfs_permissions() -> None:
+    if not SETTINGS.sshfs_permissions:
+        return
+    app = TreePermissionsApplicator(SETTINGS.sshfs_permissions)
+    for path in SETTINGS.sshfs_dir.glob('*'):
+        app.apply_to(path)
 
 
 class SshfsSyncBase(ABC):

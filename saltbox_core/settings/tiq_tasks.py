@@ -22,6 +22,7 @@ from saltbox_core.utilities.git_repo_helper import (
     SlsReposServeUpdater,
     create_sshfs_sync,
     repository_lock,
+    update_sshfs_permissions,
 )
 from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.exceptions import ObjectNotFoundException
@@ -122,6 +123,7 @@ async def sync_sls_repo_task(
             await progress.set_progress(TaskState.SUCCESS, 'Sync successful')
 
             await cleanup_orphan_aux_files.kiq()
+            update_sshfs_permissions()
 
             return {
                 'created': created,
