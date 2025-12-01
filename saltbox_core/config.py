@@ -86,6 +86,10 @@ class Settings(BaseSettings):
         Path('/srv/salt'),
         description='Ready-to-sync SLS files location',
     )
+    salt_modules_permissions: TreePermissions | None = Field(
+        default=None,
+        description='Optional specification to force owner and permissions of SLS modules files in the serve_dir'
+    )
     salt_modules_allow_duplicating_dirs: bool = Field(
         default=True, description='No error on duplicating directories in SLS modules'
     )

@@ -584,6 +584,8 @@ class SlsReposServeUpdater:
     # Rsync excludes to not to sync to serve location.
     IGNORE_LIST: ClassVar[tuple[str, ...]] = ('.git', '.gitignore', 'README.md', *MANIFEST_FILE_ALLOWED_NAMES,)
     ALLOW_DUPLICATING_DIRS = SETTINGS.salt_modules_allow_duplicating_dirs
+    SERVE_DIR = SETTINGS.salt_modules_serve_dir
+    SERVE_DIR_PERMISSIONS = SETTINGS.salt_modules_permissions
 
     def __init__(self, repos: list[SettingsSlsRepoModel]) -> None:
         self.repos = repos
@@ -598,7 +600,11 @@ class SlsReposServeUpdater:
         rsync_src_list = [str(p) + '/' for p in src_list]
         rsync_dst = str(dst)
 
-        cmd = ['rsync', '--archive', '--delete-after', '--delete-excluded']
+        cmd = [
+            'rsync', '--archive',
+            '--no-perms', '--no-owner', '--no-group',
+            '--delete-after', '--delete-excluded'
+        ]
         for i in self.IGNORE_LIST:
             cmd.append('--exclude')
             cmd.append(i)
@@ -672,8 +678,15 @@ class SlsReposServeUpdater:
         if dups:
             raise SlsReposDuplicatesException(dups=list(dups))
 
+    def _update_permissions(self) -> None:
+        if self.SERVE_DIR_PERMISSIONS is None:
+            return
+        tpa = TreePermissionsApplicator(self.SERVE_DIR_PERMISSIONS)
+        for path in self.SERVE_DIR.glob('*'):
+            tpa.apply_to(path)
+
     def update(self) -> None:
-        dst = SETTINGS.salt_modules_serve_dir
+        dst = self.SERVE_DIR
         src_list: list[Path] = []
         for repo in self.repos:
             sls_repo = SlsRepoService(repo)
@@ -688,6 +701,7 @@ class SlsReposServeUpdater:
             src_list.append(src_path)
         self._check_conflicts(src_list)
         self._rsync(src_list, dst)
+        self._update_permissions()
 
 
 class OrphanAuxFilesCleaner:
