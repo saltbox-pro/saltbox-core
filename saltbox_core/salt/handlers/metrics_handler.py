@@ -1,7 +1,7 @@
 import json
 import re
 import sys
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from saltbox_core.salt.handlers.base_handler import BaseMessageHandler, MessageDataType
 
@@ -28,20 +28,22 @@ class SaltMessageMetricMessageHandler(BaseMessageHandler):
     tag_patterns: ClassVar[list[re.Pattern[str]]] = list(AVAILABLE_TAG_PATTERNS_TO_TAG_NAME.keys())
 
     async def handle(self, master_id: str, tag: str, data: MessageDataType) -> None:
-        tag_name: str | None = None
-        for tag_pattern, _tag_name in self.AVAILABLE_TAG_PATTERNS_TO_TAG_NAME.items():
+        if not self.can_process_metrics():
+            return
+
+        metrics_tag_name = self.OTHER_TAG_NAME
+        for tag_pattern, tag_name in self.AVAILABLE_TAG_PATTERNS_TO_TAG_NAME.items():
             if tag_pattern.match(tag):
-                tag_name = _tag_name
+                metrics_tag_name = tag_name
                 break
 
-        if self.can_process_metrics():
-            metrics_data: dict[str, Any] = {
-                'master_id': master_id,
-                'payload_size': sys.getsizeof(data),
-                'tag': tag,
-                'tag_name': tag_name if tag_name else self.OTHER_TAG_NAME,
-            }
+        metrics_data = {
+            'master_id': master_id,
+            'payload_size': sys.getsizeof(data),
+            'tag': tag,
+            'tag_name': metrics_tag_name,
+        }
 
-            await self.redis_client.publish(channel=self.METRIC_TAG, message=json.dumps(metrics_data))
+        await self.redis_client.publish(channel=self.METRIC_TAG, message=json.dumps(metrics_data))
 
     async def process(self, match: re.Match, master_id: str, data: MessageDataType) -> None: ...

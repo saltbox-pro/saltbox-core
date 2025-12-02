@@ -210,23 +210,25 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         if not job_return.data:
             return
 
-        for _mod, mod_data in job_return.data.items():
+        mod_name = None
+        for mod, mod_data in job_return.data.items():
             if mod_data['name'] == 'inventory.get':
                 if mod_data['result'] is not True:
                     logger.warning(
                         'Calling inventory.get from state seems failed for JID=%s, minion=%s',
-                        job_return.jid,
-                        job_return.minion_id,
+                        job_return.jid, job_return.minion_id,
                     )
                     return
+                mod_name = mod
                 break
         else:
             logger.error(
-                'Failed to find inventory.get data for JID=%s, minion=%s', job_return.jid, job_return.minion_id
+                'Failed to find inventory.get data for JID=%s, minion=%s',
+                job_return.jid, job_return.minion_id,
             )
             return
 
-        await self._send_inventory_data(job_return=job_return, path=['return', _mod, 'changes', 'ret'])
+        await self._send_inventory_data(job_return=job_return, path=['return', mod_name, 'changes', 'ret'])
 
     async def _process_grains(self, job_return: JobReturnModel) -> None:
         logger.debug('Processing grains for %s', job_return.minion_id)

@@ -36,8 +36,8 @@ class SaltBufferManager:
                 if not salt_events:
                     continue
 
-                for _event in salt_events:
-                    event = json.loads(_event.decode())
+                for event_json in salt_events:
+                    event = json.loads(event_json.decode())
                     try:
                         master_id = event['master_id']
                         tag = event['tag']
@@ -52,7 +52,7 @@ class SaltBufferManager:
                     try:
                         await process_salt_event_task.kiq(master_id=master_id, tag=tag, data=data, retries=retries)
                     except SendTaskError:
-                        await redis_client.lpush(buffer_key, _event)
+                        await redis_client.lpush(buffer_key, event_json)
 
             await asyncio.sleep(SETTINGS.salt_buffer_manager_timeout)
 
