@@ -250,7 +250,7 @@ class TaskLifespanService:
             for master in task.target_masters:
                 try:
                     await self.__create_job(
-                        minions=minions_by_master[master],
+                        minions=minions_by_master.get(master, []),
                         compound=MongoQueryToSaltTgtConverter.convert_from_dict(query_dict=targeting_query),
                         master=master,
                     )
