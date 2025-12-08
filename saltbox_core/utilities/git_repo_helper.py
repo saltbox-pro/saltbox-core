@@ -202,7 +202,9 @@ class SshfsSyncBase(ABC):
                         if total_written % (100 * 1024 * 1024) < chunk_size:
                             logger.debug('Downloaded %d MB to %s', total_written // (1024 * 1024), download_path)
         except httpx.HTTPError as err:
-            raise GitRepoSshfsFileSyncException(err) from None
+            err_txt = str(err) or '[NO TEXT]'
+            msg = f'HTTP error for {self.file_entry.url}: {err_txt}'
+            raise GitRepoSshfsFileSyncException(msg) from err
         except httpx.HTTPStatusError as err:
             msg = f'Response {err.response.status_code} for {err.request.url!r}'
             raise GitRepoSshfsFileSyncException(msg) from None
