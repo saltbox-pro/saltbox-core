@@ -12,7 +12,7 @@ class PillarSelector(BaseModel):
 class PillarModel(BaseModel):
     master_id: str
     minion_id: str | None = None
-
+    is_secure: bool = False
     name: str
     value: str
 
