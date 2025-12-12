@@ -5,6 +5,8 @@ from typing import Annotated, BinaryIO
 from fastapi import Depends
 from redis.asyncio import Redis
 
+from saltbox_bridge_messages import CoreEncryptPillarRequest
+from saltbox_core.event_bus.redis.masters_bus import send_message_and_wait_response_to_master
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from saltbox_core.pillars.exceptions import PillarServiceParseCsvException
@@ -81,10 +83,17 @@ class PillarService:
 
         async def add_pillar_from_redis(redis_key_pattern: str, mid: str | None = None) -> None:
             redis_key = redis_key_pattern.format(master_id=master_id, minion_id=mid)
-            pillar_data = await self.redis_client.hgetall(redis_key)
+            pillar_data: dict[bytes, bytes] = await self.redis_client.hgetall(redis_key)
+
             for pillar_name, pillar_value in pillar_data.items():
                 pillars.append(
-                    PillarModel(master_id=master_id, minion_id=mid, name=pillar_name, value=pillar_value.decode())
+                    PillarModel(
+                        master_id=master_id,
+                        minion_id=mid,
+                        name=pillar_name.decode(),
+                        value=pillar_value.decode(),
+                        is_secure=pillar_value.decode().startswith('-----BEGIN PGP MESSAGE-----'),
+                    )
                 )
 
         if not only_for_minion:
@@ -101,8 +110,23 @@ class PillarService:
 
         return pillars
 
+    async def encrypt_pillar_value_by_master(self, value: str, master_id: str) -> str:
+        resp: dict[str, str] = await send_message_and_wait_response_to_master(
+            message=CoreEncryptPillarRequest(master=master_id, text=value),
+            message_tag='encrypt_pillar_data',
+            response_timeout=10.0,
+        )
+
+        return resp.get('encrypted_text', '')
+
     async def create(
-        self, name: str, value: str, master_id: str, minion_id: str | None = None, update_pillar_cache: bool = True
+        self,
+        name: str,
+        value: str,
+        master_id: str,
+        minion_id: str | None = None,
+        update_pillar_cache: bool = True,
+        is_secure: bool = False,
     ) -> PillarModel:
         try:
             await self.master_service.get_by_master_id(master_id=master_id)
@@ -127,6 +151,9 @@ class PillarService:
             else:
                 msg = f'Pillar "{name}" for master "{master_id}" already exists'
             raise ObjectCreateException(msg)
+
+        if is_secure:
+            value = await self.encrypt_pillar_value_by_master(value=value, master_id=master_id)
 
         await self.redis_client.hset(hash_name, name, value)
 
@@ -234,7 +261,7 @@ class PillarService:
 
         return result
 
-    async def validate_import_date(self, items: list[PillarModel]) -> list[PillarCSVParseResult]:
+    async def validate_import_data(self, items: list[PillarModel]) -> list[PillarCSVParseResult]:
         result: list[PillarCSVParseResult] = []
 
         for item in items:

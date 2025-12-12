@@ -49,7 +49,7 @@ async def pillar_create(
     pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
 ) -> PillarModel:
     return await pillar_service.create(
-        master_id=item.master_id, minion_id=item.minion_id, name=item.name, value=item.value
+        master_id=item.master_id, minion_id=item.minion_id, name=item.name, value=item.value, is_secure=item.is_secure
     )
 
 
@@ -117,7 +117,7 @@ async def pillar_import_validate(
     data: list[PillarModel],
     pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
 ) -> list[PillarCSVParseResult]:
-    return await pillar_service.validate_import_date(data)
+    return await pillar_service.validate_import_data(data)
 
 
 @router.post(
