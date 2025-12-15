@@ -86,13 +86,14 @@ class PillarService:
             pillar_data: dict[bytes, bytes] = await self.redis_client.hgetall(redis_key)
 
             for pillar_name, pillar_value in pillar_data.items():
+                is_secure = pillar_value.decode().startswith('-----BEGIN PGP MESSAGE-----')
                 pillars.append(
                     PillarModel(
                         master_id=master_id,
                         minion_id=mid,
                         name=pillar_name.decode(),
-                        value=pillar_value.decode(),
-                        is_secure=pillar_value.decode().startswith('-----BEGIN PGP MESSAGE-----'),
+                        value=pillar_value.decode() if not is_secure else '********',
+                        is_secure=is_secure,
                     )
                 )
 
@@ -134,7 +135,8 @@ class PillarService:
             msg = f'Master "{master_id}" does not exist'
             raise ObjectCreateException(msg) from None
 
-        if not minion_id or minion_id == '*':
+        minion_id = None if minion_id and minion_id.strip() in ['', '*'] else minion_id
+        if not minion_id:
             query = {'master': master_id}
         else:
             query = {'minion_id': minion_id, 'master': master_id}
