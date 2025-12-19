@@ -74,7 +74,7 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
         try:
             await self.update(
                 query={'master': master_id, 'minion_id': minion_id},
-                data={'grains': GrainsSchema(**grains).model_dump()},
+                data={'grains': GrainsSchema(**grains).model_dump(by_alias=True)},
                 projection_model=EmptyModel,
             )
         except ObjectNotFoundException:
@@ -83,7 +83,9 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
                 'master': master_id,
                 'grains': grains,
             }
-            await self.create(data=MinionCreateSchema(**minion_obj), projection_model=EmptyModel)
+            await self.create(
+                data=MinionCreateSchema(**minion_obj).model_dump(by_alias=True), projection_model=EmptyModel
+            )
 
     async def export_to_csv(self, query: dict[str, Any], skip: int = 0, limit: int = 0) -> str:
         data = await self.get_list(query, skip=skip, limit=limit)

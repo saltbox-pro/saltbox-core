@@ -80,7 +80,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
     @overload
     async def create(
         self,
-        data: JobCreateSchema,
+        data: JobCreateSchema | dict[str, Any],
         *,
         session: MongoAsyncClientSession | None = None,
         notify: bool = True,
@@ -89,7 +89,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
     @overload
     async def create(
         self,
-        data: JobCreateSchema,
+        data: JobCreateSchema | dict[str, Any],
         *,
         session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel],
@@ -97,14 +97,17 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
     ) -> ProjectionModel: ...
 
     @override
-    async def create(
+    async def create(  # noqa: C901
         self,
-        data: JobCreateSchema,
+        data: JobCreateSchema | dict[str, Any],
         *,
         session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel] | None = None,
         notify: bool = True,
     ) -> JobModel | ProjectionModel:
+        if isinstance(data, dict):
+            data = JobCreateSchema.model_validate(data)
+
         if not data.jid:
             data.jid = str(JID.generate())
 

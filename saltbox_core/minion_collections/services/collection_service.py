@@ -1,4 +1,4 @@
-from typing import Annotated, TypeVar, overload, override
+from typing import Annotated, Any, TypeVar, overload, override
 from uuid import uuid4
 
 from fastapi import Depends
@@ -60,7 +60,7 @@ class CollectionService(
     @overload
     async def create(
         self,
-        data: CollectionCreateSchema,
+        data: CollectionCreateSchema | dict[str, Any],
         *,
         session: MongoAsyncClientSession | None = None,
     ) -> CollectionModel: ...
@@ -68,7 +68,7 @@ class CollectionService(
     @overload
     async def create(
         self,
-        data: CollectionCreateSchema,
+        data: CollectionCreateSchema | dict[str, Any],
         *,
         session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel],
@@ -77,11 +77,14 @@ class CollectionService(
     @override
     async def create(
         self,
-        data: CollectionCreateSchema,
+        data: CollectionCreateSchema | dict[str, Any],
         *,
         session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel] | None = None,
     ) -> CollectionModel | ProjectionModel:
+        if not isinstance(data, CollectionCreateSchema):
+            data = CollectionCreateSchema.model_validate(data)
+
         while True:
             existing = await self.exists(query={'slug': data.slug}, session=session)
             if not existing:

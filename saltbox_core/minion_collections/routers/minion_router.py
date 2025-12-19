@@ -133,7 +133,7 @@ async def minion_retrieve(
     minion = await minion_service.get(mid)
 
     # TODO (a.baikov): doing like this because of additional_grains. Need to find a better way
-    minion = MinionDetailSchema(**minion.model_dump(exclude={'id'}), _id=minion.id)
+    minion = MinionDetailSchema(**minion.model_dump(exclude={'id'}, by_alias=True), _id=minion.id)
 
     return minion
 

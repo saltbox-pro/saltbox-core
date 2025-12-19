@@ -122,7 +122,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
     @overload
     async def create(
         self,
-        data: TaskCreateInputSchema,
+        data: TaskCreateInputSchema | dict[str, Any],
         *,
         session: MongoAsyncClientSession | None = None,
         projection_model: None = None,
@@ -132,7 +132,7 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
     @overload
     async def create(
         self,
-        data: TaskCreateInputSchema,
+        data: TaskCreateInputSchema | dict[str, Any],
         *,
         session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel],
@@ -142,12 +142,15 @@ class TaskService(MongoBaseService[TaskRepository, TaskModel, TaskCreateInputSch
     @override
     async def create(
         self,
-        data: TaskCreateInputSchema,
+        data: TaskCreateInputSchema | dict[str, Any],
         *,
         session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel] | None = None,
         notify: bool = True,
     ) -> TaskModel | ProjectionModel:
+        if not isinstance(data, TaskCreateInputSchema):
+            data = TaskCreateInputSchema.model_validate(data)
+
         creation_data: TaskCreateSchema = await self.__parse_input_create_schema(data=data)
 
         if data.postprocessing:
