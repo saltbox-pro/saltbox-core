@@ -120,13 +120,16 @@ class GrainsSchema(BaseModel):
 
 
 class GrainsShortSchema(BaseModel):
-    id: str | None = None
-    fqdn: str | None = None
-    osfullname: str | None = None
-    domain: str | None = None
-    efi: bool | None = None
-    cpu_model: str | None = None
-    mem_total: int | None = None
+    id: str | None = Field(title='ID', default=None)
+    fqdn: str | None = Field(title='FQDN', default=None)
+    domain: str | None = Field(title='Domain', default=None)
+    master: str | None = Field(title='Grains master', default=None)
+    saltversion: str | None = Field(title='Salt version', default=None)
+    osfinger: str | None = Field(title='OS Finger', default=None)
+    efi: bool | None = Field(title='EFI', default=None)
+    efi_secure_boot: bool | None = Field(
+        title='EFI secure boot', default=None, alias='efi-secure-boot', serialization_alias='efi-secure-boot'
+    )
 
 
 class MinionEditableFieldsMixin[T](BaseModel):
