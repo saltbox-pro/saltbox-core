@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2025-12-22
+
+### Added
+- Helpers for migrations
+- Permissions for SSHFS
+- Secured pillars (by GPG)
+
+### Changed
+- Minions list endpoint (removed `osfullname`, `cpu_model` and `mem_total`; added `saltversion`, `osfinger` and `efi_secure_boot`)
+
+### Fixed
+- Grains with aliases
+- Job creation by tasks (when minion list is empty)
+
+
 ## [0.1.1] - 2025-11-15
 
 ### Added
@@ -61,6 +76,7 @@ archive format string. `unpack` field is deprecated.
 
 - Remove `SaltBoxCrypt` implementation.
 - Remove obsolete endpoints `jobs_list_cursor` and `job_create_sync`.
+
 ## [0.0.1] - 2025-05-16
 
 ## Added
