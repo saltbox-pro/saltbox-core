@@ -10,11 +10,11 @@ from taskiq.depends.progress_tracker import ProgressTracker, TaskState
 from saltbox_core.config import Settings, logger
 from saltbox_core.event_bus.redis.masters_bus import notify_accepted_masters_on_repos_update
 from saltbox_core.settings.repository import SettingsSlsRepoRepository, get_sls_repo_repository
-from saltbox_core.tasks.repositories.task_template_repository import (
+from saltbox_core.tasks.repositories.tasks_template import (
     TaskTemplateRepository,
     get_task_template_repository,
 )
-from saltbox_core.tasks.schemas.task_template_schemas import TaskTemplateCreateSchema, TaskTemplateUpdateSchema
+from saltbox_core.tasks.schemas.tasks_template import TaskTemplateCreateSchema, TaskTemplateUpdateSchema
 from saltbox_core.tkq import ConcurrencyLocker, broker
 from saltbox_core.utilities.git_repo_helper import (
     OrphanAuxFilesCleaner,

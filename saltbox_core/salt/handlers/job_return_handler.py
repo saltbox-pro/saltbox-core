@@ -18,6 +18,7 @@ from saltbox_core.minion_collections.services.minion_service import MinionServic
 from saltbox_core.salt.exceptions import StopProcessing
 from saltbox_core.salt.handlers.base_handler import MessageDataType
 from saltbox_core.salt.handlers.base_job_handler import BaseJobMessageHandler
+from saltbox_core.tasks.tiq_tasks import process_task_job_return
 from saltbox_sdk.event_bus.utils import send_message
 from saltbox_sdk.exceptions import DuplicateKeyException
 
@@ -97,8 +98,8 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         if not job:
             return
 
-        jid = match.group('jid')
-        mid = match.group('mid')
+        jid: str = match.group('jid')
+        mid: str = match.group('mid')
         function = data['fun']
         return_data = data.pop('return')
 
@@ -110,6 +111,9 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         job_return = await self._save_job_return(
             master_id=master_id, jid=jid, mid=mid, job=job, data=data, return_data=return_data
         )
+
+        if tid:
+            await process_task_job_return.kiq(jid=jid, minion_id=mid)  # type: ignore
 
         await self._send_presence(master_id=master_id, mid=mid, data=data)
         await self._process_return(job_return=job_return)

@@ -22,10 +22,14 @@ from saltbox_core.salt.handlers.metrics_handler import SaltMessageMetricMessageH
 from saltbox_core.salt.handlers.minion_started_handler import MinionStartedMessageHandler
 from saltbox_core.salt.handlers.new_job_handler import JobNewMessageHandler
 from saltbox_core.salt.handlers.presence_handler import PresenceMessageHandler
-from saltbox_core.tasks.repositories.task_repository import get_task_repository
-from saltbox_core.tasks.repositories.task_template_repository import get_task_template_repository
-from saltbox_core.tasks.services.tasks import get_task_service
-from saltbox_core.tasks.services.tasks_templates import get_task_template_service
+from saltbox_core.tasks.repositories.task import get_task_repository
+from saltbox_core.tasks.repositories.tasks_minion import get_task_minion_repository
+from saltbox_core.tasks.repositories.tasks_status import get_task_status_repository
+from saltbox_core.tasks.repositories.tasks_template import get_task_template_repository
+from saltbox_core.tasks.services.task import get_task_service
+from saltbox_core.tasks.services.tasks_minion import get_task_minion_service
+from saltbox_core.tasks.services.tasks_status import get_task_status_service
+from saltbox_core.tasks.services.tasks_template import get_task_template_service
 from saltbox_sdk.db.mongo.config import get_mongo_db
 from saltbox_sdk.db.redis.config import get_redis_now
 from saltbox_sdk.event_bus.faststream_app import get_faststream_broker
@@ -56,13 +60,20 @@ class SaltEventsHandler:
         )
         self.task_template_repository = get_task_template_repository(db=self.mongo_db)
         self.task_template_service = get_task_template_service(repo=self.task_template_repository)
+        self.task_minion_repository = get_task_minion_repository(db=self.mongo_db)
+        self.task_minion_service = get_task_minion_service(repo=self.task_minion_repository)
         self.task_repository = get_task_repository(db=self.mongo_db)
+        self.task_status_repository = get_task_status_repository(db=self.mongo_db)
+        self.task_status_service = get_task_status_service(repo=self.task_status_repository)
         self.task_service = get_task_service(
             repo=self.task_repository,
             rdb=self.redis,
+            task_status_service=self.task_status_service,
             task_template_service=self.task_template_service,
+            task_minion_service=self.task_minion_service,
             job_schema_service=self.job_schema_service,
             collections_service=self.collection_service,
+            minion_service=self.minion_service,
         )
         self.broker = get_faststream_broker()
 

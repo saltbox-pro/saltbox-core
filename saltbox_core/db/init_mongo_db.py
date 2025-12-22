@@ -14,7 +14,8 @@ from saltbox_core.masters.repositories.master_repository import MasterRepository
 from saltbox_core.minion_collections.repositories.collection_repository import CollectionRepository
 from saltbox_core.minion_collections.schemas.collection_schemas import CollectionCreateSchema
 from saltbox_core.settings.repository import SettingsSlsRepoRepository
-from saltbox_core.tasks.repositories.task_template_repository import TaskTemplateRepository
+from saltbox_core.tasks.repositories.tasks_minion import TaskMinionRepository
+from saltbox_core.tasks.repositories.tasks_template import TaskTemplateRepository
 from saltbox_sdk.db.mongo.config import get_mongo_db
 from saltbox_sdk.db.redis.config import get_redis_now
 
@@ -29,6 +30,23 @@ async def init_task_tpl(db: AsyncDatabase) -> None:
     if 'name_repo_id_unique_index' not in indexes:
         result = await sls_tpl_repo.collection.create_index(
             [('name', pymongo.ASCENDING), ('repo_id', pymongo.ASCENDING)], name='name_repo_id_unique_index', unique=True
+        )
+        logger.debug('Index created: %s', result)
+        logger.debug('Indexes: %s', indexes)
+
+
+async def init_task_minion(db: AsyncDatabase) -> None:
+    repo = TaskMinionRepository(db)
+
+    # Check existing indexes
+    indexes = sorted(await repo.collection.index_information())
+
+    # Create unique index for name and repo_id if not exists
+    if 'task_minion_unique_index' not in indexes:
+        result = await repo.collection.create_index(
+            [('task_id', pymongo.ASCENDING), ('minion_inner_id', pymongo.ASCENDING)],
+            name='task_minion_unique_index',
+            unique=True,
         )
         logger.debug('Index created: %s', result)
         logger.debug('Indexes: %s', indexes)
@@ -232,6 +250,10 @@ async def init_mongo_db() -> None:
     # Initialize sls_tpl collection
     await init_task_tpl(db)
     logger.debug('SLS templates initialized')
+
+    # Initialize task_minions collection
+    await init_task_minion(db)
+    logger.debug('Task minions initialized')
 
     # Initialize masters collection
     await init_masters(db)

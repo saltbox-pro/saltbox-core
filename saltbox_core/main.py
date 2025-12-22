@@ -19,8 +19,8 @@ from saltbox_core.minion_collections.routers.minion_router import router as mini
 from saltbox_core.pillars.routers.pillar_route import router as pillars_router
 from saltbox_core.settings.routers.gitlab_router import router as gitlab_router
 from saltbox_core.settings.routers.sls_repos_router import router as settings_sls_router
-from saltbox_core.tasks.routers.tasks_router import router as task_router
-from saltbox_core.tasks.routers.template_router import router as template_router
+from saltbox_core.tasks.routers.task import router as task_router
+from saltbox_core.tasks.routers.tasks_template import router as template_router
 from saltbox_core.tkq import broker
 from saltbox_core.utilities.httpx_client import HttpxClientSingletoneFactory
 from saltbox_core.utilities.redis_cache import CustomRedisCache

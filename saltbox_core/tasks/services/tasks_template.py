@@ -2,11 +2,8 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from saltbox_core.tasks.repositories.task_template_repository import (
-    TaskTemplateRepository,
-    get_task_template_repository,
-)
-from saltbox_core.tasks.schemas.task_template_schemas import (
+from saltbox_core.tasks.repositories.tasks_template import TaskTemplateRepository, get_task_template_repository
+from saltbox_core.tasks.schemas.tasks_template import (
     TaskTemplateCreateSchema,
     TaskTemplateModel,
     TaskTemplateUpdateSchema,

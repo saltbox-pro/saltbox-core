@@ -2,30 +2,31 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends
 
-# from saltbox_core.config import logger
-from saltbox_core.jobs.exceptions import JobDoesNotExistsException
-from saltbox_core.jobs.schemas.job_return_schemas import JobReturnModel
-from saltbox_core.jobs.schemas.job_schemas import JobModel
+from saltbox_core.jobs.schemas.job_return_schemas import JobReturnListResponse, JobReturnsListBody
+from saltbox_core.jobs.schemas.job_schemas import JobListBody, JobsListResponse
 from saltbox_core.jobs.services.job_return_service import JobReturnService, get_job_return_service
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.minion_collections.schemas.filter_schemas import (
     FiltersActions,
     MinionFilterSchema,
 )
-from saltbox_core.tasks.schemas.task_schemas import (
+from saltbox_core.tasks.schemas.task import (
     TaskCreateInputSchema,
     TaskCreateRequestSchema,
     TaskListBody,
     TaskListResponseSchema,
     TaskModel,
     TasksActions,
-    TaskSource,
 )
-from saltbox_core.tasks.services.tasks import TaskService, get_task_service
+from saltbox_core.tasks.schemas.tasks_minion import TaskMinionListBody, TaskMinionModel
+from saltbox_core.tasks.schemas.tasks_status import TaskStatusListBody, TaskStatusModel
+from saltbox_core.tasks.services.task import TaskService, get_task_service
 from saltbox_core.tasks.services.tasks_lifespan import TaskLifespanService, get_task_lifespan_service
+from saltbox_core.tasks.services.tasks_minion import TaskMinionService, get_task_minion_service
+from saltbox_core.tasks.services.tasks_status import TaskStatusService, get_task_status_service
 from saltbox_core.utilities.model_schema import get_model_schema
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
-from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
+from saltbox_sdk.db.schemas_base import PaginatedResponse, Source, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 from saltbox_sdk.fastapi_utils.dependencies import get_current_user, get_opa_query
 
@@ -40,7 +41,7 @@ router = APIRouter(prefix='/tasks', tags=['Tasks'])
         action=TasksActions.LIST,
     ).model_dump(by_alias=True),
 )
-async def tasks_list_new(
+async def tasks_list(
     opa_query: Annotated[dict, Depends(get_opa_query)],
     body: Annotated[TaskListBody, Body()],
     task_service: Annotated[TaskService, Depends(get_task_service)],
@@ -89,7 +90,7 @@ async def task_create(
         data=TaskCreateInputSchema(
             **{
                 'user': user.model_dump(),
-                'source': TaskSource.model_validate({'type': 'rest', 'id': user.sub}),
+                'source': Source.model_validate({'type': 'rest', 'id': user.sub}),
                 **item.model_dump(by_alias=True),
             }
         )
@@ -111,9 +112,62 @@ async def task_retrieve(
     return await task_service.get(query=tid)
 
 
-@router.get(
+@router.post(
+    '/{tid}/statues',
+    operation_id='tasks_statuses',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.list',
+        action=TasksActions.LIST,
+    ).model_dump(by_alias=True),
+)
+async def task_statues(
+    tid: PyObjectId,
+    body: Annotated[TaskStatusListBody, Body()],
+    task_status_service: Annotated[TaskStatusService, Depends(get_task_status_service)],
+) -> PaginatedResponse[TaskStatusModel]:
+    query = {'$and': [{'task_id': tid}, body.query]}
+
+    task_statuses_list = await task_status_service.get_list_paginated(
+        query=query,
+        limit=body.limit,
+        skip=body.skip,
+        projection_model=TaskStatusModel,
+        sort=body.sort,
+    )
+
+    return task_statuses_list
+
+
+@router.post(
+    '/{tid}/minions',
+    operation_id='tasks_minions',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.list',
+        action=TasksActions.LIST,
+    ).model_dump(by_alias=True),
+)
+async def task_minions(
+    tid: PyObjectId,
+    body: Annotated[TaskMinionListBody, Body()],
+    task_minion_service: Annotated[TaskMinionService, Depends(get_task_minion_service)],
+) -> PaginatedResponse[TaskMinionModel]:
+    query = {'$and': [{'task_id': tid}, body.query]}
+
+    task_minions_list = await task_minion_service.get_list_paginated(
+        query=query,
+        limit=body.limit,
+        skip=body.skip,
+        projection_model=TaskMinionModel,
+        sort=body.sort,
+    )
+
+    return task_minions_list
+
+
+@router.post(
     '/{tid}/jobs',
     operation_id='task_jobs',
+    deprecated=True,
     openapi_extra=GatewayEndpointConfig(
         policy='core.tasks.read',
         action=TasksActions.READ,
@@ -121,24 +175,26 @@ async def task_retrieve(
 )
 async def task_jobs(
     tid: PyObjectId,
-    task_service: Annotated[TaskService, Depends(get_task_service)],
+    body: Annotated[JobListBody, Body()],
     job_service: Annotated[JobService, Depends(get_job_service)],
-) -> list[JobModel]:
-    result: list[JobModel] = []
-    task = await task_service.get(query=tid)
+) -> PaginatedResponse[JobsListResponse]:
+    query = {'$and': [{'source.type': 'task', 'source.id': str(tid)}, body.query]}
 
-    for task_job in task.jobs.values():
-        try:
-            job = await job_service.get(query={'jid': task_job.jid, 'salt_master': task_job.target.master})
-            result.append(job)
-        except JobDoesNotExistsException:
-            continue
-    return result
+    task_jobs_list = await job_service.get_list_paginated(
+        query=query,
+        limit=body.limit,
+        skip=body.skip,
+        projection_model=JobsListResponse,
+        sort=body.sort,
+    )
+
+    return task_jobs_list
 
 
-@router.get(
+@router.post(
     '/{tid}/returns',
     operation_id='task_returns',
+    deprecated=True,
     openapi_extra=GatewayEndpointConfig(
         policy='core.tasks.read',
         action=TasksActions.READ,
@@ -146,22 +202,20 @@ async def task_jobs(
 )
 async def task_returns(
     tid: PyObjectId,
-    task_service: Annotated[TaskService, Depends(get_task_service)],
+    body: Annotated[JobReturnsListBody, Body()],
     job_return_service: Annotated[JobReturnService, Depends(get_job_return_service)],
-) -> list[JobReturnModel]:
-    result: list[JobReturnModel] = []
+) -> PaginatedResponse[JobReturnListResponse]:
+    query = {'$and': [{'source.type': 'task', 'source.id': str(tid)}, body.query]}
 
-    task = await task_service.get(query=tid)
+    task_jobs_returns_list = await job_return_service.get_list_paginated(
+        query=query,
+        limit=body.limit,
+        skip=body.skip,
+        projection_model=JobReturnListResponse,
+        sort=body.sort,
+    )
 
-    for task_job in task.jobs.values():
-        try:
-            job_returns = await job_return_service.get_list(
-                query={'jid': task_job.jid, 'salt_master': task_job.target.master}
-            )
-            result.extend(job_returns)
-        except JobDoesNotExistsException:
-            continue
-    return result
+    return task_jobs_returns_list
 
 
 @router.post(
@@ -175,9 +229,9 @@ async def task_returns(
 async def task_run(
     task_lifespan_service: Annotated[TaskLifespanService, Depends(get_task_lifespan_service)],
 ) -> TaskModel:
-    task = await task_lifespan_service.get_task()
     await task_lifespan_service.run()
-    return task
+
+    return await task_lifespan_service.get_task()
 
 
 @router.post(
@@ -191,10 +245,9 @@ async def task_run(
 async def task_stop(
     task_lifespan_service: Annotated[TaskLifespanService, Depends(get_task_lifespan_service)],
 ) -> TaskModel:
-    task = await task_lifespan_service.get_task()
     await task_lifespan_service.stop()
 
-    return task
+    return await task_lifespan_service.get_task()
 
 
 @router.post(
@@ -208,10 +261,9 @@ async def task_stop(
 async def restart_failed(
     task_lifespan_service: Annotated[TaskLifespanService, Depends(get_task_lifespan_service)],
 ) -> TaskModel:
-    task = await task_lifespan_service.get_task()
     await task_lifespan_service.restart_failed()
 
-    return task
+    return await task_lifespan_service.get_task()
 
 
 @router.post(
@@ -227,7 +279,6 @@ async def restart_failed_on_minion(
     minion_id: str,
     task_lifespan_service: Annotated[TaskLifespanService, Depends(get_task_lifespan_service)],
 ) -> TaskModel:
-    task = await task_lifespan_service.get_task()
     await task_lifespan_service.restart_failed_on_minion(master=master, minion_id=minion_id)
 
-    return task
+    return await task_lifespan_service.get_task()

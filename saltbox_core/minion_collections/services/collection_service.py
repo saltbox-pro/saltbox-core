@@ -22,20 +22,32 @@ ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
 class CollectionService(
     MongoBaseService[CollectionRepository, CollectionModel, CollectionCreateSchema, CollectionUpdateSchema]
 ):
+    @overload
     async def get_by_slug(
         self,
         slug: str,
         *,
         session: MongoAsyncClientSession | None = None,
-    ) -> CollectionModel:
-        return await self.repo.get(query={'slug': slug}, session=session)
+    ) -> CollectionModel: ...
 
-    async def get_by_slug_or_none(
+    @overload
+    async def get_by_slug(
         self,
         slug: str,
         *,
         session: MongoAsyncClientSession | None = None,
-    ) -> CollectionModel | None:
+        projection_model: type[ProjectionModel],
+    ) -> ProjectionModel: ...
+
+    async def get_by_slug(
+        self,
+        slug: str,
+        *,
+        session: MongoAsyncClientSession | None = None,
+        projection_model: type[ProjectionModel] | None = None,
+    ) -> CollectionModel | ProjectionModel:
+        if projection_model:
+            return await self.repo.get(query={'slug': slug}, projection_model=projection_model, session=session)
         return await self.repo.get(query={'slug': slug}, session=session)
 
     async def update_by_slug(

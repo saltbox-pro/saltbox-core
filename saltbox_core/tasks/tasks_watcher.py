@@ -16,12 +16,17 @@ from saltbox_core.minion_collections.repositories.collection_repository import C
 from saltbox_core.minion_collections.repositories.minion_repository import MinionRepository
 from saltbox_core.minion_collections.services.collection_service import CollectionService
 from saltbox_core.minion_collections.services.minion_service import MinionService
-from saltbox_core.tasks.repositories.task_repository import TaskRepository
-from saltbox_core.tasks.repositories.task_template_repository import TaskTemplateRepository
-from saltbox_core.tasks.schemas.task_schemas import TaskModel, TaskStatus
-from saltbox_core.tasks.services.tasks import TaskService
+from saltbox_core.tasks.repositories.task import TaskRepository
+from saltbox_core.tasks.repositories.tasks_minion import TaskMinionRepository
+from saltbox_core.tasks.repositories.tasks_status import TaskStatusRepository
+from saltbox_core.tasks.repositories.tasks_template import TaskTemplateRepository
+from saltbox_core.tasks.schemas.task import TaskModel
+from saltbox_core.tasks.schemas.tasks_status import TaskStatus
+from saltbox_core.tasks.services.task import TaskService
 from saltbox_core.tasks.services.tasks_lifespan import TaskLifespanService
-from saltbox_core.tasks.services.tasks_templates import TaskTemplateService
+from saltbox_core.tasks.services.tasks_minion import TaskMinionService
+from saltbox_core.tasks.services.tasks_status import TaskStatusService
+from saltbox_core.tasks.services.tasks_template import TaskTemplateService
 from saltbox_sdk.config.redis_config import REDIS_SETTINGS
 from saltbox_sdk.db.mongo.config import get_mongo_db
 
@@ -31,13 +36,15 @@ class TasksWatcher:
         self.redis: aioredis.Redis | None = None
         self.db = get_mongo_db()
 
-        self.job_repository = JobRepository(database=self.db)
+        self.job_repository = JobRepository(self.db)
         self.job_schema_repository = JobSchemaRepository(self.db)
         self.master_repository = MasterRepository(self.db)
-        self.collections_repository: CollectionRepository = CollectionRepository(self.db)
-        self.minions_repository: MinionRepository = MinionRepository(self.db)
-        self.task_repository: TaskRepository = TaskRepository(self.db)
-        self.task_template_repository: TaskTemplateRepository = TaskTemplateRepository(self.db)
+        self.collections_repository = CollectionRepository(self.db)
+        self.minions_repository = MinionRepository(self.db)
+        self.task_repository = TaskRepository(self.db)
+        self.task_status_repository = TaskStatusRepository(self.db)
+        self.task_minion_repository = TaskMinionRepository(self.db)
+        self.task_template_repository = TaskTemplateRepository(self.db)
 
         logger.info('Tasks watcher started')
 
@@ -52,30 +59,35 @@ class TasksWatcher:
 
         job_return_repository = JobReturnRepository(database=self.db, rdb=redis)
         job_return_service = JobReturnService(repo=job_return_repository, rdb=redis)
-        job_schema_service: JobSchemaService = JobSchemaService(repo=self.job_schema_repository)
-        master_service: MasterService = MasterService(repo=self.master_repository)
-        job_service: JobService = JobService(
+        job_schema_service = JobSchemaService(repo=self.job_schema_repository)
+        master_service = MasterService(repo=self.master_repository)
+        job_service = JobService(
             rdb=redis,
             job_repository=self.job_repository,
             job_schema_service=job_schema_service,
             master_service=master_service,
         )
-        minion_service: MinionService = MinionService(repo=self.minions_repository)
-        collection_service: CollectionService = CollectionService(repo=self.collections_repository)
-        task_template_service: TaskTemplateService = TaskTemplateService(repo=self.task_template_repository)
+        minion_service = MinionService(repo=self.minions_repository)
+        collection_service = CollectionService(repo=self.collections_repository)
+        task_status_service = TaskStatusService(repo=self.task_status_repository)
+        task_template_service = TaskTemplateService(repo=self.task_template_repository)
+        task_minion_service = TaskMinionService(repo=self.task_minion_repository)
         task_service: TaskService = TaskService(
             repo=self.task_repository,
             rdb=redis,
+            task_status_service=task_status_service,
             task_template_service=task_template_service,
+            task_minion_service=task_minion_service,
             job_schema_service=job_schema_service,
             collections_service=collection_service,
+            minion_service=minion_service,
         )
 
         logger.info('Processing tasks...')
 
         while True:
             tasks: list[TaskModel] = await task_service.get_list(
-                query={'status': {'$in': [TaskStatus.running, TaskStatus.stopping, TaskStatus.postprocessing]}},
+                query={'status.type': {'$in': [TaskStatus.wait_minions, TaskStatus.running, TaskStatus.stopping]}},
                 limit=0,
                 skip=0,
             )
@@ -84,6 +96,8 @@ class TasksWatcher:
                 task_lifespan_service = TaskLifespanService(
                     rdb=redis,
                     task_service=task_service,
+                    task_minion_service=task_minion_service,
+                    master_service=master_service,
                     job_service=job_service,
                     job_return_service=job_return_service,
                     minion_service=minion_service,
