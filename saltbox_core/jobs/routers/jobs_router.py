@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Depends
 from pydantic import Field
 
-from saltbox_core.jobs.schemas.job_return_schemas import JobReturnListResponse
+from saltbox_core.jobs.schemas.job_return_schemas import JobReturnListResponse, JobReturnsListBody
 from saltbox_core.jobs.schemas.job_schemas import (
     CreateJobRequest,
     JobCreateSchema,
@@ -127,7 +127,7 @@ async def job_returns_count(
 )
 async def job_returns_list(
     # opa_query: Annotated[dict, Depends(get_opa_query)],
-    body: Annotated[JobListBody, Body()],
+    body: Annotated[JobReturnsListBody, Body()],
     job_return_service: Annotated[JobReturnService, Depends(get_job_return_service)],
 ) -> PaginatedResponse[JobReturnListResponse]:
     query = body.query

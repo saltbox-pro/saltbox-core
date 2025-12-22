@@ -9,11 +9,10 @@ class TaskServiceException(CoreException):
     detail: str = 'TaskService error occurred'
 
 
-class TaskObjectDoesNotExistException(TaskServiceException):
-    """Exception raised when a Task object does not exist."""
+class TaskCreateServiceException(TaskServiceException):
+    """Base exception for TaskService."""
 
-    status_code: int = status.HTTP_404_NOT_FOUND
-    detail: str = 'Task object does not exist'
+    detail: str = 'TaskService task create error occurred'
 
 
 class TaskCreateSchemaValidationException(TaskServiceException):

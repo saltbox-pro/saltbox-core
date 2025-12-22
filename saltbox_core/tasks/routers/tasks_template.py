@@ -4,13 +4,13 @@ from fastapi import APIRouter, Depends, Query
 
 from saltbox_core.settings.schemas.sls_repos_schemas import SettingsSlsRepoShortSchema
 from saltbox_core.settings.services.sls_repo_service import SettingsSlsRepoService, get_sls_repo_service
-from saltbox_core.tasks.schemas.task_template_schemas import (
+from saltbox_core.tasks.schemas.tasks_template import (
     TaskTemplateListQueryParams,
     TaskTemplateModel,
     TaskTemplatesActions,
     TaskTemplateShortSchema,
 )
-from saltbox_core.tasks.services.tasks_templates import TaskTemplateService, get_task_template_service
+from saltbox_core.tasks.services.tasks_template import TaskTemplateService, get_task_template_service
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig

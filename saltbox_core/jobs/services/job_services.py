@@ -15,6 +15,7 @@ from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_core.utilities.context import replace_raised
 from saltbox_core.utilities.jid import JID
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_service import ProjectionModel
@@ -159,7 +160,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
 
         return job
 
-    async def stop_job(self, jid: JID) -> None: ...  # TODO (i.moshkov): stop jobs
+    async def stop_job(self, jid: JID | PyObjectId) -> None: ...  # TODO (i.moshkov): stop jobs
 
     async def _get_fake_jobs(
         self, cursor: int, label: str | None = None, count: int = FAKE_MESSAGES_DEFAULT_BULK_SIZE

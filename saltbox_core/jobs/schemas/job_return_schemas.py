@@ -4,8 +4,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from saltbox_core.jobs.schemas.job_schemas import StrJid
 from saltbox_core.utilities.salt import fill_salt_kwarg_from_arg
-from saltbox_sdk.db.mongo.schemas_base import IDMixin
-from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER, CreatedModifiedMixin, Source, UserShort
+from saltbox_sdk.db.mongo.schemas_base import IDMixin, QueryParams, SortParams
+from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER, CreatedModifiedMixin, SkipLimitParams, Source, UserShort
 
 # Job returns
 
@@ -72,6 +72,12 @@ class JobReturnModel(
 
 
 # REST
+
+
+class JobReturnsListBody(SkipLimitParams, QueryParams, SortParams):
+    model_config = ConfigDict(
+        extra='ignore',
+    )
 
 
 class JobReturnListResponse(

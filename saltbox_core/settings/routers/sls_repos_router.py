@@ -12,7 +12,7 @@ from saltbox_core.settings.schemas.sls_repos_schemas import (
     SettingsSlsRepoUpdateSchema,
 )
 from saltbox_core.settings.services.sls_repo_service import SettingsSlsRepoService, get_sls_repo_service
-from saltbox_core.tasks.services.tasks_templates import TaskTemplateService, get_task_template_service
+from saltbox_core.tasks.services.tasks_template import TaskTemplateService, get_task_template_service
 from saltbox_core.tkq import broker
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse, SkipLimitParams

@@ -1,0 +1,192 @@
+from enum import StrEnum
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from saltbox_core.tasks.schemas.tasks_status import TaskStatus
+from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId, QueryParams, SortParams
+from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams, Source, UserShort
+from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
+from saltbox_sdk.utilities.helpers import utc_now
+
+# Task
+
+
+class TaskType(StrEnum):
+    classic = 'classic'
+    policy = 'policy'
+
+
+class TaskTemplateShort(BaseModel, IDMixin):
+    title: str = Field(title='Template title')
+    name: str = Field(title='Template name')
+    repo_id: PyObjectId = Field(title='Repository id')
+    commit_hash: str = Field(title='Repository commit hash')
+
+
+class CollectionShort(BaseModel, IDMixin):
+    slug: str = Field(title='Collection slug')
+    title: str = Field(title='Collection title')
+
+
+class TaskStatusShort(BaseModel, CreatedModifiedMixin):
+    type: TaskStatus = Field(title='Status')
+    data: dict = Field(title='Status data', default_factory=dict)
+
+
+class TaskReadOnlyFieldsMixin:
+    task_type: TaskType = Field(title='Task type')
+
+    target_collection_id: PyObjectId = Field(title='Target ID')
+    target_query: dict[str, Any] = Field(title='Target query', default={})
+
+    task_template_id: PyObjectId | None = Field(title='Task template id', default=None)
+
+    fun: str = Field(title='Salt fun')
+    arg: list[str] | None = Field(title='Arg', default=None)
+    kwarg: dict[str, Any] | None = Field(title='Kwarg', default=None)
+
+    user: UserShort
+    source: Source | None = Field(title='Source', default=None)
+
+
+class TaskEditableFieldsMixin:
+    batch_size: int = Field(title='Batch size', ge=0, default=0)
+    max_jobs_count_at_same_time: int = Field(title='Max jobs count at some time', ge=1, default=1)
+
+    max_retries: int = Field(title='Max retries', ge=0, default=1)
+    retry_delay: int = Field(title='Retry delay', description='in seconds', ge=0, default=10)
+
+    last_sync_dt: TimezoneAwareDatetime | None = Field(title='Last sync datetime', default=None)
+
+
+class TaskTemplateJoinedFieldsMixin:
+    task_template: TaskTemplateShort | None = Field(title='Task template', default=None)
+
+
+class TaskTargetCollectionJoinedFieldsMixin:
+    target_collection: CollectionShort = Field(title='Target collection')
+
+
+class TaskStatusJoinedFieldsMixin:
+    status: TaskStatusShort = Field(
+        title='Status', default=TaskStatusShort(type=TaskStatus.created, created=utc_now(), modified=utc_now())
+    )
+
+
+class TaskJobJoinedFieldsMixin[TaskJobJoinedSchema: BaseModel]:
+    jobs: list[TaskJobJoinedSchema] = Field(title='Jobs', default=[])
+
+
+class TaskComputedFieldsMixin: ...
+
+
+class TaskCreateSchema(BaseModel, TaskEditableFieldsMixin, TaskReadOnlyFieldsMixin): ...
+
+
+class TaskUpdateSchema(BaseModel, TaskEditableFieldsMixin):
+    status: TaskStatus | None = Field(title='Status', default=None, exclude=True)
+
+    model_config = ConfigDict(
+        extra='ignore',
+    )
+
+
+class TaskModel(
+    BaseModel,
+    CreatedModifiedMixin,
+    TaskTemplateJoinedFieldsMixin,
+    TaskTargetCollectionJoinedFieldsMixin,
+    TaskStatusJoinedFieldsMixin,
+    TaskEditableFieldsMixin,
+    TaskReadOnlyFieldsMixin,
+    TaskComputedFieldsMixin,
+    IDMixin,
+): ...
+
+
+# REST
+
+
+class TaskTargetMinion(BaseModel):
+    minion_id: str = Field(title='Target minion ID')
+    salt_master: str = Field(title='Target minion master')
+
+
+class TaskCreateRequestSchema(BaseModel):
+    task_type: TaskType = Field(title='Task type')
+
+    collection_id: PyObjectId | None = Field(title='Collection ID', default=None)
+    collection_slug: str | None = Field(title='Collection slug', default=None)
+    query: dict = Field(title='Query', default={})
+    minions: list[TaskTargetMinion] = Field(title='Minions', default=[])
+
+    task_template_id: PyObjectId | None = Field(title='Task template id', default=None)
+
+    fun: str | None = Field(title='Salt fun', default=None)
+    arg: list[str] | None = Field(title='Arg', default=None)
+    kwarg: dict[str, Any] | None = Field(title='Kwarg', default=None)
+
+    batch_size: int = Field(title='Batch size', ge=0, default=0)
+    max_jobs_count_at_same_time: int = Field(title='Max jobs count at some time', ge=1, default=1)
+
+    max_retries: int = Field(title='Max retries', ge=0, default=1)
+    retry_delay: int = Field(title='Retry delay', ge=0, default=0)
+
+    @model_validator(mode='after')
+    def validate_fun(self) -> 'TaskCreateRequestSchema':
+        if self.task_template_id is None and self.fun is None:
+            msg = 'One of `task_template` or `fun` must be set'
+            raise ValueError(msg)
+
+        if self.task_template_id is not None and self.fun is not None:
+            msg = 'Only one of `task_template` or `fun` can be set'
+            raise ValueError(msg)
+
+        return self
+
+    @model_validator(mode='after')
+    def validate_collection(self) -> 'TaskCreateRequestSchema':
+        if self.collection_id is None and self.collection_slug is None:
+            msg = 'One of `collection_id` or `collection_slug` must be set'
+            raise ValueError(msg)
+
+        if self.collection_id is not None and self.collection_slug is not None:
+            msg = 'Only one of `collection_id` or `collection_slug` can be set'
+            raise ValueError(msg)
+
+        return self
+
+
+class TaskCreateInputSchema(TaskCreateRequestSchema):
+    user: UserShort
+    source: Source
+
+
+class TaskListResponseSchema(
+    BaseModel,
+    CreatedModifiedMixin,
+    TaskTemplateJoinedFieldsMixin,
+    TaskTargetCollectionJoinedFieldsMixin,
+    TaskStatusJoinedFieldsMixin,
+    TaskEditableFieldsMixin,
+    TaskReadOnlyFieldsMixin,
+    TaskComputedFieldsMixin,
+    IDMixin,
+): ...
+
+
+class TaskListBody(SkipLimitParams, QueryParams, SortParams):
+    model_config = ConfigDict(
+        extra='ignore',
+    )
+
+
+# OPA
+
+
+class TasksActions(StrEnum):
+    CREATE = 'create'
+    READ = 'read'
+    LIST = 'list'
+    RUN = 'run'

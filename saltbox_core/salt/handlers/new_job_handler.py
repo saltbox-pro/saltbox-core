@@ -6,6 +6,7 @@ from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel, Job
 from saltbox_core.salt.exceptions import StopProcessing
 from saltbox_core.salt.handlers.base_handler import MessageDataType
 from saltbox_core.salt.handlers.base_job_handler import BaseJobMessageHandler
+from saltbox_core.tasks.tiq_tasks import process_task_job
 from saltbox_sdk.db.schemas_base import SYSTEM_USER
 from saltbox_sdk.exceptions import ObjectNotFoundException
 
@@ -63,6 +64,9 @@ class JobNewMessageHandler(BaseJobMessageHandler):
             logger.info('New job (jid: %s) for task: %s', jid, tid)
         else:
             logger.info('New job: %s', jid)
+
+        if tid and job:
+            await process_task_job.kiq(jid=jid)  # type: ignore
 
         raise StopProcessing()
 

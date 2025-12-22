@@ -19,7 +19,7 @@ from saltbox_core.settings.schemas.sls_repos_schemas import (
     SettingsSlsRepoUpdateSchema,
 )
 from saltbox_core.settings.tiq_tasks import cleanup_orphan_aux_files, sync_sls_repo_task, sync_sls_repos_to_serve_dir
-from saltbox_core.tasks.services.tasks_templates import TaskTemplateService
+from saltbox_core.tasks.services.tasks_template import TaskTemplateService
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
 from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.db.schemas_base import PaginatedResponse

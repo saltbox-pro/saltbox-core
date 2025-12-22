@@ -182,6 +182,12 @@ class MinionShortSchema(
     pass
 
 
+class MinionSimpleSchema(BaseModel, IDMixin):
+    minion_id: str = Field(title='Minion ID')
+    master: str = Field(title='Master')
+    last_activity: TimezoneAwareDatetime | None = Field(title='Last activity', default=None)
+
+
 class MinionIDs(BaseModel, IDMixin):
     pass
 
