@@ -61,7 +61,7 @@ class SaltEventsHandler:
         self.task_template_repository = get_task_template_repository(db=self.mongo_db)
         self.task_template_service = get_task_template_service(repo=self.task_template_repository)
         self.task_minion_repository = get_task_minion_repository(db=self.mongo_db)
-        self.task_minion_service = get_task_minion_service(repo=self.task_minion_repository)
+        self.task_minion_service = get_task_minion_service(repo=self.task_minion_repository, rdb=self.redis)
         self.task_repository = get_task_repository(db=self.mongo_db)
         self.task_status_repository = get_task_status_repository(db=self.mongo_db)
         self.task_status_service = get_task_status_service(repo=self.task_status_repository)

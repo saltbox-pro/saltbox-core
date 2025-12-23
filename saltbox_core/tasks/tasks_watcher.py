@@ -71,7 +71,7 @@ class TasksWatcher:
         collection_service = CollectionService(repo=self.collections_repository)
         task_status_service = TaskStatusService(repo=self.task_status_repository)
         task_template_service = TaskTemplateService(repo=self.task_template_repository)
-        task_minion_service = TaskMinionService(repo=self.task_minion_repository)
+        task_minion_service = TaskMinionService(repo=self.task_minion_repository, rdb=redis)
         task_service: TaskService = TaskService(
             repo=self.task_repository,
             rdb=redis,
