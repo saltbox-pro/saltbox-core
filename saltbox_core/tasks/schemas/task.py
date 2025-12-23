@@ -113,6 +113,11 @@ class TaskTargetMinion(BaseModel):
     salt_master: str = Field(title='Target minion master')
 
 
+class TaskData(BaseModel):  # type: ignore
+    args: list[str] | None = Field(title='Arg', default=None)
+    kwargs: dict[str, Any] | None = Field(title='Kwarg', default=None)
+
+
 class TaskCreateRequestSchema(BaseModel):
     task_type: TaskType = Field(title='Task type')
 
@@ -124,8 +129,7 @@ class TaskCreateRequestSchema(BaseModel):
     task_template_id: PyObjectId | None = Field(title='Task template id', default=None)
 
     fun: str | None = Field(title='Salt fun', default=None)
-    arg: list[str] | None = Field(title='Arg', default=None)
-    kwarg: dict[str, Any] | None = Field(title='Kwarg', default=None)
+    data: TaskData | None = Field(title='Data data', default=None)
 
     batch_size: int = Field(title='Batch size', ge=0, default=0)
     max_jobs_count_at_same_time: int = Field(title='Max jobs count at some time', ge=1, default=1)

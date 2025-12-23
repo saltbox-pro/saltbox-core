@@ -74,10 +74,10 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
 
     async def __parse_salt_fun_params(self, data: TaskCreateInputSchema) -> tuple[str, list | None, dict | None]:
         task_data: dict = {}
-        if data.arg:
-            task_data['args'] = data.arg
-        if data.kwarg:
-            task_data['kwargs'] = data.kwarg
+        if data.data and data.data.args:
+            task_data['args'] = data.data.args
+        if data.data and data.data.kwargs:
+            task_data['kwargs'] = data.data.kwargs
 
         task_template: TaskTemplateModel | None = None
 
