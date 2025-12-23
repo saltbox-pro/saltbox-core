@@ -113,14 +113,14 @@ async def task_retrieve(
 
 
 @router.post(
-    '/{tid}/statues',
+    '/{tid}/statuses',
     operation_id='tasks_statuses',
     openapi_extra=GatewayEndpointConfig(
         policy='core.tasks.list',
         action=TasksActions.LIST,
     ).model_dump(by_alias=True),
 )
-async def task_statues(
+async def task_statuses(
     tid: PyObjectId,
     body: Annotated[TaskStatusListBody, Body()],
     task_status_service: Annotated[TaskStatusService, Depends(get_task_status_service)],
