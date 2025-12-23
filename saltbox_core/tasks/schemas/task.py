@@ -78,6 +78,19 @@ class TaskJobJoinedFieldsMixin[TaskJobJoinedSchema: BaseModel]:
     jobs: list[TaskJobJoinedSchema] = Field(title='Jobs', default=[])
 
 
+class TaskMinionsCountAggregation(BaseModel):
+    total: int = Field(title='Total number of minions', default=0)
+    pending: int = Field(title='Pending minions', default=0)
+    busy: int = Field(title='Busy', default=0)
+    in_work: int = Field(title='In work', default=0)
+    success: int = Field(title='Success', default=0)
+    failed: int = Field(title='Failed', default=0)
+
+
+class TaskAggregatedFieldsMixin:
+    minions_count: TaskMinionsCountAggregation = Field()
+
+
 class TaskComputedFieldsMixin: ...
 
 
@@ -98,6 +111,7 @@ class TaskModel(
     TaskTemplateJoinedFieldsMixin,
     TaskTargetCollectionJoinedFieldsMixin,
     TaskStatusJoinedFieldsMixin,
+    TaskAggregatedFieldsMixin,
     TaskEditableFieldsMixin,
     TaskReadOnlyFieldsMixin,
     TaskComputedFieldsMixin,
@@ -173,6 +187,7 @@ class TaskListResponseSchema(
     TaskTemplateJoinedFieldsMixin,
     TaskTargetCollectionJoinedFieldsMixin,
     TaskStatusJoinedFieldsMixin,
+    TaskAggregatedFieldsMixin,
     TaskEditableFieldsMixin,
     TaskReadOnlyFieldsMixin,
     TaskComputedFieldsMixin,
