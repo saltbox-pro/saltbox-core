@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Depends
 from pydantic import Field
 
-from saltbox_core.jobs.schemas.job_return_schemas import JobReturnListResponse, JobReturnsListBody
+from saltbox_core.jobs.schemas.job_return_schemas import JobReturnModel, JobReturnsListBody
 from saltbox_core.jobs.schemas.job_schemas import (
     CreateJobRequest,
     JobCreateSchema,
@@ -129,7 +129,7 @@ async def job_returns_list(
     # opa_query: Annotated[dict, Depends(get_opa_query)],
     body: Annotated[JobReturnsListBody, Body()],
     job_return_service: Annotated[JobReturnService, Depends(get_job_return_service)],
-) -> PaginatedResponse[JobReturnListResponse]:
+) -> PaginatedResponse[JobReturnModel]:
     query = body.query
 
     # TODO (@): Apply OPA query filtering
@@ -140,7 +140,7 @@ async def job_returns_list(
         query=query,
         skip=body.skip,
         limit=body.limit,
-        projection_model=JobReturnListResponse,
+        projection_model=JobReturnModel,
         sort=body.sort,
     )
 
