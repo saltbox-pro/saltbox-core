@@ -115,8 +115,8 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         if tid:
             await process_task_job_return.kiq(jid=jid, minion_id=mid)  # type: ignore
 
-        await self._send_presence(master_id=master_id, mid=mid, data=data)
         await self._process_return(job_return=job_return)
+        await self._send_presence(master_id=master_id, mid=mid, data=data)
 
         raise StopProcessing()
 
@@ -220,7 +220,8 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
                 if mod_data['result'] is not True:
                     logger.warning(
                         'Calling inventory.get from state seems failed for JID=%s, minion=%s',
-                        job_return.jid, job_return.minion_id,
+                        job_return.jid,
+                        job_return.minion_id,
                     )
                     return
                 mod_name = mod
@@ -228,7 +229,8 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         else:
             logger.error(
                 'Failed to find inventory.get data for JID=%s, minion=%s',
-                job_return.jid, job_return.minion_id,
+                job_return.jid,
+                job_return.minion_id,
             )
             return
 
