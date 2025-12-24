@@ -9,12 +9,6 @@ from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatet
 # Task minion
 
 
-class MinionDataSchema(BaseModel):
-    minion_id: str = Field(title='Minion ID')
-    master: str = Field(title='Master')
-    last_activity: TimezoneAwareDatetime | None = Field(title='Last activity', default=None)
-
-
 class TaskMinionStatus(StrEnum):
     pending = 'pending'
     busy = 'busy'
@@ -53,7 +47,9 @@ class TaskMinionUpdateSchema(BaseModel, TaskMinionEditableFieldsMixin):
 
 
 class TaskMinionJoinedFieldsMixin:
-    minion_data: MinionDataSchema = Field(title='Minion Data')
+    minion_id: str = Field(title='Minion ID')
+    master: str = Field(title='Master')
+    last_activity: TimezoneAwareDatetime | None = Field(title='Last activity', default=None)
 
 
 class TaskMinionModel(

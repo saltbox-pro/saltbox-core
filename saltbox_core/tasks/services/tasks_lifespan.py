@@ -22,7 +22,6 @@ from saltbox_sdk.db.mongo.config import get_mongo_db
 from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
 from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.db.schemas_base import Source
-from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.utilities.helpers import utc_now
 
 
@@ -158,7 +157,7 @@ class TaskLifespanService:
         minions = await self.task_minion_service.get_list(
             query={
                 'task_id': task.id,
-                'minion_data.master': master,
+                'master': master,
                 'status': TaskMinionStatus.pending,
             },
             limit=batch_size * 3,
@@ -196,13 +195,13 @@ class TaskLifespanService:
         minions = await self.task_minion_service.get_list(
             query={
                 'task_id': task.id,
-                'minion_data.master': master,
+                'master': master,
                 'status': TaskMinionStatus.pending,
                 '$or': [
                     {'start_last_dt': None},
                     {'start_last_dt': {'$lte': utc_now() - timedelta(seconds=task.retry_delay)}},
                 ],
-                'minion_data.last_activity': {'$gte': self.__active_dt()},
+                'last_activity': {'$gte': self.__active_dt()},
             },
             skip=0,
             limit=batch_size,
@@ -212,7 +211,7 @@ class TaskLifespanService:
             job = await self.job_service.create(
                 data=JobCreateSchema.model_validate(
                     {
-                        'tgt': [minion.minion_data.minion_id for minion in minions],
+                        'tgt': [minion.minion_id for minion in minions],
                         'tgt_type': 'list',
                         'salt_master': master,
                         'fun': task.fun,

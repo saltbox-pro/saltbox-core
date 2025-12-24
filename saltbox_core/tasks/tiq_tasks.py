@@ -26,7 +26,7 @@ async def process_task_job(
 
         for minion_id in job.minions:
             task_minion = await task_minion_service.get(
-                query={'task_id': task.id, 'minion_data.minion_id': minion_id, 'minion_data.master': job.salt_master}
+                query={'task_id': task.id, 'minion_id': minion_id, 'master': job.salt_master}
             )
             await task_minion_service.update(
                 query=task_minion.id, data={'jobs': {**task_minion.jobs, jid: TaskMinionJobStatus.in_work}}
@@ -34,7 +34,7 @@ async def process_task_job(
 
         for minion_id in job.missing:
             task_minion = await task_minion_service.get(
-                query={'task_id': task.id, 'minion_data.minion_id': minion_id, 'minion_data.master': job.salt_master}
+                query={'task_id': task.id, 'minion_id': minion_id, 'master': job.salt_master}
             )
             await task_minion_service.update(
                 query=task_minion.id, data={'jobs': {**task_minion.jobs, jid: TaskMinionJobStatus.ignored}}
@@ -58,7 +58,7 @@ async def process_task_job_return(
     if job.source and job.source.type == 'task' and job.source.id:
         task = await task_service.get(query=PyObjectId(job.source.id))
         task_minion = await task_minion_service.get(
-            query={'task_id': task.id, 'minion_data.minion_id': minion_id, 'minion_data.master': job.salt_master}
+            query={'task_id': task.id, 'minion_id': minion_id, 'master': job.salt_master}
         )
         is_success = job_return.success
 
