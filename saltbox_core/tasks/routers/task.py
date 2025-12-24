@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends
 
@@ -11,6 +11,7 @@ from saltbox_core.minion_collections.schemas.filter_schemas import (
     MinionFilterSchema,
 )
 from saltbox_core.tasks.schemas.task import (
+    RestartFailedBody,
     TaskCreateInputSchema,
     TaskCreateRequestSchema,
     TaskListBody,
@@ -18,7 +19,7 @@ from saltbox_core.tasks.schemas.task import (
     TaskModel,
     TasksActions,
 )
-from saltbox_core.tasks.schemas.tasks_minion import TaskMinionListBody, TaskMinionModel
+from saltbox_core.tasks.schemas.tasks_minion import TaskMinionListBody, TaskMinionModel, TaskMinionStatus
 from saltbox_core.tasks.schemas.tasks_status import TaskStatusListBody, TaskStatusModel
 from saltbox_core.tasks.services.task import TaskService, get_task_service
 from saltbox_core.tasks.services.tasks_lifespan import TaskLifespanService, get_task_lifespan_service
@@ -146,14 +147,14 @@ async def task_statuses(
         action=TasksActions.LIST,
     ).model_dump(by_alias=True),
 )
-async def task_minions(
+async def task_minions_list(
     tid: PyObjectId,
     body: Annotated[TaskMinionListBody, Body()],
     task_minion_service: Annotated[TaskMinionService, Depends(get_task_minion_service)],
 ) -> PaginatedResponse[TaskMinionModel]:
     query = {'$and': [{'task_id': tid}, body.query]}
 
-    task_minions_list = await task_minion_service.get_list_paginated(
+    result = await task_minion_service.get_list_paginated(
         query=query,
         limit=body.limit,
         skip=body.skip,
@@ -161,7 +162,7 @@ async def task_minions(
         sort=body.sort,
     )
 
-    return task_minions_list
+    return result
 
 
 @router.post(
@@ -259,26 +260,31 @@ async def task_stop(
     ).model_dump(by_alias=True),
 )
 async def restart_failed(
+    tid: PyObjectId,
+    body: Annotated[RestartFailedBody, Body()],
+    task_minion_service: Annotated[TaskMinionService, Depends(get_task_minion_service)],
     task_lifespan_service: Annotated[TaskLifespanService, Depends(get_task_lifespan_service)],
 ) -> TaskModel:
-    await task_lifespan_service.restart_failed()
+    query: dict[str, Any] = {'task_id': tid, 'status': TaskMinionStatus.failed}
+    subqueries: list[dict] = []
 
-    return await task_lifespan_service.get_task()
+    if body.minions_by_tgt:
+        subqueries.append(
+            {
+                '$or': [
+                    {'minion_id': minion_tgt.minion_id, 'master': minion_tgt.salt_master}
+                    for minion_tgt in body.minions_by_tgt
+                ]
+            }
+        )
+    if body.minions_by_ids:
+        subqueries.append({'minion_inner_id': {'$in': body.minions_by_ids}})
 
+    if subqueries:
+        query['$and'] = subqueries
 
-@router.post(
-    '/{tid}/restart_failed_on_minion',
-    operation_id='restart_failed_on_minion',
-    openapi_extra=GatewayEndpointConfig(
-        policy='core.tasks.run',
-        action=TasksActions.RUN,
-    ).model_dump(by_alias=True),
-)
-async def restart_failed_on_minion(
-    master: str,
-    minion_id: str,
-    task_lifespan_service: Annotated[TaskLifespanService, Depends(get_task_lifespan_service)],
-) -> TaskModel:
-    await task_lifespan_service.restart_failed_on_minion(master=master, minion_id=minion_id)
+    task_minions = await task_minion_service.get_list(query=query)
+
+    await task_lifespan_service.restart_on_minions(minions_ids=[minion.id for minion in task_minions])
 
     return await task_lifespan_service.get_task()

@@ -181,6 +181,11 @@ class TaskCreateInputSchema(TaskCreateRequestSchema):
     source: Source
 
 
+class RestartFailedBody(BaseModel):
+    minions_by_tgt: list[TaskTargetMinion] | None = Field(title='Minions by target', default=None)
+    minions_by_ids: list[PyObjectId] | None = Field(title='Minions by ids', default=None)
+
+
 class TaskListResponseSchema(
     BaseModel,
     CreatedModifiedMixin,

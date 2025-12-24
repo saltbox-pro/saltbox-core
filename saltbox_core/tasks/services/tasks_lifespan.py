@@ -22,7 +22,6 @@ from saltbox_sdk.db.mongo.config import get_mongo_db
 from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
 from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.db.schemas_base import Source
-from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.utilities.helpers import utc_now
 
 
@@ -104,37 +103,14 @@ class TaskLifespanService:
             await self.__stop_jobs()
             await self.update_task(status=TaskStatus.stopping)
 
-    async def restart_failed(self) -> None:
+    async def restart_on_minions(self, minions_ids: list[PyObjectId]) -> None:
         task = await self.get_task()
 
         if task.status and task.status.type in [TaskStatus.finished, TaskStatus.stopped]:
-            minions: list[EmptyModel] = await self.minion_service.get_list(
-                query={'status': TaskMinionStatus.failed}, limit=0, skip=0, projection_model=EmptyModel
-            )
+            for minion_id in minions_ids:
+                await self.task_minion_service.update(query=minion_id, data={'status': TaskMinionStatus.pending})
 
-            for minion in minions:
-                await self.minion_service.update(query=minion.id, data={'status': TaskMinionStatus.pending})
-
-            # await self.__create_jobs()
-            await self.run(force=True)
-
-    async def restart_failed_on_minion(self, master: str, minion_id: str) -> None:
-        task = await self.get_task()
-
-        if task.status and task.status.type != TaskStatus.finished:
-            return
-
-        try:
-            await self.task_minion_service.update(
-                query={'master': master, 'minion_id': minion_id, 'status': TaskMinionStatus.failed},
-                data={'status': TaskMinionStatus.pending},
-                projection_model=EmptyModel,
-            )
-        except ObjectNotFoundException:
-            return
-
-        # await self.__create_jobs()
-        await self.update_task(status=TaskStatus.running)
+            await self.update_task(status=TaskStatus.running)
 
     async def _batch_size(self, salt_master: str) -> int:
         # TODO: Need algorithm to get batch size
