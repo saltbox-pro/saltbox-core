@@ -6,6 +6,7 @@ from saltbox_core.jobs.schemas.job_schemas import StrJid
 from saltbox_core.utilities.salt import fill_salt_kwarg_from_arg
 from saltbox_sdk.db.mongo.schemas_base import IDMixin, QueryParams, SortParams
 from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER, CreatedModifiedMixin, SkipLimitParams, Source, UserShort
+from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
 
 # Job returns
 
@@ -20,8 +21,8 @@ class JobReturnReadOnlyFieldsMixin:
     fun_kwarg: dict | None = None
     system_user: str | None = None
     user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
-    stamp: str
-    stamp_job: str | None = Field(default=None)
+    stamp: TimezoneAwareDatetime
+    stamp_job: TimezoneAwareDatetime | None = Field(default=None)
     source: Source | None = None
 
 

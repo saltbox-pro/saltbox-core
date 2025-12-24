@@ -21,6 +21,7 @@ from saltbox_core.salt.handlers.base_job_handler import BaseJobMessageHandler
 from saltbox_core.tasks.tiq_tasks import process_task_job_return
 from saltbox_sdk.event_bus.utils import send_message
 from saltbox_sdk.exceptions import DuplicateKeyException
+from saltbox_sdk.utilities.helpers import format_iso8601_z, make_aware
 
 
 class JobReturnMessageHandler(BaseJobMessageHandler):
@@ -57,7 +58,10 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         data['system_user'] = data.pop('user')
         data['minion_id'] = data.pop('id', match.group('mid'))
         data['salt_master'] = data.pop('master_id', master_id)
-        data['stamp'] = data.pop('_stamp')
+
+        raw_stamp = data.pop('_stamp')
+        data['stamp'] = make_aware(datetime.fromisoformat(raw_stamp)) if raw_stamp else None
+
         return data
 
     async def get_job(self, jid: str, master_id: str, data: MessageDataType) -> JobModel:
@@ -246,9 +250,7 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         )
 
     async def _send_presence(self, master_id: str, mid: str, data: dict[str, Any]) -> None:
-        await self.minion_service.process_presence(
-            master_id=master_id, minions=[mid], stamp=datetime.fromisoformat(data['stamp']).timestamp()
-        )
+        await self.minion_service.process_presence(master_id=master_id, minions=[mid], stamp=data['stamp'].timestamp())
 
     async def _extract_job_status(self, data: MessageDataType) -> str:
         if data.get(self._STATUS_SUCCESS, False):
@@ -271,7 +273,7 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
             {
                 'jid': match.group('jid'),
                 'minion_id': match.group('mid'),
-                'stamp': data['stamp'],
+                'stamp': format_iso8601_z(data['stamp']),
             }
         )
 

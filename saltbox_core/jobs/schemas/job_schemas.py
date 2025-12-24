@@ -10,6 +10,7 @@ from saltbox_core.utilities.jid import JID, JidError
 from saltbox_core.utilities.salt import fill_salt_kwarg_from_arg
 from saltbox_sdk.db.mongo.schemas_base import IDMixin, QueryParams, SortParams
 from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER, CreatedModifiedMixin, SkipLimitParams, Source, UserShort
+from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
 
 
 def jidable[JID_T: str | int](value: JID_T) -> JID_T:
@@ -50,7 +51,7 @@ class JobEditableFieldsMixin:
     minions: list[str] = Field(default=[])
     missing: list[str] = Field(default=[])
     returning: dict[str, bool | None] = Field(default={})
-    stamp: str | None = Field(default=None)
+    stamp: TimezoneAwareDatetime | None = Field(default=None)
     status: JobStatus = JobStatus.in_queue
 
 

@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 from typing import ClassVar
 
 from saltbox_core.config import logger
@@ -9,6 +10,7 @@ from saltbox_core.salt.handlers.base_job_handler import BaseJobMessageHandler
 from saltbox_core.tasks.tiq_tasks import process_task_job
 from saltbox_sdk.db.schemas_base import SYSTEM_USER
 from saltbox_sdk.exceptions import ObjectNotFoundException
+from saltbox_sdk.utilities.helpers import format_iso8601_z, make_aware
 
 
 class JobNewMessageHandler(BaseJobMessageHandler):
@@ -26,7 +28,9 @@ class JobNewMessageHandler(BaseJobMessageHandler):
         data = await super().normalize_data(match, master_id, tag, data)
         data['system_user'] = data.pop('user')
         data['salt_master'] = master_id
-        data['stamp'] = data.pop('_stamp')
+
+        raw_stamp = data.pop('_stamp')
+        data['stamp'] = make_aware(datetime.fromisoformat(raw_stamp)) if raw_stamp else None
 
         return data
 
@@ -79,7 +83,7 @@ class JobNewMessageHandler(BaseJobMessageHandler):
                 'jid': match.group('jid'),
                 'tgt': data['tgt'],
                 'fun': data['fun'],
-                'stamp': data['stamp'],
+                'stamp': format_iso8601_z(data['stamp']),
             }
         )
 
