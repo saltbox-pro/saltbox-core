@@ -169,7 +169,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         return [
             minion.id
             for minion in await self.minion_service.get_list(
-                query={'$and': queries},
+                query={'$and': queries} if queries else {},
                 limit=0,
                 skip=0,
                 session=session,
