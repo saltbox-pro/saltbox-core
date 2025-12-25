@@ -106,7 +106,7 @@ class TaskLifespanService:
     async def restart_on_minions(self, minions_ids: list[PyObjectId]) -> None:
         task = await self.get_task()
 
-        if task.status and task.status.type in [TaskStatus.finished, TaskStatus.stopped]:
+        if task.status and task.status.type != TaskStatus.stopping:
             for minion_id in minions_ids:
                 await self.task_minion_service.update(query=minion_id, data={'status': TaskMinionStatus.pending})
 
@@ -220,7 +220,8 @@ class TaskLifespanService:
         if task.task_type == TaskType.policy:
             await self.task_service.fill_task_minions(task=task)
 
-        total_minions_in_job_count = 0
+        total_count_minions_in_new_job = 0
+        total_count_active_jobs = 0
 
         for master in await self.master_service.get_accepted_list():
             active_jobs_count = await self.job_service.count(
@@ -235,7 +236,7 @@ class TaskLifespanService:
             batch_size = await self._batch_size(master.master_id)
             while active_jobs_count < task.max_jobs_count_at_same_time:
                 minions_in_job_count = await self.create_job(master.master_id, batch_size)
-                total_minions_in_job_count += minions_in_job_count
+                total_count_minions_in_new_job += minions_in_job_count
 
                 if minions_in_job_count < batch_size:
                     await self.check_unactive_minions(master=master.master_id, batch_size=batch_size)
@@ -243,8 +244,17 @@ class TaskLifespanService:
 
                 active_jobs_count += 1
 
-        if not total_minions_in_job_count and not await self.task_minion_service.exists(
-            query={'status': {'$in': [TaskMinionStatus.pending, TaskMinionStatus.busy, TaskMinionStatus.in_work]}}
+            total_count_active_jobs += active_jobs_count
+
+        if (
+            total_count_active_jobs == 0
+            and total_count_minions_in_new_job == 0
+            and not await self.task_minion_service.exists(
+                query={
+                    'task_id': task.id,
+                    'status': {'$in': [TaskMinionStatus.pending, TaskMinionStatus.busy, TaskMinionStatus.in_work]},
+                }
+            )
         ):
             await self.update_task(
                 status=TaskStatus.wait_minions if task.task_type == TaskType.policy else TaskStatus.finished
