@@ -149,7 +149,7 @@ class TaskCreateRequestSchema(BaseModel):
     max_jobs_count_at_same_time: int = Field(title='Max jobs count at some time', ge=1, default=1)
 
     max_retries: int = Field(title='Max retries', ge=0, default=1)
-    retry_delay: int = Field(title='Retry delay', ge=0, default=0)
+    retry_delay: int = Field(title='Retry delay', description='in seconds', ge=0, default=10)
 
     @model_validator(mode='after')
     def validate_fun(self) -> 'TaskCreateRequestSchema':
