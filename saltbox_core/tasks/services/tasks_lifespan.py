@@ -136,6 +136,7 @@ class TaskLifespanService:
                 'task_id': task.id,
                 'master': master,
                 'status': TaskMinionStatus.pending,
+                'last_sync_dt': {'$lt': self.__active_dt()},
             },
             limit=batch_size * 3,
             skip=0,
