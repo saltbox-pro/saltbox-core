@@ -99,7 +99,7 @@ class TaskLifespanService:
     async def stop(self) -> None:
         task = await self.get_task()
 
-        if task.status and task.status.type == TaskStatus.running:
+        if task.status and task.status.type in [TaskStatus.running, TaskStatus.wait_minions]:
             await self.__stop_jobs()
             await self.update_task(status=TaskStatus.stopping)
 
