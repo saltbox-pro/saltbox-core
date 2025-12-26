@@ -4,9 +4,15 @@ from fastapi import Depends
 from pymongo.asynchronous.database import AsyncDatabase
 
 from saltbox_core.tasks.schemas.tasks_minion import TaskMinionModel
+from saltbox_sdk.db.mongo.aggregations import (
+    AddFieldsAggregationStage,
+    AggregatedField,
+    AggregationsStore,
+    LookupAggregationStage,
+    UnwindAggregationStage,
+)
 from saltbox_sdk.db.mongo.config import get_mongo
 from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
-from saltbox_sdk.db.mongo.utils import AggregatedField, AggregationsStore
 
 
 class TaskMinionRepository(BaseMongoRepository[TaskMinionModel]):
@@ -19,30 +25,28 @@ class TaskMinionRepository(BaseMongoRepository[TaskMinionModel]):
                 AggregatedField(
                     field_name='minion',
                     stages=[
-                        {
-                            '$lookup': {
-                                'from': 'minions',
-                                'localField': 'minion_inner_id',
-                                'foreignField': '_id',
-                                'as': 'minion',
-                            }
-                        },
-                        {'$unwind': '$minion'},
+                        LookupAggregationStage(
+                            from_collection='minions',
+                            local_field='minion_inner_id',
+                            foreign_field='_id',
+                            as_field='minion',
+                        ),
+                        UnwindAggregationStage(path='$minion'),
                     ],
                 ),
                 AggregatedField(
                     field_name='minion_id',
-                    stages=[{'$addFields': {'minion_id': '$minion.minion_id'}}],
+                    stages=[AddFieldsAggregationStage(fields={'minion_id': '$minion.minion_id'})],
                     parent_aggregations=['minion'],
                 ),
                 AggregatedField(
                     field_name='master',
-                    stages=[{'$addFields': {'master': '$minion.master'}}],
+                    stages=[AddFieldsAggregationStage(fields={'master': '$minion.master'})],
                     parent_aggregations=['minion'],
                 ),
                 AggregatedField(
                     field_name='last_activity',
-                    stages=[{'$addFields': {'last_activity': '$minion.last_activity'}}],
+                    stages=[AddFieldsAggregationStage(fields={'last_activity': '$minion.last_activity'})],
                     parent_aggregations=['minion'],
                 ),
             ]

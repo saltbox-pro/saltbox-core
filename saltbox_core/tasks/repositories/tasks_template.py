@@ -5,9 +5,14 @@ from pydantic import BaseModel
 from pymongo.asynchronous.database import AsyncDatabase
 
 from saltbox_core.tasks.schemas.tasks_template import TaskTemplateModel
+from saltbox_sdk.db.mongo.aggregations import (
+    AggregatedField,
+    AggregationsStore,
+    LookupAggregationStage,
+    UnwindAggregationStage,
+)
 from saltbox_sdk.db.mongo.config import get_mongo
 from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
-from saltbox_sdk.db.mongo.utils import AggregatedField, AggregationsStore
 
 ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
 
@@ -22,16 +27,14 @@ class TaskTemplateRepository(BaseMongoRepository[TaskTemplateModel]):
                 AggregatedField(
                     field_name='repo_info',
                     stages=[
-                        {
-                            '$lookup': {
-                                'from': 'settings_sls_repos',
-                                'localField': 'repo_id',
-                                'foreignField': '_id',
-                                'as': 'repo_info',
-                                'pipeline': [{'$project': {'repo_url': 1, 'name': 1}}],
-                            }
-                        },
-                        {'$unwind': '$repo_info'},
+                        LookupAggregationStage(
+                            from_collection='settings_sls_repos',
+                            local_field='repo_id',
+                            foreign_field='_id',
+                            as_field='repo_info',
+                            pipeline=[{'$project': {'repo_url': 1, 'name': 1}}],
+                        ),
+                        UnwindAggregationStage(path='$repo_info'),
                     ],
                 )
             ]
