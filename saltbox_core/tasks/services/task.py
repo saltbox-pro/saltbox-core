@@ -139,6 +139,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                 'target_query': data.query,
                 'batch_size': data.batch_size,
                 'max_retries': data.max_retries,
+                'retry_delay': data.retry_delay,
                 'max_jobs_count_at_same_time': data.max_jobs_count_at_same_time,
                 'user': data.user,
                 'source': data.source,
