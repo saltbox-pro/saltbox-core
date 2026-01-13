@@ -6,7 +6,7 @@ from saltbox_sdk.db.schemas_base import Source
 from saltbox_sdk.scheduler.messages import RunTaskEventBusMessage
 
 
-async def run_job(message: RunTaskEventBusMessage, context: ContextRepo) -> dict:
+async def run_job_handler(message: RunTaskEventBusMessage, context: ContextRepo) -> dict:
     job_service: JobService = context.get('job_service')
 
     job = await job_service.create(

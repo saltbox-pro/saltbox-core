@@ -8,7 +8,7 @@ from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER, Source
 from saltbox_sdk.scheduler.messages import RunTaskEventBusMessage
 
 
-async def run_task(message: RunTaskEventBusMessage, context: ContextRepo) -> dict:
+async def run_task_handler(message: RunTaskEventBusMessage, context: ContextRepo) -> dict:
     redis_db = context.get('redis_db')
     task_service: TaskService = context.get('task_service')
     task_minion_service: TaskMinionService = context.get('task_minion_service')
