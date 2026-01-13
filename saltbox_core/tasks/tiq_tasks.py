@@ -82,3 +82,24 @@ async def process_task_job_return(
         await task_minion_service.update(query=task_minion.id, data=data_to_update)
 
         await task_service.update(query=task.id, data={})
+
+
+@broker.task()
+async def process_task_job_error(
+    jid: str,
+    job_service: Annotated[JobService, TaskiqDepends(get_job_service)],
+    task_service: Annotated[TaskService, TaskiqDepends(get_task_service)],
+    task_minion_service: Annotated[TaskMinionService, TaskiqDepends(get_task_minion_service)],
+) -> None:
+    job = await job_service.get(query={'jid': jid})
+
+    if job.source and job.source.type in ['task', 'task_system'] and job.source.id:
+        task = await task_service.get(query=PyObjectId(job.source.id))
+        minions_ids = job.tgt if isinstance(job.tgt, list) else [job.tgt]
+
+        for task_minion in await task_minion_service.get_list(
+            query={'task_id': task.id, 'minion_id': {'$in': minions_ids}, 'master': job.salt_master}
+        ):
+            status = TaskMinionStatus.failed
+
+            await task_minion_service.update(query=task_minion.id, data={'status': status})

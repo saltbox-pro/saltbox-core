@@ -87,7 +87,11 @@ class TaskLifespanService:
         task = await self.get_task()
 
         task_jobs = await self.job_service.get_list(
-            query={'source.type': 'task', 'source.id': str(task.id), 'status': {'$ne': JobStatus.finished}},
+            query={
+                'source.type': 'task',
+                'source.id': str(task.id),
+                'status': {'$nin': [JobStatus.finished, JobStatus.error]},
+            },
             limit=0,
             skip=0,
             projection_model=EmptyModel,
@@ -108,7 +112,9 @@ class TaskLifespanService:
 
         if task.status and task.status.type != TaskStatus.stopping:
             for minion_id in minions_ids:
-                await self.task_minion_service.update(query=minion_id, data={'status': TaskMinionStatus.pending})
+                await self.task_minion_service.update(
+                    query=minion_id, data={'status': TaskMinionStatus.pending, 'check_unactive_last_job_dt': None}
+                )
 
             await self.update_task(status=TaskStatus.running)
 
@@ -136,7 +142,21 @@ class TaskLifespanService:
                 'task_id': task.id,
                 'master': master,
                 'status': TaskMinionStatus.pending,
-                'last_sync_dt': {'$lt': self.__active_dt()},
+                'last_activity': {'$lt': self.__active_dt()},
+                '$and': [
+                    {
+                        '$or': [
+                            {'last_check_unactive_dt': None},
+                            {'last_check_unactive_dt': {'$lt': utc_now() - self.__timedelta_to_sync_task() * 2}},
+                        ],
+                    },
+                    {
+                        '$or': [
+                            {'check_unactive_last_job_dt': None},
+                            {'check_unactive_last_job_dt': {'$lt': utc_now() - self.__timedelta_to_sync_task()}},
+                        ]
+                    },
+                ],
             },
             limit=batch_size * 3,
             skip=0,
@@ -144,14 +164,21 @@ class TaskLifespanService:
         )
 
         if minions:
+            minions_ids = []
+
+            for minion in minions:
+                minions_ids.append(minion.minion_id)
+                await self.task_minion_service.update(query=minion.id, data={'check_unactive_last_job_dt': utc_now()})
+
             await self.job_service.create(
                 data=JobCreateSchema.model_validate(
                     {
-                        'tgt': [minion.minion_id for minion in minions],
+                        'tgt': minions_ids,
                         'tgt_type': 'list',
                         'salt_master': master,
                         'fun': 'test.ping',
                         'source': Source(type='task_system', id=str(task.id)),
+                        'user': task.user,
                     },
                 ),
                 projection_model=EmptyModel,
@@ -196,6 +223,7 @@ class TaskLifespanService:
                         'arg': task.arg,
                         'kwarg': task.kwarg,
                         'source': Source(type='task', id=str(task.id)),
+                        'user': task.user,
                     }
                 )
             )
@@ -239,11 +267,12 @@ class TaskLifespanService:
                 minions_in_job_count = await self.create_job(master.master_id, batch_size)
                 total_count_minions_in_new_job += minions_in_job_count
 
+                if minions_in_job_count > 0:
+                    active_jobs_count += 1
+
                 if minions_in_job_count < batch_size:
                     await self.check_unactive_minions(master=master.master_id, batch_size=batch_size)
                     break
-
-                active_jobs_count += 1
 
             total_count_active_jobs += active_jobs_count
 
@@ -271,7 +300,11 @@ class TaskLifespanService:
             return
 
         if await self.job_service.exists(
-            query={'source.type': 'task', 'source.id': str(task.id), 'status': {'$ne': JobStatus.finished}}
+            query={
+                'source.type': 'task',
+                'source.id': str(task.id),
+                'status': {'$nin': [JobStatus.finished, JobStatus.error]},
+            }
         ):
             # Sync jobs when task has no updates a long time
             if utc_now() - task.modified > self.__timedelta_to_sync_task():

@@ -32,6 +32,7 @@ class JobStatus(StrEnum):
     started = 'started'
     waiting_returns = 'waiting_returns'
     finished = 'finished'
+    error = 'error'
 
 
 class JobReadOnlyFieldsMixin:
@@ -53,6 +54,7 @@ class JobEditableFieldsMixin:
     returning: dict[str, bool | None] = Field(default={})
     stamp: TimezoneAwareDatetime | None = Field(default=None)
     status: JobStatus = JobStatus.in_queue
+    error_type: str | None = None
 
 
 class JobComputedFieldsMixin:

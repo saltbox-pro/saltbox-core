@@ -37,6 +37,7 @@ class TaskMinionEditableFieldsMixin:
 
     start_last_dt: TimezoneAwareDatetime | None = Field(title='Last job start dt', default=None)
     finished_dt: TimezoneAwareDatetime | None = Field(title='Processing finished dt', default=None)
+    check_unactive_last_job_dt: TimezoneAwareDatetime | None = Field(title='Last check unactive dt', default=None)
 
 
 class TaskMinionCreateSchema(BaseModel, TaskMinionReadOnlyFieldsMixin, TaskMinionEditableFieldsMixin): ...
