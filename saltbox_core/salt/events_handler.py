@@ -17,7 +17,7 @@ from saltbox_core.minion_collections.services.collection_service import get_coll
 from saltbox_core.minion_collections.services.minion_service import get_minion_service
 from saltbox_core.salt.exceptions import StopProcessing
 from saltbox_core.salt.handlers.base_handler import BaseMessageHandler
-from saltbox_core.salt.handlers.job_failed import JobFailedHandler
+from saltbox_core.salt.handlers.job_error import JobErrorHandler
 from saltbox_core.salt.handlers.job_return_handler import JobReturnMessageHandler
 from saltbox_core.salt.handlers.metrics_handler import SaltMessageMetricMessageHandler
 from saltbox_core.salt.handlers.minion_started_handler import MinionStartedMessageHandler
@@ -81,7 +81,7 @@ class SaltEventsHandler:
         self.salt_handlers: list[BaseMessageHandler] = [
             SaltMessageMetricMessageHandler(redis_client=self.redis),
             JobNewMessageHandler(redis_client=self.redis, job_service=self.job_service),
-            JobFailedHandler(redis_client=self.redis, job_service=self.job_service),
+            JobErrorHandler(redis_client=self.redis, job_service=self.job_service),
             JobReturnMessageHandler(
                 redis_client=self.redis,
                 job_service=self.job_service,

@@ -12,9 +12,9 @@ from saltbox_core.tasks.tiq_tasks import process_task_job_error
 from saltbox_sdk.exceptions import ObjectNotFoundException
 
 
-class JobFailedHandler(BaseMessageHandler):
+class JobErrorHandler(BaseMessageHandler):
     """
-    A message handler for job failed messages
+    A message handler for job error messages
     """
 
     tag_patterns: ClassVar[list[re.Pattern[str]]] = [re.compile(r'^saltbox/job/(?P<jid>\d{20})/error$')]
