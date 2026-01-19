@@ -25,7 +25,7 @@ from saltbox_core.utilities.git_repo_helper import (
     update_sshfs_permissions,
 )
 from saltbox_sdk.db.redis.config import get_redis
-from saltbox_sdk.exceptions import ObjectNotFoundException
+from saltbox_sdk.exceptions import ObjectNotFoundException, SaltBoxBaseException
 
 SETTINGS = Settings()
 SYNC_SERVE_DIR_LOCK_EXPIRATION_SEC = 300
@@ -84,7 +84,7 @@ async def sync_sls_repo_task(
     sls_repo_of_repo: SettingsSlsRepoRepository = TaskiqDepends(get_sls_repo_repository),
     redis: Redis = TaskiqDepends(get_redis),
 ) -> dict:
-    """Task for synchronizing job schemas from a Git repository."""
+    """Sync an SLS Git repo to backend"""
     try:
         await progress.set_progress(TaskState.STARTED, 'Sync started')
         repo_mod = await sls_repo_of_repo.get({'_id': ObjectId(repo_id)})
@@ -131,8 +131,10 @@ async def sync_sls_repo_task(
                 'removed_count': removed_count,
                 'errors': errors,
             }
-    except Exception as e:
-        msg = f'Error during task execution: {e!s}'
+    except Exception as exc:
+        msg = f'Error during task execution: {exc!s}'
+        if isinstance(exc, SaltBoxBaseException) and (extra := exc.get_extra_fields()):
+            msg += f'; extra: {extra}'
         logger.error(msg)
         await sls_repo_of_repo.update(
             {'_id': ObjectId(repo_id)},
