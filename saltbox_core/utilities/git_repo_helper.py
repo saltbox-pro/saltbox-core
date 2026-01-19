@@ -42,6 +42,14 @@ class MultipleRepoSyncException(GitRepoException): ...
 class GitRepoSshfsFileSyncException(GitRepoException): ...
 
 
+class GitRepoSshfsFileSyncHttpStatusException(GitRepoSshfsFileSyncException):
+    extra_fields = ('content',)
+
+    def __init__(self, detail: str | None = None, content: Any = None) -> None:
+        super().__init__(detail)
+        self.content = content
+
+
 class SlsRepoException(CoreException): ...
 
 
@@ -184,7 +192,14 @@ class SshfsSyncBase(ABC):
                 httpx.AsyncClient() as client,
                 client.stream('GET', str(self.file_entry.url), headers=headers) as response,
             ):
-                response.raise_for_status()
+                if response.status_code != httpx.codes.OK:
+                    await response.aread()
+                    try:
+                        resp_cont = response.json()
+                    except ValueError:
+                        resp_cont = response.text
+                    msg = f'Response {response.status_code} for {response.url}'
+                    raise GitRepoSshfsFileSyncHttpStatusException(detail=msg, content=resp_cont) from None
 
                 url_digest = hashlib.blake2b(
                     str(response.url).encode(),
@@ -205,9 +220,6 @@ class SshfsSyncBase(ABC):
             err_txt = str(err) or '[NO TEXT]'
             msg = f'HTTP error for {self.file_entry.url}: {err_txt}'
             raise GitRepoSshfsFileSyncException(msg) from err
-        except httpx.HTTPStatusError as err:
-            msg = f'Response {err.response.status_code} for {err.request.url!r}'
-            raise GitRepoSshfsFileSyncException(msg) from None
 
         logger.debug('Downloaded: "%s"', download_path)
 
