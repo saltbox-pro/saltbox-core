@@ -3,7 +3,6 @@ import asyncio
 from redis import asyncio as aioredis
 
 from saltbox_core.config import logger
-from saltbox_core.db.init_mongo_db import init_mongo_db
 from saltbox_core.jobs.repositories.job_repository import JobRepository
 from saltbox_core.jobs.repositories.job_return_repository import JobReturnRepository
 from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository
@@ -111,10 +110,7 @@ class TasksWatcher:
 
 async def async_main() -> None:
     logger.info('Starting watcher')
-
-    await init_mongo_db()
     watcher = TasksWatcher()
-
     await watcher.process()
 
 
