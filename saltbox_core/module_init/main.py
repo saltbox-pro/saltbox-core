@@ -9,10 +9,11 @@ async def async_main() -> None:
     logger.info('Starting Core initialization...')
 
     stages = [
-        run_stage_db(),
-        run_stage_scheduler(),
+        run_stage_db,
+        run_stage_scheduler,
     ]
-    _ = await asyncio.gather(*stages)
+    for stage in stages:
+        await stage()
 
     logger.info('Core initialization has been completed successfully')
 
