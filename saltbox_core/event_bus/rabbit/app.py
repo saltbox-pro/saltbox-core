@@ -2,7 +2,6 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from anyio import Path
 from faststream import ContextRepo
 
 from saltbox_core.event_bus.rabbit.exchanges import exchanges
@@ -33,7 +32,6 @@ from saltbox_sdk.config.logger_config import logger
 from saltbox_sdk.db.mongo.config import get_mongo_db
 from saltbox_sdk.db.redis.config import get_redis_now
 from saltbox_sdk.event_bus.faststream_app import get_faststream_app, get_faststream_broker
-from saltbox_sdk.scheduler.handler import sync_scheduler_templates
 
 
 @asynccontextmanager
@@ -124,11 +122,6 @@ async def async_main() -> None:
     async def declare_exchanges() -> None:
         for exchange in exchanges.values():
             await broker.declare_exchange(exchange)
-
-    await sync_scheduler_templates(
-        templates_path=Path(__file__).parent.parent.parent.joinpath('scheduler/templates'),
-        service_name='core',
-    )
 
     logger.info('Starting faststream app')
     await app.run()

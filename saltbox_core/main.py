@@ -8,7 +8,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from saltbox_core import __version__
 from saltbox_core.config import APP_DESC, APP_NAME, SETTINGS
-from saltbox_core.db.init_mongo_db import init_mongo_db
 from saltbox_core.jobs.routers.job_sc_router import router as job_schemas_router
 from saltbox_core.jobs.routers.jobs_router import router as jobs_router
 from saltbox_core.masters.routers.master_route import router as masters_router
@@ -36,7 +35,6 @@ from saltbox_sdk.fastapi_utils.promethes_metrics.exporter import PrometheusExpor
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator:
-    await init_mongo_db()
     if not broker.is_worker_process:
         await broker.startup()
 

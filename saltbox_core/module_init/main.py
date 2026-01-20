@@ -12,7 +12,6 @@ async def async_main() -> None:
         run_stage_db,
         run_stage_scheduler,
     ]
-
     for stage in stages:
         await stage()
 
