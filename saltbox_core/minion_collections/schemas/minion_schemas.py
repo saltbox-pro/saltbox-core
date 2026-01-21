@@ -92,7 +92,6 @@ class GrainsSchema(BaseModel):
     pythonexecutable: str | None = Field(title='Python executable', default=None)
     pythonpath: list[str] | None = Field(title='Python paths list', default=None)
     pythonversion: list[Any] | None = Field(title='Python version', default=None)
-    pythonversionstring: str | None = Field(title='Python version string', default=None)
     saltpath: str | None = Field(title='Salt path', default=None)
     saltversion: str | None = Field(title='Salt version', default=None)
     saltversioninfo: list[int] | None = Field(title='Salt version info', default=None)
@@ -111,6 +110,8 @@ class GrainsSchema(BaseModel):
     uid: int | None = Field(title='UID', default=None)
     zfs_support: bool | None = Field(title='ZFS support', default=None)
     zfs_feature_flags: bool | None = Field(title='ZFS feature flags', default=None)
+    machine_id: str | None = Field(title='Machine ID', default=None)
+    lvm: dict[str, Any] | None = Field(title='LVM', default=None)
 
     model_config = ConfigDict(
         extra='allow',
