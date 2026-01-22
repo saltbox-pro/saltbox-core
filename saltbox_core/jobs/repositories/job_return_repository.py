@@ -1,8 +1,10 @@
 import json
 from typing import Annotated, Any, ClassVar
 
+import pymongo
 from fastapi import Depends
 from pymongo.asynchronous.database import AsyncDatabase
+from pymongo.operations import _IndexKeyHint
 from redis.asyncio import Redis
 
 from saltbox_core.config import logger
@@ -17,9 +19,25 @@ class JobReturnRepository(BaseMongoRepository[JobReturnModel]):
         collection_name = 'job_returns'
         auto_now_add_fields: ClassVar[list[str]] = ['created']
         auto_now_fields: ClassVar[list[str]] = ['modified']
+        collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
+            'job_return_jid_index_asc': [('jid', pymongo.ASCENDING)],
+            'job_return_jid_salt_master_index_asc': [
+                ('jid', pymongo.ASCENDING),
+                ('salt_master', pymongo.ASCENDING)
+            ],
+            'job_return_jid_minion_id_index_asc': [
+                ('jid', pymongo.ASCENDING),
+                ('minion_id', pymongo.ASCENDING)
+            ],
+            'job_return_unique_index_asc': [
+                ('jid', pymongo.ASCENDING),
+                ('salt_master', pymongo.ASCENDING),
+                ('minion_id', pymongo.ASCENDING)
+            ]
+        }
 
     def __init__(self, database: AsyncDatabase, rdb: Redis):
-        self.rdb = rdb
+        self.rdb: Redis = rdb
         super().__init__(database=database)
 
     async def prepare_object_data(
@@ -33,7 +51,8 @@ class JobReturnRepository(BaseMongoRepository[JobReturnModel]):
 
             try:
                 raw_return: bytes | None = await self.rdb.hget(
-                    name=f'master:{data["salt_master"]}:job:{data["jid"]}:return-data', key=data['minion_id']
+                    name=f'master:{data["salt_master"]}:job:{data["jid"]}:return-data',
+                    key=data['minion_id']
                 )
 
                 if raw_return:

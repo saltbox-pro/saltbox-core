@@ -1,10 +1,17 @@
 from typing import Annotated, Any, ClassVar, overload
 
+import pymongo
 from fastapi import Depends
 from pydantic import BaseModel
 from pymongo.asynchronous.database import AsyncDatabase
+from pymongo.operations import _IndexKeyHint
 
-from saltbox_core.minion_collections.schemas.collection_schemas import CollectionBaseTreeModel, CollectionModel
+from saltbox_core.config import logger
+from saltbox_core.minion_collections.schemas.collection_schemas import (
+    CollectionBaseTreeModel,
+    CollectionCreateSchema,
+    CollectionModel,
+)
 from saltbox_sdk.db.mongo.config import get_mongo
 from saltbox_sdk.db.mongo.repository_base import ModelType, ProjectionModel
 from saltbox_sdk.db.mongo.repository_tree_base import BaseTreeMongoRepository, OnDelete
@@ -18,6 +25,13 @@ class CollectionRepository(BaseTreeMongoRepository[CollectionModel]):
         auto_now_add_fields: ClassVar[list[str]] = ['created']
         auto_now_fields: ClassVar[list[str]] = ['modified']
         on_delete = OnDelete.cascade
+        collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
+            'slug_unique_index_asc': [('slug', pymongo.ASCENDING)],
+            'parent_id_title_unique_index_asc': [
+                ('parent_id', pymongo.ASCENDING),
+                ('title', pymongo.ASCENDING)
+            ]
+        }
 
     async def prepare_object_data(
         self, data: dict[str, Any], projection_model: type[ProjectionModel] | None = None
@@ -60,6 +74,25 @@ class CollectionRepository(BaseTreeMongoRepository[CollectionModel]):
                 raise ObjectNotFoundException(msg) from None
 
         return data
+
+    async def _post_create_collection(self) -> None:
+        is_exist = bool(await self.collection.count_documents(filter={'slug': 'root'}))
+        if not is_exist:
+
+            msg = f"{self.__class__.__name__} doesn't exist... Creating..."
+            logger.debug(msg)
+
+            obj = CollectionCreateSchema(
+                title='Root collection',
+                slug='root',
+                query={},
+                owner='system',
+            )
+            _ = await self.create(obj)
+            msg = f'{self.__class__.__name__} with `{obj.slug}` slug created'
+            logger.debug(msg)
+        else:
+            logger.debug('Root collection already exists')
 
 
 def get_collection_repository(db: Annotated[AsyncDatabase, Depends(get_mongo)]) -> CollectionRepository:

@@ -1,8 +1,10 @@
 from typing import Annotated, ClassVar, TypeVar
 
+import pymongo
 from fastapi import Depends
 from pydantic import BaseModel
 from pymongo.asynchronous.database import AsyncDatabase
+from pymongo.operations import _IndexKeyHint
 
 from saltbox_core.tasks.schemas.tasks_template import TaskTemplateModel
 from saltbox_sdk.db.mongo.aggregations import (
@@ -39,6 +41,12 @@ class TaskTemplateRepository(BaseMongoRepository[TaskTemplateModel]):
                 )
             ]
         )
+        collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
+            'name_repo_id_unique_index': [
+                ('name', pymongo.ASCENDING),
+                ('repo_id', pymongo.ASCENDING)
+            ]
+        }
 
 
 def get_task_template_repository(db: Annotated[AsyncDatabase, Depends(get_mongo)]) -> TaskTemplateRepository:
