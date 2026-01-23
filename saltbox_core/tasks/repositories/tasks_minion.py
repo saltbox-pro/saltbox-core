@@ -1,7 +1,9 @@
 from typing import Annotated, ClassVar
 
+import pymongo
 from fastapi import Depends
 from pymongo.asynchronous.database import AsyncDatabase
+from pymongo.operations import _IndexKeyHint
 
 from saltbox_core.tasks.schemas.tasks_minion import TaskMinionModel
 from saltbox_sdk.db.mongo.aggregations import (
@@ -20,6 +22,12 @@ class TaskMinionRepository(BaseMongoRepository[TaskMinionModel]):
         collection_name = 'task_minions'
         auto_now_add_fields: ClassVar[list[str]] = ['created']
         auto_now_fields: ClassVar[list[str]] = ['modified']
+        collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
+            'task_minion_unique_index': [
+                ('task_id', pymongo.ASCENDING),
+                ('minion_inner_id', pymongo.ASCENDING)
+            ]
+        }
         aggregations: ClassVar[AggregationsStore] = AggregationsStore(
             aggregations=[
                 AggregatedField(
