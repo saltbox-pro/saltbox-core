@@ -5,7 +5,7 @@ from saltbox_sdk.scheduler.handler import sync_scheduler_templates
 
 
 async def sync_templates() -> None:
-    path = Path(__file__).parent.joinpath('scheduler/templates')
+    path = Path(__file__).parent.joinpath('templates')
 
     logger.info(f'Loading scheduler templates from directory: {path}')
 
