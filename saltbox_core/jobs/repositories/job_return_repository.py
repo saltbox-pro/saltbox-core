@@ -1,5 +1,5 @@
 import json
-from typing import Annotated, Any, ClassVar, cast
+from typing import Annotated, Any, ClassVar
 
 import pymongo
 from fastapi import Depends
@@ -50,10 +50,10 @@ class JobReturnRepository(BaseMongoRepository[JobReturnModel]):
             return_data: Any = None
 
             try:
-                raw_return = cast(bytes | None, self.rdb.hget(
+                raw_return: bytes | None = await self.rdb.hget(
                     name=f'master:{data["salt_master"]}:job:{data["jid"]}:return-data',
                     key=data['minion_id']
-                ))
+                )
 
                 if raw_return:
                     return_data = json.loads(raw_return)
