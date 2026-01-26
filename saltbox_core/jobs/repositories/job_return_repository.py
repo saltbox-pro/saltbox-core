@@ -1,5 +1,5 @@
 import json
-from typing import Annotated, Any, ClassVar, cast
+from typing import Annotated, Any, ClassVar
 
 import pymongo
 from fastapi import Depends
