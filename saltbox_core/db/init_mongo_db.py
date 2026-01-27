@@ -1,3 +1,4 @@
+from saltbox_core.db.migration_repo import MongoMigrationStateRepository
 from saltbox_core.jobs.repositories.job_repository import JobRepository
 from saltbox_core.jobs.repositories.job_return_repository import JobReturnRepository
 from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository
@@ -27,6 +28,7 @@ async def init_mongo_db() -> None:
         SettingsSlsRepoRepository(database),
         TaskMinionRepository(database),
         TaskTemplateRepository(database),
+        MongoMigrationStateRepository(database),
     ]
     for repo in reps:
         await repo.create_collection()  # type: ignore

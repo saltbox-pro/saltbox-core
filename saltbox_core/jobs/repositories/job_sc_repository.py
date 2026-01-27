@@ -1,5 +1,5 @@
 import json
-from typing import Annotated, ClassVar
+from typing import Annotated, ClassVar, override
 
 import anyio
 import pymongo
@@ -26,6 +26,7 @@ class JobSchemaRepository(BaseMongoRepository[JobSchemaModel]):
             'name_unique_index_asc': [('name', pymongo.ASCENDING)]
         }
 
+    @override
     async def _post_create_collection(self) -> None:
         is_default_schema_exists = await self.exists(query={'name': 'default'})
         if not is_default_schema_exists:

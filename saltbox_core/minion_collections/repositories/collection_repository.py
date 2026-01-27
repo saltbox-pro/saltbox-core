@@ -1,4 +1,4 @@
-from typing import Annotated, Any, ClassVar, overload
+from typing import Annotated, Any, ClassVar, overload, override
 
 import pymongo
 from fastapi import Depends
@@ -75,6 +75,7 @@ class CollectionRepository(BaseTreeMongoRepository[CollectionModel]):
 
         return data
 
+    @override
     async def _post_create_collection(self) -> None:
         is_exist = bool(await self.collection.count_documents(filter={'slug': 'root'}))
         if not is_exist:
