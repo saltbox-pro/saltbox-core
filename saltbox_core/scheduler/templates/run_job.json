@@ -42,14 +42,14 @@
         "title": "Salt function",
         "type": "string"
       },
-      "args": {
+      "arg": {
         "title": "Args",
         "type": "array",
         "items": {
           "type": "string"
         }
       },
-      "kwargs": {
+      "kwarg": {
         "title": "Kwargs",
         "type": "object",
         "additionalProperties": {

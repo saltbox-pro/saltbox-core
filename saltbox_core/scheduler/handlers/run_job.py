@@ -16,8 +16,8 @@ async def run_job_handler(message: RunTaskEventBusMessage, context: ContextRepo)
                 'tgt': message.data['tgt'],
                 'tgt_type': message.data['tgt_type'],
                 'fun': message.data['fun'],
-                'arg': message.data.get('args'),
-                'kwarg': message.data.get('kwargs'),
+                'arg': message.data.get('arg'),
+                'kwarg': message.data.get('kwarg'),
                 'user': message.user,
                 'source': Source(type='scheduler', id=message.task_id),
             }
