@@ -1,8 +1,10 @@
 from datetime import UTC, datetime, timedelta
 from typing import Annotated, Any, ClassVar, overload
 
+import pymongo
 from fastapi import Depends
 from pymongo.asynchronous.database import AsyncDatabase
+from pymongo.operations import _IndexKeyHint
 
 from saltbox_core.minion_collections.schemas.minion_schemas import MinionModel
 
@@ -53,6 +55,9 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
         auto_now_add_fields: ClassVar[list[str]] = ['created']
         auto_now_fields: ClassVar[list[str]] = ['modified']
         query_overrides: ClassVar[dict[str, str]] = {'last_activity_seconds': 'last_activity_seconds_query_override'}
+        collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
+            'minion_id_master_unique_index_asc': [('minion_id', pymongo.ASCENDING), ('master', pymongo.ASCENDING)],
+        }
 
 
 def get_minion_repository(db: Annotated[AsyncDatabase, Depends(get_mongo)]) -> MinionRepository:
