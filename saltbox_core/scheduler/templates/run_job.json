@@ -52,9 +52,7 @@
       "kwarg": {
         "title": "Kwargs",
         "type": "object",
-        "additionalProperties": {
-          "type": "string"
-        },
+        "additionalProperties": true,
         "propertyNames": {
           "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
         }
