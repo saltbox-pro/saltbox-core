@@ -201,9 +201,7 @@ class TaskListResponseSchema(
 
 
 class TaskListBody(SkipLimitParams, QueryParams, SortParams):
-    model_config = ConfigDict(
-        extra='ignore',
-    )
+    model_config = ConfigDict(extra='ignore')
 
 
 # OPA

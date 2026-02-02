@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-from saltbox_sdk.db.mongo.schemas_base import IDMixin, MongoQuery
+from saltbox_sdk.db.mongo.schemas_base import IDMixin, QueryParams, SortParams
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
 
@@ -193,18 +193,10 @@ class MinionIDs(BaseModel, IDMixin):
     pass
 
 
-class MinionListBody(SkipLimitParams):
+class MinionListBody(SkipLimitParams, QueryParams, SortParams):
     collection_slug: str
-    query: MongoQuery = Field(
-        default_factory=dict,
-        title='MongoDB Query',
-        description='A valid MongoDB query dictionary',
-        examples=[
-            {'grains.os': 'Ubuntu'},
-            {'grains.cpu_model': {'$regex': 'Intel'}},
-        ],
-        json_schema_extra={'example': {'grains.cpu_model': {'$not': {'$regex': 'Intel'}}}},
-    )
+
+    model_config = ConfigDict(extra='ignore')
 
 
 class MinionsActions(StrEnum):

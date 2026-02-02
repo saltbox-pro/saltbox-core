@@ -1,9 +1,9 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends
 
 from saltbox_core.event_bus.redis.masters_bus import notify_master_on_repos_update
-from saltbox_core.masters.schemas.master_schemas import MasterModel, MasterQueryParams, MastersActions, MasterViewSchema
+from saltbox_core.masters.schemas.master_schemas import MasterListBody, MasterModel, MastersActions, MasterViewSchema
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse
@@ -12,7 +12,7 @@ from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 router = APIRouter(prefix='/masters', tags=['Masters'])
 
 
-@router.get(
+@router.post(
     '',
     operation_id='masters_list',
     openapi_extra=GatewayEndpointConfig(
@@ -21,16 +21,20 @@ router = APIRouter(prefix='/masters', tags=['Masters'])
     ).model_dump(by_alias=True),
 )
 async def masters_list(
-    params: Annotated[MasterQueryParams, Query()],
+    body: Annotated[MasterListBody, Body()],
     master_service: Annotated[MasterService, Depends(get_master_service)],
 ) -> PaginatedResponse[MasterViewSchema]:
-    query = params.model_dump(exclude={'skip', 'limit'}, exclude_none=True, exclude_unset=True)
+    query = body.query
+
+    if body.status:
+        query = {'$and': [query, {'status': body.status}]}
 
     master_list: PaginatedResponse[MasterViewSchema] = await master_service.get_list_paginated(
         query=query,
-        limit=params.limit,
-        skip=params.skip,
+        limit=body.limit,
+        skip=body.skip,
         projection_model=MasterViewSchema,
+        sort=body.sort,
     )
 
     return master_list

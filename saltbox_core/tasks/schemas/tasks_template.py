@@ -3,7 +3,7 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, Field
 
 # from saltbox_core.config import logger
-from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId
+from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId, QueryParams, SortParams
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
 
 
@@ -49,11 +49,10 @@ class TaskTemplateModel(BaseModel, CreatedModifiedMixin, EditableFieldsFullMixin
     pass
 
 
-class TaskTemplateListQueryParams(SkipLimitParams):
+class TaskTemplateListBody(SkipLimitParams, QueryParams, SortParams):
     repo_ids: list[PyObjectId] | None = None
-    model_config = ConfigDict(
-        extra='ignore',
-    )
+
+    model_config = ConfigDict(extra='ignore')
 
 
 class TaskTemplatesActions(StrEnum):

@@ -3,7 +3,7 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, Field
 
 from saltbox_bridge_messages import MasterStatus, MasterSyncStatus, SshPubKeyModel
-from saltbox_sdk.db.mongo.schemas_base import IDMixin
+from saltbox_sdk.db.mongo.schemas_base import IDMixin, QueryParams, SortParams
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
 
@@ -65,10 +65,10 @@ class MasterViewSchema(
 ): ...
 
 
-class MasterQueryParams(SkipLimitParams):
+class MasterListBody(SkipLimitParams, QueryParams, SortParams):
     status: MasterStatus | None = Field(title='Status', default=None)
 
-    model_config = ConfigDict(extra='forbid')
+    model_config = ConfigDict(extra='ignore')
 
 
 class MastersActions(StrEnum):

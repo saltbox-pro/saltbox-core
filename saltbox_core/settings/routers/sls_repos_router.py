@@ -1,12 +1,13 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Body, Depends, Response, status
 
 from saltbox_core.config import logger
 from saltbox_core.db.schemas_base import TaskiqTaskIdResponse, TaskiqTaskResult
 from saltbox_core.settings.schemas.sls_repos_schemas import (
     SettingsSlsActions,
     SettingsSlsRepoCreateSchema,
+    SettingsSlsRepoListBody,
     SettingsSlsRepoModel,
     SettingsSlsRepoShortSchema,
     SettingsSlsRepoUpdateSchema,
@@ -15,13 +16,13 @@ from saltbox_core.settings.services.sls_repo_service import SettingsSlsRepoServi
 from saltbox_core.tasks.services.tasks_template import TaskTemplateService, get_task_template_service
 from saltbox_core.tkq import broker
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
-from saltbox_sdk.db.schemas_base import PaginatedResponse, SkipLimitParams
+from saltbox_sdk.db.schemas_base import PaginatedResponse
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 
 router = APIRouter(prefix='/sls-repos', tags=['Settings'])
 
 
-@router.get(
+@router.post(
     '',
     operation_id='repo_list',
     openapi_extra=GatewayEndpointConfig(
@@ -30,11 +31,15 @@ router = APIRouter(prefix='/sls-repos', tags=['Settings'])
     ).model_dump(by_alias=True),
 )
 async def sls_repo_settings_list(
-    params: Annotated[SkipLimitParams, Query()],
+    body: Annotated[SettingsSlsRepoListBody, Body()],
     service: Annotated[SettingsSlsRepoService, Depends(get_sls_repo_service)],
 ) -> PaginatedResponse[SettingsSlsRepoShortSchema]:
     return await service.get_list_paginated(
-        query=None, skip=params.skip, limit=params.limit, projection_model=SettingsSlsRepoShortSchema
+        query=body.query,
+        skip=body.skip,
+        limit=body.limit,
+        projection_model=SettingsSlsRepoShortSchema,
+        sort=body.sort,
     )
 
 
