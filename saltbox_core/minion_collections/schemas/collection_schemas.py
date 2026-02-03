@@ -1,21 +1,9 @@
 from enum import StrEnum
-from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from saltbox_sdk.db.mongo.schemas_base import BaseTreeModel, MongoQuery, TreeMixin
+from saltbox_sdk.db.mongo.schemas_base import BaseTreeModel, MongoQuery, MongoQueryField, TreeMixin
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin
-
-MongoQueryField: dict[str, Any] = Field(
-    default_factory=dict,
-    title='MongoDB Query',
-    description='A valid MongoDB query dictionary',
-    examples=[
-        {'grains.os': 'Ubuntu'},
-        {'grains.cpu_model': {'$regex': 'Intel'}},
-    ],
-    json_schema_extra={'example': {'grains.cpu_model': {'$not': {'$regex': 'Intel'}}}},
-)
 
 
 class CollectionComputedFieldsMixin:

@@ -1,11 +1,11 @@
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Body, Depends
 
 from saltbox_core.settings.schemas.sls_repos_schemas import SettingsSlsRepoShortSchema
 from saltbox_core.settings.services.sls_repo_service import SettingsSlsRepoService, get_sls_repo_service
 from saltbox_core.tasks.schemas.tasks_template import (
-    TaskTemplateListQueryParams,
+    TaskTemplateListBody,
     TaskTemplateModel,
     TaskTemplatesActions,
     TaskTemplateShortSchema,
@@ -19,7 +19,7 @@ from saltbox_sdk.fastapi_utils.dependencies import get_opa_query
 router = APIRouter(prefix='/tasks/template', tags=['Task Templates'])
 
 
-@router.get(
+@router.post(
     '',
     operation_id='task_templates_list',
     openapi_extra=GatewayEndpointConfig(
@@ -28,7 +28,7 @@ router = APIRouter(prefix='/tasks/template', tags=['Task Templates'])
     ).model_dump(by_alias=True),
 )
 async def task_template_list(
-    params: Annotated[TaskTemplateListQueryParams, Query()],
+    body: Annotated[TaskTemplateListBody, Body()],
     opa_query: Annotated[dict, Depends(get_opa_query)],
     service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
     repo_settings_service: Annotated[SettingsSlsRepoService, Depends(get_sls_repo_service)],
@@ -36,22 +36,29 @@ async def task_template_list(
     active_repos = await repo_settings_service.get_list(
         query={'is_active': True}, skip=0, limit=0, projection_model=SettingsSlsRepoShortSchema
     )
-    active_repo_ids = [repo.id for repo in active_repos]
-    selected_repos_query = {'repo_id': {'$in': params.repo_ids}} if params.repo_ids else {}
 
-    query = {
-        '$and': [
-            {'repo_id': {'$in': active_repo_ids}},
-            selected_repos_query,
-            opa_query,
-        ]
-    }
+    query_filters: list[dict[str, Any]] = [
+        {'repo_id': {'$in': [repo.id for repo in active_repos]}},
+    ]
+
+    if body.repo_ids:
+        query_filters.append({'repo_id': {'$in': body.repo_ids}})
+    if body.query:
+        query_filters.append(body.query)
+    if opa_query:
+        query_filters.append(opa_query)
+
+    if len(query_filters) > 1:
+        query: dict[str, Any] = {'$and': query_filters}
+    else:
+        query = query_filters[0]
 
     return await service.get_list_paginated(
         query=query,
-        skip=params.skip,
-        limit=params.limit,
+        skip=body.skip,
+        limit=body.limit,
         projection_model=TaskTemplateShortSchema,
+        sort=body.sort,
     )
 
 

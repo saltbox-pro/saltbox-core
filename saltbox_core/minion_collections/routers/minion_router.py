@@ -46,7 +46,11 @@ async def minions_list(
         query = collection.full_query if collection.full_query else search
 
     return await minion_service.get_list_paginated(
-        query=query, skip=body.skip, limit=body.limit, projection_model=MinionShortSchema
+        query=query,
+        skip=body.skip,
+        limit=body.limit,
+        projection_model=MinionShortSchema,
+        sort=body.sort,
     )
 
 

@@ -18,8 +18,8 @@ from pydantic import (
     model_validator,
 )
 
-from saltbox_sdk.db.mongo.schemas_base import IDMixin
-from saltbox_sdk.db.schemas_base import CreatedModifiedMixin
+from saltbox_sdk.db.mongo.schemas_base import IDMixin, QueryParams, SortParams
+from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
 
 logger = logging.getLogger(__name__)
@@ -81,6 +81,10 @@ class SettingsSlsRepoUpdateSchema(BaseModel, CreateUpdateSerializerMixin, Editab
 
 
 class SettingsSlsRepoShortSchema(BaseModel, ReadOnlyFieldsShortMixin, EditableFieldsShortMixin, IDMixin): ...
+
+
+class SettingsSlsRepoListBody(SkipLimitParams, QueryParams, SortParams):
+    model_config = ConfigDict(extra='ignore')
 
 
 class ManifestDigest(StrEnum):

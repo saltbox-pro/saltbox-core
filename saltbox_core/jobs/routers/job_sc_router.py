@@ -1,20 +1,24 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Body, Depends, status
 
-from saltbox_core.config import logger
 from saltbox_core.db.schemas_base import TaskiqTaskIdResponse, TaskiqTaskResult
-from saltbox_core.jobs.schemas.job_sc_schemas import JobSchemaModel, JobSchemasActions, JobSchemaShortSchema
+from saltbox_core.jobs.schemas.job_sc_schemas import (
+    JobSchemaListBody,
+    JobSchemaModel,
+    JobSchemasActions,
+    JobSchemaShortSchema,
+)
 from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
 from saltbox_core.tkq import broker
-from saltbox_sdk.db.schemas_base import PaginatedResponse, SkipLimitParams
+from saltbox_sdk.db.schemas_base import PaginatedResponse
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 from saltbox_sdk.fastapi_utils.dependencies import get_opa_query
 
 router = APIRouter(prefix='/json-schemas', tags=['JSON Schemas'])
 
 
-@router.get(
+@router.post(
     '',
     operation_id='jobs_schemas_list',
     openapi_extra=GatewayEndpointConfig(
@@ -23,14 +27,21 @@ router = APIRouter(prefix='/json-schemas', tags=['JSON Schemas'])
     ).model_dump(by_alias=True),
 )
 async def get_json_schemas_list(
-    params: Annotated[SkipLimitParams, Query()],
+    body: Annotated[JobSchemaListBody, Body()],
     opa_query: Annotated[dict, Depends(get_opa_query)],
     service: Annotated[JobSchemaService, Depends(get_job_schema_service)],
 ) -> PaginatedResponse[JobSchemaShortSchema]:
-    logger.info(f'OPA query: {opa_query}')
+    query = body.query
+
+    if opa_query:
+        query = {'$and': [query, opa_query]}
 
     return await service.get_list_paginated(
-        query=opa_query, skip=params.skip, limit=params.limit, projection_model=JobSchemaShortSchema
+        query=query,
+        skip=body.skip,
+        limit=body.limit,
+        projection_model=JobSchemaShortSchema,
+        sort=body.sort,
     )
 
 

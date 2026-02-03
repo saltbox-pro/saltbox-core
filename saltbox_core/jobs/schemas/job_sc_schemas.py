@@ -1,9 +1,9 @@
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
-from saltbox_sdk.db.mongo.schemas_base import IDMixin
-from saltbox_sdk.db.schemas_base import CreatedModifiedMixin
+from saltbox_sdk.db.mongo.schemas_base import IDMixin, QueryParams, SortParams
+from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
 
 
 class ReadOnlyFieldsMixin:
@@ -28,6 +28,10 @@ class JobSchemaBaseSchema(BaseModel, ReadOnlyFieldsMixin): ...
 
 
 class JobSchemaModel(JobSchemaBaseSchema, CreatedModifiedMixin, IDMixin): ...
+
+
+class JobSchemaListBody(SkipLimitParams, QueryParams, SortParams):
+    model_config = ConfigDict(extra='ignore')
 
 
 class JobSchemasActions(StrEnum):
