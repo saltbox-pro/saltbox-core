@@ -23,7 +23,7 @@ router = APIRouter(prefix='/sls-repos', tags=['Settings'])
 
 
 @router.post(
-    '',
+    '/list',
     operation_id='repo_list',
     openapi_extra=GatewayEndpointConfig(
         policy='core.git_repos.base',
