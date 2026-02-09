@@ -3,6 +3,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from saltbox_core.config import SETTINGS
 from saltbox_core.tasks.schemas.tasks_status import TaskStatus
 from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId, QueryParams, SortParams
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams, Source, UserShort
@@ -51,11 +52,15 @@ class TaskReadOnlyFieldsMixin:
 
 
 class TaskEditableFieldsMixin:
-    batch_size: int = Field(title='Batch size', ge=0, default=0)
-    max_jobs_count_at_same_time: int = Field(title='Max jobs count at some time', ge=1, default=1)
+    batch_size: int = Field(title='Batch size', ge=0, default=SETTINGS.tasks_defaults_batch_size)
+    max_jobs_count_at_same_time: int = Field(
+        title='Max jobs count at some time', ge=1, default=SETTINGS.tasks_defaults_max_jobs_count_at_same_time
+    )
 
-    max_retries: int = Field(title='Max retries', ge=0, default=1)
-    retry_delay: int = Field(title='Retry delay', description='in seconds', ge=0, default=10)
+    max_retries: int = Field(title='Max retries', ge=0, default=SETTINGS.tasks_defaults_max_retries)
+    retry_delay: int = Field(
+        title='Retry delay', description='in seconds', ge=0, default=SETTINGS.tasks_defaults_retry_delay
+    )
 
     last_sync_dt: TimezoneAwareDatetime | None = Field(title='Last sync datetime', default=None)
 
@@ -145,11 +150,11 @@ class TaskCreateRequestSchema(BaseModel):
     fun: str | None = Field(title='Salt fun', default=None)
     data: TaskData | None = Field(title='Data data', default=None)
 
-    batch_size: int = Field(title='Batch size', ge=0, default=0)
-    max_jobs_count_at_same_time: int = Field(title='Max jobs count at some time', ge=1, default=1)
+    batch_size: int | None = Field(title='Batch size', ge=0, default=None)
+    max_jobs_count_at_same_time: int | None = Field(title='Max jobs count at some time', ge=1, default=None)
 
-    max_retries: int = Field(title='Max retries', ge=0, default=1)
-    retry_delay: int = Field(title='Retry delay', description='in seconds', ge=0, default=10)
+    max_retries: int | None = Field(title='Max retries', ge=0, default=None)
+    retry_delay: int | None = Field(title='Retry delay', description='in seconds', ge=0, default=None)
 
     @model_validator(mode='after')
     def validate_fun(self) -> 'TaskCreateRequestSchema':

@@ -91,6 +91,7 @@ class SshfsSyncBase(ABC):
         dest_path (Path): where the file expected
         dest_digest_path (Path): where the digest file expected
     """
+
     TMP_DIR = SETTINGS.sshfs_tmp_dir
     TMP_FILENAME_DIGEST_SIZE = 16
 
@@ -568,6 +569,9 @@ class SlsRepoService:
                 schema = {
                     'fun': 'state.apply',
                     'title': json_schema['title'],
+                    'short_description': schema_dict.get('short_description', None),
+                    'full_description': schema_dict.get('full_description', None),
+                    'defaults': schema_dict.get('defaults', None),
                     'name': name,
                     'json_schema': json_schema,
                     'ui_schema': schema_dict.get('ui_schema', {}),
@@ -596,7 +600,12 @@ class SlsReposServeUpdater:
     #  - Items will be checked on being equal or being a subpass of a value on conlicts check.
     #  - Items will be passed to rsync `--exclude` as is. Trailing `/` is significant.
     # Rsync excludes to not to sync to serve location.
-    IGNORE_LIST: ClassVar[tuple[str, ...]] = ('.git', '.gitignore', 'README.md', *MANIFEST_FILE_ALLOWED_NAMES,)
+    IGNORE_LIST: ClassVar[tuple[str, ...]] = (
+        '.git',
+        '.gitignore',
+        'README.md',
+        *MANIFEST_FILE_ALLOWED_NAMES,
+    )
     ALLOW_DUPLICATING_DIRS = SETTINGS.salt_modules_allow_duplicating_dirs
     SERVE_DIR = SETTINGS.salt_modules_serve_dir
     SERVE_DIR_PERMISSIONS = SETTINGS.salt_modules_permissions
@@ -614,11 +623,7 @@ class SlsReposServeUpdater:
         rsync_src_list = [str(p) + '/' for p in src_list]
         rsync_dst = str(dst)
 
-        cmd = [
-            'rsync', '--archive',
-            '--no-perms', '--no-owner', '--no-group',
-            '--delete-after', '--delete-excluded'
-        ]
+        cmd = ['rsync', '--archive', '--no-perms', '--no-owner', '--no-group', '--delete-after', '--delete-excluded']
         for i in self.IGNORE_LIST:
             cmd.append('--exclude')
             cmd.append(i)
@@ -725,6 +730,7 @@ class OrphanAuxFilesCleaner:
     Prefer to not run directly, beter use cleanup_orphan_aux_files() task which is
     safe from concurrent runs.
     """
+
     SSHFS_DIR = SETTINGS.sshfs_dir
     DRY_RUN = SETTINGS.orphan_aux_files_cleanup_dry_run
 

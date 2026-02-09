@@ -88,7 +88,7 @@ class Settings(BaseSettings):
     )
     salt_modules_permissions: TreePermissions | None = Field(
         default=None,
-        description='Optional specification to force owner and permissions of SLS modules files in the serve_dir'
+        description='Optional specification to force owner and permissions of SLS modules files in the serve_dir',
     )
     salt_modules_allow_duplicating_dirs: bool = Field(
         default=True, description='No error on duplicating directories in SLS modules'
@@ -100,8 +100,7 @@ class Settings(BaseSettings):
         description='Path to store of files served by sshfs',
     )
     sshfs_permissions: TreePermissions | None = Field(
-        default=None,
-        description='Optional specification to force owner and permissions of Manifest.sshfs_files'
+        default=None, description='Optional specification to force owner and permissions of Manifest.sshfs_files'
     )
     local_repo_sync_timeout_sec: int = 3600
     orphan_aux_files_cleanup_dry_run: bool = Field(
@@ -119,6 +118,10 @@ class Settings(BaseSettings):
     tasks_job_create_cooldown: int = Field(
         default=5, description='Number of seconds to wait from tasks job creation to new job'
     )
+    tasks_defaults_batch_size: int = Field(title='Batch size', ge=0, default=0)
+    tasks_defaults_max_jobs_count_at_same_time: int = Field(title='Max jobs count at some time', ge=1, default=1)
+    tasks_defaults_max_retries: int = Field(title='Max retries', ge=0, default=1)
+    tasks_defaults_retry_delay: int = Field(title='Retry delay', description='in seconds', ge=0, default=10)
 
     # JOBS
     jobs_return_data_expire_ttl: int = Field(
