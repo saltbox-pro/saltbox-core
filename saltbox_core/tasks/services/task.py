@@ -6,7 +6,7 @@ from pydantic import BaseModel
 from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
 from redis.asyncio import Redis
 
-from saltbox_core.config import logger
+from saltbox_core.config import SETTINGS, logger
 from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
 from saltbox_core.minion_collections.schemas.collection_schemas import CollectionModel
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
@@ -72,17 +72,19 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
             'delete': f'task:{obj.id}:delete',
         }.get(action)
 
-    async def __parse_salt_fun_params(self, data: TaskCreateInputSchema) -> tuple[str, list | None, dict | None]:
+    async def __parse_salt_fun_params(
+        self, data: TaskCreateInputSchema, task_template: TaskTemplateModel | None = None
+    ) -> tuple[str, list | None, dict | None]:
         task_data: dict = {}
         if data.data and data.data.args:
             task_data['args'] = data.data.args
         if data.data and data.data.kwargs:
             task_data['kwargs'] = data.data.kwargs
 
-        task_template: TaskTemplateModel | None = None
-
-        if data.task_template_id:
+        if not task_template and data.task_template_id:
             task_template = await self.task_template_service.get(query=data.task_template_id)
+
+        if task_template:
             fun = task_template.fun
 
             try:
@@ -126,7 +128,20 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
             msg = 'Collection must be provided'
             raise TaskCreateServiceException(msg)
 
-        fun, task_arg, task_kwarg = await self.__parse_salt_fun_params(data)
+        task_template: TaskTemplateModel | None = None
+
+        task_defaults = {
+            'batch_size': SETTINGS.tasks_defaults_batch_size,
+            'max_jobs_count_at_same_time': SETTINGS.tasks_defaults_max_jobs_count_at_same_time,
+            'max_retries': SETTINGS.tasks_defaults_max_retries,
+            'retry_delay': SETTINGS.tasks_defaults_retry_delay,
+        }
+
+        if data.task_template_id:
+            task_template = await self.task_template_service.get(query=data.task_template_id)
+            task_defaults.update(task_template.defaults.model_dump())
+
+        fun, task_arg, task_kwarg = await self.__parse_salt_fun_params(data=data, task_template=task_template)
 
         return TaskCreateSchema.model_validate(
             {
@@ -137,10 +152,14 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                 'kwarg': task_kwarg,
                 'target_collection_id': collection_id,
                 'target_query': data.query,
-                'batch_size': data.batch_size,
-                'max_retries': data.max_retries,
-                'retry_delay': data.retry_delay,
-                'max_jobs_count_at_same_time': data.max_jobs_count_at_same_time,
+                'batch_size': data.batch_size if data.batch_size is not None else task_defaults['batch_size'],
+                'max_retries': data.max_retries if data.max_retries is not None else task_defaults['max_retries'],
+                'retry_delay': data.retry_delay if data.retry_delay is not None else task_defaults['retry_delay'],
+                'max_jobs_count_at_same_time': (
+                    data.max_jobs_count_at_same_time
+                    if data.max_jobs_count_at_same_time is not None
+                    else task_defaults['max_jobs_count_at_same_time']
+                ),
                 'user': data.user,
                 'source': data.source,
             }
