@@ -14,6 +14,7 @@ from saltbox_core.minion_collections.schemas.collection_schemas import (
     CollectionModel,
     CollectionUpdateSchema,
 )
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 
 ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
@@ -105,6 +106,10 @@ class CollectionService(
         if projection_model:
             return await super().create(data=data, projection_model=projection_model, session=session)
         return await super().create(data=data, session=session)
+
+    async def get_root_collection_id(self) -> PyObjectId:
+        root_collection = await self.get_by_slug(slug='root')
+        return root_collection.id
 
 
 def get_collection_service(
