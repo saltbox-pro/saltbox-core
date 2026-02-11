@@ -14,7 +14,7 @@ from saltbox_core.pillars_old.schemas.pillar_schemas import (
 from saltbox_core.pillars_old.services.pillar_service import PillarService, get_pillar_service
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 
-router = APIRouter(prefix='/pillars', tags=['Pillars'])
+router = APIRouter(prefix='/pillars-old', tags=['Pillars Old'])
 
 
 @router.get(

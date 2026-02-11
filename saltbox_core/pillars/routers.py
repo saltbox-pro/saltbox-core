@@ -14,7 +14,7 @@ from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 from saltbox_sdk.fastapi_utils.dependencies import get_current_user, get_opa_query
 
-router = APIRouter(prefix='/pillars-new', tags=['Pillars New'])
+router = APIRouter(prefix='/pillars', tags=['Pillars'])
 
 
 @router.post(
