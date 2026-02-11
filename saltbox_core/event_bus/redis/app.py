@@ -20,8 +20,15 @@ from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.masters.repositories.master_repository import MasterRepository, get_master_repository
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
+from saltbox_core.minion_collections.repositories.collection_repository import (
+    CollectionRepository,
+    get_collection_repository,
+)
 from saltbox_core.minion_collections.repositories.minion_repository import MinionRepository, get_minion_repository
+from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
+from saltbox_core.pillars_v2.repository import PillarRepository, get_pillar_repository
+from saltbox_core.pillars_v2.services import PillarService, get_pillar_service
 from saltbox_sdk.config.redis_config import REDIS_SETTINGS
 from saltbox_sdk.db.mongo.config import get_mongo_db
 
@@ -76,11 +83,19 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
         job_schema_service=job_schema_service,
         master_service=master_service,
     )
+    collection_repository: CollectionRepository = get_collection_repository(db=mongo_db)
+    collection_service: CollectionService = get_collection_service(repo=collection_repository)
+    pillar_repository: PillarRepository = get_pillar_repository(db=mongo_db)
+    pillar_service: PillarService = get_pillar_service(
+        repo=pillar_repository, collection_service=collection_service, minion_service=minion_service
+    )
 
     context.set_global('master_service', master_service)
     context.set_global('minion_service', minion_service)
     context.set_global('job_schema_repository', job_schema_repository)
     context.set_global('job_service', job_service)
+    context.set_global('pillar_service', pillar_service)
+    context.set_global('collection_service', collection_service)
 
     yield
 
