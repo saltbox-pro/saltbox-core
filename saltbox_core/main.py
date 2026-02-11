@@ -15,7 +15,7 @@ from saltbox_core.masters.routers.system_route import router as system_router
 from saltbox_core.minion_collections.routers.collections_router import router as collections_router
 from saltbox_core.minion_collections.routers.filters_router import router as filters_router
 from saltbox_core.minion_collections.routers.minion_router import router as minions_router
-from saltbox_core.pillars.routers.pillar_route import router as pillars_router
+from saltbox_core.pillars_old.routers.pillar_route import router as pillars_old_router
 from saltbox_core.pillars_v2.routers import router as pillars_v2_router
 from saltbox_core.settings.routers.gitlab_router import router as gitlab_router
 from saltbox_core.settings.routers.sls_repos_router import router as settings_sls_router
@@ -97,7 +97,7 @@ app.include_router(collections_router)
 app.include_router(minions_router)
 app.include_router(masters_router)
 app.include_router(system_router)
-app.include_router(pillars_router, deprecated=True)
+app.include_router(pillars_old_router, deprecated=True)
 app.include_router(pillars_v2_router)
 app.include_router(router=settings_sls_router, prefix='/settings', tags=['Settings'])
 app.include_router(router=gitlab_router, prefix='/settings')

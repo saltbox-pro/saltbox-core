@@ -9,8 +9,8 @@ from saltbox_bridge_messages import CoreEncryptPillarRequest
 from saltbox_core.event_bus.redis.masters_bus import send_message_and_wait_response_to_master
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
-from saltbox_core.pillars.exceptions import PillarServiceParseCsvException
-from saltbox_core.pillars.schemas.pillar_schemas import (
+from saltbox_core.pillars_old.exceptions import PillarServiceParseCsvException
+from saltbox_core.pillars_old.schemas.pillar_schemas import (
     PillarCSVParseResult,
     PillarCSVParseResultErrorCode,
     PillarImportResultItemSchema,
@@ -18,7 +18,7 @@ from saltbox_core.pillars.schemas.pillar_schemas import (
     PillarImportResultSchema,
     PillarModel,
 )
-from saltbox_core.pillars.tasks import update_pillar_cache as update_pillar_cache_task
+from saltbox_core.pillars_old.tasks import update_pillar_cache as update_pillar_cache_task
 from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.exceptions import ObjectCreateException, ObjectNotFoundException
 

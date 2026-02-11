@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, UploadFile
 
-from saltbox_core.pillars.schemas.pillar_schemas import (
+from saltbox_core.pillars_old.schemas.pillar_schemas import (
     PillarCSVParseResult,
     PillarImportResultSchema,
     PillarImportSchema,
@@ -11,7 +11,7 @@ from saltbox_core.pillars.schemas.pillar_schemas import (
     PillarsActions,
     PillarSelector,
 )
-from saltbox_core.pillars.services.pillar_service import PillarService, get_pillar_service
+from saltbox_core.pillars_old.services.pillar_service import PillarService, get_pillar_service
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 
 router = APIRouter(prefix='/pillars', tags=['Pillars'])

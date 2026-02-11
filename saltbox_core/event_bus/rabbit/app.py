@@ -19,7 +19,7 @@ from saltbox_core.minion_collections.repositories.collection_repository import g
 from saltbox_core.minion_collections.repositories.minion_repository import get_minion_repository
 from saltbox_core.minion_collections.services.collection_service import get_collection_service
 from saltbox_core.minion_collections.services.minion_service import get_minion_service
-from saltbox_core.pillars.services.pillar_service import PillarService, get_pillar_service
+from saltbox_core.pillars_old.services.pillar_service import PillarService, get_pillar_service
 from saltbox_core.tasks.repositories.task import get_task_repository
 from saltbox_core.tasks.repositories.tasks_minion import get_task_minion_repository
 from saltbox_core.tasks.repositories.tasks_status import get_task_status_repository
