@@ -1,16 +1,19 @@
-from faststream import Context
+from faststream import Context, Logger
 from faststream.redis import RedisRouter
 
 from saltbox_bridge_messages import (
     BridgeAuthRequest,
+    BridgePillarDataRequest,
     BridgeSyncDoneMessage,
     BridgeTestBurstLoadMessage,
     CoreAuthResponse,
+    CorePillarDataResponse,
     MasterStatus,
 )
 from saltbox_core.event_bus.redis.master_bus_middlewares import MastersAuthMiddleware
 from saltbox_core.masters.schemas.master_schemas import MasterCreateSchema, MasterModel
 from saltbox_core.masters.services.master_service import MasterService
+from saltbox_core.pillars.services import PillarService
 from saltbox_sdk.exceptions import ObjectNotFoundException
 
 router_not_auth = RedisRouter(prefix='master_', middlewares=[])
@@ -60,3 +63,24 @@ async def sync_saltbox_done(
 async def burst_test_load_handler(message: BridgeTestBurstLoadMessage) -> None:
     # TODO (a.karmanov) : Count burst rate and save to DB
     ...
+
+
+@router.subscriber('get_pillar_data')
+async def get_pillar_data_handler(
+    message: BridgePillarDataRequest,
+    logger: Logger,
+    pillar_service: PillarService = Context(),  # noqa: B008
+) -> CorePillarDataResponse:
+    logger.debug(
+        'Received pillar data request for minion %s from master %s, pillarenv %s',
+        message.minion_id,
+        message.master,
+        message.pillarenv,
+    )
+    pillars = await pillar_service.get_for_minion(
+        master=message.master,
+        minion_id=message.minion_id,
+        pillarenv=message.pillarenv,
+    )
+
+    return CorePillarDataResponse(master=message.master, data=pillars)

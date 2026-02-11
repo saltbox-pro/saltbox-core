@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, UploadFile
 
-from saltbox_core.pillars.schemas.pillar_schemas import (
+from saltbox_core.pillars_old.schemas.pillar_schemas import (
     PillarCSVParseResult,
     PillarImportResultSchema,
     PillarImportSchema,
@@ -11,15 +11,15 @@ from saltbox_core.pillars.schemas.pillar_schemas import (
     PillarsActions,
     PillarSelector,
 )
-from saltbox_core.pillars.services.pillar_service import PillarService, get_pillar_service
+from saltbox_core.pillars_old.services.pillar_service import PillarService, get_pillar_service
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 
-router = APIRouter(prefix='/pillars', tags=['Pillars'])
+router = APIRouter(prefix='/pillars-old', tags=['Pillars Old'])
 
 
 @router.get(
     '',
-    operation_id='pillars_list',
+    operation_id='pillars_list_old',
     openapi_extra=GatewayEndpointConfig(
         policy='core.masters.base',
         action=PillarsActions.LIST,
@@ -37,7 +37,7 @@ async def pillars_list(
 
 @router.post(
     '',
-    operation_id='pillar_create',
+    operation_id='pillar_create_old',
     openapi_extra=GatewayEndpointConfig(
         policy='core.masters.base',
         action=PillarsActions.CREATE,
@@ -55,7 +55,7 @@ async def pillar_create(
 
 @router.put(
     '',
-    operation_id='pillar_update',
+    operation_id='pillar_update_old',
     openapi_extra=GatewayEndpointConfig(
         policy='core.masters.base',
         action=PillarsActions.UPDATE,
@@ -73,7 +73,7 @@ async def pillar_update(
 
 @router.delete(
     '',
-    operation_id='pillar_delete',
+    operation_id='pillar_delete_old',
     openapi_extra=GatewayEndpointConfig(
         policy='core.masters.base',
         action=PillarsActions.DELETE,
@@ -89,7 +89,7 @@ async def pillar_delete(
 
 @router.post(
     '/parse_csv',
-    operation_id='pillar_parse_csv',
+    operation_id='pillar_parse_csv_old',
     openapi_extra=GatewayEndpointConfig(
         policy='core.masters.base',
         action=PillarsActions.EXPORT,
@@ -106,7 +106,7 @@ async def pillar_parse_csv(
 
 @router.post(
     '/validate',
-    operation_id='pillar_import_validate',
+    operation_id='pillar_import_validate_old',
     openapi_extra=GatewayEndpointConfig(
         policy='core.masters.base',
         action=PillarsActions.VALIDATE,
@@ -122,7 +122,7 @@ async def pillar_import_validate(
 
 @router.post(
     '/import',
-    operation_id='pillar_import',
+    operation_id='pillar_import_old',
     openapi_extra=GatewayEndpointConfig(
         policy='core.masters.base',
         action=PillarsActions.IMPORT,

@@ -3,15 +3,21 @@ from fastapi import status
 from saltbox_core.exceptions import CoreException
 
 
-class PillarServiceException(CoreException):
-    """Base exception for PillarService."""
+class PillarException(CoreException):
+    """Base exception for Pillar errors."""
 
-    detail: str = 'An error occurred in the PillarService'
-    status_code: int = status.HTTP_500_INTERNAL_SERVER_ERROR
+    detail: str = 'An error occurred in the Pillar service.'
 
 
-class PillarServiceParseCsvException(PillarServiceException):
-    """Custom exception for errors during CSV parsing in PillarService."""
+class PillarAlreadyExistsException(PillarException):
+    """Exception raised when attempting to create a pillar that already exists."""
 
-    detail: str = 'An error occurred while parsing the CSV file'
+    status_code: int = status.HTTP_409_CONFLICT
+    detail: str = 'The specified pillar already exists.'
+
+
+class PillarCreatedByRequiredException(PillarException):
+    """Exception raised when attempting to create a personal pillar without created_by field."""
+
     status_code: int = status.HTTP_400_BAD_REQUEST
+    detail: str = 'The created_by field is required.'
