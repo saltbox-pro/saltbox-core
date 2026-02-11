@@ -27,8 +27,8 @@ from saltbox_core.minion_collections.repositories.collection_repository import (
 from saltbox_core.minion_collections.repositories.minion_repository import MinionRepository, get_minion_repository
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
-from saltbox_core.pillars_v2.repository import PillarRepository, get_pillar_repository
-from saltbox_core.pillars_v2.services import PillarService, get_pillar_service
+from saltbox_core.pillars.repository import PillarRepository, get_pillar_repository
+from saltbox_core.pillars.services import PillarService, get_pillar_service
 from saltbox_sdk.config.redis_config import REDIS_SETTINGS
 from saltbox_sdk.db.mongo.config import get_mongo_db
 

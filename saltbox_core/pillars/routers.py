@@ -3,13 +3,13 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Depends
 
 # from saltbox_core.config import logger
-from saltbox_core.pillars_v2.schemas import (
+from saltbox_core.pillars.schemas import (
     PillarCreateSchema,
     PillarListBody,
     PillarModel,
     PillarsActions,
 )
-from saltbox_core.pillars_v2.services import PillarService, get_pillar_service
+from saltbox_core.pillars.services import PillarService, get_pillar_service
 from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 from saltbox_sdk.fastapi_utils.dependencies import get_current_user, get_opa_query

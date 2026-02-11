@@ -4,7 +4,7 @@ from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository
 from saltbox_core.masters.repositories.master_repository import MasterRepository
 from saltbox_core.minion_collections.repositories.collection_repository import CollectionRepository
 from saltbox_core.minion_collections.repositories.minion_repository import MinionRepository
-from saltbox_core.pillars_v2.repository import PillarRepository
+from saltbox_core.pillars.repository import PillarRepository
 from saltbox_core.settings.repository import SettingsSlsRepoRepository
 from saltbox_core.tasks.repositories.tasks_minion import TaskMinionRepository
 from saltbox_core.tasks.repositories.tasks_template import TaskTemplateRepository

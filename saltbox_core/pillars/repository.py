@@ -6,7 +6,7 @@ from pymongo.asynchronous.database import AsyncDatabase
 from pymongo.operations import _IndexKeyHint
 
 from saltbox_core.config import logger
-from saltbox_core.pillars_v2.schemas import PillarCreateSchema, PillarModel, PillarTgtType
+from saltbox_core.pillars.schemas import PillarCreateSchema, PillarModel, PillarTgtType
 from saltbox_sdk.db.mongo.config import get_mongo
 from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
 

@@ -7,9 +7,9 @@ from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsync
 from saltbox_core.config import logger
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
-from saltbox_core.pillars_v2.exceptions import PillarCreatedByRequiredException
-from saltbox_core.pillars_v2.repository import PillarRepository, get_pillar_repository
-from saltbox_core.pillars_v2.schemas import (
+from saltbox_core.pillars.exceptions import PillarCreatedByRequiredException
+from saltbox_core.pillars.repository import PillarRepository, get_pillar_repository
+from saltbox_core.pillars.schemas import (
     PillarCreateSchema,
     PillarModel,
     PillarTgtType,
