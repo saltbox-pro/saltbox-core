@@ -27,27 +27,29 @@ class CollectionRepository(BaseTreeMongoRepository[CollectionModel]):
         on_delete = OnDelete.cascade
         collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
             'slug_unique_index_asc': [('slug', pymongo.ASCENDING)],
-            'parent_id_title_unique_index_asc': [
-                ('parent_id', pymongo.ASCENDING),
-                ('title', pymongo.ASCENDING)
-            ]
+            'parent_id_title_unique_index_asc': [('parent_id', pymongo.ASCENDING), ('title', pymongo.ASCENDING)],
         }
 
     async def prepare_object_data(
         self, data: dict[str, Any], projection_model: type[ProjectionModel] | None = None
     ) -> dict[str, Any]:
-        parent = await self.get_parent(PyObjectId(data['_id']), projection_model=CollectionBaseTreeModel)
-        query = data['query'] if 'query' in data else {}
+        fields_to_get_parent = ['full_query', 'parent_slug', 'parent_title']
 
-        if parent and parent.full_query and query:
-            data['full_query'] = {'$and': [parent.full_query, query]}
-        elif parent and parent.full_query and not query:
-            data['full_query'] = parent.full_query
-        else:
-            data['full_query'] = query
+        if projection_model is None or any(
+            field_name in fields_to_get_parent for field_name in projection_model.model_fields.keys()
+        ):
+            parent = await self.get_parent(PyObjectId(data['_id']), projection_model=CollectionBaseTreeModel)
+            query = data['query'] if 'query' in data else {}
 
-        data['parent_slug'] = parent.slug if parent else None
-        data['parent_title'] = parent.title if parent else None
+            if parent and parent.full_query and query:
+                data['full_query'] = {'$and': [parent.full_query, query]}
+            elif parent and parent.full_query and not query:
+                data['full_query'] = parent.full_query
+            else:
+                data['full_query'] = query
+
+            data['parent_slug'] = parent.slug if parent else None
+            data['parent_title'] = parent.title if parent else None
 
         return data
 
@@ -78,7 +80,6 @@ class CollectionRepository(BaseTreeMongoRepository[CollectionModel]):
     async def _post_create_collection(self) -> None:
         is_exist = bool(await self.collection.count_documents(filter={'slug': 'root'}))
         if not is_exist:
-
             msg = f"{self.__class__.__name__} doesn't exist... Creating..."
             logger.debug(msg)
 
