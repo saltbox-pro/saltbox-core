@@ -70,6 +70,18 @@ class CollectionService(
         result = await self.delete(query={'slug': slug}, session=session)
         return result
 
+    async def get_tree(
+        self,
+        query: dict[str, Any] | None = None,
+        *,
+        session: MongoAsyncClientSession | None = None,
+        projection_model: type[ProjectionModel],
+        children_field_name: str = 'children',
+    ) -> list[ProjectionModel]:
+        return await self.repo.get_tree(
+            query=query, projection_model=projection_model, children_field_name=children_field_name, session=session
+        )
+
     @overload
     async def create(
         self,

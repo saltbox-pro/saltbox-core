@@ -2,7 +2,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from saltbox_sdk.db.mongo.schemas_base import BaseTreeModel, MongoQuery, MongoQueryField, TreeMixin
+from saltbox_sdk.db.mongo.schemas_base import BaseTreeModel, IDMixin, MongoQuery, MongoQueryField, PyObjectId, TreeMixin
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin
 
 
@@ -61,6 +61,14 @@ class CollectionBaseTreeModel(BaseTreeModel):
     full_query: MongoQuery = MongoQueryField
     slug: str
     title: str
+
+
+class CollectionTreeNodeSchema(BaseModel, IDMixin):
+    title: str = Field(title='Title', min_length=3, max_length=50)
+    slug: str = Field(title='Slug', pattern=r'^[a-z0-9-]+$', min_length=3, max_length=30)
+
+    parent_id: PyObjectId | None = Field(title='Parent ID', default=None)
+    children: list['CollectionTreeNodeSchema'] = Field(title='Children', default=[])
 
 
 class CollectionActions(StrEnum):

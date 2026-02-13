@@ -9,6 +9,7 @@ from saltbox_core.minion_collections.schemas.collection_schemas import (
     CollectionCreateSchema,
     CollectionDetailSchema,
     CollectionModel,
+    CollectionTreeNodeSchema,
     CollectionUpdateSchema,
 )
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
@@ -36,6 +37,24 @@ async def collections_list(
     logger.info(f'OPA query: {opa_query}')
 
     return await collection_service.get_list_paginated(query=opa_query, skip=params.skip, limit=params.limit)
+
+
+@router.post(
+    '/tree',
+    operation_id='minion_collections_tree',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.collections.list',
+        action=CollectionActions.LIST,
+        cache_ttl=0,
+    ).model_dump(by_alias=True),  # need to use by_alias=True to match the OpenAPI schema format
+)
+async def collections_tree(
+    opa_query: Annotated[dict, Depends(get_opa_query)],
+    collection_service: Annotated[CollectionService, Depends(get_collection_service)],
+) -> list[CollectionTreeNodeSchema]:
+    logger.info(f'OPA query: {opa_query}')
+
+    return await collection_service.get_tree(query=opa_query, projection_model=CollectionTreeNodeSchema)
 
 
 @router.get(
