@@ -1,6 +1,6 @@
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, Query, Response, status
+from fastapi import APIRouter, Body, Depends, Response, status
 
 from saltbox_core.config import logger
 from saltbox_core.minion_collections.schemas.collection_schemas import (
@@ -8,20 +8,21 @@ from saltbox_core.minion_collections.schemas.collection_schemas import (
     CollectionCreateRequestSchema,
     CollectionCreateSchema,
     CollectionDetailSchema,
+    CollectionListBody,
     CollectionModel,
     CollectionTreeNodeSchema,
     CollectionUpdateSchema,
 )
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
-from saltbox_sdk.db.schemas_base import PaginatedResponse, SkipLimitParams, UserShort
+from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 from saltbox_sdk.fastapi_utils.dependencies import get_current_user, get_opa_query
 
 router = APIRouter(prefix='/collections', tags=['Minion Collections'])
 
 
-@router.get(
-    '',
+@router.post(
+    '/list',
     operation_id='minion_collections_list',
     openapi_extra=GatewayEndpointConfig(
         policy='core.collections.list',
@@ -30,13 +31,31 @@ router = APIRouter(prefix='/collections', tags=['Minion Collections'])
     ).model_dump(by_alias=True),  # need to use by_alias=True to match the OpenAPI schema format
 )
 async def collections_list(
-    params: Annotated[SkipLimitParams, Query()],
+    params: Annotated[CollectionListBody, Body()],
     opa_query: Annotated[dict, Depends(get_opa_query)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
 ) -> PaginatedResponse[CollectionModel]:
     logger.info(f'OPA query: {opa_query}')
 
-    return await collection_service.get_list_paginated(query=opa_query, skip=params.skip, limit=params.limit)
+    query: dict[str, Any] = {}
+    queries: list[dict[str, Any]] = []
+
+    if opa_query:
+        queries.append(opa_query)
+    if params.query:
+        queries.append(params.query)
+
+    if len(queries) == 1:
+        query = queries[0]
+    elif len(queries) > 1:
+        query = {'$and': queries}
+
+    return await collection_service.get_list_paginated(
+        query=query,
+        skip=params.skip,
+        limit=params.limit,
+        sort=params.sort,
+    )
 
 
 @router.post(
