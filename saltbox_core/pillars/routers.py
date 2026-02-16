@@ -8,6 +8,7 @@ from saltbox_core.pillars.schemas import (
     PillarListBody,
     PillarModel,
     PillarsActions,
+    PillarWithTgtInfoSchema,
 )
 from saltbox_core.pillars.services import PillarService, get_pillar_service
 from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
@@ -53,11 +54,11 @@ async def pillars_list(
     body: Annotated[PillarListBody, Body()],
     opa_query: Annotated[dict, Depends(get_opa_query)],
     pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
-) -> PaginatedResponse[PillarModel]:
+) -> PaginatedResponse[PillarWithTgtInfoSchema]:
     query = body.query
     if opa_query:
         query = {'$and': [query, opa_query]}
 
     return await pillar_service.get_list_paginated(
-        query=query, skip=body.skip, limit=body.limit, projection_model=PillarModel, sort=body.sort
+        query=query, skip=body.skip, limit=body.limit, projection_model=PillarWithTgtInfoSchema, sort=body.sort
     )

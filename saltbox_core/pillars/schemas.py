@@ -44,6 +44,28 @@ class PillarListBody(SkipLimitParams, QueryParams, SortParams):
     )
 
 
+class PillarTargetInfoBase(BaseModel):
+    type: PillarTgtType = Field(default=PillarTgtType.ROOT)
+    id: PyObjectId | None = None
+
+
+class PillarTargetInfoCollection(PillarTargetInfoBase):
+    title: str | None = None
+    slug: str | None = None
+
+
+class PillarTargetInfoMinion(PillarTargetInfoBase):
+    minion_id: str | None = None
+    master: str | None = None
+
+
+class PillarWithTgtInfoSchema(BaseModel):
+    name: str
+    value: JsonValue
+    is_personal: bool = False
+    tgt_info: PillarTargetInfoCollection | PillarTargetInfoMinion
+
+
 class PillarsActions(StrEnum):
     LIST = 'list'
     CREATE = 'create'
