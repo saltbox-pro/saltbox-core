@@ -2,8 +2,17 @@ from enum import StrEnum
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from saltbox_sdk.db.mongo.schemas_base import BaseTreeModel, IDMixin, MongoQuery, MongoQueryField, PyObjectId, TreeMixin
-from saltbox_sdk.db.schemas_base import CreatedModifiedMixin
+from saltbox_sdk.db.mongo.schemas_base import (
+    BaseTreeModel,
+    IDMixin,
+    MongoQuery,
+    MongoQueryField,
+    PyObjectId,
+    QueryParams,
+    SortParams,
+    TreeMixin,
+)
+from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
 
 
 class CollectionComputedFieldsMixin:
@@ -69,6 +78,10 @@ class CollectionTreeNodeSchema(BaseModel, IDMixin):
 
     parent_id: PyObjectId | None = Field(title='Parent ID', default=None)
     children: list['CollectionTreeNodeSchema'] = Field(title='Children', default=[])
+
+
+class CollectionListBody(SkipLimitParams, QueryParams, SortParams):
+    model_config = ConfigDict(extra='ignore')
 
 
 class CollectionActions(StrEnum):
