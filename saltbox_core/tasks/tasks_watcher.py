@@ -64,6 +64,7 @@ class TasksWatcher:
             rdb=redis,
             job_repository=self.job_repository,
             job_schema_service=job_schema_service,
+            job_return_service=job_return_service,
             master_service=master_service,
         )
         minion_service = MinionService(repo=self.minions_repository)

@@ -57,6 +57,7 @@ class SaltEventsHandler:
             rdb=self.redis,
             job_repository=self.job_repository,
             job_schema_service=self.job_schema_service,
+            job_return_service=self.job_return_service,
             master_service=self.master_service,
         )
         self.task_template_repository = get_task_template_repository(db=self.mongo_db)
@@ -80,7 +81,11 @@ class SaltEventsHandler:
 
         self.salt_handlers: list[BaseMessageHandler] = [
             SaltMessageMetricMessageHandler(redis_client=self.redis),
-            JobNewMessageHandler(redis_client=self.redis, job_service=self.job_service),
+            JobNewMessageHandler(
+                redis_client=self.redis,
+                job_service=self.job_service,
+                job_return_service=self.job_return_service,
+            ),
             JobErrorHandler(redis_client=self.redis, job_service=self.job_service),
             JobReturnMessageHandler(
                 redis_client=self.redis,

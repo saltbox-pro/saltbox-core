@@ -5,7 +5,7 @@ from fastapi import Depends
 from redis.asyncio import Redis
 
 from saltbox_core.config import logger
-from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobStatus
+from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobSimpleSchema, JobStatus
 from saltbox_core.jobs.services.job_return_service import JobReturnService, get_job_return_service
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
@@ -18,6 +18,7 @@ from saltbox_core.tasks.schemas.tasks_minion import TaskMinionJobStatus, TaskMin
 from saltbox_core.tasks.schemas.tasks_status import TaskStatus
 from saltbox_core.tasks.services.task import TaskService, get_task_service
 from saltbox_core.tasks.services.tasks_minion import TaskMinionService, get_task_minion_service
+from saltbox_core.utilities.jid import JID
 from saltbox_sdk.db.mongo.config import get_mongo_db
 from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
 from saltbox_sdk.db.redis.config import get_redis
@@ -131,8 +132,21 @@ class TaskLifespanService:
     async def sync_jobs(self) -> None:
         task = await self.get_task()
 
-        # TODO: Sync task jobs
         logger.debug('Syncing jobs for task %s', task.id)
+
+        task_jobs = await self.job_service.get_list(
+            query={
+                'source.type': 'task',
+                'source.id': str(task.id),
+                'status': {'$in': [JobStatus.started, JobStatus.waiting_returns]},
+            },
+            limit=0,
+            skip=0,
+            projection_model=JobSimpleSchema,
+        )
+
+        for task_job in task_jobs:
+            await self.job_service.update_status(jid=JID(task_job.jid), notify=True)
 
     async def check_unactive_minions(self, master: str, batch_size: int) -> None:
         task = await self.get_task()

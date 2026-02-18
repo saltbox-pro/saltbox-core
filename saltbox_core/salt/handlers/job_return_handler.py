@@ -5,13 +5,16 @@ from typing import Any, ClassVar
 
 import redis.asyncio as aioredis
 from faststream.rabbit import RabbitBroker
-from pymongo.asynchronous.client_session import AsyncClientSession
-from pymongo.errors import OperationFailure
 
 from saltbox_core.config import SETTINGS, logger
 from saltbox_core.event_bus.rabbit.common_messages import InventoryPutEventBusMessage, InventoryPutForMinion
-from saltbox_core.jobs.schemas.job_return_schemas import JobReturnCreateSchema, JobReturnModel
-from saltbox_core.jobs.schemas.job_schemas import JobModel, JobStatus
+from saltbox_core.jobs.schemas.job_return_schemas import (
+    JobReturnCreateSchema,
+    JobReturnModel,
+    JobReturnStatus,
+    JobReturnUpdateSchema,
+)
+from saltbox_core.jobs.schemas.job_schemas import JobModel
 from saltbox_core.jobs.services.job_return_service import JobReturnService
 from saltbox_core.jobs.services.job_services import JobService
 from saltbox_core.minion_collections.services.minion_service import MinionService
@@ -19,8 +22,9 @@ from saltbox_core.salt.exceptions import StopProcessing
 from saltbox_core.salt.handlers.base_handler import MessageDataType
 from saltbox_core.salt.handlers.base_job_handler import BaseJobMessageHandler
 from saltbox_core.tasks.tiq_tasks import process_task_job_return
+from saltbox_core.utilities.jid import JID
 from saltbox_sdk.event_bus.utils import send_message
-from saltbox_sdk.exceptions import DuplicateKeyException
+from saltbox_sdk.exceptions import DuplicateKeyException, NotFoundException
 from saltbox_sdk.utilities.helpers import format_iso8601_z, make_aware
 
 
@@ -47,9 +51,8 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         minion_service: MinionService,
         broker: RabbitBroker,
     ) -> None:
-        super().__init__(redis_client=redis_client, job_service=job_service)
+        super().__init__(redis_client=redis_client, job_service=job_service, job_return_service=job_return_service)
 
-        self.job_return_service = job_return_service
         self.minion_service = minion_service
         self.broker = broker
 
@@ -58,6 +61,7 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         data['system_user'] = data.pop('user')
         data['minion_id'] = data.pop('id', match.group('mid'))
         data['salt_master'] = data.pop('master_id', master_id)
+        data['status'] = JobReturnStatus.success if data.get('retcode', None) == 0 else JobReturnStatus.failed
 
         raw_stamp = data.pop('_stamp')
         data['stamp'] = make_aware(datetime.fromisoformat(raw_stamp)) if raw_stamp else None
@@ -65,31 +69,7 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         return data
 
     async def get_job(self, jid: str, master_id: str, data: MessageDataType) -> JobModel:
-        async def _get_job(_session: AsyncClientSession | None = None) -> JobModel:
-            job = await self.job_service.get(query={'jid': str(jid), 'salt_master': str(master_id)}, session=_session)
-
-            job.returning[data['minion_id']] = data['retcode'] == 0
-            is_finished = all(mid in job.returning.keys() for mid in job.minions)
-            updating_data: dict[str, Any] = {
-                'returning': job.returning,
-                'status': JobStatus.finished if is_finished else JobStatus.waiting_returns,
-            }
-
-            return await self.job_service.update(query=job.id, data=updating_data, session=session, notify=True)
-
-        async with self.job_service.repo.client.start_session() as session:
-            try:
-                return await session.with_transaction(_get_job)
-            except OperationFailure as e:
-                if e.has_error_label('TransientTransactionError'):
-                    logger.debug('Transaction with getting job is failed: %s\nRetrying...', e)
-                    return await self.get_job(jid=jid, master_id=master_id, data=data)
-
-                if e.code == 20:
-                    logger.error('Mongo transaction may be unavailable. Try get job without transaction.')
-                    return await _get_job()
-
-                raise e
+        return await self.job_service.get(query={'jid': str(jid), 'salt_master': str(master_id)})
 
     async def process(
         self,
@@ -115,6 +95,7 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         job_return = await self._save_job_return(
             master_id=master_id, jid=jid, mid=mid, job=job, data=data, return_data=return_data
         )
+        await self.job_service.update_status(jid=JID(jid), force=True)
 
         if tid:
             await process_task_job_return.kiq(jid=jid, minion_id=mid)  # type: ignore
@@ -167,6 +148,8 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
                 pipe = pipe.expire(name=hash_name, time=SETTINGS.jobs_return_data_expire_ttl)
             await pipe.execute()
 
+        is_new_return = False
+
         try:
             job_return = await self.job_return_service.create(
                 data=JobReturnCreateSchema.model_validate(
@@ -174,15 +157,28 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
                 ),
                 notify=True,
             )
-            if job.source and job.source.type == 'migration':
-                await self.broker.connect()
-                job_return.data = return_data
-                await self.broker.publish(job_return, 'migration_job_return')
-            return job_return
+            is_new_return = True
         except DuplicateKeyException:
-            return await self.job_return_service.get(
-                query={'jid': str(jid), 'salt_master': str(master_id), 'minion_id': mid}
-            )
+            try:
+                job_return = await self.job_return_service.update(
+                    query={'jid': jid, 'salt_master': master_id, 'minion_id': mid, 'retcode': None},
+                    data=JobReturnUpdateSchema.model_validate(
+                        {'source': job.source, 'user': job.user, 'stamp_job': job.stamp, **data}
+                    ),
+                    notify=True,
+                )
+                is_new_return = True
+            except NotFoundException:
+                job_return = await self.job_return_service.get(
+                    query={'jid': jid, 'salt_master': master_id, 'minion_id': mid}
+                )
+
+        if is_new_return and job.source and job.source.type == 'migration':
+            await self.broker.connect()
+            job_return.data = return_data
+            await self.broker.publish(job_return, 'migration_job_return')
+
+        return job_return
 
     @staticmethod
     async def _send_inventory_data(job_return: JobReturnModel, path: list[str | int]) -> None:

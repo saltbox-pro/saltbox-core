@@ -10,12 +10,14 @@ from redis.asyncio import Redis
 from saltbox_core.config import logger
 from saltbox_core.jobs.exceptions import JobCreateException, JobServiceException
 from saltbox_core.jobs.repositories.job_repository import JobRepository, get_job_repository
-from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel, JobUpdateSchema
+from saltbox_core.jobs.schemas.job_return_schemas import JobReturnStatus
+from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel, JobSimpleSchema, JobStatus, JobUpdateSchema
+from saltbox_core.jobs.services.job_return_service import JobReturnService, get_job_return_service
 from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_core.utilities.context import replace_raised
 from saltbox_core.utilities.jid import JID
-from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
 from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_service import ProjectionModel
@@ -35,9 +37,11 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         rdb: Redis,
         job_repository: JobRepository,
         job_schema_service: JobSchemaService,
+        job_return_service: JobReturnService,
         master_service: MasterService,
     ):
         self.job_schema_service = job_schema_service
+        self.job_return_service = job_return_service
         self.master_service = master_service
         super().__init__(repo=job_repository, rdb=rdb)
 
@@ -160,6 +164,64 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
 
         return job
 
+    @overload
+    async def update_status(
+        self,
+        jid: JID,
+        force: bool = False,
+        *,
+        session: MongoAsyncClientSession | None = None,
+        notify: bool = True,
+    ) -> JobModel: ...
+
+    @overload
+    async def update_status(
+        self,
+        jid: JID,
+        force: bool = False,
+        *,
+        session: MongoAsyncClientSession | None = None,
+        projection_model: type[ProjectionModel],
+        notify: bool = True,
+    ) -> ProjectionModel: ...
+
+    async def update_status(
+        self,
+        jid: JID,
+        force: bool = False,
+        *,
+        session: MongoAsyncClientSession | None = None,
+        projection_model: type[ProjectionModel] | None = None,
+        notify: bool = True,
+    ) -> JobModel | ProjectionModel:
+        job = await self.get(query={'jid': str(jid)}, projection_model=JobSimpleSchema)
+
+        if job.status in [JobStatus.waiting_returns, JobStatus.started]:
+            new_status: JobStatus | None = job.status if force else None
+
+            if await self.job_return_service.exists(
+                query={'jid': job.jid, 'salt_master': job.salt_master, 'status': JobReturnStatus.waiting},
+                session=session,
+            ):
+                if job.status != JobStatus.waiting_returns:
+                    new_status = JobStatus.waiting_returns
+            else:
+                new_status = JobStatus.finished
+
+            if new_status:
+                await self.update(
+                    query=job.id,
+                    data={'status': new_status},
+                    session=session,
+                    notify=notify,
+                    projection_model=EmptyModel,
+                )
+
+        if projection_model:
+            return await self.get(query=job.id, session=session, projection_model=projection_model)
+
+        return await self.get(query=job.id, session=session)
+
     async def stop_job(self, jid: JID | PyObjectId) -> None: ...  # TODO (i.moshkov): stop jobs
 
     async def _get_fake_jobs(
@@ -212,8 +274,13 @@ def get_job_service(
     rdb: Annotated[Redis, Depends(get_redis)],
     job_repository: Annotated[JobRepository, Depends(get_job_repository)],
     job_schema_service: Annotated[JobSchemaService, Depends(get_job_schema_service)],
+    job_return_service: Annotated[JobReturnService, Depends(get_job_return_service)],
     master_service: Annotated[MasterService, Depends(get_master_service)],
 ) -> JobService:
     return JobService(
-        rdb=rdb, job_repository=job_repository, job_schema_service=job_schema_service, master_service=master_service
+        rdb=rdb,
+        job_repository=job_repository,
+        job_schema_service=job_schema_service,
+        job_return_service=job_return_service,
+        master_service=master_service,
     )
