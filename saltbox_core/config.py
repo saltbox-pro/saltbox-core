@@ -114,6 +114,16 @@ class Settings(BaseSettings):
     gpg_key_email: str = 'gpg@saltbox.pro'
     gpg_key_comment: str = 'This is a certificate for saltbox services'
 
+    # PILLARS CRYPTO (encrypt-at-rest)
+    pillars_kek_b64: str | None = Field(
+        default=None,
+        description='Base64-encoded 32-byte key for AES-256-GCM pillars encryption at rest',
+    )
+    pillars_kid: str = Field(
+        default='core-kek-v1',
+        description='Key identifier for pillars encryption (used for rotation)',
+    )
+
     # TASKS
     tasks_job_create_cooldown: int = Field(
         default=5, description='Number of seconds to wait from tasks job creation to new job'

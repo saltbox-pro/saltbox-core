@@ -1,4 +1,4 @@
-from typing import Annotated, Any, ClassVar, override
+from typing import Annotated, ClassVar, override
 
 from fastapi import Depends
 from pymongo import ASCENDING
@@ -6,7 +6,7 @@ from pymongo.asynchronous.database import AsyncDatabase
 from pymongo.operations import _IndexKeyHint
 
 from saltbox_core.config import logger
-from saltbox_core.pillars.schemas import PillarCreateSchema, PillarModel, PillarTgtType, PillarWithTgtInfoSchema
+from saltbox_core.pillars.schemas import PillarCreateSchema, PillarModel, PillarTgtType
 from saltbox_sdk.db.mongo.aggregations import (
     AddFieldsAggregationStage,
     AggregatedField,
@@ -15,7 +15,7 @@ from saltbox_sdk.db.mongo.aggregations import (
     UnwindAggregationStage,
 )
 from saltbox_sdk.db.mongo.config import get_mongo
-from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository, ProjectionModel
+from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
 
 
 class PillarRepository(BaseMongoRepository[PillarModel]):
@@ -157,25 +157,6 @@ class PillarRepository(BaseMongoRepository[PillarModel]):
             logger.info('Created test pillar: %s', created_pillar)
         else:
             logger.debug('Test pillar already exists')
-
-    @override
-    async def prepare_object_data(
-        self, data: dict[str, Any], projection_model: type[ProjectionModel] | None = None
-    ) -> dict[str, Any]:
-        if projection_model is PillarWithTgtInfoSchema:
-            tgt_info = data.get('tgt_info')
-            if tgt_info is None:
-                tgt_type = data.get('tgt_type', PillarTgtType.ROOT.value)
-                tgt_info = {'type': tgt_type, 'id': data.get('tgt_id')}
-
-            return {
-                'name': data.get('name'),
-                'value': data.get('value'),
-                'is_personal': data.get('is_personal', False),
-                'tgt_info': tgt_info,
-            }
-
-        return data
 
 
 def get_pillar_repository(db: Annotated[AsyncDatabase, Depends(get_mongo)]) -> PillarRepository:
