@@ -23,10 +23,7 @@ class TaskMinionRepository(BaseMongoRepository[TaskMinionModel]):
         auto_now_add_fields: ClassVar[list[str]] = ['created']
         auto_now_fields: ClassVar[list[str]] = ['modified']
         collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
-            'task_minion_unique_index': [
-                ('task_id', pymongo.ASCENDING),
-                ('minion_inner_id', pymongo.ASCENDING)
-            ]
+            'task_minion_unique_index': [('task_id', pymongo.ASCENDING), ('minion_inner_id', pymongo.ASCENDING)]
         }
         aggregations: ClassVar[AggregationsStore] = AggregationsStore(
             aggregations=[
@@ -56,6 +53,10 @@ class TaskMinionRepository(BaseMongoRepository[TaskMinionModel]):
                     field_name='last_activity',
                     stages=[AddFieldsAggregationStage(fields={'last_activity': '$minion.last_activity'})],
                     parent_aggregations=['minion'],
+                ),
+                AggregatedField(
+                    field_name='count_runs',
+                    stages=[AddFieldsAggregationStage(fields={'count_runs': {'$size': {'$objectToArray': '$jobs'}}})],
                 ),
             ]
         )

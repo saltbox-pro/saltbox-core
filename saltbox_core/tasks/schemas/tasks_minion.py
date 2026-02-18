@@ -1,6 +1,6 @@
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field
 
 from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId, QueryParams, SortParams
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
@@ -51,6 +51,7 @@ class TaskMinionJoinedFieldsMixin:
     minion_id: str = Field(title='Minion ID')
     master: str = Field(title='Master')
     last_activity: TimezoneAwareDatetime | None = Field(title='Last activity', default=None)
+    count_runs: int = Field(title='Count runs')
 
 
 class TaskMinionModel(
@@ -60,10 +61,7 @@ class TaskMinionModel(
     TaskMinionReadOnlyFieldsMixin,
     TaskMinionEditableFieldsMixin,
     IDMixin,
-):
-    @computed_field(title='Count job runs')
-    def count_runs(self) -> int:
-        return len(self.jobs)
+): ...
 
 
 # REST
