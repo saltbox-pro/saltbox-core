@@ -28,7 +28,8 @@ from saltbox_core.minion_collections.repositories.minion_repository import Minio
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from saltbox_core.pillars.repository import PillarRepository, get_pillar_repository
-from saltbox_core.pillars.services import PillarService, get_pillar_service
+from saltbox_core.pillars.services.pillar import PillarService, get_pillar_service
+from saltbox_core.pillars.services.pillar_crypto import PillarCryptoService, get_pillar_crypto_service
 from saltbox_sdk.config.redis_config import REDIS_SETTINGS
 from saltbox_sdk.db.mongo.config import get_mongo_db
 
@@ -86,8 +87,12 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
     collection_repository: CollectionRepository = get_collection_repository(db=mongo_db)
     collection_service: CollectionService = get_collection_service(repo=collection_repository)
     pillar_repository: PillarRepository = get_pillar_repository(db=mongo_db)
+    pillar_crypto_service: PillarCryptoService = get_pillar_crypto_service()
     pillar_service: PillarService = get_pillar_service(
-        repo=pillar_repository, collection_service=collection_service, minion_service=minion_service
+        repo=pillar_repository,
+        collection_service=collection_service,
+        minion_service=minion_service,
+        crypto_service=pillar_crypto_service,
     )
 
     context.set_global('master_service', master_service)

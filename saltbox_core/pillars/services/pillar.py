@@ -15,6 +15,7 @@ from saltbox_core.pillars.schemas import (
     PillarTgtType,
     PillarUpdateSchema,
 )
+from saltbox_core.pillars.services.pillar_crypto import PillarCryptoService, get_pillar_crypto_service
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService, ProjectionModel
 
@@ -25,10 +26,12 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
         repo: PillarRepository,
         collection_service: CollectionService,
         minion_service: MinionService,
+        crypto_service: PillarCryptoService,
     ):
         super().__init__(repo=repo)
         self._collection_service = collection_service
         self._minion_service = minion_service
+        self._crypto_service = crypto_service
 
     @overload
     async def create(
@@ -73,9 +76,31 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
                 'pillarenv': data.created_by.sub if data.is_personal else 'base',
             }
         )
+
+        encrypted_value = self._crypto_service.encrypt_if_needed(
+            value=data.value,
+            is_secret=data.is_secret,
+            name=data.name,
+            pillarenv=data.pillarenv,
+            tgt_type=data.tgt_type,
+            tgt_id=data.tgt_id,
+        )
+        if encrypted_value is not data.value:
+            data = data.model_copy(update={'value': encrypted_value})
+
         if projection_model:
             return await super().create(data=data, projection_model=projection_model, session=session)
         return await super().create(data=data, session=session)
+
+    def _maybe_decrypt_pillar_value(self, pillar: PillarModel) -> JsonValue:
+        return self._crypto_service.decrypt_if_needed(
+            value=pillar.value,
+            is_secret=pillar.is_secret,
+            name=pillar.name,
+            pillarenv=pillar.pillarenv,
+            tgt_type=pillar.tgt_type,
+            tgt_id=pillar.tgt_id,
+        )
 
     async def _get_merged_collection_pillars(
         self, collection_ids: list[str], pillarenv: str = 'base'
@@ -94,7 +119,7 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
         # Later created pillars have higher priority
         sorted_pillars = sorted(collection_pillars, key=lambda p: p.created)
         for pillar in sorted_pillars:
-            merged_pillars[pillar.name] = pillar.value
+            merged_pillars[pillar.name] = self._maybe_decrypt_pillar_value(pillar)
         logger.debug('Merged collection pillars: %s', merged_pillars)
         return merged_pillars
 
@@ -111,11 +136,11 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
 
         merged_pillars: dict[str, JsonValue] = {}
         for pillar in root_pillars:
-            merged_pillars[pillar.name] = pillar.value
+            merged_pillars[pillar.name] = self._maybe_decrypt_pillar_value(pillar)
         for name, value in collection_pillars.items():
             merged_pillars[name] = value
         for pillar in minion_pillars:
-            merged_pillars[pillar.name] = pillar.value
+            merged_pillars[pillar.name] = self._maybe_decrypt_pillar_value(pillar)
 
         logger.debug('Merged pillars for minion %s: %s', minion_id, merged_pillars)
         return merged_pillars
@@ -140,5 +165,11 @@ def get_pillar_service(
     repo: Annotated[PillarRepository, Depends(get_pillar_repository)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
     minion_service: Annotated[MinionService, Depends(get_minion_service)],
+    crypto_service: Annotated[PillarCryptoService, Depends(get_pillar_crypto_service)],
 ) -> PillarService:
-    return PillarService(repo=repo, collection_service=collection_service, minion_service=minion_service)
+    return PillarService(
+        repo=repo,
+        collection_service=collection_service,
+        minion_service=minion_service,
+        crypto_service=crypto_service,
+    )

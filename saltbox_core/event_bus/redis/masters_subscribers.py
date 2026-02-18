@@ -13,7 +13,7 @@ from saltbox_bridge_messages import (
 from saltbox_core.event_bus.redis.master_bus_middlewares import MastersAuthMiddleware
 from saltbox_core.masters.schemas.master_schemas import MasterCreateSchema, MasterModel
 from saltbox_core.masters.services.master_service import MasterService
-from saltbox_core.pillars.services import PillarService
+from saltbox_core.pillars.services.pillar import PillarService
 from saltbox_sdk.exceptions import ObjectNotFoundException
 
 router_not_auth = RedisRouter(prefix='master_', middlewares=[])

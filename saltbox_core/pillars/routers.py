@@ -10,7 +10,7 @@ from saltbox_core.pillars.schemas import (
     PillarsActions,
     PillarWithTgtInfoSchema,
 )
-from saltbox_core.pillars.services import PillarService, get_pillar_service
+from saltbox_core.pillars.services.pillar import PillarService, get_pillar_service
 from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 from saltbox_sdk.fastapi_utils.dependencies import get_current_user, get_opa_query
