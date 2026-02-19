@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import ClassVar
 
 from saltbox_core.config import logger
+from saltbox_core.jobs.schemas.job_return_schemas import JobReturnCreateSchema
 from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel, JobStatus
 from saltbox_core.salt.exceptions import StopProcessing
 from saltbox_core.salt.handlers.base_handler import MessageDataType
@@ -68,6 +69,23 @@ class JobNewMessageHandler(BaseJobMessageHandler):
             logger.info('New job (jid: %s) for task: %s', jid, tid)
         else:
             logger.info('New job: %s', jid)
+
+        if job and job.minions:
+            for minion_id in job.minions:
+                await self.job_return_service.create(
+                    data=JobReturnCreateSchema.model_validate(
+                        {
+                            'minion_id': minion_id,
+                            'salt_master': master_id,
+                            'jid': job.jid,
+                            'fun': job.fun,
+                            'source': job.source,
+                            'user': job.user,
+                            'stamp_job': job.stamp,
+                        }
+                    ),
+                    notify=True,
+                )
 
         if tid and job:
             await process_task_job.kiq(jid=jid)  # type: ignore

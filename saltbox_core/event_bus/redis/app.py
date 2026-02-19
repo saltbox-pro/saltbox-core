@@ -15,7 +15,9 @@ from saltbox_core.event_bus.redis.master_bus_middlewares import MastersAuthMiddl
 from saltbox_core.event_bus.redis.masters_subscribers import router as masters_router
 from saltbox_core.event_bus.redis.masters_subscribers import router_not_auth as masters_router_not_auth
 from saltbox_core.jobs.repositories.job_repository import JobRepository, get_job_repository
+from saltbox_core.jobs.repositories.job_return_repository import JobReturnRepository, get_job_return_repository
 from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository, get_job_schema_repository
+from saltbox_core.jobs.services.job_return_service import JobReturnService, get_job_return_service
 from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.masters.repositories.master_repository import MasterRepository, get_master_repository
@@ -75,6 +77,8 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
     master_service: MasterService = get_master_service(repo=master_repository)
     minion_repository: MinionRepository = get_minion_repository(db=mongo_db)
     minion_service: MinionService = get_minion_service(repo=minion_repository)
+    job_return_repository: JobReturnRepository = get_job_return_repository(db=mongo_db, rdb=redis_db)
+    job_return_service: JobReturnService = get_job_return_service(rdb=redis_db, repo=job_return_repository)
     job_schema_repository: JobSchemaRepository = get_job_schema_repository(db=mongo_db)
     job_schema_service: JobSchemaService = get_job_schema_service(repo=job_schema_repository)
     job_repository: JobRepository = get_job_repository(db=mongo_db)
@@ -82,6 +86,7 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
         rdb=redis_db,
         job_repository=job_repository,
         job_schema_service=job_schema_service,
+        job_return_service=job_return_service,
         master_service=master_service,
     )
     collection_repository: CollectionRepository = get_collection_repository(db=mongo_db)

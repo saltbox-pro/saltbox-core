@@ -1,3 +1,4 @@
+from enum import StrEnum
 from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -11,39 +12,38 @@ from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatet
 # Job returns
 
 
+class JobReturnStatus(StrEnum):
+    waiting = 'waiting'
+    success = 'success'
+    failed = 'failed'
+    timeout = 'timeout'
+
+
 class JobReturnReadOnlyFieldsMixin:
     minion_id: str
     salt_master: str
-    retcode: int
     jid: StrJid
     fun: str
-    fun_args: list | None = None
-    fun_kwarg: dict | None = None
-    system_user: str | None = None
     user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
-    stamp: TimezoneAwareDatetime
-    stamp_job: TimezoneAwareDatetime | None = Field(default=None)
     source: Source | None = None
 
 
-class JobReturnEditableFieldsMixin: ...
+class JobReturnEditableFieldsMixin:
+    status: JobReturnStatus = Field(default=JobReturnStatus.waiting)
+    retcode: int | None = None
+    fun_args: list | None = None
+    fun_kwarg: dict | None = None
+    system_user: str | None = None
+    stamp: TimezoneAwareDatetime | None = None
+    stamp_job: TimezoneAwareDatetime | None = Field(default=None)
 
 
-class JobReturnComputedFieldsMixin:
-    @property
-    def success(self) -> bool:
-        """
-        Does job finished successfully
-
-        Field exists in an Event Bus object, but not for all cases. E.g. field is
-        missing on `salt.call` return. For convenience in the model it is True when
-        retcode is zero and vice versa.
-        """
-        return not self.retcode  # type: ignore
+class JobReturnAggregatedFieldsMixin:
+    success: bool | None = None
 
 
 class JobReturnCreateSchema(BaseModel, JobReturnReadOnlyFieldsMixin, JobReturnEditableFieldsMixin):
-    model_config = ConfigDict(extra='allow')
+    model_config = ConfigDict(extra='ignore')
 
     @model_validator(mode='before')
     @classmethod
@@ -63,7 +63,7 @@ class JobReturnUpdateSchema(BaseModel, JobReturnEditableFieldsMixin):
 
 class JobReturnModel(
     BaseModel,
-    JobReturnComputedFieldsMixin,
+    JobReturnAggregatedFieldsMixin,
     CreatedModifiedMixin,
     JobReturnReadOnlyFieldsMixin,
     JobReturnEditableFieldsMixin,
@@ -76,14 +76,12 @@ class JobReturnModel(
 
 
 class JobReturnsListBody(SkipLimitParams, QueryParams, SortParams):
-    model_config = ConfigDict(
-        extra='ignore',
-    )
+    model_config = ConfigDict(extra='ignore')
 
 
 class JobReturnListResponse(
     BaseModel,
-    JobReturnComputedFieldsMixin,
+    JobReturnAggregatedFieldsMixin,
     CreatedModifiedMixin,
     JobReturnReadOnlyFieldsMixin,
     JobReturnEditableFieldsMixin,

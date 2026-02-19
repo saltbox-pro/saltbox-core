@@ -6,6 +6,7 @@ import re
 import redis.asyncio as aioredis
 
 from saltbox_core.jobs.schemas.job_schemas import JobModel
+from saltbox_core.jobs.services.job_return_service import JobReturnService
 from saltbox_core.jobs.services.job_services import JobService
 from saltbox_core.salt.handlers.base_handler import BaseMessageHandler, MessageDataType
 
@@ -18,10 +19,16 @@ class BaseJobMessageHandler(BaseMessageHandler, abc.ABC):
     METRIC_TAG: str
     METRIC_TASK_TAG: str
 
-    def __init__(self, redis_client: aioredis.Redis, job_service: JobService) -> None:
+    def __init__(
+        self,
+        redis_client: aioredis.Redis,
+        job_service: JobService,
+        job_return_service: JobReturnService,
+    ) -> None:
         super().__init__(redis_client)
 
         self.job_service = job_service
+        self.job_return_service = job_return_service
 
     async def _handle(self, match: re.Match, master_id: str, tag: str, data: MessageDataType) -> None:
         data = await self.normalize_data(match=match, master_id=master_id, tag=tag, data=data)

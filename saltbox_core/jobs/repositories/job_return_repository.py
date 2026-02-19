@@ -9,6 +9,7 @@ from redis.asyncio import Redis
 
 from saltbox_core.config import logger
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnModel
+from saltbox_sdk.db.mongo.aggregations import AddFieldsAggregationStage, AggregatedField, AggregationsStore
 from saltbox_sdk.db.mongo.config import get_mongo
 from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository, ProjectionModel
 from saltbox_sdk.db.redis.config import get_redis
@@ -21,20 +22,34 @@ class JobReturnRepository(BaseMongoRepository[JobReturnModel]):
         auto_now_fields: ClassVar[list[str]] = ['modified']
         collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
             'job_return_jid_index_asc': [('jid', pymongo.ASCENDING)],
-            'job_return_jid_salt_master_index_asc': [
-                ('jid', pymongo.ASCENDING),
-                ('salt_master', pymongo.ASCENDING)
-            ],
-            'job_return_jid_minion_id_index_asc': [
-                ('jid', pymongo.ASCENDING),
-                ('minion_id', pymongo.ASCENDING)
-            ],
+            'job_return_jid_salt_master_index_asc': [('jid', pymongo.ASCENDING), ('salt_master', pymongo.ASCENDING)],
+            'job_return_jid_minion_id_index_asc': [('jid', pymongo.ASCENDING), ('minion_id', pymongo.ASCENDING)],
             'job_return_unique_index_asc': [
                 ('jid', pymongo.ASCENDING),
                 ('salt_master', pymongo.ASCENDING),
-                ('minion_id', pymongo.ASCENDING)
-            ]
+                ('minion_id', pymongo.ASCENDING),
+            ],
         }
+        aggregations: ClassVar[AggregationsStore] = AggregationsStore(
+            aggregations=[
+                AggregatedField(
+                    field_name='success',
+                    stages=[
+                        AddFieldsAggregationStage(
+                            fields={
+                                'success': {
+                                    '$cond': {
+                                        'if': {'$eq': ['$retcode', None]},
+                                        'then': None,
+                                        'else': {'$eq': ['$retcode', 0]},
+                                    }
+                                }
+                            }
+                        )
+                    ],
+                ),
+            ]
+        )
 
     def __init__(self, database: AsyncDatabase, rdb: Redis):
         self.rdb: Redis = rdb
@@ -51,8 +66,7 @@ class JobReturnRepository(BaseMongoRepository[JobReturnModel]):
 
             try:
                 raw_return: bytes | None = await self.rdb.hget(
-                    name=f'master:{data["salt_master"]}:job:{data["jid"]}:return-data',
-                    key=data['minion_id']
+                    name=f'master:{data["salt_master"]}:job:{data["jid"]}:return-data', key=data['minion_id']
                 )
 
                 if raw_return:

@@ -51,9 +51,8 @@ class JobEditableFieldsMixin:
     system_user: str | None = None
     minions: list[str] = Field(default=[])
     missing: list[str] = Field(default=[])
-    returning: dict[str, bool | None] = Field(default={})
     stamp: TimezoneAwareDatetime | None = Field(default=None)
-    status: JobStatus = JobStatus.in_queue
+    status: JobStatus = Field(default=JobStatus.in_queue)
     error_type: str | None = None
 
 
@@ -61,6 +60,10 @@ class JobComputedFieldsMixin:
     @computed_field(title='Timestamp decoded from JID')
     def fms_jid_timestamp(self) -> Annotated[datetime, PastDatetime]:
         return JID(self.jid).to_datetime()  # type: ignore
+
+
+class JobAggregateFieldsMixin:
+    returning: dict[str, bool | None] = Field(default={})
 
 
 class JobCreateSchema(BaseModel, JobReadOnlyFieldsMixin, JobEditableFieldsMixin):
@@ -85,9 +88,21 @@ class JobUpdateSchema(BaseModel, JobEditableFieldsMixin):
 
 
 class JobModel(
-    BaseModel, CreatedModifiedMixin, JobReadOnlyFieldsMixin, JobEditableFieldsMixin, JobComputedFieldsMixin, IDMixin
+    BaseModel,
+    CreatedModifiedMixin,
+    JobReadOnlyFieldsMixin,
+    JobEditableFieldsMixin,
+    JobComputedFieldsMixin,
+    JobAggregateFieldsMixin,
+    IDMixin,
 ):
     jid: StrJid
+
+
+class JobSimpleSchema(BaseModel, IDMixin):
+    jid: StrJid
+    salt_master: str
+    status: JobStatus
 
 
 # Rest
@@ -107,15 +122,10 @@ class JobsListResponse(BaseModel, CreatedModifiedMixin, JobComputedFieldsMixin, 
     system_user: str | None = None
     fun: str
     status: JobStatus
+    has_failed_job_returns: bool
 
     user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
     source: Source | None = None
-
-    returning: dict[str, bool | None] = Field(default={}, exclude=True)
-
-    @computed_field()
-    def has_failed_job_returns(self) -> bool:
-        return not all(res for res in self.returning.values())
 
 
 class CreateJobRequest(BaseModel):
