@@ -8,7 +8,7 @@ from typing import Any, cast
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from pydantic import JsonValue
 
-from saltbox_core.config import SETTINGS, logger
+from saltbox_core.config import SETTINGS
 from saltbox_core.pillars.exceptions import (
     PillarCryptoException,
     PillarEncryptionKeyNotConfiguredException,
@@ -79,7 +79,6 @@ class PillarCryptoService:
 
     def is_encrypted_value(self, value: JsonValue) -> bool:
         payload = self._get_enc_payload(value)
-        logger.debug('Checking if value is encrypted: has_payload=%s', payload is not None)
         return payload is not None
 
     def encrypt_json_value(self, value: JsonValue, *, aad: str) -> dict[str, Any]:

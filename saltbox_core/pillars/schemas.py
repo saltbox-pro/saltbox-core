@@ -19,12 +19,6 @@ class ReadOnlyShortFieldsMixin:
     is_personal: bool = False
     is_secret: bool = False
 
-    @model_validator(mode='after')
-    def hide_secret_value(self) -> Self:
-        if self.is_secret:
-            self.value = '*******'
-        return self
-
 
 class ReadOnlyFieldsMixin(ReadOnlyShortFieldsMixin):
     tgt_type: PillarTgtType = Field(default=PillarTgtType.ROOT)
@@ -72,6 +66,12 @@ class PillarTargetInfoMinion(PillarTargetInfoBase):
 
 class PillarWithTgtInfoSchema(BaseModel, ReadOnlyShortFieldsMixin, CreatedModifiedMixin, IDMixin):
     tgt_info: PillarTargetInfoCollection | PillarTargetInfoMinion
+
+    @model_validator(mode='after')
+    def hide_secret_value(self) -> Self:
+        if self.is_secret:
+            self.value: JsonValue = '*******'
+        return self
 
 
 class PillarsActions(StrEnum):
