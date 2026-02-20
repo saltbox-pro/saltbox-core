@@ -84,7 +84,7 @@ Build core image for branch:
 
 
 Trigger API Client pipeline:
-  stage: gen-api-client
+  stage: build
   variables:
     MODULE_NAME: saltbox_core
     SALTBOX_ENV_FILE: 'tests/test.env'
