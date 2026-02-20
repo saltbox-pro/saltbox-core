@@ -12,7 +12,6 @@ stages:
 variables:
   # Set 0 to disable linting jobs
   LINTING_ENABLED: true
-  VERSION_TAG_PATTERN: '/^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/'
 
 include:
   - project: 'saltbox/ci-lib'
