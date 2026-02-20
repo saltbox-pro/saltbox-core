@@ -15,6 +15,7 @@ stages:
 variables:
   # Set 0 to disable linting jobs
   LINTING_ENABLED: true
+  TESTING_ENABLED: true
 
 include:
   - project: 'saltbox/ci-lib'
@@ -64,6 +65,8 @@ Pytest:
     paths:
       - '$PIP_CACHE_DIR'
       - '$APK_CACHE_DIR'
+  rules:
+    - if: $TESTING_ENABLED == 'true'
 
 
 Build core image for tag:
