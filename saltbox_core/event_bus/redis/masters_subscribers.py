@@ -77,10 +77,25 @@ async def get_pillar_data_handler(
         message.master,
         message.pillarenv,
     )
-    pillars = await pillar_service.get_for_minion(
-        master=message.master,
-        minion_id=message.minion_id,
-        pillarenv=message.pillarenv,
-    )
+    error = None
+    pillars = {}
+    try:
+        pillars = await pillar_service.get_for_minion(
+            master=message.master,
+            minion_id=message.minion_id,
+            pillarenv=message.pillarenv,
+        )
+    except ObjectNotFoundException:
+        logger.warning('Minion with master %s and id %s not found', message.master, message.minion_id)
+        pillars = {}
+        error = 'Minion not found'
+    except Exception as e:
+        logger.error(
+            'Error while getting pillar data for minion %s from master %s: %s',
+            message.minion_id,
+            message.master,
+            str(e),
+        )
+        error = 'Unknown error. Please check FastStream logs for details.'
 
-    return CorePillarDataResponse(master=message.master, data=pillars)
+    return CorePillarDataResponse(master=message.master, pillars=pillars, error=error)
