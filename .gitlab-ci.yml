@@ -86,4 +86,4 @@ Build core image for branch:
 Trigger API Client pipeline:
   stage: build
   trigger:
-    include: '.api-client.gitlab-ci.yml'
+    include: '.gitlab-ci.api-client.yml'

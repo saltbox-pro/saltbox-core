@@ -92,7 +92,7 @@ select = [
   "FA",    # flake8-future-annotations
   "LOG",   # flake8-logging
   "PTH",   # flake8-use-pathlib
-  "ASYNC", #flake8-async
+  "ASYNC", # flake8-async
   "G",     # flake8-logging-format
   "E",     # pycodestyle errors
   "F",     # pyflakes
