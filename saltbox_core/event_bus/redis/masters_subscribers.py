@@ -91,10 +91,7 @@ async def get_pillar_data_handler(
         error = 'Minion not found'
     except Exception as e:
         logger.error(
-            'Error while getting pillar data for minion %s from master %s: %s',
-            message.minion_id,
-            message.master,
-            str(e),
+            'Error while getting pillar data for minion %s from master %s: %s', message.minion_id, message.master, e
         )
         error = 'Unknown error. Please check FastStream logs for details.'
 
