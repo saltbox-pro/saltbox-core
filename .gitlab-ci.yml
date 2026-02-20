@@ -1,5 +1,8 @@
 ---
 
+# Change to make non-empty commit and trigger push event
+# epoch: 0
+
 workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE != 'merge_request_event'
@@ -84,7 +87,7 @@ Build core image for branch:
 
 
 Trigger API Client pipeline:
-  stage: gen-api-client
+  stage: build
   variables:
     MODULE_NAME: saltbox_core
     SALTBOX_ENV_FILE: 'tests/test.env'
@@ -93,3 +96,8 @@ Trigger API Client pipeline:
       - project: 'saltbox/ci-lib'
         file: 'gen-api-client.yml'
     strategy: mirror
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'push'
+
+
+# vim: filetype=yaml.gitlab
