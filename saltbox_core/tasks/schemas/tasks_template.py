@@ -30,13 +30,12 @@ class ReadOnlyFieldsFullMixin(ReadOnlyFieldsShortMixin): ...
 
 class EditableFieldsShortMixin:
     title: str = Field(title='Template title')
-    short_description: str | None = Field(title='Template short description', default=None)
+    description: str | dict[str, str] | None = Field(title='Template description', default=None)
     fun: str = Field(title='Salt fun', examples=['salt.ping'])
     commit_hash: str = Field(title='Commit hash')
 
 
 class EditableFieldsFullMixin(EditableFieldsShortMixin):
-    full_description: str | None = Field(title='Template full description', default=None)
     json_schema: dict = Field(title='JSON schema')
     ui_schema: dict = Field(title='UI schema', default_factory=dict)
     sls_content: str = Field(title='SLS content')

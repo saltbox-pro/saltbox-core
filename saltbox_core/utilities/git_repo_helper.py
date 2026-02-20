@@ -569,8 +569,7 @@ class SlsRepoService:
                 schema = {
                     'fun': 'state.apply',
                     'title': json_schema['title'],
-                    'short_description': schema_dict.get('short_description', None),
-                    'full_description': schema_dict.get('full_description', None),
+                    'description': schema_dict.get('description', None),
                     'defaults': schema_dict.get('defaults', None),
                     'name': name,
                     'json_schema': json_schema,
