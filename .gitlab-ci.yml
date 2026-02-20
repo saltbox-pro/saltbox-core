@@ -1,5 +1,8 @@
 ---
 
+# Change to make non-empty commit and trigger push event
+# epoch: 0
+
 workflow:
   rules:
     - if: $CI_PIPELINE_SOURCE != 'merge_request_event'
@@ -12,6 +15,7 @@ stages:
 variables:
   # Set 0 to disable linting jobs
   LINTING_ENABLED: true
+  TESTING_ENABLED: true
 
 include:
   - project: 'saltbox/ci-lib'
@@ -61,6 +65,8 @@ Pytest:
     paths:
       - '$PIP_CACHE_DIR'
       - '$APK_CACHE_DIR'
+  rules:
+    - if: $TESTING_ENABLED == 'true'
 
 
 Build core image for tag:
@@ -93,3 +99,8 @@ Trigger API Client pipeline:
       - project: 'saltbox/ci-lib'
         file: 'gen-api-client.yml'
     strategy: mirror
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'push'
+
+
+# vim: filetype=yaml.gitlab
