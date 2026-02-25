@@ -7,6 +7,7 @@ from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsync
 from redis import exceptions as redis_exceptions
 from redis.asyncio import Redis
 
+from saltbox_bridge_messages import MasterStatus
 from saltbox_core.config import logger
 from saltbox_core.jobs.exceptions import JobCreateException, JobServiceException
 from saltbox_core.jobs.repositories.job_repository import JobRepository, get_job_repository
@@ -19,7 +20,6 @@ from saltbox_core.utilities.context import replace_raised
 from saltbox_core.utilities.jid import JID
 from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
 from saltbox_sdk.db.redis.config import get_redis
-from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_service import ProjectionModel
 from saltbox_sdk.serivces.mongo_base_with_notify_service import MongoBaseWithNotifyService
 
@@ -31,6 +31,16 @@ JobData = dict[str, Any]
 class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSchema, JobUpdateSchema]):
     FAKE_MESSAGES_DEFAULT_BULK_SIZE = 1000
     FAKE_MESSAGE_LABEL_FIELD = '_fake_message_label'
+    SALT_FUNCS_TO_ADD_PILLARENV = (
+        'pillar.data',
+        'pillar.fetch',
+        'pillar.get',
+        'pillar.item',
+        'pillar.items',
+        'pillar.ls',
+        'pillar.obfuscate',
+        'state.apply',
+    )
 
     def __init__(
         self,
@@ -82,6 +92,32 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         except redis_exceptions.RedisError as e:
             logger.error(e)
 
+    async def __prepare_create_obj(self, data: JobCreateSchema) -> None:
+        if not data.jid:
+            data.jid = str(JID.generate())
+
+        try:
+            data_to_validate: dict[str, Any] = {}
+            if data.arg:
+                data_to_validate['args'] = data.arg
+            if data.kwarg:
+                data_to_validate['kwargs'] = data.kwarg
+            validated_data = await self.job_schema_service.get_validated_data(name=data.fun, data=data_to_validate)
+            data.arg = validated_data.get('args')
+            data.kwarg = validated_data.get('kwargs')
+        except JsonSchemaValidationError as e:
+            raise JobCreateException(str(e)) from e
+
+        if data.fun in self.SALT_FUNCS_TO_ADD_PILLARENV:
+            if not data.kwarg:
+                data.kwarg = {}
+
+            pillarenv = ['base']
+            if data.user:
+                pillarenv.append(data.user.sub)
+
+            data.kwarg['pillarenv'] = ','.join(pillarenv)
+
     @overload
     async def create(
         self,
@@ -102,7 +138,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
     ) -> ProjectionModel: ...
 
     @override
-    async def create(  # noqa: C901
+    async def create(
         self,
         data: JobCreateSchema | dict[str, Any],
         *,
@@ -113,37 +149,22 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         if isinstance(data, dict):
             data = JobCreateSchema.model_validate(data)
 
-        if not data.jid:
-            data.jid = str(JID.generate())
+        if not await self.master_service.exists(
+            query={'status': MasterStatus.ACCEPTED, 'master_id': data.salt_master}, session=session
+        ):
+            msg = 'Master not found'
+            raise JobCreateException(msg)
 
-        try:
-            await self.master_service.get_accepted_by_master_id(master_id=data.salt_master, session=session)
-        except ObjectNotFoundException as e:
-            raise JobCreateException(str(e)) from e
-
-        try:
-            data_to_validate: dict[str, Any] = {}
-            if data.arg:
-                data_to_validate['args'] = data.arg
-            if data.kwarg:
-                data_to_validate['kwargs'] = data.kwarg
-            validated_data = await self.job_schema_service.get_validated_data(name=data.fun, data=data_to_validate)
-            data.arg = validated_data.get('args')
-            data.kwarg = validated_data.get('kwargs')
-        except JsonSchemaValidationError as e:
-            raise JobCreateException(str(e)) from e
+        await self.__prepare_create_obj(data=data)
 
         job: JobModel | ProjectionModel
-        try:
-            create_args: dict[str, Any] = {'data': data}
-            if projection_model:
-                create_args['projection_model'] = projection_model
-            if notify:
-                create_args['notify'] = notify
+        create_args: dict[str, Any] = {'data': data}
+        if projection_model:
+            create_args['projection_model'] = projection_model
+        if notify:
+            create_args['notify'] = notify
 
-            job = await super().create(**create_args, session=session)
-        except redis_exceptions.RedisError as e:
-            raise JobCreateException(str(e)) from e
+        job = await super().create(**create_args, session=session)
 
         await self.rdb.rpush(
             JOBS_TO_CREATE_SET_NAME.format(master_id=data.salt_master),
@@ -158,9 +179,6 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
                 }
             ),
         )
-
-        if notify and hasattr(job, 'id'):
-            await self._notify(obj=job, action='create')
 
         return job
 
