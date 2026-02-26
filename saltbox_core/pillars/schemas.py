@@ -15,7 +15,6 @@ class PillarTgtType(StrEnum):
 
 class ReadOnlyShortFieldsMixin:
     name: str
-    value: JsonValue
     is_personal: bool = False
     is_secret: bool = False
 
@@ -23,15 +22,22 @@ class ReadOnlyShortFieldsMixin:
 class ReadOnlyFieldsMixin(ReadOnlyShortFieldsMixin):
     tgt_type: PillarTgtType = Field(default=PillarTgtType.ROOT)
     tgt_id: PyObjectId | None = None
+
+
+class ExtraFieldsMixin:
     pillarenv: str = Field(default='base', title='Pillar environment')
     created_by: UserShort | None = None
 
 
 class EditableFieldsMixin:
+    value: JsonValue
+
+
+class PillarCreateRequestSchema(BaseModel, ReadOnlyFieldsMixin, EditableFieldsMixin):
     pass
 
 
-class PillarCreateSchema(BaseModel, ReadOnlyFieldsMixin, EditableFieldsMixin):
+class PillarCreateSchema(BaseModel, ReadOnlyFieldsMixin, EditableFieldsMixin, ExtraFieldsMixin):
     pass
 
 
@@ -39,7 +45,7 @@ class PillarUpdateSchema(BaseModel, EditableFieldsMixin):
     pass
 
 
-class PillarModel(BaseModel, ReadOnlyFieldsMixin, EditableFieldsMixin, CreatedModifiedMixin, IDMixin):
+class PillarModel(BaseModel, ReadOnlyFieldsMixin, EditableFieldsMixin, ExtraFieldsMixin, CreatedModifiedMixin, IDMixin):
     pass
 
 

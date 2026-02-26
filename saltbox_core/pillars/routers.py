@@ -4,6 +4,7 @@ from fastapi import APIRouter, Body, Depends
 
 # from saltbox_core.config import logger
 from saltbox_core.pillars.schemas import (
+    PillarCreateRequestSchema,
     PillarCreateSchema,
     PillarListBody,
     PillarModel,
@@ -28,17 +29,13 @@ router = APIRouter(prefix='/pillars', tags=['Pillars'])
     ).model_dump(by_alias=True),
 )
 async def pillar_create(
-    pillar: PillarCreateSchema,
+    pillar: PillarCreateRequestSchema,
     pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
     user: Annotated[UserShort, Depends(get_current_user)],
 ) -> PillarModel:
-    pillar = pillar.model_copy(
-        update={
-            'created_by': user,
-        }
-    )
+    pillar_create = PillarCreateSchema(**pillar.model_dump(), created_by=user)
 
-    return await pillar_service.create(data=pillar)
+    return await pillar_service.create(data=pillar_create)
 
 
 @router.post(

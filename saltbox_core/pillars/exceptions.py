@@ -23,6 +23,27 @@ class PillarCreatedByRequiredException(PillarException):
     detail: str = 'The created_by field is required.'
 
 
+class PillarTargetIdRequiredException(PillarException):
+    """Exception raised when attempting to create a MINION or COLLECTION pillar without tgt_id."""
+
+    status_code: int = status.HTTP_400_BAD_REQUEST
+    detail: str = 'tgt_id is required for MINION and COLLECTION pillar types.'
+
+
+class PillarTgtNotFoundException(PillarException):
+    """Exception raised when the specified tgt_id does not exist for MINION or COLLECTION pillar types."""
+
+    status_code: int = status.HTTP_404_NOT_FOUND
+    detail: str = 'The specified tgt_id does not exist.'
+
+
+class PillarTgtTypeInvalidException(PillarException):
+    """Exception raised when attempting to create a pillar with an invalid tgt_type."""
+
+    status_code: int = status.HTTP_400_BAD_REQUEST
+    detail: str = 'Invalid tgt_type specified for pillar.'
+
+
 class PillarEncryptionKeyNotConfiguredException(PillarException):
     """Exception raised when core is asked to encrypt/decrypt a secret pillar but no key is configured."""
 

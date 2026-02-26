@@ -7,7 +7,12 @@ from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsync
 from saltbox_core.config import logger
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
-from saltbox_core.pillars.exceptions import PillarCreatedByRequiredException
+from saltbox_core.pillars.exceptions import (
+    PillarCreatedByRequiredException,
+    PillarTargetIdRequiredException,
+    PillarTgtNotFoundException,
+    PillarTgtTypeInvalidException,
+)
 from saltbox_core.pillars.repository import PillarRepository, get_pillar_repository
 from saltbox_core.pillars.schemas import (
     PillarCreateSchema,
@@ -60,22 +65,13 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
     ) -> PillarModel | ProjectionModel:
         if not isinstance(data, PillarCreateSchema):
             data = PillarCreateSchema.model_validate(data)
-        if data.tgt_type == PillarTgtType.ROOT and not data.tgt_id:
-            tgt_id = await self._collection_service.get_root_collection_id()
-        elif data.tgt_type in (PillarTgtType.MINION, PillarTgtType.COLLECTION) and data.tgt_id:
-            tgt_id = data.tgt_id
-        else:
-            msg = 'tgt_id is required for MINION and COLLECTION pillar types, and must be empty for ROOT type'
-            raise ValueError(msg)
         if not data.created_by:
             raise PillarCreatedByRequiredException()
 
-        data = data.model_copy(
-            update={
-                'tgt_id': tgt_id,
-                'pillarenv': data.created_by.sub if data.is_personal else 'base',
-            }
-        )
+        tgt_id = await self._resolve_target_id(data)
+        pillarenv = data.created_by.sub if data.is_personal else 'base'
+
+        data = data.model_copy(update={'tgt_id': tgt_id, 'pillarenv': pillarenv})
 
         encrypted_value = self._crypto_service.encrypt_if_needed(
             value=data.value,
@@ -91,6 +87,25 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
         if projection_model:
             return await super().create(data=data, projection_model=projection_model, session=session)
         return await super().create(data=data, session=session)
+
+    async def _resolve_target_id(self, data: PillarCreateSchema) -> Any:
+        match data.tgt_type:
+            case PillarTgtType.ROOT:
+                return await self._collection_service.get_root_collection_id()
+            case PillarTgtType.MINION:
+                if not data.tgt_id:
+                    raise PillarTargetIdRequiredException()
+                if not await self._minion_service.exists(query={'_id': data.tgt_id}):
+                    raise PillarTgtNotFoundException()
+                return data.tgt_id
+            case PillarTgtType.COLLECTION:
+                if not data.tgt_id:
+                    raise PillarTargetIdRequiredException()
+                if not await self._collection_service.exists(query={'_id': data.tgt_id}):
+                    raise PillarTgtNotFoundException()
+                return data.tgt_id
+            case _:
+                raise PillarTgtTypeInvalidException()
 
     def _maybe_decrypt_pillar_value(self, pillar: PillarModel) -> JsonValue:
         return self._crypto_service.decrypt_if_needed(
