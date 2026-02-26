@@ -19,7 +19,6 @@ from saltbox_core.minion_collections.repositories.collection_repository import g
 from saltbox_core.minion_collections.repositories.minion_repository import get_minion_repository
 from saltbox_core.minion_collections.services.collection_service import get_collection_service
 from saltbox_core.minion_collections.services.minion_service import get_minion_service
-from saltbox_core.pillars_old.services.pillar_service import PillarService, get_pillar_service
 from saltbox_core.tasks.repositories.task import get_task_repository
 from saltbox_core.tasks.repositories.tasks_minion import get_task_minion_repository
 from saltbox_core.tasks.repositories.tasks_status import get_task_status_repository
@@ -74,9 +73,6 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
         collections_service=collection_service,
         minion_service=minion_service,
     )
-    pillar_service: PillarService = get_pillar_service(
-        redis_client=redis_db, minion_service=minion_service, master_service=master_service
-    )
 
     context.set_global('service_name', 'core')
     context.set_global('redis_db', redis_db)
@@ -90,11 +86,9 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
     context.set_global('task_template_service', task_template_service)
     context.set_global('task_minion_service', task_minion_service)
     context.set_global('task_service', task_service)
-    context.set_global('pillar_service', pillar_service)
 
     yield
 
-    del pillar_service
     del task_service
     del task_repository
     del task_minion_service
