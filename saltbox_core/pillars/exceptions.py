@@ -37,6 +37,13 @@ class PillarTgtNotFoundException(PillarException):
     detail: str = 'The specified tgt_id does not exist.'
 
 
+class PillarUpdateSecretNotAllowedException(PillarException):
+    """Exception raised when attempting to update a  secret pillar."""
+
+    status_code: int = status.HTTP_400_BAD_REQUEST
+    detail: str = 'Updating secret pillars is not allowed.'
+
+
 class PillarTgtTypeInvalidException(PillarException):
     """Exception raised when attempting to create a pillar with an invalid tgt_type."""
 

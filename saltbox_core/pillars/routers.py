@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, Response, status
 
 # from saltbox_core.config import logger
 from saltbox_core.pillars.schemas import (
@@ -9,9 +9,11 @@ from saltbox_core.pillars.schemas import (
     PillarListBody,
     PillarModel,
     PillarsActions,
+    PillarUpdateSchema,
     PillarWithTgtInfoSchema,
 )
 from saltbox_core.pillars.services.pillar import PillarService, get_pillar_service
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 from saltbox_sdk.fastapi_utils.dependencies import get_current_user, get_opa_query
@@ -59,3 +61,35 @@ async def pillars_list(
     return await pillar_service.get_list_paginated(
         query=query, skip=body.skip, limit=body.limit, projection_model=PillarWithTgtInfoSchema, sort=body.sort
     )
+
+
+@router.put(
+    '/{pid}',
+    operation_id='pillar_update',
+    openapi_extra=GatewayEndpointConfig(
+        policy='public',
+        action=PillarsActions.UPDATE,
+    ).model_dump(by_alias=True),
+)
+async def pillar_update(
+    pid: PyObjectId,
+    pillar: PillarUpdateSchema,
+    pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
+) -> PillarModel:
+    return await pillar_service.update(query={'_id': pid}, data=pillar)
+
+
+@router.delete(
+    '/{pid}',
+    operation_id='pillar_delete',
+    openapi_extra=GatewayEndpointConfig(
+        policy='public',
+        action=PillarsActions.DELETE,
+    ).model_dump(by_alias=True),
+)
+async def pillar_delete(
+    pid: PyObjectId,
+    pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
+) -> Response:
+    await pillar_service.delete(query={'_id': pid})
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

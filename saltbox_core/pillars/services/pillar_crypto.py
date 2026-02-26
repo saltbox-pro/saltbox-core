@@ -14,7 +14,7 @@ from saltbox_core.pillars.exceptions import (
     PillarEncryptionKeyNotConfiguredException,
     PillarInvalidEncryptionPayloadException,
 )
-from saltbox_core.pillars.schemas import PillarTgtType
+from saltbox_core.pillars.schemas import PillarModel, PillarTgtType
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 
 
@@ -80,6 +80,9 @@ class PillarCryptoService:
     def is_encrypted_value(self, value: JsonValue) -> bool:
         payload = self._get_enc_payload(value)
         return payload is not None
+
+    def is_encrypted(self, data: PillarModel) -> bool:
+        return data.is_secret and self.is_encrypted_value(data.value)
 
     def encrypt_json_value(self, value: JsonValue, *, aad: str) -> dict[str, Any]:
         kek = self._get_kek()
