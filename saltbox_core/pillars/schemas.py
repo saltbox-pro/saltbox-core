@@ -70,7 +70,7 @@ class PillarTargetInfoMinion(PillarTargetInfoBase):
     master: str | None = None
 
 
-class PillarWithTgtInfoSchema(BaseModel, ReadOnlyShortFieldsMixin, CreatedModifiedMixin, IDMixin):
+class PillarWithTgtInfoSchema(BaseModel, ReadOnlyShortFieldsMixin, EditableFieldsMixin, CreatedModifiedMixin, IDMixin):
     tgt_info: PillarTargetInfoCollection | PillarTargetInfoMinion
 
     @model_validator(mode='after')
