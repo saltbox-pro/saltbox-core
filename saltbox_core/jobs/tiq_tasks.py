@@ -40,7 +40,7 @@ async def sync_schemas(
                 {'name': schema['name']},
                 schema_update_obj,
             )
-            updated.append(schema_update_obj.name)
+            updated.append(schema['name'])
 
     return created, updated, removed_count
 

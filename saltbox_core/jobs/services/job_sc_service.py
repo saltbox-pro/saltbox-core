@@ -35,6 +35,19 @@ class JobSchemaService(
 
         return data
 
+    async def get_ttl(self, name: str) -> int:
+        try:
+            json_schema = await self.get_by_name(name)
+        except ObjectNotFoundException:
+            return SETTINGS.jobs_default_ttl
+
+        if json_schema.default_ttl is None:
+            return SETTINGS.jobs_default_ttl
+        elif json_schema.default_ttl == 0:
+            return SETTINGS.jobs_max_ttl
+        else:
+            return json_schema.default_ttl
+
     async def remove_repo_data(self) -> None:
         try:
             path = Path(SETTINGS.local_repos_dir) / SETTINGS.salt_func_local_repo_name

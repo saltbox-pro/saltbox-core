@@ -134,6 +134,8 @@ class Settings(BaseSettings):
     tasks_defaults_retry_delay: int = Field(title='Retry delay', description='in seconds', ge=0, default=10)
 
     # JOBS
+    jobs_max_ttl: int = Field(title='Max Job TTL', ge=0, default=60 * 60 * 24 * 7)
+    jobs_default_ttl: int = Field(title='Default Job TTL', ge=0, default=60 * 60 * 24 * 7)
     jobs_return_data_expire_ttl: int = Field(
         default=60 * 60 * 24 * 30, description='Job return data expiration time in seconds'
     )
