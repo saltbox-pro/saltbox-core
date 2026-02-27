@@ -95,7 +95,7 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         job_return = await self._save_job_return(
             master_id=master_id, jid=jid, mid=mid, job=job, data=data, return_data=return_data
         )
-        await self.job_service.update_status(jid=JID(jid), force=True)
+        await self.job_service.update_status(jid=JID(jid))
 
         if tid:
             await process_task_job_return.kiq(jid=jid, minion_id=mid)  # type: ignore

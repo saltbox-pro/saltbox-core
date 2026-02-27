@@ -186,7 +186,6 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
     async def update_status(
         self,
         jid: JID,
-        force: bool = False,
         *,
         session: MongoAsyncClientSession | None = None,
         notify: bool = True,
@@ -196,7 +195,6 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
     async def update_status(
         self,
         jid: JID,
-        force: bool = False,
         *,
         session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel],
@@ -206,7 +204,6 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
     async def update_status(
         self,
         jid: JID,
-        force: bool = False,
         *,
         session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel] | None = None,
@@ -214,22 +211,14 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
     ) -> JobModel | ProjectionModel:
         job = await self.get(query={'jid': str(jid)}, projection_model=JobSimpleSchema)
 
-        if job.status in [JobStatus.waiting_returns, JobStatus.started]:
-            new_status: JobStatus | None = job.status if force else None
-
-            if await self.job_return_service.exists(
+        if job.status == JobStatus.running:
+            if not await self.job_return_service.exists(
                 query={'jid': job.jid, 'salt_master': job.salt_master, 'status': JobReturnStatus.waiting},
                 session=session,
             ):
-                if job.status != JobStatus.waiting_returns:
-                    new_status = JobStatus.waiting_returns
-            else:
-                new_status = JobStatus.finished
-
-            if new_status:
                 await self.update(
                     query=job.id,
-                    data={'status': new_status},
+                    data={'status': JobStatus.finished},
                     session=session,
                     notify=notify,
                     projection_model=EmptyModel,

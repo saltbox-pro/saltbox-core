@@ -42,7 +42,7 @@ class JobNewMessageHandler(BaseJobMessageHandler):
             return await self.job_service.update(
                 query=existed_job.id,
                 data={
-                    'status': JobStatus.started,
+                    'status': JobStatus.running,
                     'minions': data.get('minions', []),
                     'missing': data.get('missing', []),
                     'stamp': data.get('stamp'),
@@ -51,7 +51,7 @@ class JobNewMessageHandler(BaseJobMessageHandler):
             )
         except ObjectNotFoundException:
             return await self.job_service.create(
-                data=JobCreateSchema.model_validate({**data, 'status': JobStatus.started, 'user': SYSTEM_USER}),
+                data=JobCreateSchema.model_validate({**data, 'status': JobStatus.running, 'user': SYSTEM_USER}),
                 notify=True,
             )
 

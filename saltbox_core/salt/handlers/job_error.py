@@ -37,8 +37,8 @@ class JobErrorHandler(BaseMessageHandler):
             await self.job_service.update(
                 query=job.id,
                 data={
-                    'status': JobStatus.error,
-                    'error_type': data.get('error_type', 'unknown'),
+                    'status': JobStatus.launch_error,
+                    'launch_error_type': data.get('error_type', 'unknown'),
                 },
             )
 

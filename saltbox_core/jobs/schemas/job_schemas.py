@@ -28,11 +28,10 @@ StrJid = Annotated[str, AfterValidator(jidable)]
 
 
 class JobStatus(StrEnum):
-    in_queue = 'in_queue'
-    started = 'started'
-    waiting_returns = 'waiting_returns'
+    starting = 'starting'
+    running = 'running'
     finished = 'finished'
-    error = 'error'
+    launch_error = 'launch_error'
 
 
 class JobReadOnlyFieldsMixin:
@@ -52,8 +51,8 @@ class JobEditableFieldsMixin:
     minions: list[str] = Field(default=[])
     missing: list[str] = Field(default=[])
     stamp: TimezoneAwareDatetime | None = Field(default=None)
-    status: JobStatus = Field(default=JobStatus.in_queue)
-    error_type: str | None = None
+    status: JobStatus = Field(default=JobStatus.starting)
+    launch_error_type: str | None = None
 
 
 class JobComputedFieldsMixin:
