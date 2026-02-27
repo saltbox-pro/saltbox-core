@@ -4,6 +4,7 @@
 # rel: 0
 
 stages:
+  - .guard
   - lint
   - test
   - build
