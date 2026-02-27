@@ -1,11 +1,7 @@
 ---
 
 # Change to make non-empty commit and trigger push event
-# epoch: 0
-
-workflow:
-  rules:
-    - if: $CI_PIPELINE_SOURCE != 'merge_request_event'
+# rel: 0
 
 stages:
   - lint
