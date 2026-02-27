@@ -91,7 +91,7 @@ class TaskLifespanService:
             query={
                 'source.type': 'task',
                 'source.id': str(task.id),
-                'status': {'$nin': [JobStatus.finished, JobStatus.error]},
+                'status': {'$nin': [JobStatus.finished, JobStatus.launch_error]},
             },
             limit=0,
             skip=0,
@@ -138,7 +138,7 @@ class TaskLifespanService:
             query={
                 'source.type': 'task',
                 'source.id': str(task.id),
-                'status': {'$in': [JobStatus.started, JobStatus.waiting_returns]},
+                'status': JobStatus.running,
             },
             limit=0,
             skip=0,
@@ -272,7 +272,7 @@ class TaskLifespanService:
                     'source.type': 'task',
                     'source.id': str(task.id),
                     'salt_master': master.master_id,
-                    'status': {'$in': [JobStatus.in_queue, JobStatus.started, JobStatus.waiting_returns]},
+                    'status': {'$in': [JobStatus.starting, JobStatus.running]},
                 }
             )
 
@@ -317,7 +317,7 @@ class TaskLifespanService:
             query={
                 'source.type': 'task',
                 'source.id': str(task.id),
-                'status': {'$nin': [JobStatus.finished, JobStatus.error]},
+                'status': {'$nin': [JobStatus.finished, JobStatus.launch_error]},
             }
         ):
             # Sync jobs when task has no updates a long time
