@@ -8,7 +8,7 @@ from redis import exceptions as redis_exceptions
 from redis.asyncio import Redis
 
 from saltbox_bridge_messages import MasterStatus
-from saltbox_core.config import logger
+from saltbox_core.config import SETTINGS, logger
 from saltbox_core.jobs.exceptions import JobCreateException, JobServiceException
 from saltbox_core.jobs.repositories.job_repository import JobRepository, get_job_repository
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnStatus
@@ -95,6 +95,11 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
     async def __prepare_create_obj(self, data: JobCreateSchema) -> None:
         if not data.jid:
             data.jid = str(JID.generate())
+
+        if data.ttl is None:
+            data.ttl = await self.job_schema_service.get_ttl(name=data.fun)
+        elif data.ttl == 0:
+            data.ttl = SETTINGS.jobs_max_ttl
 
         try:
             data_to_validate: dict[str, Any] = {}

@@ -28,6 +28,18 @@ class JobRepository(BaseMongoRepository[JobModel]):
         aggregations: ClassVar[AggregationsStore] = AggregationsStore(
             aggregations=[
                 AggregatedField(
+                    field_name='waiting_expires_at_dt',
+                    stages=[
+                        AddFieldsAggregationStage(
+                            fields={
+                                'waiting_expires_at_dt': {
+                                    '$dateAdd': {'startDate': '$created', 'unit': 'second', 'amount': '$ttl'}
+                                }
+                            }
+                        )
+                    ],
+                ),
+                AggregatedField(
                     field_name='returns',
                     stages=[
                         LookupAggregationStage(
