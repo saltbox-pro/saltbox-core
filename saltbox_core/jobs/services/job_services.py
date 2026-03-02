@@ -113,16 +113,6 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         except JsonSchemaValidationError as e:
             raise JobCreateException(str(e)) from e
 
-        if data.fun in self.SALT_FUNCS_TO_ADD_PILLARENV:
-            if not data.kwarg:
-                data.kwarg = {}
-
-            pillarenv = ['base']
-            if data.user:
-                pillarenv.append(data.user.sub)
-
-            data.kwarg['pillarenv'] = ','.join(pillarenv)
-
     @overload
     async def create(
         self,
@@ -170,20 +160,29 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
             create_args['notify'] = notify
 
         job = await super().create(**create_args, session=session)
+        job_salt_data: dict[str, Any] = {
+            'jid': data.jid,
+            'tgt': data.tgt,
+            'tgt_type': data.tgt_type,
+            'fun': data.fun,
+            'arg': data.arg,
+            'kwarg': data.kwarg,
+        }
 
-        await self.rdb.rpush(
-            JOBS_TO_CREATE_SET_NAME.format(master_id=data.salt_master),
-            json.dumps(
-                {
-                    'jid': data.jid,
-                    'tgt': data.tgt,
-                    'tgt_type': data.tgt_type,
-                    'fun': data.fun,
-                    'arg': data.arg,
-                    'kwarg': data.kwarg,
-                }
-            ),
-        )
+        if data.fun in self.SALT_FUNCS_TO_ADD_PILLARENV:
+            if not data.kwarg:
+                data.kwarg = {}
+
+            pillarenv = ['base']
+            if data.user:
+                pillarenv.append(data.user.sub)
+
+            if job_salt_data['kwarg'] is None:
+                job_salt_data['kwarg'] = {}
+
+            job_salt_data['kwarg']['pillarenv'] = ','.join(pillarenv)
+
+        await self.rdb.rpush(JOBS_TO_CREATE_SET_NAME.format(master_id=data.salt_master), json.dumps(job_salt_data))
 
         return job
 
