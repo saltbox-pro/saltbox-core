@@ -31,7 +31,6 @@ class BaseJobMessageHandler(BaseMessageHandler, abc.ABC):
         self.job_return_service = job_return_service
 
     async def _handle(self, match: re.Match, master_id: str, tag: str, data: MessageDataType) -> None:
-        process_metrics_task = None
         normalized_data = await self.normalize_data(match=match, master_id=master_id, tag=tag, data=data)
         jid = match.group('jid')
         job = await self.get_job(jid=jid, master_id=master_id, data=normalized_data)
@@ -40,6 +39,7 @@ class BaseJobMessageHandler(BaseMessageHandler, abc.ABC):
         if job and job.source and job.source.type == 'task':
             tid = job.source.id
 
+        process_metrics_task = None
         if self.can_process_metrics():
             process_metrics_task = asyncio.create_task(
                 self.process_metrics(match=match, master_id=master_id, tag=tag, data={**normalized_data}, tid=tid)
