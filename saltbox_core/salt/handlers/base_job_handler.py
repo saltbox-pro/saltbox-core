@@ -32,23 +32,21 @@ class BaseJobMessageHandler(BaseMessageHandler, abc.ABC):
 
     async def _handle(self, match: re.Match, master_id: str, tag: str, data: MessageDataType) -> None:
         process_metrics_task = None
-        try:
-            data = await self.normalize_data(match=match, master_id=master_id, tag=tag, data=data)
-            jid = match.group('jid')
-            job = await self.get_job(jid=jid, master_id=master_id, data=data)
+        normalized_data = await self.normalize_data(match=match, master_id=master_id, tag=tag, data=data)
+        jid = match.group('jid')
+        job = await self.get_job(jid=jid, master_id=master_id, data=normalized_data)
 
-            tid: str | None = None
-            if job and job.source and job.source.type == 'task':
-                tid = job.source.id
+        tid: str | None = None
+        if job and job.source and job.source.type == 'task':
+            tid = job.source.id
 
-            if self.can_process_metrics():
-                process_metrics_task = asyncio.create_task(
-                    self.process_metrics(match=match, master_id=master_id, tag=tag, data={**data}, tid=tid)
-                )
-            await self.process(match=match, master_id=master_id, data=data, job=job, tid=tid)
-        finally:
-            if process_metrics_task is not None:
-                await process_metrics_task
+        if self.can_process_metrics():
+            process_metrics_task = asyncio.create_task(
+                self.process_metrics(match=match, master_id=master_id, tag=tag, data={**normalized_data}, tid=tid)
+            )
+        await self.process(match=match, master_id=master_id, data=normalized_data, job=job, tid=tid)
+        if process_metrics_task is not None:
+            await process_metrics_task
 
     @abc.abstractmethod
     async def get_job(self, jid: str, master_id: str, data: MessageDataType) -> JobModel: ...

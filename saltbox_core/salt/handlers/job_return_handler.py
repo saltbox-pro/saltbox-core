@@ -65,7 +65,7 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         salt_master = normalized_data.pop('master_id', master_id)
 
         enriched_data = {
-            **data,
+            **normalized_data,
             'user': system_user,  # NOTE: field `user` in 3005.1 does not exist
             'system_user': system_user,
             'minion_id': minion_id,
