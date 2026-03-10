@@ -118,6 +118,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         self,
         data: JobCreateSchema | dict[str, Any],
         *,
+        extra_pillarenv: list[str] | None = None,
         session: MongoAsyncClientSession | None = None,
         notify: bool = True,
     ) -> JobModel: ...
@@ -127,6 +128,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         self,
         data: JobCreateSchema | dict[str, Any],
         *,
+        extra_pillarenv: list[str] | None = None,
         session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel],
         notify: bool = True,
@@ -137,6 +139,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         self,
         data: JobCreateSchema | dict[str, Any],
         *,
+        extra_pillarenv: list[str] | None = None,
         session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel] | None = None,
         notify: bool = True,
@@ -175,7 +178,10 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
 
             pillarenv = ['base']
             if data.user:
-                pillarenv.append(data.user.sub)
+                pillarenv.append(f'user:{data.user.sub}')
+
+            if extra_pillarenv:
+                pillarenv.extend(extra_pillarenv)
 
             if job_salt_data['kwarg'] is None:
                 job_salt_data['kwarg'] = {}
