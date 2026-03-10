@@ -57,16 +57,31 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         self.broker = broker
 
     async def normalize_data(self, match: re.Match, master_id: str, tag: str, data: MessageDataType) -> MessageDataType:
-        data = await super().normalize_data(match=match, master_id=master_id, tag=tag, data=data)
-        data['system_user'] = data.pop('user')
-        data['minion_id'] = data.pop('id', match.group('mid'))
-        data['salt_master'] = data.pop('master_id', master_id)
-        data['status'] = JobReturnStatus.success if data.get('retcode', None) == 0 else JobReturnStatus.failed
 
-        raw_stamp = data.pop('_stamp')
-        data['stamp'] = make_aware(datetime.fromisoformat(raw_stamp)) if raw_stamp else None
+        normalized_data = await super().normalize_data(match=match, master_id=master_id, tag=tag, data=data)
 
-        return data
+        system_user = normalized_data.pop('user', 'undefined')  # NOTE: KeyError - field `user` in 3005.1 does not exist
+        minion_id = normalized_data.pop('id', match.group('mid'))
+        salt_master = normalized_data.pop('master_id', master_id)
+
+        enriched_data = {
+            **normalized_data,
+            'user': system_user,  # NOTE: field `user` in 3005.1 does not exist
+            'system_user': system_user,
+            'minion_id': minion_id,
+            'salt_master': salt_master
+        }
+
+        if enriched_data.get('retcode', None) == 0:
+            enriched_data['status'] = JobReturnStatus.success
+        else:
+            enriched_data['status'] = JobReturnStatus.failed
+
+        raw_stamp = enriched_data.pop('_stamp')
+        iso_stamp = datetime.fromisoformat(raw_stamp)
+        enriched_data['stamp'] = make_aware(iso_stamp) if raw_stamp else None
+
+        return enriched_data
 
     async def get_job(self, jid: str, master_id: str, data: MessageDataType) -> JobModel:
         return await self.job_service.get(query={'jid': str(jid), 'salt_master': str(master_id)})
@@ -151,10 +166,14 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         is_new_return = False
 
         try:
+            payload = {
+                **data,
+                'source': job.source,
+                'user': job.user,
+                'stamp_job': job.stamp,
+            }
             job_return = await self.job_return_service.create(
-                data=JobReturnCreateSchema.model_validate(
-                    {'source': job.source, 'user': job.user, 'stamp_job': job.stamp, **data}
-                ),
+                data=JobReturnCreateSchema.model_validate(payload),
                 notify=True,
             )
             is_new_return = True
