@@ -3,12 +3,11 @@ from datetime import datetime
 from typing import ClassVar
 
 from saltbox_core.config import logger
-from saltbox_core.jobs.schemas.job_return_schemas import JobReturnCreateSchema
+from saltbox_core.jobs.schemas.job_return_schemas import JobReturnCreateSchema, JobReturnStatus
 from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel, JobStatus
 from saltbox_core.salt.exceptions import StopProcessing
 from saltbox_core.salt.handlers.base_handler import MessageDataType
 from saltbox_core.salt.handlers.base_job_handler import BaseJobMessageHandler
-from saltbox_core.tasks.tiq_tasks import process_task_job
 from saltbox_sdk.db.schemas_base import SYSTEM_USER
 from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.utilities.helpers import format_iso8601_z, make_aware
@@ -70,25 +69,30 @@ class JobNewMessageHandler(BaseJobMessageHandler):
         else:
             logger.info('New job: %s', jid)
 
-        if job and job.minions:
-            for minion_id in job.minions:
+        if job:
+            job_return_data = {
+                'salt_master': master_id,
+                'jid': job.jid,
+                'fun': job.fun,
+                'source': job.source,
+                'user': job.user,
+                'stamp_job': job.stamp,
+            }
+
+            minions_by_status = {}
+
+            if job.minions:
+                minions_by_status[JobReturnStatus.waiting] = job.minions
+            if job.missing:
+                minions_by_status[JobReturnStatus.ignored] = job.missing
+
+            for job_return_status, minion_id in minions_by_status.items():
                 await self.job_return_service.create(
                     data=JobReturnCreateSchema.model_validate(
-                        {
-                            'minion_id': minion_id,
-                            'salt_master': master_id,
-                            'jid': job.jid,
-                            'fun': job.fun,
-                            'source': job.source,
-                            'user': job.user,
-                            'stamp_job': job.stamp,
-                        }
+                        {'minion_id': minion_id, 'status': job_return_status, **job_return_data}
                     ),
                     notify=True,
                 )
-
-        if tid and job:
-            await process_task_job.kiq(jid=jid)  # type: ignore
 
         raise StopProcessing()
 

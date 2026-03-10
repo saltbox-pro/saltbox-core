@@ -14,7 +14,7 @@ from saltbox_core.minion_collections.services.collection_service import Collecti
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from saltbox_core.tasks.exceptions import TaskServiceException
 from saltbox_core.tasks.schemas.task import TaskModel, TaskType
-from saltbox_core.tasks.schemas.tasks_minion import TaskMinionJobStatus, TaskMinionStatus
+from saltbox_core.tasks.schemas.tasks_minion import TaskMinionStatus
 from saltbox_core.tasks.schemas.tasks_status import TaskStatus
 from saltbox_core.tasks.services.task import TaskService, get_task_service
 from saltbox_core.tasks.services.tasks_minion import TaskMinionService, get_task_minion_service
@@ -227,7 +227,12 @@ class TaskLifespanService:
         )
 
         if minions:
-            job = await self.job_service.create(
+            ttl: int | None = task.ttl
+
+            if ttl is None and task.task_template:
+                ttl = task.task_template.defaults.ttl
+
+            await self.job_service.create(
                 data=JobCreateSchema.model_validate(
                     {
                         'tgt': [minion.minion_id for minion in minions],
@@ -236,10 +241,12 @@ class TaskLifespanService:
                         'fun': task.fun,
                         'arg': task.arg,
                         'kwarg': task.kwarg,
+                        'ttl': ttl,
                         'source': Source(type='task', id=str(task.id)),
                         'user': task.user,
                     }
-                )
+                ),
+                projection_model=EmptyModel,
             )
 
             for minion in minions:
@@ -248,7 +255,6 @@ class TaskLifespanService:
                     data={
                         'status': TaskMinionStatus.in_work,
                         'start_last_dt': utc_now(),
-                        'jobs': {**minion.jobs, job.jid: TaskMinionJobStatus.created},
                     },
                 )
 

@@ -55,8 +55,53 @@ class TaskMinionRepository(BaseMongoRepository[TaskMinionModel]):
                     parent_aggregations=['minion'],
                 ),
                 AggregatedField(
+                    field_name='job_returns',
+                    stages=[
+                        LookupAggregationStage(
+                            from_collection='job_returns',
+                            let={'minion': '$minion', 'task_id': {'$toString': '$task_id'}},
+                            pipeline=[
+                                {
+                                    '$match': {
+                                        '$expr': {
+                                            '$and': [
+                                                {'$eq': ['$source.type', 'task']},
+                                                {'$eq': ['$source.id', '$$task_id']},
+                                                {'$eq': ['$salt_master', '$$minion.master']},
+                                                {'$eq': ['$minion_id', '$$minion.minion_id']},
+                                            ]
+                                        }
+                                    }
+                                }
+                            ],
+                            as_field='job_returns',
+                        )
+                    ],
+                    parent_aggregations=['minion'],
+                ),
+                AggregatedField(
+                    field_name='jobs',
+                    stages=[
+                        AddFieldsAggregationStage(
+                            fields={
+                                'jobs': {
+                                    '$arrayToObject': {
+                                        '$map': {
+                                            'input': '$job_returns',
+                                            'as': 'ret',
+                                            'in': {'k': '$$ret.jid', 'v': '$$ret.status'},
+                                        }
+                                    }
+                                }
+                            }
+                        )
+                    ],
+                    parent_aggregations=['job_returns'],
+                ),
+                AggregatedField(
                     field_name='count_runs',
-                    stages=[AddFieldsAggregationStage(fields={'count_runs': {'$size': {'$objectToArray': '$jobs'}}})],
+                    stages=[AddFieldsAggregationStage(fields={'count_runs': {'$size': '$job_returns'}})],
+                    parent_aggregations=['job_returns'],
                 ),
             ]
         )

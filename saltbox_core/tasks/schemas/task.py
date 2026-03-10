@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from saltbox_core.config import SETTINGS
 from saltbox_core.tasks.schemas.tasks_status import TaskStatus
+from saltbox_core.tasks.schemas.tasks_template import TaskTemplateDefaultsSchema
 from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId, QueryParams, SortParams
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams, Source, UserShort
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
@@ -23,6 +24,7 @@ class TaskTemplateShort(BaseModel, IDMixin):
     name: str = Field(title='Template name')
     repo_id: PyObjectId = Field(title='Repository id')
     commit_hash: str = Field(title='Repository commit hash')
+    defaults: TaskTemplateDefaultsSchema = Field(title='Default values')
 
 
 class CollectionShort(BaseModel, IDMixin):
@@ -61,6 +63,7 @@ class TaskEditableFieldsMixin:
     retry_delay: int = Field(
         title='Retry delay', description='in seconds', ge=0, default=SETTINGS.tasks_defaults_retry_delay
     )
+    ttl: int | None = Field(ge=0, le=SETTINGS.jobs_max_ttl, default=None)
 
     last_sync_dt: TimezoneAwareDatetime | None = Field(title='Last sync datetime', default=None)
 
@@ -155,6 +158,8 @@ class TaskCreateRequestSchema(BaseModel):
 
     max_retries: int | None = Field(title='Max retries', ge=0, default=None)
     retry_delay: int | None = Field(title='Retry delay', description='in seconds', ge=0, default=None)
+
+    ttl: int | None = Field(ge=0, le=SETTINGS.jobs_max_ttl, default=None)
 
     @model_validator(mode='after')
     def validate_fun(self) -> 'TaskCreateRequestSchema':
