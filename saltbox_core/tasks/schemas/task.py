@@ -24,7 +24,7 @@ class TaskTemplateShort(BaseModel, IDMixin):
     name: str = Field(title='Template name')
     repo_id: PyObjectId = Field(title='Repository id')
     commit_hash: str = Field(title='Repository commit hash')
-    defaults: TaskTemplateDefaultsSchema = Field(title='Default values')
+    defaults: TaskTemplateDefaultsSchema | None = Field(title='Default values', default=None)
 
 
 class CollectionShort(BaseModel, IDMixin):

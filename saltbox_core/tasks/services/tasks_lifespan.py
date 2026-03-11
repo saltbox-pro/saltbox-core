@@ -229,7 +229,7 @@ class TaskLifespanService:
         if minions:
             ttl: int | None = task.ttl
 
-            if ttl is None and task.task_template:
+            if ttl is None and task.task_template and task.task_template.defaults:
                 ttl = task.task_template.defaults.ttl
 
             await self.job_service.create(

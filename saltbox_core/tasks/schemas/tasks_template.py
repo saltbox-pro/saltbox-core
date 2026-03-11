@@ -8,14 +8,6 @@ from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
 
 
 class TaskTemplateDefaultsSchema(BaseModel):
-    batch_size: int = Field(title='Batch size', ge=0)
-    max_jobs_count_at_same_time: int = Field(title='Max jobs count at some time', ge=1)
-    max_retries: int = Field(title='Max retries', ge=0)
-    retry_delay: int = Field(title='Retry delay', ge=0)
-    ttl: int | None = Field(ge=0, le=SETTINGS.jobs_max_ttl, default=None)
-
-
-class TaskTemplateDefaultsInputSchema(BaseModel):
     batch_size: int | None = Field(title='Batch size', ge=0, default=None)
     max_jobs_count_at_same_time: int | None = Field(title='Max jobs count at some time', ge=1, default=None)
     max_retries: int | None = Field(title='Max retries', ge=0, default=None)
@@ -39,18 +31,16 @@ class EditableFieldsShortMixin:
 
 
 class EditableFieldsFullMixin(EditableFieldsShortMixin):
+    defaults: TaskTemplateDefaultsSchema | None = Field(title='Default values', default=None)
     json_schema: dict = Field(title='JSON schema')
     ui_schema: dict = Field(title='UI schema', default_factory=dict)
     sls_content: str = Field(title='SLS content')
 
 
-class TaskTemplateCreateSchema(BaseModel, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin):
-    defaults: TaskTemplateDefaultsInputSchema | None = Field(title='Default values', default=None)
+class TaskTemplateCreateSchema(BaseModel, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin): ...
 
 
 class TaskTemplateUpdateSchema(BaseModel, EditableFieldsFullMixin):
-    defaults: TaskTemplateDefaultsInputSchema | None = Field(title='Default values', default=None)
-
     model_config = ConfigDict(extra='ignore')
 
 
@@ -64,8 +54,7 @@ class TaskTemplateShortSchema(BaseModel, ReadOnlyFieldsShortMixin, EditableField
     repo_info: RepoInTaskTemplateSchema
 
 
-class TaskTemplateModel(BaseModel, CreatedModifiedMixin, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin, IDMixin):
-    defaults: TaskTemplateDefaultsSchema = Field(title='Default values')
+class TaskTemplateModel(BaseModel, CreatedModifiedMixin, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin, IDMixin): ...
 
 
 class TaskTemplateListBody(SkipLimitParams, QueryParams, SortParams):

@@ -139,7 +139,9 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
 
         if data.task_template_id:
             task_template = await self.task_template_service.get(query=data.task_template_id)
-            task_defaults.update(task_template.defaults.model_dump())
+
+            if task_template.defaults:
+                task_defaults.update(task_template.defaults.model_dump())
 
         fun, task_arg, task_kwarg = await self.__parse_salt_fun_params(data=data, task_template=task_template)
 
