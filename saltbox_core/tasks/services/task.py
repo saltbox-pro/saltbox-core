@@ -157,6 +157,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                 'batch_size': data.batch_size if data.batch_size is not None else task_defaults['batch_size'],
                 'max_retries': data.max_retries if data.max_retries is not None else task_defaults['max_retries'],
                 'retry_delay': data.retry_delay if data.retry_delay is not None else task_defaults['retry_delay'],
+                'ttl': data.ttl,
                 'max_jobs_count_at_same_time': (
                     data.max_jobs_count_at_same_time
                     if data.max_jobs_count_at_same_time is not None
