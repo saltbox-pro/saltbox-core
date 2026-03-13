@@ -8,6 +8,7 @@ from saltbox_core.tasks.schemas.tasks_template import (
     TaskTemplateListBody,
     TaskTemplateModel,
     TaskTemplatesActions,
+    TaskTemplateSchemaResponse,
     TaskTemplateShortSchema,
 )
 from saltbox_core.tasks.services.tasks_template import TaskTemplateService, get_task_template_service
@@ -60,6 +61,21 @@ async def task_template_list(
         projection_model=TaskTemplateShortSchema,
         sort=body.sort,
     )
+
+
+@router.get(
+    '/schema-by-name/{tpl_name}',
+    operation_id='task_template_schema_by_name',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.templates.read',
+        action=TaskTemplatesActions.READ,
+    ).model_dump(by_alias=True),
+)
+async def task_template_schema_by_name(
+    tpl_name: str,
+    service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
+) -> TaskTemplateSchemaResponse:
+    return await service.get(query={'name': tpl_name}, projection_model=TaskTemplateSchemaResponse)
 
 
 @router.get(

@@ -63,6 +63,11 @@ class TaskTemplateListBody(SkipLimitParams, QueryParams, SortParams):
     model_config = ConfigDict(extra='ignore')
 
 
+class TaskTemplateSchemaResponse(BaseModel):
+    json_schema: dict = Field(title='JSON schema')
+    ui_schema: dict = Field(title='UI schema', default_factory=dict)
+
+
 class TaskTemplatesActions(StrEnum):
     READ = 'read'
     LIST = 'list'
