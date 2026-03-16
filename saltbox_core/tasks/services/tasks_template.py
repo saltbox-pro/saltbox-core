@@ -19,10 +19,10 @@ from saltbox_sdk.utilities.json_schema import Draft4ValidatorWithDefaults
 class TaskTemplateService(
     MongoBaseService[TaskTemplateRepository, TaskTemplateModel, TaskTemplateCreateSchema, TaskTemplateUpdateSchema]
 ):
-    async def get_by_name(self, name: str, sid: PyObjectId) -> TaskTemplateModel:
+    async def get_by_name(self, name: str, sid: PyObjectId | None) -> TaskTemplateModel:
         return await self.repo.get({'name': name, 'repo_id': sid})
 
-    async def get_validated_data(self, name: str, sid: PyObjectId, data: dict) -> dict:
+    async def get_validated_data(self, name: str, sid: PyObjectId | None, data: dict) -> dict:
         try:
             task_template = await self.get_by_name(name=name, sid=sid)
         except ObjectNotFoundException:

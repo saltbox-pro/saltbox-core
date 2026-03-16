@@ -22,8 +22,8 @@ class TaskType(StrEnum):
 class TaskTemplateShort(BaseModel, IDMixin):
     title: str = Field(title='Template title')
     name: str = Field(title='Template name')
-    repo_id: PyObjectId = Field(title='Repository id')
-    commit_hash: str = Field(title='Repository commit hash')
+    repo_id: PyObjectId | None = Field(title='Repository id', default=None)
+    commit_hash: str | None = Field(title='Repository commit hash', default=None)
     defaults: TaskTemplateDefaultsSchema | None = Field(title='Default values', default=None)
 
 

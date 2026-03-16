@@ -37,7 +37,7 @@ class TaskTemplateRepository(BaseMongoRepository[TaskTemplateModel]):
                             as_field='repo_info',
                             pipeline=[{'$project': {'repo_url': 1, 'name': 1}}],
                         ),
-                        UnwindAggregationStage(path='$repo_info'),
+                        UnwindAggregationStage(path='$repo_info', preserve_null_and_empty_arrays=True),
                     ],
                 )
             ]

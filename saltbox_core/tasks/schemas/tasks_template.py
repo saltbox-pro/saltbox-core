@@ -17,7 +17,7 @@ class TaskTemplateDefaultsSchema(BaseModel):
 
 class ReadOnlyFieldsShortMixin:
     name: str = Field(title='SLS name')
-    repo_id: PyObjectId = Field(title='Repository ID')
+    repo_id: PyObjectId | None = Field(title='Repository ID', default=None)
 
 
 class ReadOnlyFieldsFullMixin(ReadOnlyFieldsShortMixin): ...
@@ -27,14 +27,14 @@ class EditableFieldsShortMixin:
     title: str = Field(title='Template title')
     description: str | dict[str, str] | None = Field(title='Template description', default=None)
     fun: str = Field(title='Salt fun', examples=['salt.ping'])
-    commit_hash: str = Field(title='Commit hash')
+    commit_hash: str | None = Field(title='Commit hash', default=None)
 
 
 class EditableFieldsFullMixin(EditableFieldsShortMixin):
     defaults: TaskTemplateDefaultsSchema | None = Field(title='Default values', default=None)
-    json_schema: dict = Field(title='JSON schema')
+    json_schema: dict = Field(title='JSON schema', default_factory=dict)
     ui_schema: dict = Field(title='UI schema', default_factory=dict)
-    sls_content: str = Field(title='SLS content')
+    sls_content: str | None = Field(title='SLS content', default=None)
 
 
 class TaskTemplateCreateSchema(BaseModel, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin): ...
@@ -51,7 +51,7 @@ class RepoInTaskTemplateSchema(BaseModel):
 
 class TaskTemplateShortSchema(BaseModel, ReadOnlyFieldsShortMixin, EditableFieldsShortMixin, IDMixin):
     defaults: TaskTemplateDefaultsSchema = Field(title='Default values')
-    repo_info: RepoInTaskTemplateSchema
+    repo_info: RepoInTaskTemplateSchema | None = Field(title='Repository info', default=None)
 
 
 class TaskTemplateModel(BaseModel, CreatedModifiedMixin, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin, IDMixin): ...
@@ -81,3 +81,6 @@ class TaskTemplateSchemasProjection(BaseModel):
 class TaskTemplatesActions(StrEnum):
     READ = 'read'
     LIST = 'list'
+    CREATE = 'create'
+    UPDATE = 'update'
+    DELETE = 'delete'

@@ -1,16 +1,18 @@
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, Response, status
 
 from saltbox_core.settings.schemas.sls_repos_schemas import SettingsSlsRepoShortSchema
 from saltbox_core.settings.services.sls_repo_service import SettingsSlsRepoService, get_sls_repo_service
 from saltbox_core.tasks.schemas.tasks_template import (
+    TaskTemplateCreateSchema,
     TaskTemplateListBody,
     TaskTemplateModel,
     TaskTemplatesActions,
     TaskTemplateSchemaResponse,
     TaskTemplateSchemasListRequest,
     TaskTemplateShortSchema,
+    TaskTemplateUpdateSchema,
 )
 from saltbox_core.tasks.services.tasks_template import TaskTemplateService, get_task_template_service
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
@@ -22,7 +24,7 @@ router = APIRouter(prefix='/tasks/template', tags=['Task Templates'])
 
 
 @router.post(
-    '',
+    '/list',
     operation_id='task_templates_list',
     openapi_extra=GatewayEndpointConfig(
         policy='core.tasks.templates.list',
@@ -40,7 +42,12 @@ async def task_template_list(
     )
 
     query_filters: list[dict[str, Any]] = [
-        {'repo_id': {'$in': [repo.id for repo in active_repos]}},
+        {
+            '$or': [
+                {'repo_id': {'$in': [repo.id for repo in active_repos]}},
+                {'repo_id': None},
+            ]
+        }
     ]
 
     if body.repo_ids:
@@ -94,6 +101,21 @@ async def task_template_schemas_list(
     return await service.get_schemas_by_names(body.names)
 
 
+@router.post(
+    '',
+    operation_id='task_template_create',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.templates.create',
+        action=TaskTemplatesActions.CREATE,
+    ).model_dump(by_alias=True),
+)
+async def task_template_create(
+    item: TaskTemplateCreateSchema,
+    service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
+) -> TaskTemplateModel:
+    return await service.create(item)
+
+
 @router.get(
     '/{tpl_id}',
     operation_id='task_template_retrieve',
@@ -107,3 +129,36 @@ async def task_template_retrieve(
     service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
 ) -> TaskTemplateModel:
     return await service.get(tpl_id)
+
+
+@router.delete(
+    '/{tpl_id}',
+    operation_id='task_template_delete',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.templates.delete',
+        action=TaskTemplatesActions.DELETE,
+    ).model_dump(by_alias=True),
+)
+async def task_template_delete(
+    tpl_id: PyObjectId,
+    service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
+) -> Response:
+    await service.delete(query={'_id': tpl_id, 'repo_id': None})
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.put(
+    '/{tpl_id}',
+    operation_id='task_template_update',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.templates.update',
+        action=TaskTemplatesActions.UPDATE,
+    ).model_dump(by_alias=True),
+)
+async def task_template_update(
+    tpl_id: PyObjectId,
+    item: TaskTemplateUpdateSchema,
+    service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
+) -> TaskTemplateModel:
+    return await service.update(query={'_id': tpl_id, 'repo_id': None}, data=item)
