@@ -63,9 +63,19 @@ class TaskTemplateListBody(SkipLimitParams, QueryParams, SortParams):
     model_config = ConfigDict(extra='ignore')
 
 
+class TaskTemplateSchemasListRequest(BaseModel):
+    names: list[str] = Field(title='Template names')
+
+
 class TaskTemplateSchemaResponse(BaseModel):
     json_schema: dict = Field(title='JSON schema')
     ui_schema: dict = Field(title='UI schema', default_factory=dict)
+
+
+class TaskTemplateSchemasProjection(BaseModel):
+    name: str
+    json_schema: dict
+    ui_schema: dict
 
 
 class TaskTemplatesActions(StrEnum):

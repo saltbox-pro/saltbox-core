@@ -2,10 +2,12 @@ from typing import Annotated
 
 from fastapi import Depends
 
+from saltbox_core.tasks.exceptions import TaskTemplateNotFoundException
 from saltbox_core.tasks.repositories.tasks_template import TaskTemplateRepository, get_task_template_repository
 from saltbox_core.tasks.schemas.tasks_template import (
     TaskTemplateCreateSchema,
     TaskTemplateModel,
+    TaskTemplateSchemasProjection,
     TaskTemplateUpdateSchema,
 )
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
@@ -29,6 +31,19 @@ class TaskTemplateService(
         Draft4ValidatorWithDefaults(task_template.json_schema).validate(data)
 
         return data
+
+    async def get_schemas_by_names(self, names: list[str]) -> dict[str, dict[str, dict]]:
+        for name in names:
+            if not await self.exists({'name': name}):
+                raise TaskTemplateNotFoundException(template_name=name)
+        templates = await self.get_list({'name': {'$in': names}}, projection_model=TaskTemplateSchemasProjection)
+        return {
+            template.name: {
+                'json-schema': template.json_schema,
+                'ui-schema': template.ui_schema,
+            }
+            for template in templates
+        }
 
 
 def get_task_template_service(
