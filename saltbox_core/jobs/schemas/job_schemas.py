@@ -129,6 +129,7 @@ class JobsListResponse(BaseModel, CreatedModifiedMixin, JobComputedFieldsMixin, 
     fun: str
     status: JobStatus
     has_failed_job_returns: bool
+    launch_error_type: str | None = None
 
     user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
     source: Source | None = None
