@@ -69,7 +69,7 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
             'user': system_user,  # NOTE: field `user` in 3005.1 does not exist
             'system_user': system_user,
             'minion_id': minion_id,
-            'salt_master': salt_master
+            'salt_master': salt_master,
         }
 
         if enriched_data.get('retcode', None) == 0:
@@ -138,7 +138,7 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
 
         # Check inventory in kwargs
         for arg in fun_args:
-            if isinstance(arg, dict) and arg.get('__kwarg__') and check_kwargs(arg):
+            if isinstance(arg, dict) and check_kwargs(arg):
                 return True
 
         return check_kwargs(job_return.fun_kwarg or {})
