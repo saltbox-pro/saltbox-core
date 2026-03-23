@@ -86,13 +86,14 @@ class JobNewMessageHandler(BaseJobMessageHandler):
             if job.missing:
                 minions_by_status[JobReturnStatus.ignored] = job.missing
 
-            for job_return_status, minion_id in minions_by_status.items():
-                await self.job_return_service.create(
-                    data=JobReturnCreateSchema.model_validate(
-                        {'minion_id': minion_id, 'status': job_return_status, **job_return_data}
-                    ),
-                    notify=True,
-                )
+            for job_return_status, minion_ids in minions_by_status.items():
+                for minion_id in minion_ids:
+                    await self.job_return_service.create(
+                        data=JobReturnCreateSchema.model_validate(
+                            {'minion_id': minion_id, 'status': job_return_status, **job_return_data}
+                        ),
+                        notify=True,
+                    )
 
         raise StopProcessing()
 
