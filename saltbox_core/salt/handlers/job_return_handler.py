@@ -110,7 +110,9 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         job_return = await self._save_job_return(
             master_id=master_id, jid=jid, mid=mid, job=job, data=data, return_data=return_data
         )
-        await self.job_service.update_status(jid=JID(jid))
+
+        # TODO (@): "force=True" is temporary! Remove this after frontend changes to use WS with job-returns
+        await self.job_service.update_status(jid=JID(jid), force=True, notify=True)
 
         if tid:
             await process_task_job_return.kiq(jid=jid, minion_id=mid)  # type: ignore
@@ -191,9 +193,6 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
                 job_return = await self.job_return_service.get(
                     query={'jid': jid, 'salt_master': master_id, 'minion_id': mid}
                 )
-
-        # TODO (@): Temporary! Remove this after frontend changes to use WS with job-returns
-        await self.job_service.update(query=job.id, data={}, notify=True)
 
         if is_new_return and job.source and job.source.type == 'migration':
             await self.broker.connect()

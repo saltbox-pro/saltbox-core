@@ -198,6 +198,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         jid: JID,
         *,
         session: MongoAsyncClientSession | None = None,
+        force: bool = False,
         notify: bool = True,
     ) -> JobModel: ...
 
@@ -208,6 +209,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         *,
         session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel],
+        force: bool = False,
         notify: bool = True,
     ) -> ProjectionModel: ...
 
@@ -217,22 +219,28 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         *,
         session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel] | None = None,
+        force: bool = False,
         notify: bool = True,
     ) -> JobModel | ProjectionModel:
         job = await self.get(query={'jid': str(jid)}, projection_model=JobSimpleSchema)
+
+        data_to_update = {}
 
         if job.status == JobStatus.running:
             if not await self.job_return_service.exists(
                 query={'jid': job.jid, 'salt_master': job.salt_master, 'status': JobReturnStatus.waiting},
                 session=session,
             ):
-                await self.update(
-                    query=job.id,
-                    data={'status': JobStatus.finished},
-                    session=session,
-                    notify=notify,
-                    projection_model=EmptyModel,
-                )
+                data_to_update['status'] = JobStatus.finished
+
+        if len(data_to_update.keys()) or force:
+            await self.update(
+                query=job.id,
+                data=data_to_update,
+                session=session,
+                notify=notify,
+                projection_model=JobModel if notify else EmptyModel,
+            )
 
         if projection_model:
             return await self.get(query=job.id, session=session, projection_model=projection_model)
