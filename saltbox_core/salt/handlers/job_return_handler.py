@@ -192,6 +192,9 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
                     query={'jid': jid, 'salt_master': master_id, 'minion_id': mid}
                 )
 
+        # TODO (@): Temporary! Remove this after frontend changes to use WS with job-returns
+        await self.job_service.update(query=job.id, data={}, notify=True)
+
         if is_new_return and job.source and job.source.type == 'migration':
             await self.broker.connect()
             job_return.data = return_data
