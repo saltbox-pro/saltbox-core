@@ -2,7 +2,7 @@
 dynamic = ["dependencies", "version"]
 name = "saltbox-core"
 requires-python = ">=3.12"
-license = "Apache-2.0"
+license = { file = 'LICENSE.txt' }
 description = ""
 readme = "README.md"
 classifiers = [
