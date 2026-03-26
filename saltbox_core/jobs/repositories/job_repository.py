@@ -23,6 +23,7 @@ class JobRepository(BaseMongoRepository[JobModel]):
         auto_now_fields: ClassVar[list[str]] = ['modified']
         collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
             'job_jid_index_asc': [('jid', pymongo.ASCENDING)],
+            'jid_and_salt_master_unique_index_asc': [('jid', pymongo.ASCENDING), ('salt_master', pymongo.ASCENDING)],
         }
         aggregations: ClassVar[AggregationsStore] = AggregationsStore(
             aggregations=[

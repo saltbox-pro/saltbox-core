@@ -5,7 +5,6 @@ import re
 
 import redis.asyncio as aioredis
 
-from saltbox_core.config import logger
 from saltbox_core.jobs.schemas.job_schemas import JobModel
 from saltbox_core.jobs.services.job_return_service import JobReturnService
 from saltbox_core.jobs.services.job_services import JobService

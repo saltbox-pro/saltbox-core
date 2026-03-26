@@ -11,10 +11,10 @@ from saltbox_core.jobs.schemas.job_schemas import (
     JobModel,
     JobsActions,
     JobsListResponse,
+    StrJid,
 )
 from saltbox_core.jobs.services.job_return_service import JobReturnService, get_job_return_service
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
-from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse, Source, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 from saltbox_sdk.fastapi_utils.dependencies import get_current_user
@@ -64,10 +64,10 @@ async def jobs_list(
     ).model_dump(by_alias=True),
 )
 async def job_retrieve(
-    jid: PyObjectId,
+    jid: StrJid,
     job_service: Annotated[JobService, Depends(get_job_service)],
 ) -> JobModel:
-    return await job_service.get(query={'_id': jid})
+    return await job_service.get(query={'jid': jid})
 
 
 @router.post(
@@ -106,7 +106,7 @@ async def job_create(
     ).model_dump(by_alias=True),
 )
 async def job_returns_count(
-    jid: PyObjectId,
+    jid: StrJid,
     job_return_service: Annotated[JobReturnService, Depends(get_job_return_service)],
 ) -> Annotated[int, Field(ge=0)]:
     """
@@ -114,7 +114,7 @@ async def job_returns_count(
 
     To be used in pair with GET /jobs/{jid}/return cycle.
     """
-    return await job_return_service.count(query={'_id': jid})
+    return await job_return_service.count(query={'jid': jid})
 
 
 @router.post(
