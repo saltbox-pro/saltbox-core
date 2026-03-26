@@ -28,19 +28,9 @@ TASKIQ_BROKER_URL="${TASKIQ_BROKER_URL}/${REDIS_TASKIQ_DB}"
 export REDIS_PASSWORD MONGO_PASSWORD TASKIQ_BROKER_URL KEYCLOAK_CLIENT_SECRET
 
 if [ "$DEV_MODE" = 1 ]; then
-    uv --no-progress pip install \
-      --system \
-      --editable .[reload]
-
-    uv --no-progress pip install \
-      --system \
-      --editable "${SALTBOX_BRIDGE_MESSAGES_SRC_PATH}" \
-      --config-settings editable_mode=compat
-
-    uv --no-progress pip install \
-      --system \
-      --editable "${SALTBOX_SDK_SRC_PATH}" \
-      --config-settings editable_mode=compat
+    uv --no-progress pip install --system --editable .[reload]
+    uv --no-progress pip install --system --editable "${SALTBOX_BRIDGE_MESSAGES_SRC_PATH}"
+    uv --no-progress pip install --system --editable "${SALTBOX_SDK_SRC_PATH}"
 fi
 
 declare -r tiq_tasks_pattern='saltbox_core/**/tiq_tasks.py'
@@ -51,7 +41,6 @@ cmd_uvicorn() {
   cmd+=(--timeout-graceful-shutdown="${TIMEOUT_GRACEFUL_SHUTDOWN}")
   if [ "$DEV_MODE" = 1 ]; then
     cmd+=(--reload)
-    cmd+=(--reload-dir "${SALTBOX_SDK_SRC_PATH}")
   fi
 }
 
