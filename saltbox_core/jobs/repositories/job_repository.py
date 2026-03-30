@@ -81,34 +81,6 @@ class JobRepository(BaseMongoRepository[JobModel]):
                     ],
                 ),
                 AggregatedField(
-                    field_name='returning',
-                    stages=[
-                        AddFieldsAggregationStage(
-                            fields={
-                                'returning': {
-                                    '$arrayToObject': {
-                                        '$map': {
-                                            'input': '$returns',
-                                            'as': 'res',
-                                            'in': {
-                                                'k': '$$res.minion_id',
-                                                'v': {
-                                                    '$cond': {
-                                                        'if': {'$eq': ['$$res.retcode', None]},
-                                                        'then': None,
-                                                        'else': {'$eq': ['$$res.retcode', 0]},
-                                                    }
-                                                },
-                                            },
-                                        }
-                                    }
-                                }
-                            }
-                        )
-                    ],
-                    parent_aggregations=['returns'],
-                ),
-                AggregatedField(
                     field_name='has_failed_job_returns',
                     stages=[
                         AddFieldsAggregationStage(

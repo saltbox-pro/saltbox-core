@@ -71,7 +71,6 @@ class JobMinionsCountAggregation(BaseModel):
 
 
 class JobAggregateFieldsMixin:
-    returning: dict[str, bool | None] = Field(default={})
     minions_count: JobMinionsCountAggregation = Field()
     waiting_expires_at_dt: datetime
 
