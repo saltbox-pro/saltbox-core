@@ -229,7 +229,6 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                         }
                     ),
                     session=session,
-                    projection_model=EmptyModel,
                 )
                 created_minions_count += 1
             except DuplicateKeyException:

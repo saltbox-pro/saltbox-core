@@ -45,8 +45,6 @@ async def process_task_job_return(
 
         await task_minion_service.update(query=task_minion.id, data=data_to_update)
 
-        await task_service.update(query=task.id, data={})
-
 
 @broker.task()
 async def process_task_job_error(
