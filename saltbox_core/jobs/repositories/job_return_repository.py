@@ -29,6 +29,7 @@ class JobReturnRepository(BaseMongoRepository[JobReturnModel]):
                 ('salt_master', pymongo.ASCENDING),
                 ('minion_id', pymongo.ASCENDING),
             ],
+            'source_asc': [('source.type', pymongo.ASCENDING), ('source.id', pymongo.ASCENDING)],
         }
         aggregations: ClassVar[AggregationsStore] = AggregationsStore(
             aggregations=[

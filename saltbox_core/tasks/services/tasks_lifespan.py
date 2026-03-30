@@ -13,7 +13,7 @@ from saltbox_core.minion_collections.schemas.minion_schemas import MinionSimpleS
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from saltbox_core.tasks.exceptions import TaskServiceException
-from saltbox_core.tasks.schemas.task import TaskModel, TaskType
+from saltbox_core.tasks.schemas.task import TaskForLifespanModel, TaskModel, TaskType
 from saltbox_core.tasks.schemas.tasks_minion import TaskMinionStatus
 from saltbox_core.tasks.schemas.tasks_status import TaskStatus
 from saltbox_core.tasks.services.task import TaskService, get_task_service
@@ -38,7 +38,7 @@ class TaskLifespanService:
         minion_service: MinionService,
         collection_service: CollectionService,
         task_id: PyObjectId | None = None,
-        task: TaskModel | None = None,
+        task: TaskForLifespanModel | None = None,
     ):
         self.rdb = rdb
         self.task_service = task_service
@@ -61,20 +61,26 @@ class TaskLifespanService:
         self.task_id = task_id
         self.__task = task
 
-    async def get_task(self) -> TaskModel:
+    async def get_task(self) -> TaskForLifespanModel:
         if self.__task:
             return self.__task
         elif self.task_id:
-            self.__task = await self.task_service.get(query=self.task_id)
+            self.__task = await self.task_service.get(query=self.task_id, projection_model=TaskForLifespanModel)
             return self.__task
 
         msg = 'Task does not set'
         raise TaskServiceException(msg)
 
-    async def update_task(self, notify: bool = True, **kwargs: Any) -> TaskModel:
+    async def get_full_task(self) -> TaskModel:
         task = await self.get_task()
 
-        self.__task = await self.task_service.update(query=task.id, data={**kwargs}, notify=notify)
+        return await self.task_service.get(query=task.id)
+
+    async def update_task(self, notify: bool = True, **kwargs: Any) -> TaskForLifespanModel:
+        task = await self.get_task()
+
+        await self.task_service.update(query=task.id, data={**kwargs}, notify=notify)
+        self.__task = await self.task_service.get(query=task.id, projection_model=TaskForLifespanModel)
 
         return self.__task
 
@@ -268,7 +274,9 @@ class TaskLifespanService:
             return
 
         if task.task_type == TaskType.policy:
-            await self.task_service.fill_task_minions(task=task)
+            await self.task_service.fill_task_minions(
+                task_id=task.id, target_collection_id=task.target_collection_id, target_query=task.target_query
+            )
 
         total_count_minions_in_new_job = 0
         total_count_active_jobs = 0
@@ -342,7 +350,9 @@ class TaskLifespanService:
             return
 
         if task.task_type == TaskType.policy:
-            if await self.task_service.fill_task_minions(task=task):
+            if await self.task_service.fill_task_minions(
+                task_id=task.id, target_collection_id=task.target_collection_id, target_query=task.target_query
+            ):
                 await self.update_task(status=TaskStatus.running)
         else:
             await self.update_task(status=TaskStatus.running)

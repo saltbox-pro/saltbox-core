@@ -16,7 +16,8 @@ class MasterRepository(BaseMongoRepository[MasterModel]):
         auto_now_add_fields: ClassVar[list[str]] = ['created']
         auto_now_fields: ClassVar[list[str]] = ['modified']
         collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
-            'master_id_unique_index_asc': [('master_id', pymongo.ASCENDING)]
+            'master_id_unique_index_asc': [('master_id', pymongo.ASCENDING)],
+            'status_asc': [('status', pymongo.ASCENDING)],
         }
 
     async def get_by_master_id(self, value: str) -> MasterModel:

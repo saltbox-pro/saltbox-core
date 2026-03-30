@@ -202,17 +202,19 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
 
     async def fill_task_minions(
         self,
-        task: TaskModel,
+        task_id: PyObjectId,
+        target_collection_id: PyObjectId,
+        target_query: dict | None = None,
         target_minions: list[TaskTargetMinion] | None = None,
         *,
         session: MongoAsyncClientSession | None = None,
     ) -> int:
-        collection = await self.collections_service.get(query=task.target_collection_id)
+        collection = await self.collections_service.get(query=target_collection_id)
         created_minions_count = 0
 
         minion_ids = await self.__get_minions_by_targeting(
             target_collection=collection,
-            target_query=task.target_query,
+            target_query=target_query,
             target_minions=target_minions,
             session=session,
         )
@@ -222,7 +224,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                 await self.task_minion_service.create(
                     data=TaskMinionCreateSchema.model_validate(
                         {
-                            'task_id': task.id,
+                            'task_id': task_id,
                             'minion_inner_id': minion_id,
                         }
                     ),
@@ -283,7 +285,13 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
             projection_model=EmptyModel,
         )
 
-        await self.fill_task_minions(task=task, target_minions=data.minions, session=session)
+        await self.fill_task_minions(
+            task_id=task.id,
+            target_collection_id=task.target_collection_id,
+            target_query=task.target_query,
+            target_minions=data.minions,
+            session=session,
+        )
 
         obj: TaskModel | ProjectionModel
         if projection_model:

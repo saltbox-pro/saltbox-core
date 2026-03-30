@@ -127,6 +127,17 @@ class TaskModel(
 ): ...
 
 
+class TaskForLifespanModel(
+    BaseModel,
+    CreatedModifiedMixin,
+    TaskTemplateJoinedFieldsMixin,
+    TaskStatusJoinedFieldsMixin,
+    TaskEditableFieldsMixin,
+    TaskReadOnlyFieldsMixin,
+    IDMixin,
+): ...
+
+
 # REST
 
 

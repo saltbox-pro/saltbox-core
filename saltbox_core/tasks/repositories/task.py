@@ -1,7 +1,9 @@
 from typing import Annotated, ClassVar
 
+import pymongo
 from fastapi import Depends
 from pymongo.asynchronous.database import AsyncDatabase
+from pymongo.operations import _IndexKeyHint
 
 from saltbox_core.tasks.schemas.task import TaskModel
 from saltbox_sdk.db.mongo.aggregations import (
@@ -20,6 +22,10 @@ class TaskRepository(BaseMongoRepository[TaskModel]):
         collection_name = 'tasks'
         auto_now_add_fields: ClassVar[list[str]] = ['created']
         auto_now_fields: ClassVar[list[str]] = ['modified']
+        collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
+            'source_asc': [('source.type', pymongo.ASCENDING), ('source.id', pymongo.ASCENDING)],
+            'task_type_asc': [('task_type', pymongo.ASCENDING)],
+        }
         aggregations: ClassVar[AggregationsStore] = AggregationsStore(
             aggregations=[
                 AggregatedField(
