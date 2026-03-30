@@ -23,6 +23,11 @@ class JobReturnRepository(BaseMongoRepository[JobReturnModel]):
         collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
             'job_return_jid_index_asc': [('jid', pymongo.ASCENDING)],
             'job_return_jid_salt_master_index_asc': [('jid', pymongo.ASCENDING), ('salt_master', pymongo.ASCENDING)],
+            'jid__salt_master__status_index_asc': [
+                ('jid', pymongo.ASCENDING),
+                ('salt_master', pymongo.ASCENDING),
+                ('status', pymongo.ASCENDING),
+            ],
             'job_return_jid_minion_id_index_asc': [('jid', pymongo.ASCENDING), ('minion_id', pymongo.ASCENDING)],
             'job_return_unique_index_asc': [
                 ('jid', pymongo.ASCENDING),
