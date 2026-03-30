@@ -176,7 +176,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         *,
         session: MongoAsyncClientSession | None = None,
     ) -> list[PyObjectId]:
-        queries = [target_collection.query] if target_collection.query else []
+        queries = [target_collection.full_query] if target_collection.full_query else []
         if target_query:
             queries.append(target_query)
         if target_minions:
