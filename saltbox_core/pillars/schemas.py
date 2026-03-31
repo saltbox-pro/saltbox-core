@@ -11,11 +11,12 @@ class PillarTgtType(StrEnum):
     ROOT = 'root'
     COLLECTION = 'collection'
     MINION = 'minion'
+    TASK_TPL = 'task_tpl'
+    TASK = 'task'
 
 
 class ReadOnlyShortFieldsMixin:
     name: str
-    is_personal: bool = False
     is_secret: bool = False
 
 

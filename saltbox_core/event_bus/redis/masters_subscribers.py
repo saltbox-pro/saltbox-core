@@ -80,7 +80,7 @@ async def get_pillar_data_handler(
     error = None
     pillars = {}
     try:
-        pillars = await pillar_service.get_for_minion(
+        pillars = await pillar_service.get_merged(
             master=message.master,
             minion_id=message.minion_id,
             pillarenv=message.pillarenv,

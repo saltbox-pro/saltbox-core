@@ -171,6 +171,7 @@ class TaskCreateRequestSchema(BaseModel):
     retry_delay: int | None = Field(title='Retry delay', description='in seconds', ge=0, default=None)
 
     ttl: int | None = Field(ge=0, le=SETTINGS.jobs_max_ttl, default=None)
+    save_pillars_as_default: bool = Field(title='Whether to save pillars as default for template', default=False)
 
     @model_validator(mode='after')
     def validate_fun(self) -> 'TaskCreateRequestSchema':

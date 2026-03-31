@@ -2,10 +2,14 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends, Response, status
 
+from saltbox_core.pillars.schemas import PillarTgtType
+from saltbox_core.pillars.services.pillar import PillarService, get_pillar_service
+from saltbox_core.pillars.utils import PillarSchemaUpdater
 from saltbox_core.settings.schemas.sls_repos_schemas import SettingsSlsRepoShortSchema
 from saltbox_core.settings.services.sls_repo_service import SettingsSlsRepoService, get_sls_repo_service
 from saltbox_core.tasks.schemas.tasks_template import (
     TaskTemplateCreateSchema,
+    TaskTemplateExcludeSlsSchema,
     TaskTemplateListBody,
     TaskTemplateModel,
     TaskTemplatesActions,
@@ -16,9 +20,9 @@ from saltbox_core.tasks.schemas.tasks_template import (
 )
 from saltbox_core.tasks.services.tasks_template import TaskTemplateService, get_task_template_service
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
-from saltbox_sdk.db.schemas_base import PaginatedResponse
+from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
-from saltbox_sdk.fastapi_utils.dependencies import get_opa_query
+from saltbox_sdk.fastapi_utils.dependencies import get_current_user, get_opa_query
 
 router = APIRouter(prefix='/tasks/template', tags=['Task Templates'])
 
@@ -129,6 +133,29 @@ async def task_template_retrieve(
     service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
 ) -> TaskTemplateModel:
     return await service.get(tpl_id)
+
+
+@router.get(
+    '/{tpl_id}/with-defaults',
+    operation_id='task_template_retrieve_with_defaults',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.templates.read',
+        action=TaskTemplatesActions.READ,
+    ).model_dump(by_alias=True),
+)
+async def task_template_retrieve_with_defaults(
+    tpl_id: PyObjectId,
+    service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
+    pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
+    user: Annotated[UserShort, Depends(get_current_user)],
+) -> TaskTemplateExcludeSlsSchema:
+    task_tpl = await service.get(tpl_id, projection_model=TaskTemplateExcludeSlsSchema)
+    default_pillars = await pillar_service.get_for_target(
+        tgt_type=PillarTgtType.TASK_TPL, tgt_id=tpl_id, user_sub=user.sub if user else None
+    )
+    default_setter = PillarSchemaUpdater(schema=task_tpl.json_schema)
+    task_tpl.json_schema = default_setter.set_defaults(default_pillars)
+    return task_tpl
 
 
 @router.delete(

@@ -1,3 +1,4 @@
+import re
 from typing import Annotated, Any, overload, override
 
 from fastapi import Depends
@@ -11,7 +12,6 @@ from saltbox_core.pillars.exceptions import (
     PillarCreatedByRequiredException,
     PillarTargetIdRequiredException,
     PillarTgtNotFoundException,
-    PillarTgtTypeInvalidException,
     PillarUpdateSecretNotAllowedException,
 )
 from saltbox_core.pillars.repository import PillarRepository, get_pillar_repository
@@ -23,10 +23,21 @@ from saltbox_core.pillars.schemas import (
 )
 from saltbox_core.pillars.services.pillar_crypto import PillarCryptoService, get_pillar_crypto_service
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.schemas_base import UserShort
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService, ProjectionModel
 
 
 class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreateSchema, PillarUpdateSchema]):
+    # Regex for collection:<PyObjectId>;user:<sub>
+    _COLLECTION_ID_USER_ID_REGEX = re.compile(r'collection:(?P<collection_id>[a-f0-9]{24});user:(?P<user_sub>[^;]+)')
+    # Regex for minion:<PyObjectId>;user:<sub>
+    _MINION_ID_REGEX = re.compile(r'minion:(?P<minion_id>[a-f0-9]{24})')
+    # Regex for task_tpl:<PyObjectId>;user:<sub>
+    _TASK_TPL_ID_REGEX = re.compile(r'task_tpl:(?P<task_tpl_id>[a-f0-9]{24})')
+    # Regex for task:<PyObjectId>;user:<sub>
+    _TASK_ID_REGEX = re.compile(r'task:(?P<task_id>[a-f0-9]{24})')
+    _USER_ID_REGEX = re.compile(r'user:(?P<user_id>[^;]+)')
+
     def __init__(
         self,
         repo: PillarRepository,
@@ -69,21 +80,8 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
         if not data.created_by:
             raise PillarCreatedByRequiredException()
 
-        tgt_id = await self._resolve_target_id(data)
-        pillarenv = data.created_by.sub if data.is_personal else 'base'
-
-        data = data.model_copy(update={'tgt_id': tgt_id, 'pillarenv': pillarenv})
-
-        encrypted_value = self._crypto_service.encrypt_if_needed(
-            value=data.value,
-            is_secret=data.is_secret,
-            name=data.name,
-            pillarenv=data.pillarenv,
-            tgt_type=data.tgt_type,
-            tgt_id=data.tgt_id,
-        )
-        if encrypted_value is not data.value:
-            data = data.model_copy(update={'value': encrypted_value})
+        data.tgt_id, data.pillarenv = await self._resolve_target(data)
+        data.value = self._crypto_service.encrypt(data)
 
         if projection_model:
             return await super().create(data=data, projection_model=projection_model, session=session)
@@ -132,92 +130,147 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
             )
         return await super().update(query=query, data=data, exclude_unset=exclude_unset, session=session)
 
-    async def _resolve_target_id(self, data: PillarCreateSchema) -> Any:
+    async def _resolve_target(self, data: PillarCreateSchema) -> tuple[PyObjectId, str]:
+        if not data.created_by:
+            raise PillarCreatedByRequiredException()
+
         match data.tgt_type:
             case PillarTgtType.ROOT:
-                return await self._collection_service.get_root_collection_id()
+                return await self._collection_service.get_root_collection_id(), 'base'
             case PillarTgtType.MINION:
-                if not data.tgt_id:
-                    raise PillarTargetIdRequiredException()
                 if not await self._minion_service.exists(query={'_id': data.tgt_id}):
                     raise PillarTgtNotFoundException()
-                return data.tgt_id
-            case PillarTgtType.COLLECTION:
                 if not data.tgt_id:
                     raise PillarTargetIdRequiredException()
+                return data.tgt_id, f'minion:{data.tgt_id};user:{data.created_by.sub}'
+            case PillarTgtType.COLLECTION:
                 if not await self._collection_service.exists(query={'_id': data.tgt_id}):
                     raise PillarTgtNotFoundException()
-                return data.tgt_id
+                if not data.tgt_id:
+                    raise PillarTargetIdRequiredException()
+                return data.tgt_id, f'collection:{data.tgt_id};user:{data.created_by.sub}'
             case _:
-                raise PillarTgtTypeInvalidException()
+                if not data.tgt_id:
+                    raise PillarTargetIdRequiredException()
+                return data.tgt_id, f'{data.tgt_type}:{data.tgt_id};user:{data.created_by.sub}'
 
-    def _maybe_decrypt_pillar_value(self, pillar: PillarModel) -> JsonValue:
-        return self._crypto_service.decrypt_if_needed(
-            value=pillar.value,
-            is_secret=pillar.is_secret,
-            name=pillar.name,
-            pillarenv=pillar.pillarenv,
-            tgt_type=pillar.tgt_type,
-            tgt_id=pillar.tgt_id,
-        )
+    async def get_merged(self, master: str, minion_id: str, pillarenv: str = 'base') -> dict[str, JsonValue]:
+        merge_result = {}
+        envs = [e.strip() for e in pillarenv.split(',')]
+        for env in envs:
+            if env.startswith('collection:'):
+                m = self._COLLECTION_ID_USER_ID_REGEX.search(env)
+                collection_id = m.group('collection_id') if m else None
+                user_sub = m.group('user_sub') if m else None
+                if collection_id and await self._collection_service.exists(query={'_id': PyObjectId(collection_id)}):
+                    branch_ids = await self._collection_service.repo.get_ancestors_ids(
+                        target=PyObjectId(collection_id), include_self=True
+                    )
+                    for collection_id in branch_ids:
+                        env_for_collection = (
+                            f'collection:{collection_id};user:{user_sub}' if user_sub else f'collection:{collection_id}'
+                        )
+                        pillars = await self.get_list(query={'pillarenv': env_for_collection})
+                        merge_result.update({pillar.name: self._crypto_service.decrypt(pillar) for pillar in pillars})
 
-    async def _get_merged_collection_pillars(
-        self, collection_ids: list[str], pillarenv: str = 'base'
-    ) -> dict[str, JsonValue]:
-        logger.debug('Fetching pillars for collections: %s', collection_ids)
-        collection_pillars = await self.get_list(
+            pillars = await self.get_list(query={'pillarenv': env})
+            try:
+                merge_result.update({pillar.name: self._crypto_service.decrypt(pillar) for pillar in pillars})
+            except Exception as e:
+                logger.error(f'Error decrypting pillars for env {env}: {e}')
+        return merge_result
+
+    async def create_for_task(
+        self,
+        *,
+        task_id: PyObjectId,
+        pillars: dict[str, JsonValue],
+        user: UserShort,
+        secret_pillar_names: list[str] | None = None,
+        task_template_id: PyObjectId | None = None,
+        save_as_default: bool = False,
+        session: MongoAsyncClientSession | None = None,
+    ) -> None:
+        deleted_count = await self.delete_many(
             query={
-                'tgt_type': PillarTgtType.COLLECTION,
-                'tgt_id': {'$in': [PyObjectId(cid) for cid in collection_ids]},
-                'pillarenv': pillarenv,
+                '$or': [
+                    {'tgt_type': PillarTgtType.TASK, 'tgt_id': task_id},
+                    {'pillenv': f'task:{task_id}'},
+                ]
+            },
+            session=session,
+        )
+        logger.debug(f'Deleted {deleted_count} existing pillars for task {task_id}')
+
+        if secret_pillar_names and task_template_id:
+            default_secret_pillars = await self.get_list(
+                query={
+                    'tgt_type': PillarTgtType.TASK_TPL,
+                    'tgt_id': task_template_id,
+                    'is_secret': True,
+                },
+                session=session,
+            )
+
+        new_pillars_data = []
+        created_for_task_count = 0
+        for name, value in pillars.items():
+            is_secret = secret_pillar_names is not None and name in secret_pillar_names
+
+            logger.debug(f'Processing pillar "{name}" for task {task_id} with value: {value} and is_secret={is_secret}')
+
+            if is_secret and value == '*******' and task_template_id:
+                default_pillar = next((p for p in default_secret_pillars if p.name == name), None)
+                if default_pillar:
+                    value = self._crypto_service.decrypt(default_pillar)
+            pillar_data = {
+                'name': name,
+                'value': value,
+                'is_secret': is_secret,
+                'created_by': user,
             }
-        )
-        logger.debug('Collection pillars fetched: %s', collection_pillars)
+            new_pillars_data.append(pillar_data)
+            pillar_create = PillarCreateSchema(
+                tgt_type=PillarTgtType.TASK,
+                tgt_id=task_id,
+                pillarenv=f'task:{task_id}',
+                **pillar_data,
+            )
+            await self.create(data=pillar_create, session=session)
+            created_for_task_count += 1
+        logger.debug(f'Created {created_for_task_count} pillars for task {task_id}')
 
-        merged_pillars: dict[str, JsonValue] = {}
-        # Later created pillars have higher priority
-        sorted_pillars = sorted(collection_pillars, key=lambda p: p.created)
-        for pillar in sorted_pillars:
-            merged_pillars[pillar.name] = self._maybe_decrypt_pillar_value(pillar)
-        logger.debug('Merged collection pillars: %s', merged_pillars)
-        return merged_pillars
+        if save_as_default:
+            logger.debug(f'Tryng to save pillars as default for task template {task_template_id}')
+            deleted_count = await self.delete_many(
+                query={
+                    'tgt_type': PillarTgtType.TASK_TPL,
+                    'tgt_id': task_template_id,
+                },
+                session=session,
+            )
+            logger.debug(f'Deleted {deleted_count} existing default pillars for task template {task_template_id}')
+            created_for_tpl_count = 0
+            for pillar_data in new_pillars_data:
+                pillar_create = PillarCreateSchema(
+                    tgt_type=PillarTgtType.TASK_TPL,
+                    tgt_id=task_template_id,
+                    pillarenv=f'task_tpl:{task_template_id};user:{user.sub}',
+                    **pillar_data,
+                )
+                await self.create(data=pillar_create, session=session)
+                created_for_tpl_count += 1
+            logger.debug(f'Created {created_for_tpl_count} default pillars for task template {task_template_id}')
 
-    async def _get_for_minion(
-        self, minion_id: PyObjectId, collection_ids: list[str], pillarenv: str = 'base'
+    async def get_for_target(
+        self, tgt_type: PillarTgtType, tgt_id: PyObjectId, user_sub: str | None = None
     ) -> dict[str, JsonValue]:
-        root_pillars = await self.get_list(query={'tgt_type': PillarTgtType.ROOT, 'pillarenv': pillarenv})
-        collection_pillars = await self._get_merged_collection_pillars(
-            collection_ids=collection_ids, pillarenv=pillarenv
-        )
-        minion_pillars = await self.get_list(
-            query={'tgt_type': PillarTgtType.MINION, 'tgt_id': minion_id, 'pillarenv': pillarenv}
-        )
+        user_env = f'user:{user_sub}' if user_sub else ''
+        tgt_env = f'{tgt_type}:{tgt_id}'
+        pillarenv = f'{tgt_env};{user_env}' if user_env else tgt_env
 
-        merged_pillars: dict[str, JsonValue] = {}
-        for pillar in root_pillars:
-            merged_pillars[pillar.name] = self._maybe_decrypt_pillar_value(pillar)
-        for name, value in collection_pillars.items():
-            merged_pillars[name] = value
-        for pillar in minion_pillars:
-            merged_pillars[pillar.name] = self._maybe_decrypt_pillar_value(pillar)
-
-        logger.debug('Merged pillars for minion %s: %s', minion_id, merged_pillars)
-        return merged_pillars
-
-    async def get_for_minion(self, master: str, minion_id: str, pillarenv: str = 'base') -> dict[str, JsonValue]:
-        collections = await self._collection_service.get_list(query={'slug': {'$ne': 'root'}})
-        minion = await self._minion_service.get_by_master_and_id(master=master, minion_id=minion_id)
-
-        collection_queries: list[dict] = [
-            {'id': c.id, 'query': {'$and': [c.query, {'_id': minion.id}]}} for c in collections
-        ]
-
-        minion_collections_ids: list[str] = []
-        for pair in collection_queries:
-            if await self._minion_service.exists(query=pair['query']):
-                minion_collections_ids.append(pair['id'])
-
-        return await self._get_for_minion(minion.id, minion_collections_ids, pillarenv=pillarenv)
+        pillars = await self.get_list(query={'pillarenv': pillarenv})
+        return {pillar.name: self._crypto_service.decrypt(pillar) for pillar in pillars}
 
 
 def get_pillar_service(

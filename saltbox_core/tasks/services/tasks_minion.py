@@ -9,6 +9,7 @@ from saltbox_core.tasks.repositories.tasks_minion import TaskMinionRepository, g
 from saltbox_core.tasks.schemas.tasks_minion import TaskMinionCreateSchema, TaskMinionModel, TaskMinionUpdateSchema
 from saltbox_sdk.db.mongo.config import get_mongo_db
 from saltbox_sdk.db.redis.config import get_redis
+from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_with_notify_service import MongoBaseWithNotifyService
 
 ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
@@ -41,8 +42,11 @@ class TaskMinionService(
         await super()._notify(obj=obj, action=action)
 
         if action in ['create', 'update', 'delete'] and hasattr(obj, 'task_id'):
-            task = await self.task_repository.get(query=obj.task_id)
-
+            # TODO: skip for pillars v2 - can't get task_id in create method, because transaction is used
+            try:
+                task = await self.task_repository.get(query=obj.task_id)
+            except ObjectNotFoundException:
+                return
             await self.rdb.publish(channel=f'task:{obj.task_id}:update', message=self._prepare_pub_message(obj=task))
 
 

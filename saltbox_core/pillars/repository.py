@@ -126,6 +126,10 @@ class PillarRepository(BaseMongoRepository[PillarModel]):
 
     @override
     async def _post_create_collection(self) -> None:
+        # await self.create_test_data()
+        pass
+
+    async def create_test_data(self) -> None:
         root_collection: dict = await self._BaseMongoRepository__database['minion_collections'].find_one(  # type: ignore[attr-defined]
             {'slug': 'root'}, {'_id': 1}
         )
@@ -148,7 +152,6 @@ class PillarRepository(BaseMongoRepository[PillarModel]):
                 name='test',
                 tgt_type=PillarTgtType.ROOT,
                 tgt_id=root_id,
-                is_personal=False,
                 pillarenv='base',
                 value='This is a test pillar value',
                 created_by={'sub': 'system', 'username': 'system'},

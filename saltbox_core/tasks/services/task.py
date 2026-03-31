@@ -11,6 +11,7 @@ from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_
 from saltbox_core.minion_collections.schemas.collection_schemas import CollectionModel
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
+from saltbox_core.pillars.services.pillar import PillarService, get_pillar_service
 from saltbox_core.tasks.exceptions import (
     TaskCreateSchemaValidationException,
     TaskCreateServiceException,
@@ -30,6 +31,7 @@ from saltbox_core.tasks.schemas.tasks_template import TaskTemplateModel
 from saltbox_core.tasks.services.tasks_minion import TaskMinionService, get_task_minion_service
 from saltbox_core.tasks.services.tasks_status import TaskStatusService, get_task_status_service
 from saltbox_core.tasks.services.tasks_template import TaskTemplateService, get_task_template_service
+from saltbox_sdk.db.mongo.config import get_mongo_session_with_transaction
 from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
 from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.exceptions import DuplicateKeyException
@@ -51,6 +53,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         job_schema_service: JobSchemaService,
         collections_service: CollectionService,
         minion_service: MinionService,
+        pillar_service: PillarService | None = None,
     ):
         super().__init__(repo=repo, rdb=rdb)
 
@@ -60,6 +63,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         self.job_schema_service = job_schema_service
         self.collections_service = collections_service
         self.minion_service = minion_service
+        self.pillar_service = pillar_service
         self.rdb = rdb
 
     def _get_notify_channel(self, obj: TaskModel | ProjectionModel, action: str) -> str | None:
@@ -269,6 +273,19 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         projection_model: type[ProjectionModel] | None = None,
         notify: bool = True,
     ) -> TaskModel | ProjectionModel:
+        if SETTINGS.pillar_v2_enabled:
+            return await self.create_v2(data=data, session=session, projection_model=projection_model, notify=notify)
+        else:
+            return await self.create_v1(data=data, session=session, projection_model=projection_model, notify=notify)
+
+    async def create_v1(
+        self,
+        data: TaskCreateInputSchema | dict[str, Any],
+        *,
+        session: MongoAsyncClientSession | None = None,
+        projection_model: type[ProjectionModel] | None = None,
+        notify: bool = True,
+    ) -> TaskModel | ProjectionModel:
         if isinstance(data, dict):
             data = TaskCreateInputSchema.model_validate(data)
 
@@ -297,6 +314,76 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
             obj = await self.get(query=task.id, session=session, projection_model=projection_model)
         else:
             obj = await self.get(query=task.id, session=session)
+
+        if notify and hasattr(obj, 'id'):
+            await self._notify(obj=task, action='create')
+
+        return obj
+
+    # New create method with transaction management for task pillars creation
+    async def create_v2(
+        self,
+        data: TaskCreateInputSchema | dict[str, Any],
+        *,
+        session: MongoAsyncClientSession | None = None,
+        projection_model: type[ProjectionModel] | None = None,
+        notify: bool = True,
+    ) -> TaskModel | ProjectionModel:
+        if isinstance(data, dict):
+            data = TaskCreateInputSchema.model_validate(data)
+
+        async with get_mongo_session_with_transaction() as s:
+            logger.debug(f'Session started for task creation: {s.session_id}')
+            try:
+                save_pillars_as_default = data.save_pillars_as_default
+                logger.debug(f'Save as default: {save_pillars_as_default}')
+                creation_data: TaskCreateSchema = await self.__parse_input_create_schema(data=data)
+
+                task = await self.repo.create(data=creation_data, session=s)
+                secret_pillar_names = None
+                if task.task_template_id:
+                    tpl = await self.task_template_service.get(query=task.task_template_id)
+                    secret_pillar_names = tpl.secret_pillars
+
+                if self.pillar_service and task.kwarg and task.kwarg.get('pillar'):
+                    logger.debug(f'Creating pillars for task {task.id}')
+                    await self.pillar_service.create_for_task(
+                        task_id=task.id,
+                        task_template_id=task.task_template_id,
+                        pillars=task.kwarg['pillar'],
+                        secret_pillar_names=secret_pillar_names,
+                        user=data.user,
+                        save_as_default=save_pillars_as_default,
+                        session=s,
+                    )
+                _status = await self.task_status_service.create(
+                    data=TaskStatusCreateSchema.model_validate(
+                        {
+                            'task_id': task.id,
+                            'type': TaskStatus.created,
+                        }
+                    ),
+                    projection_model=EmptyModel,
+                    session=s,
+                )
+
+                await self.fill_task_minions(
+                    task_id=task.id,
+                    target_collection_id=task.target_collection_id,
+                    target_query=task.target_query,
+                    target_minions=data.minions,
+                    session=s,
+                )
+
+                obj: TaskModel | ProjectionModel
+                if projection_model:
+                    obj = await self.get(query=task.id, session=s, projection_model=projection_model)
+                else:
+                    obj = await self.get(query=task.id, session=s)
+                logger.debug(f'Transaction committed successfully for task {task.id}')
+            except Exception:
+                logger.exception('Error during task creation, aborting transaction')
+                raise
 
         if notify and hasattr(obj, 'id'):
             await self._notify(obj=task, action='create')
@@ -384,6 +471,7 @@ def get_task_service(
     job_schema_service: Annotated[JobSchemaService, Depends(get_job_schema_service)],
     collections_service: Annotated[CollectionService, Depends(get_collection_service)],
     minion_service: Annotated[MinionService, Depends(get_minion_service)],
+    pillar_service: Annotated[PillarService | None, Depends(get_pillar_service)] = None,
 ) -> TaskService:
     return TaskService(
         repo=repo,
@@ -394,4 +482,5 @@ def get_task_service(
         job_schema_service=job_schema_service,
         collections_service=collections_service,
         minion_service=minion_service,
+        pillar_service=pillar_service,
     )

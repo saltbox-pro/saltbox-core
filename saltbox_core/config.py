@@ -123,6 +123,9 @@ class Settings(BaseSettings):
         default='core-kek-v1',
         description='Key identifier for pillars encryption (used for rotation)',
     )
+    pillar_v2_enabled: bool = Field(
+        default=False, description='Use new pillar system (with default for template and loading them on template load)'
+    )
 
     # TASKS
     tasks_job_create_cooldown: int = Field(

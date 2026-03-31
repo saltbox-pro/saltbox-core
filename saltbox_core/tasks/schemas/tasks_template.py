@@ -32,6 +32,7 @@ class EditableFieldsShortMixin:
 
 class EditableFieldsFullMixin(EditableFieldsShortMixin):
     defaults: TaskTemplateDefaultsSchema | None = Field(title='Default values', default=None)
+    secret_pillars: list[str] | None = Field(title='List of secret pillar names', default=None)
     json_schema: dict = Field(title='JSON schema', default_factory=dict)
     ui_schema: dict = Field(title='UI schema', default_factory=dict)
     sls_content: str | None = Field(title='SLS content', default=None)
@@ -55,6 +56,12 @@ class TaskTemplateShortSchema(BaseModel, ReadOnlyFieldsShortMixin, EditableField
 
 
 class TaskTemplateModel(BaseModel, CreatedModifiedMixin, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin, IDMixin): ...
+
+
+class TaskTemplateExcludeSlsSchema(BaseModel, CreatedModifiedMixin, ReadOnlyFieldsFullMixin, IDMixin):
+    defaults: TaskTemplateDefaultsSchema | None = Field(title='Default values', default=None)
+    json_schema: dict = Field(title='JSON schema', default_factory=dict)
+    ui_schema: dict = Field(title='UI schema', default_factory=dict)
 
 
 class TaskTemplateListBody(SkipLimitParams, QueryParams, SortParams):
