@@ -571,6 +571,7 @@ class SlsRepoService:
                     'title': json_schema['title'],
                     'description': schema_dict.get('description', None),
                     'defaults': schema_dict.get('defaults', None),
+                    'secret_pillars': schema_dict.get('secret_pillars', None),
                     'name': name,
                     'json_schema': json_schema,
                     'ui_schema': schema_dict.get('ui_schema', {}),
