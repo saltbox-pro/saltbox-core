@@ -39,15 +39,21 @@ class TaskMinionService(
 
     # TODO (@): Temporary
     async def _notify(self, obj: BaseModel | ProjectionModel, action: str) -> None:
-        await super()._notify(obj=obj, action=action)
+        async with self.rdb.pipeline() as pipe:
+            channel = self._get_notify_channel(obj=obj, action=action)
 
-        if action in ['create', 'update', 'delete'] and hasattr(obj, 'task_id'):
-            # TODO: skip for pillars v2 - can't get task_id in create method, because transaction is used
-            try:
-                task = await self.task_repository.get(query=obj.task_id)
-            except ObjectNotFoundException:
-                return
-            await self.rdb.publish(channel=f'task:{obj.task_id}:update', message=self._prepare_pub_message(obj=task))
+            if channel:
+                pipe.publish(channel=channel, message=self._prepare_pub_message(obj=obj))
+
+            if action in ['create', 'update', 'delete'] and hasattr(obj, 'task_id'):
+                # TODO: skip for pillars v2 - can't get task_id in create method, because transaction is used
+                try:
+                    task = await self.task_repository.get(query=obj.task_id)
+                    pipe.publish(channel=f'task:{obj.task_id}:update', message=self._prepare_pub_message(obj=task))
+                except ObjectNotFoundException:
+                    ...
+
+            await pipe.execute()
 
 
 def get_task_minion_service(

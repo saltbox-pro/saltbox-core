@@ -25,7 +25,7 @@ from saltbox_core.tasks.schemas.task import (
     TaskTargetMinion,
     TaskUpdateSchema,
 )
-from saltbox_core.tasks.schemas.tasks_minion import TaskMinionCreateSchema
+from saltbox_core.tasks.schemas.tasks_minion import TaskMinionCreateSchema, TaskMinionModel
 from saltbox_core.tasks.schemas.tasks_status import TaskStatus, TaskStatusCreateSchema
 from saltbox_core.tasks.schemas.tasks_template import TaskTemplateModel
 from saltbox_core.tasks.services.tasks_minion import TaskMinionService, get_task_minion_service
@@ -212,6 +212,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         target_minions: list[TaskTargetMinion] | None = None,
         *,
         session: MongoAsyncClientSession | None = None,
+        notify: bool = True,
     ) -> int:
         collection = await self.collections_service.get(query=target_collection_id)
         created_minions_count = 0
@@ -233,6 +234,8 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                         }
                     ),
                     session=session,
+                    projection_model=TaskMinionModel if notify else EmptyModel,
+                    notify=notify,
                 )
                 created_minions_count += 1
             except DuplicateKeyException:
@@ -307,6 +310,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
             target_query=task.target_query,
             target_minions=data.minions,
             session=session,
+            notify=False,
         )
 
         obj: TaskModel | ProjectionModel
@@ -373,6 +377,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                     target_query=task.target_query,
                     target_minions=data.minions,
                     session=s,
+                    notify=False,
                 )
 
                 obj: TaskModel | ProjectionModel
