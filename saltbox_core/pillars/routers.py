@@ -44,7 +44,7 @@ async def pillar_create(
     '/list',
     operation_id='pillars_list',
     openapi_extra=GatewayEndpointConfig(
-        policy='public',
+        policy='core.pillars.list',
         action=PillarsActions.LIST,
         cache_ttl=0,
     ).model_dump(by_alias=True),
