@@ -191,6 +191,7 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
         save_as_default: bool = False,
         session: MongoAsyncClientSession | None = None,
     ) -> None:
+        # TODO: maybe need to be removed
         deleted_count = await self.delete_many(
             query={
                 '$or': [

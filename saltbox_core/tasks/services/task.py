@@ -336,8 +336,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         if isinstance(data, dict):
             data = TaskCreateInputSchema.model_validate(data)
 
-        async with get_mongo_session_with_transaction() as s:
-            logger.debug(f'Session started for task creation: {s.session_id}')
+        async with get_mongo_session_with_transaction(session) as s:
             try:
                 save_pillars_as_default = data.save_pillars_as_default
                 logger.debug(f'Save as default: {save_pillars_as_default}')
