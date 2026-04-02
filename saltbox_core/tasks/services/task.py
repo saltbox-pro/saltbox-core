@@ -120,7 +120,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
 
         return fun, task_arg, task_kwarg
 
-    async def __parse_input_create_schema(self, data: TaskCreateInputSchema) -> TaskCreateSchema:
+    async def __parse_input_create_schema(self, data: TaskCreateInputSchema) -> tuple[TaskCreateSchema, dict[str, Any]]:
         if data.collection_slug:
             collection = await self.collections_service.get_by_slug(
                 slug=data.collection_slug, projection_model=EmptyModel
@@ -149,6 +149,11 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
 
         fun, task_arg, task_kwarg = await self.__parse_salt_fun_params(data=data, task_template=task_template)
 
+        if task_kwarg:
+            pillars = task_kwarg.pop('pillar')
+        else:
+            pillars = {}
+
         return TaskCreateSchema.model_validate(
             {
                 'task_type': data.task_type,
@@ -170,7 +175,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                 'user': data.user,
                 'source': data.source,
             }
-        )
+        ), pillars
 
     async def __get_minions_by_targeting(
         self,
@@ -276,63 +281,6 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         projection_model: type[ProjectionModel] | None = None,
         notify: bool = True,
     ) -> TaskModel | ProjectionModel:
-        if SETTINGS.pillar_v2_enabled:
-            return await self.create_v2(data=data, session=session, projection_model=projection_model, notify=notify)
-        else:
-            return await self.create_v1(data=data, session=session, projection_model=projection_model, notify=notify)
-
-    async def create_v1(
-        self,
-        data: TaskCreateInputSchema | dict[str, Any],
-        *,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel] | None = None,
-        notify: bool = True,
-    ) -> TaskModel | ProjectionModel:
-        if isinstance(data, dict):
-            data = TaskCreateInputSchema.model_validate(data)
-
-        creation_data: TaskCreateSchema = await self.__parse_input_create_schema(data=data)
-        task = await self.repo.create(data=creation_data, session=session)
-        _status = await self.task_status_service.create(
-            data=TaskStatusCreateSchema.model_validate(
-                {
-                    'task_id': task.id,
-                    'type': TaskStatus.created,
-                }
-            ),
-            projection_model=EmptyModel,
-        )
-
-        await self.fill_task_minions(
-            task_id=task.id,
-            target_collection_id=task.target_collection_id,
-            target_query=task.target_query,
-            target_minions=data.minions,
-            session=session,
-            notify=False,
-        )
-
-        obj: TaskModel | ProjectionModel
-        if projection_model:
-            obj = await self.get(query=task.id, session=session, projection_model=projection_model)
-        else:
-            obj = await self.get(query=task.id, session=session)
-
-        if notify and hasattr(obj, 'id'):
-            await self._notify(obj=task, action='create')
-
-        return obj
-
-    # New create method with transaction management for task pillars creation
-    async def create_v2(
-        self,
-        data: TaskCreateInputSchema | dict[str, Any],
-        *,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel] | None = None,
-        notify: bool = True,
-    ) -> TaskModel | ProjectionModel:
         if isinstance(data, dict):
             data = TaskCreateInputSchema.model_validate(data)
 
@@ -340,7 +288,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
             try:
                 save_pillars_as_default = data.save_pillars_as_default
                 logger.debug(f'Save as default: {save_pillars_as_default}')
-                creation_data: TaskCreateSchema = await self.__parse_input_create_schema(data=data)
+                creation_data, pillars = await self.__parse_input_create_schema(data=data)
 
                 task = await self.repo.create(data=creation_data, session=s)
                 secret_pillar_names = None
@@ -348,12 +296,12 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                     tpl = await self.task_template_service.get(query=task.task_template_id)
                     secret_pillar_names = tpl.secret_pillars
 
-                if self.pillar_service and task.kwarg and task.kwarg.get('pillar'):
+                if self.pillar_service and pillars:
                     logger.debug(f'Creating pillars for task {task.id}')
                     await self.pillar_service.create_for_task(
                         task_id=task.id,
                         task_template_id=task.task_template_id,
-                        pillars=task.kwarg['pillar'],
+                        pillars=pillars,
                         secret_pillar_names=secret_pillar_names,
                         user=data.user,
                         save_as_default=save_pillars_as_default,

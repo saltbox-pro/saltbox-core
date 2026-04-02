@@ -9,6 +9,7 @@ from saltbox_core.pillars.schemas import (
     PillarListBody,
     PillarModel,
     PillarsActions,
+    PillarTgtType,
     PillarUpdateSchema,
     PillarWithTgtInfoSchema,
 )
@@ -57,6 +58,13 @@ async def pillars_list(
     query = body.query
     if opa_query:
         query = {'$and': [query, opa_query]}
+
+    query = {
+        '$and': [
+            query,
+            {'tgt_type': {'$in': [PillarTgtType.MINION, PillarTgtType.ROOT]}},
+        ]
+    }
 
     return await pillar_service.get_list_paginated(
         query=query, skip=body.skip, limit=body.limit, projection_model=PillarWithTgtInfoSchema, sort=body.sort

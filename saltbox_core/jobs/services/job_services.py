@@ -177,8 +177,6 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
                 data.kwarg = {}
 
             pillarenv = ['base']
-            if data.user:
-                pillarenv.append(f'user:{data.user.sub}')
 
             if extra_pillarenv:
                 pillarenv.extend(extra_pillarenv)
