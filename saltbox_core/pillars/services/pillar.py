@@ -81,7 +81,7 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
             raise PillarCreatedByRequiredException()
 
         data.tgt_id, data.pillarenv = await self._resolve_target(data)
-        data.value = self._crypto_service.encrypt(data)
+        data.value = self._crypto_service.encrypt_if_needed(data)
 
         if projection_model:
             return await super().create(data=data, projection_model=projection_model, session=session)
@@ -134,27 +134,30 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
         if not data.created_by:
             raise PillarCreatedByRequiredException()
 
+        if data.tgt_type == PillarTgtType.ROOT:
+            return await self._collection_service.get_root_collection_id(), 'base'
+
+        if not data.tgt_id:
+            raise PillarTargetIdRequiredException()
+
+        tgt_id: PyObjectId = data.tgt_id
+
         match data.tgt_type:
-            case PillarTgtType.ROOT:
-                return await self._collection_service.get_root_collection_id(), 'base'
             case PillarTgtType.MINION:
-                minion = await self._minion_service.get(query={'_id': data.tgt_id})
+                minion = await self._minion_service.get(query={'_id': tgt_id})
                 if not minion:
                     raise PillarTgtNotFoundException()
-                if not data.tgt_id:
-                    raise PillarTargetIdRequiredException()
-                # return data.tgt_id, f'minion:{data.tgt_id};user:{data.created_by.sub}'
-                return data.tgt_id, f'minion_id:{minion.minion_id};master:{minion.master}'
+                return tgt_id, f'minion_id:{minion.minion_id};master:{minion.master}'
             case PillarTgtType.COLLECTION:
-                if not await self._collection_service.exists(query={'_id': data.tgt_id}):
+                if not await self._collection_service.exists(query={'_id': tgt_id}):
                     raise PillarTgtNotFoundException()
-                if not data.tgt_id:
-                    raise PillarTargetIdRequiredException()
-                return data.tgt_id, f'collection:{data.tgt_id};user:{data.created_by.sub}'
+                return tgt_id, f'{data.tgt_type}:{tgt_id};user:{data.created_by.sub}'
+            case PillarTgtType.TASK:
+                return tgt_id, f'{data.tgt_type}:{tgt_id}'
+            case PillarTgtType.TASK_TPL:
+                return tgt_id, f'{data.tgt_type}:{tgt_id};user:{data.created_by.sub}'
             case _:
-                if not data.tgt_id:
-                    raise PillarTargetIdRequiredException()
-                return data.tgt_id, f'{data.tgt_type}:{data.tgt_id};user:{data.created_by.sub}'
+                raise PillarTgtNotFoundException()
 
     async def get_merged(self, master: str, minion_id: str, pillarenv: str = 'base') -> dict[str, JsonValue]:
         merge_result = {}
@@ -173,16 +176,21 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
                             f'collection:{collection_id};user:{user_sub}' if user_sub else f'collection:{collection_id}'
                         )
                         pillars = await self.get_list(query={'pillarenv': env_for_collection})
-                        merge_result.update({pillar.name: self._crypto_service.decrypt(pillar) for pillar in pillars})
+                        merge_result.update(
+                            {pillar.name: self._crypto_service.decrypt_if_needed(pillar) for pillar in pillars}
+                        )
 
             pillars = await self.get_list(query={'pillarenv': env})
             try:
-                merge_result.update({pillar.name: self._crypto_service.decrypt(pillar) for pillar in pillars})
+                merge_result.update({pillar.name: self._crypto_service.decrypt_if_needed(pillar) for pillar in pillars})
             except Exception as e:
                 logger.error(f'Error decrypting pillars for env {env}: {e}')
         # Get base pillars for minion:<minion_id> if exists, because it has the highest priority
-        minion_base_pillars = await self.get_list(query={'pillarenv': f'minion_id:{minion_id};master:{master}'})
-        merge_result.update({pillar.name: self._crypto_service.decrypt(pillar) for pillar in minion_base_pillars})
+        if 'base' in envs:
+            minion_base_pillars = await self.get_list(query={'pillarenv': f'minion_id:{minion_id};master:{master}'})
+            merge_result.update(
+                {pillar.name: self._crypto_service.decrypt_if_needed(pillar) for pillar in minion_base_pillars}
+            )
         return merge_result
 
     async def create_for_task(
@@ -228,7 +236,7 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
             if is_secret and value == '*******' and task_template_id:
                 default_pillar = next((p for p in default_secret_pillars if p.name == name), None)
                 if default_pillar:
-                    value = self._crypto_service.decrypt(default_pillar)
+                    value = self._crypto_service.decrypt_if_needed(default_pillar)
             pillar_data = {
                 'name': name,
                 'value': value,
@@ -276,7 +284,7 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
         pillarenv = f'{tgt_env};{user_env}' if user_env else tgt_env
 
         pillars = await self.get_list(query={'pillarenv': pillarenv})
-        return {pillar.name: self._crypto_service.decrypt(pillar) for pillar in pillars}
+        return {pillar.name: self._crypto_service.decrypt_if_needed(pillar) for pillar in pillars}
 
 
 def get_pillar_service(

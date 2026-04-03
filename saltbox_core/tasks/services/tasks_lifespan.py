@@ -252,7 +252,7 @@ class TaskLifespanService:
                         'user': task.user,
                     }
                 ),
-                extra_pillarenv=[f'task:{task.id!s};user:{task.user.sub}'],
+                extra_pillarenv=[f'task:{task.id!s}'],
                 projection_model=EmptyModel,
             )
 

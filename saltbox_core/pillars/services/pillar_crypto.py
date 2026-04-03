@@ -169,7 +169,7 @@ class PillarCryptoService:
             logger.error('Error decrypting pillar value: %s', e)
             raise PillarCryptoException() from e
 
-    def encrypt(self, pillar: PillarCreateSchema) -> JsonValue:
+    def encrypt_if_needed(self, pillar: PillarCreateSchema) -> JsonValue:
         if not pillar.is_secret or self._is_encrypted_value(pillar.value):
             return pillar.value
 
@@ -177,7 +177,7 @@ class PillarCryptoService:
         encrypted: dict[str, Any] = self._encrypt_value(pillar.value, aad=aad)
         return encrypted
 
-    def decrypt(self, pillar: PillarModel) -> JsonValue:
+    def decrypt_if_needed(self, pillar: PillarModel) -> JsonValue:
         if not pillar.is_secret and not self._is_encrypted_value(pillar.value):
             return pillar.value
 

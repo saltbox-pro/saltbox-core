@@ -1,7 +1,7 @@
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from saltbox_core.config import SETTINGS
 from saltbox_core.tasks.schemas.tasks_status import TaskStatus
@@ -97,6 +97,7 @@ class TaskMinionsCountAggregation(BaseModel):
 
 class TaskAggregatedFieldsMixin:
     minions_count: TaskMinionsCountAggregation = Field()
+    pillars: dict[str, JsonValue] = Field(title='Pillars', default_factory=dict)
 
 
 class TaskComputedFieldsMixin: ...
