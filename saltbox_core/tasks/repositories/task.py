@@ -1,8 +1,11 @@
 from typing import Annotated, ClassVar
 
+import pymongo
 from fastapi import Depends
 from pymongo.asynchronous.database import AsyncDatabase
+from pymongo.operations import _IndexKeyHint
 
+from saltbox_core.pillars.schemas import PillarTgtType
 from saltbox_core.tasks.schemas.task import TaskModel
 from saltbox_sdk.db.mongo.aggregations import (
     AddFieldsAggregationStage,
@@ -20,6 +23,10 @@ class TaskRepository(BaseMongoRepository[TaskModel]):
         collection_name = 'tasks'
         auto_now_add_fields: ClassVar[list[str]] = ['created']
         auto_now_fields: ClassVar[list[str]] = ['modified']
+        collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
+            'source_asc': [('source.type', pymongo.ASCENDING), ('source.id', pymongo.ASCENDING)],
+            'task_type_asc': [('task_type', pymongo.ASCENDING)],
+        }
         aggregations: ClassVar[AggregationsStore] = AggregationsStore(
             aggregations=[
                 AggregatedField(
@@ -118,6 +125,54 @@ class TaskRepository(BaseMongoRepository[TaskModel]):
                                 'minions_count.in_work': {'$ifNull': ['$minions_count.in_work.count', 0]},
                                 'minions_count.success': {'$ifNull': ['$minions_count.success.count', 0]},
                                 'minions_count.failed': {'$ifNull': ['$minions_count.failed.count', 0]},
+                            }
+                        ),
+                    ],
+                ),
+                AggregatedField(
+                    field_name='pillars',
+                    stages=[
+                        LookupAggregationStage(
+                            from_collection='pillars',
+                            let={'task_id': '$_id'},
+                            pipeline=[
+                                {
+                                    '$match': {
+                                        '$expr': {
+                                            '$and': [
+                                                {'$eq': ['$tgt_id', '$$task_id']},
+                                                {'$eq': ['$tgt_type', PillarTgtType.TASK.value]},
+                                            ]
+                                        }
+                                    }
+                                },
+                                {
+                                    '$project': {
+                                        '_id': 0,
+                                        'name': 1,
+                                        'value': {
+                                            '$cond': [
+                                                {'$eq': ['$is_secret', True]},
+                                                '*******',
+                                                '$value',
+                                            ]
+                                        },
+                                    }
+                                },
+                            ],
+                            as_field='pillars',
+                        ),
+                        AddFieldsAggregationStage(
+                            fields={
+                                'pillars': {
+                                    '$arrayToObject': {
+                                        '$map': {
+                                            'input': {'$ifNull': ['$pillars', []]},
+                                            'as': 'pillar',
+                                            'in': {'k': '$$pillar.name', 'v': '$$pillar.value'},
+                                        }
+                                    }
+                                }
                             }
                         ),
                     ],

@@ -17,6 +17,7 @@ class JobReturnStatus(StrEnum):
     success = 'success'
     failed = 'failed'
     timeout = 'timeout'
+    ignored = 'ignored'
 
 
 class JobReturnReadOnlyFieldsMixin:

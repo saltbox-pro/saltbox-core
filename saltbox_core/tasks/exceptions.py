@@ -20,3 +20,15 @@ class TaskCreateSchemaValidationException(TaskServiceException):
 
     status_code: int = status.HTTP_400_BAD_REQUEST
     detail: str = 'TaskCreateSchema validation failed'
+
+
+class TaskTemplateNotFoundException(TaskServiceException):
+    """Exception raised when a task template is not found."""
+
+    status_code: int = status.HTTP_400_BAD_REQUEST
+    detail: str = 'Task template not found'
+
+    def __init__(self, template_name: str | None = None):
+        if template_name:
+            self.detail = f'Task template with name "{template_name}" not found'
+        super().__init__(detail=self.detail)

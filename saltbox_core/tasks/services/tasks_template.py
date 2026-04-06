@@ -2,10 +2,12 @@ from typing import Annotated
 
 from fastapi import Depends
 
+from saltbox_core.tasks.exceptions import TaskTemplateNotFoundException
 from saltbox_core.tasks.repositories.tasks_template import TaskTemplateRepository, get_task_template_repository
 from saltbox_core.tasks.schemas.tasks_template import (
     TaskTemplateCreateSchema,
     TaskTemplateModel,
+    TaskTemplateSchemasProjection,
     TaskTemplateUpdateSchema,
 )
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
@@ -17,10 +19,10 @@ from saltbox_sdk.utilities.json_schema import Draft4ValidatorWithDefaults
 class TaskTemplateService(
     MongoBaseService[TaskTemplateRepository, TaskTemplateModel, TaskTemplateCreateSchema, TaskTemplateUpdateSchema]
 ):
-    async def get_by_name(self, name: str, sid: PyObjectId) -> TaskTemplateModel:
+    async def get_by_name(self, name: str, sid: PyObjectId | None) -> TaskTemplateModel:
         return await self.repo.get({'name': name, 'repo_id': sid})
 
-    async def get_validated_data(self, name: str, sid: PyObjectId, data: dict) -> dict:
+    async def get_validated_data(self, name: str, sid: PyObjectId | None, data: dict) -> dict:
         try:
             task_template = await self.get_by_name(name=name, sid=sid)
         except ObjectNotFoundException:
@@ -29,6 +31,19 @@ class TaskTemplateService(
         Draft4ValidatorWithDefaults(task_template.json_schema).validate(data)
 
         return data
+
+    async def get_schemas_by_names(self, names: list[str]) -> dict[str, dict[str, dict]]:
+        for name in names:
+            if not await self.exists({'name': name}):
+                raise TaskTemplateNotFoundException(template_name=name)
+        templates = await self.get_list({'name': {'$in': names}}, projection_model=TaskTemplateSchemasProjection)
+        return {
+            template.name: {
+                'json-schema': template.json_schema,
+                'ui-schema': template.ui_schema,
+            }
+            for template in templates
+        }
 
 
 def get_task_template_service(

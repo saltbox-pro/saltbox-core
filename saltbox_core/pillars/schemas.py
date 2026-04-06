@@ -11,27 +11,34 @@ class PillarTgtType(StrEnum):
     ROOT = 'root'
     COLLECTION = 'collection'
     MINION = 'minion'
+    TASK_TPL = 'task_tpl'
+    TASK = 'task'
 
 
 class ReadOnlyShortFieldsMixin:
     name: str
-    value: JsonValue
-    is_personal: bool = False
     is_secret: bool = False
 
 
 class ReadOnlyFieldsMixin(ReadOnlyShortFieldsMixin):
     tgt_type: PillarTgtType = Field(default=PillarTgtType.ROOT)
     tgt_id: PyObjectId | None = None
+
+
+class ExtraFieldsMixin:
     pillarenv: str = Field(default='base', title='Pillar environment')
     created_by: UserShort | None = None
 
 
 class EditableFieldsMixin:
+    value: JsonValue
+
+
+class PillarCreateRequestSchema(BaseModel, ReadOnlyFieldsMixin, EditableFieldsMixin):
     pass
 
 
-class PillarCreateSchema(BaseModel, ReadOnlyFieldsMixin, EditableFieldsMixin):
+class PillarCreateSchema(BaseModel, ReadOnlyFieldsMixin, EditableFieldsMixin, ExtraFieldsMixin):
     pass
 
 
@@ -39,7 +46,7 @@ class PillarUpdateSchema(BaseModel, EditableFieldsMixin):
     pass
 
 
-class PillarModel(BaseModel, ReadOnlyFieldsMixin, EditableFieldsMixin, CreatedModifiedMixin, IDMixin):
+class PillarModel(BaseModel, ReadOnlyFieldsMixin, EditableFieldsMixin, ExtraFieldsMixin, CreatedModifiedMixin, IDMixin):
     pass
 
 
@@ -64,7 +71,7 @@ class PillarTargetInfoMinion(PillarTargetInfoBase):
     master: str | None = None
 
 
-class PillarWithTgtInfoSchema(BaseModel, ReadOnlyShortFieldsMixin, CreatedModifiedMixin, IDMixin):
+class PillarWithTgtInfoSchema(BaseModel, ReadOnlyShortFieldsMixin, EditableFieldsMixin, CreatedModifiedMixin, IDMixin):
     tgt_info: PillarTargetInfoCollection | PillarTargetInfoMinion
 
     @model_validator(mode='after')

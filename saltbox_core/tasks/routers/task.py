@@ -232,7 +232,7 @@ async def task_run(
 ) -> TaskModel:
     await task_lifespan_service.run()
 
-    return await task_lifespan_service.get_task()
+    return await task_lifespan_service.get_full_task()
 
 
 @router.post(
@@ -248,7 +248,7 @@ async def task_stop(
 ) -> TaskModel:
     await task_lifespan_service.stop()
 
-    return await task_lifespan_service.get_task()
+    return await task_lifespan_service.get_full_task()
 
 
 @router.post(
@@ -287,4 +287,4 @@ async def restart_failed(
 
     await task_lifespan_service.restart_on_minions(minions_ids=[minion.id for minion in task_minions])
 
-    return await task_lifespan_service.get_task()
+    return await task_lifespan_service.get_full_task()

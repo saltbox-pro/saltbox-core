@@ -2,10 +2,11 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, PastDatetime, computed_field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.functional_validators import AfterValidator
 
 from saltbox_bridge_messages import SaltTgtType
+from saltbox_core.config import SETTINGS
 from saltbox_core.utilities.jid import JID, JidError
 from saltbox_core.utilities.salt import fill_salt_kwarg_from_arg
 from saltbox_sdk.db.mongo.schemas_base import IDMixin, QueryParams, SortParams
@@ -28,11 +29,10 @@ StrJid = Annotated[str, AfterValidator(jidable)]
 
 
 class JobStatus(StrEnum):
-    in_queue = 'in_queue'
-    started = 'started'
-    waiting_returns = 'waiting_returns'
+    starting = 'starting'
+    running = 'running'
     finished = 'finished'
-    error = 'error'
+    launch_error = 'launch_error'
 
 
 class JobReadOnlyFieldsMixin:
@@ -43,6 +43,8 @@ class JobReadOnlyFieldsMixin:
     arg: list | None = None
     kwarg: dict | None = None
 
+    ttl: int = Field(ge=1, le=SETTINGS.jobs_max_ttl, default=SETTINGS.jobs_default_ttl)
+
     user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
     source: Source | None = None
 
@@ -52,22 +54,32 @@ class JobEditableFieldsMixin:
     minions: list[str] = Field(default=[])
     missing: list[str] = Field(default=[])
     stamp: TimezoneAwareDatetime | None = Field(default=None)
-    status: JobStatus = Field(default=JobStatus.in_queue)
-    error_type: str | None = None
+    status: JobStatus = Field(default=JobStatus.starting)
+    launch_error_type: str | None = None
 
 
-class JobComputedFieldsMixin:
-    @computed_field(title='Timestamp decoded from JID')
-    def fms_jid_timestamp(self) -> Annotated[datetime, PastDatetime]:
-        return JID(self.jid).to_datetime()  # type: ignore
+class JobComputedFieldsMixin: ...
+
+
+class JobMinionsCountAggregation(BaseModel):
+    total: int = Field(title='Total number of minions', default=0)
+    waiting: int = Field(title='Waiting', default=0)
+    success: int = Field(title='Success', default=0)
+    failed: int = Field(title='Failed', default=0)
+    timeout: int = Field(title='Timeout', default=0)
+    ignored: int = Field(title='Ignored', default=0)
 
 
 class JobAggregateFieldsMixin:
-    returning: dict[str, bool | None] = Field(default={})
+    minions_count: JobMinionsCountAggregation = Field()
+    waiting_expires_at_dt: datetime
 
 
 class JobCreateSchema(BaseModel, JobReadOnlyFieldsMixin, JobEditableFieldsMixin):
     jid: StrJid | None = Field(default=None)
+    ttl: int | None = Field(ge=0, le=SETTINGS.jobs_max_ttl, default=None)  # type: ignore
+
+    model_config = ConfigDict(extra='ignore')
 
     @model_validator(mode='before')
     @classmethod
@@ -123,6 +135,7 @@ class JobsListResponse(BaseModel, CreatedModifiedMixin, JobComputedFieldsMixin, 
     fun: str
     status: JobStatus
     has_failed_job_returns: bool
+    launch_error_type: str | None = None
 
     user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
     source: Source | None = None
@@ -135,6 +148,7 @@ class CreateJobRequest(BaseModel):
     salt_master: str = 'salt-master'
     arg: list | None = None
     kwarg: dict | None = None
+    ttl: int | None = Field(ge=0, le=SETTINGS.jobs_max_ttl, default=None)
 
 
 # Permissions

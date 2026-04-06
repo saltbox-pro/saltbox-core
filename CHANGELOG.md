@@ -5,6 +5,58 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-04-06
+
+### Added
+
+- Initial database migrations.
+- Support for job/state execution for minion `v3005.1`.
+- Job timeout support.
+- `extra_pillarenv` support in job creation.
+- `launch_error_type` field in jobs list response.
+- Aggregated minion statistics in jobs via `minions_count`.
+- WebSocket notifications for task minion create/update/delete events.
+
+### Changed
+
+- Job statuses updated:
+  - `in_queue` → `starting`
+  - `started` → `running`
+  - `error` → `launch_error`
+  - removed `waiting_returns`
+- Renamed job field `error_type` to `launch_error_type`.
+- Collections list endpoint now uses `POST` with body payload mixins.
+- List endpoints switched to a universal response format.
+- Task template list endpoint moved to `/list`.
+- Task template description model updated:
+  - removed `full_description`
+  - `short_description` renamed to `description`
+  - added localized `dict[str, str]` support for descriptions
+- Pillar API and internal structure refactored:
+  - deprecated pillar modules/services removed
+  - Pillar v2 became the primary implementation
+  - updated router prefixes and related schemas/policies
+- Improved pillar handling and schema definitions.
+- Optimized task creation and related DB queries.
+- Added/updated MongoDB indexes for jobs, task minions, and related entities.
+- Updated SDK/dependency versions for Mongo query and aggregation fixes.
+
+### Fixed
+
+- Task creation without template defaults.
+- TTL assignment during task creation.
+- Filling tasks by minions.
+- Processing of job returns.
+- Creating job returns for new jobs.
+- Inventory collection from job returns.
+- Repository lock release after repository deletion.
+- Scheduler job/task creation issues and scheduler template paths.
+- Incorrect list/status endpoint URLs.
+- Mongo query preparation when values are `None`.
+- Sorting task minions by `count_runs`.
+- PEP 639 compatibility issues.
+- Minor backend cleanup and argument passing issues.
+
 ## [0.1.2] - 2025-12-22
 
 ### Added

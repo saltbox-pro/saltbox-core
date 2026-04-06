@@ -2,7 +2,7 @@
 dynamic = ["dependencies", "version"]
 name = "saltbox-core"
 requires-python = ">=3.12"
-license = "Apache-2.0"
+license = { file = 'LICENSE.txt' }
 description = ""
 readme = "README.md"
 classifiers = [
@@ -16,7 +16,7 @@ Repository = "https://dev.saltbox.pro/saltbox/saltbox-core"
 
 [project.optional-dependencies]
 dev = [
-  "mypy>=1.17.0",
+  "mypy>=1.20.0",
   "pre-commit>=4.2.0",
   "types-redis",
   "python-lsp-server[all]",
@@ -39,6 +39,7 @@ reload = [
 saltbox-module-init = "saltbox_core.module_init.main:main"
 saltbox-faststream-redis = "saltbox_core.event_bus.redis.app:main"
 saltbox-faststream-rabbit = "saltbox_core.event_bus.rabbit.app:main"
+saltbox-jobs-watcher = "saltbox_core.jobs.jobs_watcher:main"
 saltbox-tasks-watcher = "saltbox_core.tasks.tasks_watcher:main"
 saltbox-salt-buffer-manager = "saltbox_core.salt.buffer_manager:main"
 
@@ -92,7 +93,7 @@ select = [
   "FA",    # flake8-future-annotations
   "LOG",   # flake8-logging
   "PTH",   # flake8-use-pathlib
-  "ASYNC", #flake8-async
+  "ASYNC", # flake8-async
   "G",     # flake8-logging-format
   "E",     # pycodestyle errors
   "F",     # pyflakes

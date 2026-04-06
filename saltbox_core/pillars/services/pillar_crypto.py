@@ -8,24 +8,16 @@ from typing import Any, cast
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
 from pydantic import JsonValue
 
-from saltbox_core.config import SETTINGS
+from saltbox_core.config import SETTINGS, logger
 from saltbox_core.pillars.exceptions import (
     PillarCryptoException,
     PillarEncryptionKeyNotConfiguredException,
     PillarInvalidEncryptionPayloadException,
 )
-from saltbox_core.pillars.schemas import PillarTgtType
-from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_core.pillars.schemas import PillarCreateSchema, PillarModel
 
 
 class PillarCryptoService:
-    """Pillars encrypt-at-rest helper.
-
-    Implements local envelope encryption (KEK/DEK) without KMS:
-    - KEK (from config) is used to wrap (encrypt) a random DEK
-    - DEK is used to encrypt the actual JSON payload
-    """
-
     _ENC_MARKER_KEY = '$enc'
     _ENC_FORMAT_VERSION = 1
 
@@ -46,6 +38,19 @@ class PillarCryptoService:
             return None
         payload = value.get(cls._ENC_MARKER_KEY)
         return payload if isinstance(payload, dict) else None
+
+    def _is_encrypted_value(self, value: JsonValue) -> bool:
+        payload = self._get_enc_payload(value)
+        return payload is not None
+
+    def is_encrypted(self, pillar: PillarModel) -> bool:
+        return pillar.is_secret and self._is_encrypted_value(pillar.value)
+
+    @staticmethod
+    def _build_aad(pillar: PillarCreateSchema | PillarModel) -> str:
+        # Stable context binding; if any of these change, decrypt will fail.
+        aad = f'{pillar.tgt_type}:{pillar.tgt_id}:{pillar.pillarenv}:{pillar.name}'
+        return aad
 
     @classmethod
     def _get_kek(cls) -> bytes:
@@ -72,16 +77,7 @@ class PillarCryptoService:
     def _canonical_json(value: JsonValue) -> bytes:
         return json.dumps(value, ensure_ascii=False, separators=(',', ':'), sort_keys=True).encode('utf-8')
 
-    @staticmethod
-    def build_aad(*, name: str, pillarenv: str, tgt_type: PillarTgtType, tgt_id: PyObjectId | None) -> str:
-        # Stable context binding; if any of these change, decrypt will fail.
-        return f'pillars:{tgt_type}:{tgt_id}:{pillarenv}:{name}'
-
-    def is_encrypted_value(self, value: JsonValue) -> bool:
-        payload = self._get_enc_payload(value)
-        return payload is not None
-
-    def encrypt_json_value(self, value: JsonValue, *, aad: str) -> dict[str, Any]:
+    def _encrypt_value(self, value: JsonValue, *, aad: str) -> dict[str, Any]:
         kek = self._get_kek()
         kid = SETTINGS.pillars_kid
 
@@ -114,8 +110,8 @@ class PillarCryptoService:
             }
         }
 
-    def decrypt_json_value(self, value: JsonValue, *, aad: str) -> JsonValue:
-        if not self.is_encrypted_value(value):
+    def _decrypt_value(self, value: JsonValue, *, aad: str) -> JsonValue:
+        if not self._is_encrypted_value(value):
             return value
 
         if not isinstance(value, dict):
@@ -170,40 +166,23 @@ class PillarCryptoService:
         except PillarEncryptionKeyNotConfiguredException:
             raise
         except Exception as e:
+            logger.error('Error decrypting pillar value: %s', e)
             raise PillarCryptoException() from e
 
-    def encrypt_if_needed(
-        self,
-        *,
-        value: JsonValue,
-        is_secret: bool,
-        name: str,
-        pillarenv: str,
-        tgt_type: PillarTgtType,
-        tgt_id: PyObjectId | None,
-    ) -> JsonValue:
-        if not is_secret or self.is_encrypted_value(value):
-            return value
+    def encrypt_if_needed(self, pillar: PillarCreateSchema) -> JsonValue:
+        if not pillar.is_secret or self._is_encrypted_value(pillar.value):
+            return pillar.value
 
-        aad = self.build_aad(name=name, pillarenv=pillarenv, tgt_type=tgt_type, tgt_id=tgt_id)
-        encrypted: dict[str, Any] = self.encrypt_json_value(value, aad=aad)
+        aad = self._build_aad(pillar)
+        encrypted: dict[str, Any] = self._encrypt_value(pillar.value, aad=aad)
         return encrypted
 
-    def decrypt_if_needed(
-        self,
-        *,
-        value: JsonValue,
-        is_secret: bool,
-        name: str,
-        pillarenv: str,
-        tgt_type: PillarTgtType,
-        tgt_id: PyObjectId | None,
-    ) -> JsonValue:
-        if not is_secret and not self.is_encrypted_value(value):
-            return value
+    def decrypt_if_needed(self, pillar: PillarModel) -> JsonValue:
+        if not pillar.is_secret and not self._is_encrypted_value(pillar.value):
+            return pillar.value
 
-        aad = self.build_aad(name=name, pillarenv=pillarenv, tgt_type=tgt_type, tgt_id=tgt_id)
-        return self.decrypt_json_value(value, aad=aad)
+        aad = self._build_aad(pillar)
+        return self._decrypt_value(pillar.value, aad=aad)
 
 
 def get_pillar_crypto_service() -> PillarCryptoService:

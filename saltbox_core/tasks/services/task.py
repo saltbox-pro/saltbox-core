@@ -11,6 +11,7 @@ from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_
 from saltbox_core.minion_collections.schemas.collection_schemas import CollectionModel
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
+from saltbox_core.pillars.services.pillar import PillarService, get_pillar_service
 from saltbox_core.tasks.exceptions import (
     TaskCreateSchemaValidationException,
     TaskCreateServiceException,
@@ -24,12 +25,13 @@ from saltbox_core.tasks.schemas.task import (
     TaskTargetMinion,
     TaskUpdateSchema,
 )
-from saltbox_core.tasks.schemas.tasks_minion import TaskMinionCreateSchema
+from saltbox_core.tasks.schemas.tasks_minion import TaskMinionCreateSchema, TaskMinionModel
 from saltbox_core.tasks.schemas.tasks_status import TaskStatus, TaskStatusCreateSchema
 from saltbox_core.tasks.schemas.tasks_template import TaskTemplateModel
 from saltbox_core.tasks.services.tasks_minion import TaskMinionService, get_task_minion_service
 from saltbox_core.tasks.services.tasks_status import TaskStatusService, get_task_status_service
 from saltbox_core.tasks.services.tasks_template import TaskTemplateService, get_task_template_service
+from saltbox_sdk.db.mongo.config import get_mongo_session_with_transaction
 from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
 from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.exceptions import DuplicateKeyException
@@ -51,6 +53,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         job_schema_service: JobSchemaService,
         collections_service: CollectionService,
         minion_service: MinionService,
+        pillar_service: PillarService | None = None,
     ):
         super().__init__(repo=repo, rdb=rdb)
 
@@ -60,6 +63,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         self.job_schema_service = job_schema_service
         self.collections_service = collections_service
         self.minion_service = minion_service
+        self.pillar_service = pillar_service
         self.rdb = rdb
 
     def _get_notify_channel(self, obj: TaskModel | ProjectionModel, action: str) -> str | None:
@@ -116,7 +120,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
 
         return fun, task_arg, task_kwarg
 
-    async def __parse_input_create_schema(self, data: TaskCreateInputSchema) -> TaskCreateSchema:
+    async def __parse_input_create_schema(self, data: TaskCreateInputSchema) -> tuple[TaskCreateSchema, dict[str, Any]]:
         if data.collection_slug:
             collection = await self.collections_service.get_by_slug(
                 slug=data.collection_slug, projection_model=EmptyModel
@@ -139,9 +143,16 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
 
         if data.task_template_id:
             task_template = await self.task_template_service.get(query=data.task_template_id)
-            task_defaults.update(task_template.defaults.model_dump())
+
+            if task_template.defaults:
+                task_defaults.update(task_template.defaults.model_dump())
 
         fun, task_arg, task_kwarg = await self.__parse_salt_fun_params(data=data, task_template=task_template)
+
+        if task_kwarg:
+            pillars = task_kwarg.pop('pillar', {})
+        else:
+            pillars = {}
 
         return TaskCreateSchema.model_validate(
             {
@@ -155,6 +166,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                 'batch_size': data.batch_size if data.batch_size is not None else task_defaults['batch_size'],
                 'max_retries': data.max_retries if data.max_retries is not None else task_defaults['max_retries'],
                 'retry_delay': data.retry_delay if data.retry_delay is not None else task_defaults['retry_delay'],
+                'ttl': data.ttl,
                 'max_jobs_count_at_same_time': (
                     data.max_jobs_count_at_same_time
                     if data.max_jobs_count_at_same_time is not None
@@ -163,7 +175,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                 'user': data.user,
                 'source': data.source,
             }
-        )
+        ), pillars
 
     async def __get_minions_by_targeting(
         self,
@@ -173,7 +185,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         *,
         session: MongoAsyncClientSession | None = None,
     ) -> list[PyObjectId]:
-        queries = [target_collection.query] if target_collection.query else []
+        queries = [target_collection.full_query] if target_collection.full_query else []
         if target_query:
             queries.append(target_query)
         if target_minions:
@@ -199,17 +211,20 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
 
     async def fill_task_minions(
         self,
-        task: TaskModel,
+        task_id: PyObjectId,
+        target_collection_id: PyObjectId,
+        target_query: dict | None = None,
         target_minions: list[TaskTargetMinion] | None = None,
         *,
         session: MongoAsyncClientSession | None = None,
+        notify: bool = True,
     ) -> int:
-        collection = await self.collections_service.get(query=task.target_collection_id)
+        collection = await self.collections_service.get(query=target_collection_id)
         created_minions_count = 0
 
         minion_ids = await self.__get_minions_by_targeting(
             target_collection=collection,
-            target_query=task.target_query,
+            target_query=target_query,
             target_minions=target_minions,
             session=session,
         )
@@ -219,12 +234,13 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                 await self.task_minion_service.create(
                     data=TaskMinionCreateSchema.model_validate(
                         {
-                            'task_id': task.id,
+                            'task_id': task_id,
                             'minion_inner_id': minion_id,
                         }
                     ),
                     session=session,
-                    projection_model=EmptyModel,
+                    projection_model=TaskMinionModel if notify else EmptyModel,
+                    notify=notify,
                 )
                 created_minions_count += 1
             except DuplicateKeyException:
@@ -268,25 +284,58 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         if isinstance(data, dict):
             data = TaskCreateInputSchema.model_validate(data)
 
-        creation_data: TaskCreateSchema = await self.__parse_input_create_schema(data=data)
-        task = await self.repo.create(data=creation_data, session=session)
-        _status = await self.task_status_service.create(
-            data=TaskStatusCreateSchema.model_validate(
-                {
-                    'task_id': task.id,
-                    'type': TaskStatus.created,
-                }
-            ),
-            projection_model=EmptyModel,
-        )
+        async with get_mongo_session_with_transaction(session) as s:
+            try:
+                save_pillars_as_default = data.save_pillars_as_default
+                logger.debug(f'Save as default: {save_pillars_as_default}')
+                creation_data, pillars = await self.__parse_input_create_schema(data=data)
 
-        await self.fill_task_minions(task=task, target_minions=data.minions, session=session)
+                task = await self.repo.create(data=creation_data, session=s)
+                secret_pillar_names = None
+                if task.task_template_id:
+                    tpl = await self.task_template_service.get(query=task.task_template_id)
+                    secret_pillar_names = tpl.secret_pillars
 
-        obj: TaskModel | ProjectionModel
-        if projection_model:
-            obj = await self.get(query=task.id, session=session, projection_model=projection_model)
-        else:
-            obj = await self.get(query=task.id, session=session)
+                if self.pillar_service and pillars:
+                    logger.debug(f'Creating pillars for task {task.id}')
+                    await self.pillar_service.create_for_task(
+                        task_id=task.id,
+                        task_template_id=task.task_template_id,
+                        pillars=pillars,
+                        secret_pillar_names=secret_pillar_names,
+                        user=data.user,
+                        save_as_default=save_pillars_as_default,
+                        session=s,
+                    )
+                _status = await self.task_status_service.create(
+                    data=TaskStatusCreateSchema.model_validate(
+                        {
+                            'task_id': task.id,
+                            'type': TaskStatus.created,
+                        }
+                    ),
+                    projection_model=EmptyModel,
+                    session=s,
+                )
+
+                await self.fill_task_minions(
+                    task_id=task.id,
+                    target_collection_id=task.target_collection_id,
+                    target_query=task.target_query,
+                    target_minions=data.minions,
+                    session=s,
+                    notify=False,
+                )
+
+                obj: TaskModel | ProjectionModel
+                if projection_model:
+                    obj = await self.get(query=task.id, session=s, projection_model=projection_model)
+                else:
+                    obj = await self.get(query=task.id, session=s)
+                logger.debug(f'Transaction committed successfully for task {task.id}')
+            except Exception:
+                logger.exception('Error during task creation, aborting transaction')
+                raise
 
         if notify and hasattr(obj, 'id'):
             await self._notify(obj=task, action='create')
@@ -374,6 +423,7 @@ def get_task_service(
     job_schema_service: Annotated[JobSchemaService, Depends(get_job_schema_service)],
     collections_service: Annotated[CollectionService, Depends(get_collection_service)],
     minion_service: Annotated[MinionService, Depends(get_minion_service)],
+    pillar_service: Annotated[PillarService | None, Depends(get_pillar_service)] = None,
 ) -> TaskService:
     return TaskService(
         repo=repo,
@@ -384,4 +434,5 @@ def get_task_service(
         job_schema_service=job_schema_service,
         collections_service=collections_service,
         minion_service=minion_service,
+        pillar_service=pillar_service,
     )

@@ -48,9 +48,9 @@ WORKDIR /
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 
 
-################
+###############
 ## Dev image ##
-################
+###############
 
 FROM base AS dev
 LABEL name='saltbox-core-dev' version='1.4'
@@ -72,6 +72,7 @@ VOLUME /mnt/saltbox-bridge-messages/
 ENV SALTBOX_BRIDGE_MESSAGES_SRC_PATH /mnt/saltbox-bridge-messages/
 VOLUME /mnt/saltbox-sdk/
 ENV SALTBOX_SDK_SRC_PATH /mnt/saltbox-sdk/
+RUN git config --global --add safe.directory '/mnt/*'
 
 
 ################

@@ -20,6 +20,7 @@ from saltbox_core.settings.schemas.sls_repos_schemas import (
 )
 from saltbox_core.settings.tiq_tasks import cleanup_orphan_aux_files, sync_sls_repo_task, sync_sls_repos_to_serve_dir
 from saltbox_core.tasks.services.tasks_template import TaskTemplateService
+from saltbox_core.utilities.git_repo_helper import RepositoryLocker
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
 from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.db.schemas_base import PaginatedResponse
@@ -156,6 +157,8 @@ class SettingsSlsRepoService(
         session: MongoAsyncClientSession | None = None,
     ) -> None:
         repo_settings = await self.get(sid)
+        locker = RepositoryLocker(self._redis)
+        await locker.release_lock(str(repo_settings.repo_url))
         # Remove all templates from this repo
         try:
             deleted_count = await tpl_service.delete_many(query={'repo_id': sid}, session=session)

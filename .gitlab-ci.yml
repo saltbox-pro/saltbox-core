@@ -1,10 +1,10 @@
 ---
 
-workflow:
-  rules:
-    - if: $CI_PIPELINE_SOURCE != 'merge_request_event'
+# Change to make non-empty commit and trigger push event
+# rel: 0
 
 stages:
+  - .guard
   - lint
   - test
   - build
@@ -12,11 +12,13 @@ stages:
 variables:
   # Set 0 to disable linting jobs
   LINTING_ENABLED: true
-  VERSION_TAG_PATTERN: '/^v(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)-?/'
+  TESTING_ENABLED: true
 
 include:
   - project: 'saltbox/ci-lib'
     file: 'build-image.yml'
+  - project: 'saltbox/ci-lib'
+    file: 'def-branch-merge-guard.yml'
 
 
 .lint-job:
@@ -62,6 +64,8 @@ Pytest:
     paths:
       - '$PIP_CACHE_DIR'
       - '$APK_CACHE_DIR'
+  rules:
+    - if: $TESTING_ENABLED == 'true'
 
 
 Build core image for tag:
@@ -86,5 +90,16 @@ Build core image for branch:
 
 Trigger API Client pipeline:
   stage: build
+  variables:
+    MODULE_NAME: saltbox_core
+    SALTBOX_ENV_FILE: 'tests/test.env'
   trigger:
-    include: '.api-client.gitlab-ci.yml'
+    include: 
+      - project: 'saltbox/ci-lib'
+        file: 'gen-api-client.yml'
+    strategy: mirror
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'push'
+
+
+# vim: filetype=yaml.gitlab
