@@ -150,7 +150,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         fun, task_arg, task_kwarg = await self.__parse_salt_fun_params(data=data, task_template=task_template)
 
         if task_kwarg:
-            pillars = task_kwarg.pop('pillar')
+            pillars = task_kwarg.pop('pillar', {})
         else:
             pillars = {}
 
