@@ -58,7 +58,9 @@ class TaskTemplateShortSchema(BaseModel, ReadOnlyFieldsShortMixin, EditableField
 class TaskTemplateModel(BaseModel, CreatedModifiedMixin, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin, IDMixin): ...
 
 
-class TaskTemplateExcludeSlsSchema(BaseModel, CreatedModifiedMixin, ReadOnlyFieldsFullMixin, IDMixin):
+class TaskTemplateExcludeSlsSchema(
+    BaseModel, CreatedModifiedMixin, EditableFieldsShortMixin, ReadOnlyFieldsFullMixin, IDMixin
+):
     defaults: TaskTemplateDefaultsSchema | None = Field(title='Default values', default=None)
     json_schema: dict = Field(title='JSON schema', default_factory=dict)
     ui_schema: dict = Field(title='UI schema', default_factory=dict)
