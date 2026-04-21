@@ -30,6 +30,7 @@ from saltbox_sdk.discovery_client.schemas import HealthCheckResponse
 from saltbox_sdk.exceptions import SaltBoxBaseException
 from saltbox_sdk.fastapi_utils.custom_openapi import custom_openapi, patch_swagger_config
 from saltbox_sdk.fastapi_utils.exception_handlers import custom_http_handler
+from saltbox_sdk.fastapi_utils.middlewares import AuditContextMiddleware, ServerTimingMiddleware
 from saltbox_sdk.fastapi_utils.promethes_metrics.exporter import PrometheusExporter
 
 
@@ -66,6 +67,12 @@ app_config = patch_swagger_config(app_config)
 
 app = FastAPI(**app_config)
 
+app.add_middleware(
+    AuditContextMiddleware,
+    service='core',
+    gen_cor_id_if_missing=False,
+    add_to_response=True,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -74,6 +81,9 @@ app.add_middleware(
     allow_methods=['*'],
     allow_headers=['*'],
 )
+
+app.add_middleware(ServerTimingMiddleware, service='core')
+
 app.add_exception_handler(SaltBoxBaseException, custom_http_handler)
 PrometheusExporter(app).expose_metrics()
 

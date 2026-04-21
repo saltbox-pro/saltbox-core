@@ -130,7 +130,7 @@ class PillarRepository(BaseMongoRepository[PillarModel]):
         pass
 
     async def create_test_data(self) -> None:
-        root_collection: dict = await self._BaseMongoRepository__database['minion_collections'].find_one(  # type: ignore[attr-defined]
+        root_collection: dict = await self._BaseMongoRepository_database['minion_collections'].find_one(  # type: ignore[attr-defined]
             {'slug': 'root'}, {'_id': 1}
         )
         root_id = root_collection.get('_id') if root_collection else None
