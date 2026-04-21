@@ -60,7 +60,6 @@ class Settings(BaseSettings):
     base_url_root_path: str = '/'
     max_count: int = Field(default=1000, description='Max array length to request')
     origins: list[str] = Field(['*'], description='CORS allowed resources')
-    rabbitmq_url: str = 'amqp://guest:guest@rabbitmq:5672'
     is_module_inventory_on: bool = Field(default=False, description='Provide data for Inventory extension module')
     is_module_metric_on: bool = Field(default=False, description='Provide data for Metric extension module')
 

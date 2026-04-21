@@ -10,10 +10,11 @@ from taskiq_aio_pika import AioPikaBroker
 from taskiq_redis import RedisAsyncResultBackend
 
 from saltbox_core.config import SETTINGS
+from saltbox_sdk.config.rabbitmq_config import RABBIT_SETTINGS
 
 logger = logging.getLogger(__name__)
 result_backend: RedisAsyncResultBackend = RedisAsyncResultBackend(SETTINGS.taskiq_redis_url)
-broker = AioPikaBroker(SETTINGS.rabbitmq_url).with_result_backend(result_backend)
+broker = AioPikaBroker(RABBIT_SETTINGS.url).with_result_backend(result_backend)
 
 
 taskiq_fastapi.init(broker, 'saltbox_core.main:app')
