@@ -4,12 +4,12 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Response, status
 from fastapi.responses import FileResponse
 
 from saltbox_bridge_messages import BridgeGatherMinionsResponse, CoreGatherMinionsRequest, MasterStatus, SaltTgtType
-
-# from saltbox_core.config import logger
+from saltbox_core.config import logger
 from saltbox_core.event_bus.redis.masters_bus import send_message_and_wait_response_to_master
 from saltbox_core.masters.schemas.master_schemas import MasterModel
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_core.minion_collections.schemas.minion_schemas import (
+    MinionBulkDeleteBody,
     MinionDetailSchema,
     MinionListBody,
     MinionsActions,
@@ -18,8 +18,9 @@ from saltbox_core.minion_collections.schemas.minion_schemas import (
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
-from saltbox_sdk.db.schemas_base import PaginatedResponse
+from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
+from saltbox_sdk.fastapi_utils.dependencies import get_current_user
 
 router = APIRouter(prefix='/minions', tags=['Minions'])
 
@@ -164,7 +165,7 @@ async def minion_retrieve_by_master_and_id(
 
 
 @router.delete(
-    '/{mid}',
+    '/delete/{mid}',
     operation_id='minion_delete',
     openapi_extra=GatewayEndpointConfig(
         policy='core.minions.delete',
@@ -185,4 +186,37 @@ async def minion_delete(
         raise HTTPException(status_code=404, detail='Minion not found')
 
     await minion_service.delete(mid)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete(
+    '/bulk_delete',
+    operation_id='minion_bulk_delete',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.minions.delete',
+        action=MinionsActions.DELETE,
+    ).model_dump(by_alias=True),
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def minion_bulk_delete(
+    body: Annotated[MinionBulkDeleteBody, Body()],
+    user: Annotated[UserShort, Depends(get_current_user)],
+    minion_service: Annotated[MinionService, Depends(get_minion_service)],
+    collection_service: Annotated[CollectionService, Depends(get_collection_service)],
+) -> Response:
+    deleted_count = 0
+    collection = await collection_service.get_by_slug(body.collection_slug)
+
+    ids = [i.id for i in await minion_service.get_ids_by_query(query=collection.full_query)]
+    for mid in body.minions:
+        if mid not in ids:
+            continue
+
+        deleted_count += await minion_service.delete(mid)
+
+    logger.debug(
+        f'Deleted {deleted_count} minions from "{body.collection_slug}" collection '
+        f'by {user.name} [{user.email}] ({user.sub})'
+    )
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)

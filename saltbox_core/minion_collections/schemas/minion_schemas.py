@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-from saltbox_sdk.db.mongo.schemas_base import IDMixin, QueryParams, SortParams
+from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId, QueryParams, SortParams
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
 
@@ -195,6 +195,13 @@ class MinionIDs(BaseModel, IDMixin):
 
 class MinionListBody(SkipLimitParams, QueryParams, SortParams):
     collection_slug: str
+
+    model_config = ConfigDict(extra='ignore')
+
+
+class MinionBulkDeleteBody(BaseModel):
+    collection_slug: str
+    minions: list[PyObjectId]
 
     model_config = ConfigDict(extra='ignore')
 
