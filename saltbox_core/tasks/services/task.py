@@ -32,6 +32,7 @@ from saltbox_core.tasks.services.tasks_minion import TaskMinionService, get_task
 from saltbox_core.tasks.services.tasks_status import TaskStatusService, get_task_status_service
 from saltbox_core.tasks.services.tasks_template import TaskTemplateService, get_task_template_service
 from saltbox_sdk.db.mongo.config import get_mongo_session_with_transaction
+from saltbox_sdk.db.mongo.repository_base import MongoUpdateOperator
 from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
 from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.exceptions import DuplicateKeyException
@@ -349,6 +350,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         data: TaskUpdateSchema | dict[str, Any],
         exclude_unset: bool = True,
         *,
+        operator: MongoUpdateOperator = MongoUpdateOperator.set,
         session: MongoAsyncClientSession | None = None,
         notify: bool = True,
     ) -> TaskModel: ...
@@ -360,6 +362,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         data: TaskUpdateSchema | dict[str, Any],
         exclude_unset: bool = True,
         *,
+        operator: MongoUpdateOperator = MongoUpdateOperator.set,
         session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel],
         notify: bool = True,
@@ -372,6 +375,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         data: TaskUpdateSchema | dict[str, Any],
         exclude_unset: bool = True,
         *,
+        operator: MongoUpdateOperator = MongoUpdateOperator.set,
         session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel] | None = None,
         notify: bool = True,
@@ -400,6 +404,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                 query=query,
                 data=data,
                 exclude_unset=exclude_unset,
+                operator=operator,
                 session=session,
                 projection_model=projection_model,
                 notify=notify,
@@ -409,6 +414,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                 query=query,
                 data=data,
                 exclude_unset=exclude_unset,
+                operator=operator,
                 session=session,
                 notify=notify,
             )

@@ -22,6 +22,7 @@ from saltbox_core.pillars.schemas import (
     PillarUpdateSchema,
 )
 from saltbox_core.pillars.services.pillar_crypto import PillarCryptoService, get_pillar_crypto_service
+from saltbox_sdk.db.mongo.repository_base import MongoUpdateOperator
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import UserShort
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService, ProjectionModel
@@ -94,6 +95,7 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
         data: PillarUpdateSchema | dict[str, Any],
         exclude_unset: bool = True,
         *,
+        operator: MongoUpdateOperator = MongoUpdateOperator.set,
         session: MongoAsyncClientSession | None = None,
     ) -> PillarModel: ...
 
@@ -104,6 +106,7 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
         data: PillarUpdateSchema | dict[str, Any],
         exclude_unset: bool = True,
         *,
+        operator: MongoUpdateOperator = MongoUpdateOperator.set,
         session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel],
     ) -> ProjectionModel: ...
@@ -115,6 +118,7 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
         data: PillarUpdateSchema | dict[str, Any],
         exclude_unset: bool = True,
         *,
+        operator: MongoUpdateOperator = MongoUpdateOperator.set,
         session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel] | None = None,
     ) -> PillarModel | ProjectionModel:
@@ -126,9 +130,16 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
 
         if projection_model:
             return await super().update(
-                query=query, data=data, exclude_unset=exclude_unset, session=session, projection_model=projection_model
+                query=query,
+                data=data,
+                exclude_unset=exclude_unset,
+                operator=operator,
+                session=session,
+                projection_model=projection_model,
             )
-        return await super().update(query=query, data=data, exclude_unset=exclude_unset, session=session)
+        return await super().update(
+            query=query, data=data, exclude_unset=exclude_unset, operator=operator, session=session
+        )
 
     async def _resolve_target(self, data: PillarCreateSchema) -> tuple[PyObjectId, str]:
         if not data.created_by:
