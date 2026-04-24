@@ -34,13 +34,15 @@ async def auth(
             salt_conf_pubkey=message.salt_conf_pubkey,
             sshfs_pubkey=message.sshfs_pubkey,
         )
-        master = await master_service.create(create)
+        master_obj_id = await master_service.create(create)
+        master = await master_service.get(query=master_obj_id)
     else:
         if master.status is MasterStatus.KEYS_STALE:
             master.status = MasterStatus.NEW
             master.salt_conf_pubkey = message.salt_conf_pubkey
             master.sshfs_pubkey = message.sshfs_pubkey
-            master = await master_service.update(query=master.id, data=master.model_dump())
+            master_obj_id = await master_service.update(query=master.id, data=master.model_dump())
+            master = await master_service.get(query=master_obj_id)
 
     return CoreAuthResponse(
         master=master.master_id,

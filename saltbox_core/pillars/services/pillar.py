@@ -1,5 +1,5 @@
 import re
-from typing import Annotated, Any, overload, override
+from typing import Annotated, Any
 
 from fastapi import Depends
 from pydantic import JsonValue
@@ -25,7 +25,7 @@ from saltbox_core.pillars.services.pillar_crypto import PillarCryptoService, get
 from saltbox_sdk.db.mongo.repository_base import MongoUpdateOperator
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import UserShort
-from saltbox_sdk.serivces.mongo_base_service import MongoBaseService, ProjectionModel
+from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 
 
 class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreateSchema, PillarUpdateSchema]):
@@ -51,31 +51,12 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
         self._minion_service = minion_service
         self._crypto_service = crypto_service
 
-    @overload
     async def create(
         self,
         data: PillarCreateSchema | dict[str, Any],
         *,
         session: MongoAsyncClientSession | None = None,
-    ) -> PillarModel: ...
-
-    @overload
-    async def create(
-        self,
-        data: PillarCreateSchema | dict[str, Any],
-        *,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel],
-    ) -> ProjectionModel: ...
-
-    @override
-    async def create(
-        self,
-        data: PillarCreateSchema | dict[str, Any],
-        *,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel] | None = None,
-    ) -> PillarModel | ProjectionModel:
+    ) -> PyObjectId:
         if not isinstance(data, PillarCreateSchema):
             data = PillarCreateSchema.model_validate(data)
         if not data.created_by:
@@ -84,11 +65,8 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
         data.tgt_id, data.pillarenv = await self._resolve_target(data)
         data.value = self._crypto_service.encrypt_if_needed(data)
 
-        if projection_model:
-            return await super().create(data=data, projection_model=projection_model, session=session)
         return await super().create(data=data, session=session)
 
-    @overload
     async def update(
         self,
         query: dict[str, Any] | PyObjectId,
@@ -97,46 +75,13 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
         *,
         operator: MongoUpdateOperator = MongoUpdateOperator.set,
         session: MongoAsyncClientSession | None = None,
-    ) -> PillarModel: ...
-
-    @overload
-    async def update(
-        self,
-        query: dict[str, Any] | PyObjectId,
-        data: PillarUpdateSchema | dict[str, Any],
-        exclude_unset: bool = True,
-        *,
-        operator: MongoUpdateOperator = MongoUpdateOperator.set,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel],
-    ) -> ProjectionModel: ...
-
-    @override
-    async def update(
-        self,
-        query: dict[str, Any] | PyObjectId,
-        data: PillarUpdateSchema | dict[str, Any],
-        exclude_unset: bool = True,
-        *,
-        operator: MongoUpdateOperator = MongoUpdateOperator.set,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel] | None = None,
-    ) -> PillarModel | ProjectionModel:
+    ) -> PyObjectId:
         if isinstance(query, PyObjectId):
             query = {'_id': query}
         pillar = await self.get(query=query, session=session)
         if self._crypto_service.is_encrypted(pillar):
             raise PillarUpdateSecretNotAllowedException()
 
-        if projection_model:
-            return await super().update(
-                query=query,
-                data=data,
-                exclude_unset=exclude_unset,
-                operator=operator,
-                session=session,
-                projection_model=projection_model,
-            )
         return await super().update(
             query=query, data=data, exclude_unset=exclude_unset, operator=operator, session=session
         )

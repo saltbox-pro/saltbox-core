@@ -38,7 +38,8 @@ async def pillar_create(
 ) -> PillarModel:
     pillar_create = PillarCreateSchema(**pillar.model_dump(), created_by=user)
 
-    return await pillar_service.create(data=pillar_create)
+    pillar_id = await pillar_service.create(data=pillar_create)
+    return await pillar_service.get(query=pillar_id)
 
 
 @router.post(
@@ -84,7 +85,8 @@ async def pillar_update(
     pillar: PillarUpdateSchema,
     pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
 ) -> PillarModel:
-    return await pillar_service.update(query={'_id': pid}, data=pillar)
+    pillar_id = await pillar_service.update(query={'_id': pid}, data=pillar)
+    return await pillar_service.get(query=pillar_id)
 
 
 @router.delete(

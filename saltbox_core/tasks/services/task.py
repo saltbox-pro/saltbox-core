@@ -1,4 +1,4 @@
-from typing import Annotated, Any, TypeVar, overload, override
+from typing import Annotated, Any, TypeVar
 
 from fastapi import Depends
 from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
@@ -25,7 +25,7 @@ from saltbox_core.tasks.schemas.task import (
     TaskTargetMinion,
     TaskUpdateSchema,
 )
-from saltbox_core.tasks.schemas.tasks_minion import TaskMinionCreateSchema, TaskMinionModel
+from saltbox_core.tasks.schemas.tasks_minion import TaskMinionCreateSchema
 from saltbox_core.tasks.schemas.tasks_status import TaskStatus, TaskStatusCreateSchema
 from saltbox_core.tasks.schemas.tasks_template import TaskTemplateModel
 from saltbox_core.tasks.services.tasks_minion import TaskMinionService, get_task_minion_service
@@ -240,7 +240,6 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                         }
                     ),
                     session=session,
-                    projection_model=TaskMinionModel if notify else EmptyModel,
                     notify=notify,
                 )
                 created_minions_count += 1
@@ -253,35 +252,13 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         async with self.rdb.lock(f'task-process-{task_id!s}'):
             logger.debug(f'Task process {task_id} started')
 
-    @overload
     async def create(
         self,
         data: TaskCreateInputSchema | dict[str, Any],
         *,
         session: MongoAsyncClientSession | None = None,
-        projection_model: None = None,
         notify: bool = True,
-    ) -> TaskModel: ...
-
-    @overload
-    async def create(
-        self,
-        data: TaskCreateInputSchema | dict[str, Any],
-        *,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel],
-        notify: bool = True,
-    ) -> ProjectionModel: ...
-
-    @override
-    async def create(
-        self,
-        data: TaskCreateInputSchema | dict[str, Any],
-        *,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel] | None = None,
-        notify: bool = True,
-    ) -> TaskModel | ProjectionModel:
+    ) -> PyObjectId:
         if isinstance(data, dict):
             data = TaskCreateInputSchema.model_validate(data)
 
@@ -291,8 +268,10 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                 logger.debug(f'Save as default: {save_pillars_as_default}')
                 creation_data, pillars = await self.__parse_input_create_schema(data=data)
 
-                task = await self.repo.create(data=creation_data, session=s)
+                task_id = await self.repo.create(data=creation_data, session=s)
+                task = await self.get(query=task_id, session=s)
                 secret_pillar_names = None
+
                 if task.task_template_id:
                     tpl = await self.task_template_service.get(query=task.task_template_id)
                     secret_pillar_names = tpl.secret_pillars
@@ -308,14 +287,13 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                         save_as_default=save_pillars_as_default,
                         session=s,
                     )
-                _status = await self.task_status_service.create(
+                await self.task_status_service.create(
                     data=TaskStatusCreateSchema.model_validate(
                         {
                             'task_id': task.id,
                             'type': TaskStatus.created,
                         }
                     ),
-                    projection_model=EmptyModel,
                     session=s,
                 )
 
@@ -328,22 +306,16 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                     notify=False,
                 )
 
-                obj: TaskModel | ProjectionModel
-                if projection_model:
-                    obj = await self.get(query=task.id, session=s, projection_model=projection_model)
-                else:
-                    obj = await self.get(query=task.id, session=s)
                 logger.debug(f'Transaction committed successfully for task {task.id}')
             except Exception:
                 logger.exception('Error during task creation, aborting transaction')
                 raise
 
-        if notify and hasattr(obj, 'id'):
-            await self._notify(obj=task, action='create')
+        if notify:
+            await self._notify(obj_id=task_id, action='create')
 
-        return obj
+        return task_id
 
-    @overload
     async def update(
         self,
         query: dict[str, Any] | PyObjectId,
@@ -353,33 +325,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         operator: MongoUpdateOperator = MongoUpdateOperator.set,
         session: MongoAsyncClientSession | None = None,
         notify: bool = True,
-    ) -> TaskModel: ...
-
-    @overload
-    async def update(
-        self,
-        query: dict[str, Any] | PyObjectId,
-        data: TaskUpdateSchema | dict[str, Any],
-        exclude_unset: bool = True,
-        *,
-        operator: MongoUpdateOperator = MongoUpdateOperator.set,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel],
-        notify: bool = True,
-    ) -> ProjectionModel: ...
-
-    @override
-    async def update(
-        self,
-        query: dict[str, Any] | PyObjectId,
-        data: TaskUpdateSchema | dict[str, Any],
-        exclude_unset: bool = True,
-        *,
-        operator: MongoUpdateOperator = MongoUpdateOperator.set,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel] | None = None,
-        notify: bool = True,
-    ) -> TaskModel | ProjectionModel:
+    ) -> PyObjectId:
         obj = await self.get(query=query, projection_model=TaskModel, session=session)
 
         new_status = None
@@ -389,35 +335,23 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
             new_status = data.pop('status')
 
         if new_status and obj.status.type != new_status:
-            _status = await self.task_status_service.create(
+            await self.task_status_service.create(
                 data=TaskStatusCreateSchema.model_validate(
                     {
                         'task_id': obj.id,
                         'type': new_status,
                     }
                 ),
-                projection_model=EmptyModel,
             )
 
-        if projection_model:
-            return await super().update(
-                query=query,
-                data=data,
-                exclude_unset=exclude_unset,
-                operator=operator,
-                session=session,
-                projection_model=projection_model,
-                notify=notify,
-            )
-        else:
-            return await super().update(
-                query=query,
-                data=data,
-                exclude_unset=exclude_unset,
-                operator=operator,
-                session=session,
-                notify=notify,
-            )
+        return await super().update(
+            query=query,
+            data=data,
+            exclude_unset=exclude_unset,
+            operator=operator,
+            session=session,
+            notify=notify,
+        )
 
 
 def get_task_service(

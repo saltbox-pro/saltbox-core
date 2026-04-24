@@ -1,5 +1,5 @@
 import json
-from typing import Annotated, Any, overload, override
+from typing import Annotated, Any, overload
 
 from fastapi import Depends
 from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
@@ -18,7 +18,7 @@ from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_core.utilities.context import replace_raised
 from saltbox_core.utilities.jid import JID
-from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.serivces.mongo_base_service import ProjectionModel
 from saltbox_sdk.serivces.mongo_base_with_notify_service import MongoBaseWithNotifyService
@@ -77,7 +77,9 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
 
         return channels.get(action)
 
-    async def _notify(self, obj: JobModel | ProjectionModel, action: str) -> None:
+    async def _notify(self, obj_id: PyObjectId, action: str) -> None:
+        obj = await self.get(query=obj_id)
+
         try:
             channel = self._get_notify_channel(obj=obj, action=action)
             task_channel = self._get_notify_channel(obj=obj, action=f'{action}_task')
@@ -113,7 +115,6 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         except JsonSchemaValidationError as e:
             raise JobCreateException(str(e)) from e
 
-    @overload
     async def create(
         self,
         data: JobCreateSchema | dict[str, Any],
@@ -121,29 +122,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         extra_pillarenv: list[str] | None = None,
         session: MongoAsyncClientSession | None = None,
         notify: bool = True,
-    ) -> JobModel: ...
-
-    @overload
-    async def create(
-        self,
-        data: JobCreateSchema | dict[str, Any],
-        *,
-        extra_pillarenv: list[str] | None = None,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel],
-        notify: bool = True,
-    ) -> ProjectionModel: ...
-
-    @override
-    async def create(
-        self,
-        data: JobCreateSchema | dict[str, Any],
-        *,
-        extra_pillarenv: list[str] | None = None,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel] | None = None,
-        notify: bool = True,
-    ) -> JobModel | ProjectionModel:
+    ) -> PyObjectId:
         if isinstance(data, dict):
             data = JobCreateSchema.model_validate(data)
 
@@ -155,14 +134,12 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
 
         await self.__prepare_create_obj(data=data)
 
-        job: JobModel | ProjectionModel
         create_args: dict[str, Any] = {'data': data}
-        if projection_model:
-            create_args['projection_model'] = projection_model
         if notify:
             create_args['notify'] = notify
 
-        job = await super().create(**create_args, session=session)
+        job_id = await super().create(**create_args, session=session)
+
         job_salt_data: dict[str, Any] = {
             'jid': data.jid,
             'tgt': data.tgt,
@@ -188,7 +165,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
 
         await self.rdb.rpush(JOBS_TO_CREATE_SET_NAME.format(master_id=data.salt_master), json.dumps(job_salt_data))
 
-        return job
+        return job_id
 
     @overload
     async def update_status(
@@ -237,7 +214,6 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
                 data=data_to_update,
                 session=session,
                 notify=notify,
-                projection_model=JobModel if notify else EmptyModel,
             )
 
         if projection_model:

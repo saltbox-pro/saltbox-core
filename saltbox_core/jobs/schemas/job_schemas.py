@@ -117,6 +117,10 @@ class JobSimpleSchema(BaseModel, IDMixin):
     status: JobStatus
 
 
+class JobSimpleWithSourceSchema(JobSimpleSchema):
+    source: Source | None = None
+
+
 # Rest
 
 

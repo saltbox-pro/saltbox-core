@@ -112,9 +112,9 @@ class SettingsSlsRepoService(
         document = await self.get(sid)
         if document.is_active == state:
             return document
-        result = await self.update(query=sid, data={'is_active': state}, session=session)
+        obj_id = await self.update(query=sid, data={'is_active': state}, session=session)
         await self.sync_to_serve_dir()
-        return result
+        return await self.get(query=obj_id)
 
     async def activate(
         self,

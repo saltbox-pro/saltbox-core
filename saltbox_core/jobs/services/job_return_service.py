@@ -7,6 +7,7 @@ from redis.asyncio import Redis
 from saltbox_core.config import logger
 from saltbox_core.jobs.repositories.job_return_repository import JobReturnRepository, get_job_return_repository
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnCreateSchema, JobReturnModel, JobReturnUpdateSchema
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.serivces.mongo_base_service import ProjectionModel
 from saltbox_sdk.serivces.mongo_base_with_notify_service import MongoBaseWithNotifyService
@@ -37,7 +38,9 @@ class JobReturnService(
 
         return channels.get(action)
 
-    async def _notify(self, obj: JobReturnModel | ProjectionModel, action: str) -> None:
+    async def _notify(self, obj_id: PyObjectId, action: str) -> None:
+        obj = await self.get(query=obj_id)
+
         try:
             channel = self._get_notify_channel(obj=obj, action=action)
             task_channel = self._get_notify_channel(obj=obj, action=f'{action}_task')

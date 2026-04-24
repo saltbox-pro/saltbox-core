@@ -83,7 +83,7 @@ async def job_create(
     user: Annotated[UserShort, Depends(get_current_user)],
     job_service: Annotated[JobService, Depends(get_job_service)],
 ) -> JobModel:
-    return await job_service.create(
+    job_obj_id = await job_service.create(
         data=JobCreateSchema.model_validate(
             {
                 'user': user.model_dump(),
@@ -95,6 +95,7 @@ async def job_create(
         ),
         notify=True,
     )
+    return await job_service.get(query=job_obj_id)
 
 
 @router.get(

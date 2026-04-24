@@ -29,7 +29,7 @@ from saltbox_core.tasks.services.tasks_status import TaskStatusService
 from saltbox_core.tasks.services.tasks_template import TaskTemplateService
 from saltbox_sdk.config.redis_config import REDIS_SETTINGS
 from saltbox_sdk.db.mongo.config import get_mongo_db
-from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.utilities.helpers import utc_now
 
 
@@ -129,9 +129,7 @@ class JobsWatcher:
                         await task_minion_service.update(query=task_minion.id, data=data_to_update)
                         await task_service.update(query=task.id, data={})
 
-                    await job_return_service.update(
-                        query=job_return.id, data={'status': JobReturnStatus.timeout}, projection_model=EmptyModel
-                    )
+                    await job_return_service.update(query=job_return.id, data={'status': JobReturnStatus.timeout})
 
                 await job_service.update(query=job.id, data={'status': JobStatus.finished})
 

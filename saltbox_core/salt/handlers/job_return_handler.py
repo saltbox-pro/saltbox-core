@@ -174,20 +174,22 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
                 'user': job.user,
                 'stamp_job': job.stamp,
             }
-            job_return = await self.job_return_service.create(
+            job_return_id = await self.job_return_service.create(
                 data=JobReturnCreateSchema.model_validate(payload),
                 notify=True,
             )
+            job_return = await self.job_return_service.get(query=job_return_id)
             is_new_return = True
         except DuplicateKeyException:
             try:
-                job_return = await self.job_return_service.update(
+                job_return_id = await self.job_return_service.update(
                     query={'jid': jid, 'salt_master': master_id, 'minion_id': mid, 'retcode': None},
                     data=JobReturnUpdateSchema.model_validate(
                         {'source': job.source, 'user': job.user, 'stamp_job': job.stamp, **data}
                     ),
                     notify=True,
                 )
+                job_return = await self.job_return_service.get(query=job_return_id)
                 is_new_return = True
             except NotFoundException:
                 job_return = await self.job_return_service.get(

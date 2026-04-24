@@ -117,7 +117,8 @@ async def task_template_create(
     item: TaskTemplateCreateSchema,
     service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
 ) -> TaskTemplateModel:
-    return await service.create(item)
+    obj_id = await service.create(item)
+    return await service.get(query=obj_id)
 
 
 @router.get(
@@ -188,4 +189,5 @@ async def task_template_update(
     item: TaskTemplateUpdateSchema,
     service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
 ) -> TaskTemplateModel:
-    return await service.update(query={'_id': tpl_id, 'repo_id': None}, data=item)
+    obj_id = await service.update(query={'_id': tpl_id, 'repo_id': None}, data=item)
+    return await service.get(query=obj_id)

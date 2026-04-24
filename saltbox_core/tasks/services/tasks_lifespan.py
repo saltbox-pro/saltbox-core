@@ -201,7 +201,6 @@ class TaskLifespanService:
                         'user': task.user,
                     },
                 ),
-                projection_model=EmptyModel,
             )
 
     @staticmethod
@@ -253,7 +252,6 @@ class TaskLifespanService:
                     }
                 ),
                 extra_pillarenv=[f'task:{task.id!s}'],
-                projection_model=EmptyModel,
             )
 
             for minion in minions:

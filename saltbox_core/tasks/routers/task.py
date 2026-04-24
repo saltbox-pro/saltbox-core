@@ -87,7 +87,7 @@ async def task_create(
     user: Annotated[UserShort, Depends(get_current_user)],
     task_service: Annotated[TaskService, Depends(get_task_service)],
 ) -> TaskModel:
-    return await task_service.create(
+    obj_id = await task_service.create(
         data=TaskCreateInputSchema(
             **{
                 'user': user.model_dump(),
@@ -96,6 +96,7 @@ async def task_create(
             }
         )
     )
+    return await task_service.get(query=obj_id)
 
 
 @router.get(

@@ -132,7 +132,8 @@ async def collection_create(
     creation_data['parent_id'] = parent_collection.id
     creation_data['owner_id'] = user.sub
 
-    return await collection_service.create(CollectionCreateSchema.model_validate(creation_data))
+    collection_id = await collection_service.create(CollectionCreateSchema.model_validate(creation_data))
+    return await collection_service.get(query=collection_id)
 
 
 @router.put(

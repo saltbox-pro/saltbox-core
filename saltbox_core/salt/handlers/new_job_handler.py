@@ -9,7 +9,7 @@ from saltbox_core.salt.exceptions import StopProcessing
 from saltbox_core.salt.handlers.base_handler import MessageDataType
 from saltbox_core.salt.handlers.base_job_handler import BaseJobMessageHandler
 from saltbox_sdk.db.schemas_base import SYSTEM_USER
-from saltbox_sdk.exceptions import DuplicateKeyException, ObjectNotFoundException
+from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.utilities.helpers import format_iso8601_z, make_aware
 
 
@@ -38,7 +38,7 @@ class JobNewMessageHandler(BaseJobMessageHandler):
         try:
             existed_job = await self.job_service.get(query={'jid': str(jid), 'salt_master': str(master_id)})
 
-            return await self.job_service.update(
+            obj_id = await self.job_service.update(
                 query=existed_job.id,
                 data={
                     'status': JobStatus.running,
@@ -47,12 +47,15 @@ class JobNewMessageHandler(BaseJobMessageHandler):
                     'stamp': data.get('stamp'),
                     'system_user': data.get('system_user'),
                 },
+                notify=False,
             )
         except ObjectNotFoundException:
-            return await self.job_service.create(
+            obj_id = await self.job_service.create(
                 data=JobCreateSchema.model_validate({**data, 'status': JobStatus.running, 'user': SYSTEM_USER}),
-                notify=True,
+                notify=False,
             )
+
+        return await self.job_service.get(query=obj_id)
 
     async def process(
         self,
@@ -86,17 +89,18 @@ class JobNewMessageHandler(BaseJobMessageHandler):
             if job.missing:
                 minions_by_status[JobReturnStatus.ignored] = job.missing
 
+            job_returns_documents_to_create: list[JobReturnCreateSchema] = []
+
             for job_return_status, minion_ids in minions_by_status.items():
                 for minion_id in minion_ids:
-                    try:
-                        await self.job_return_service.create(
-                            data=JobReturnCreateSchema.model_validate(
-                                {'minion_id': minion_id, 'status': job_return_status, **job_return_data}
-                            ),
-                            notify=True,
+                    job_returns_documents_to_create.append(
+                        JobReturnCreateSchema.model_validate(
+                            {'minion_id': minion_id, 'status': job_return_status, **job_return_data}
                         )
-                    except DuplicateKeyException:
-                        continue
+                    )
+
+            await self.job_return_service.bulk_create(job_returns_documents_to_create)
+            await self.job_service.update(query=job.id, data={}, notify=True)
 
         raise StopProcessing()
 
