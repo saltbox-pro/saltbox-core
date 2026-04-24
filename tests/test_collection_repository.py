@@ -44,7 +44,8 @@ async def test_collection_repository_create(mocked_db):
     )
 
     # Call create method
-    created_collection = await repo.create(collection_data)
+    created_collection_id = await repo.create(collection_data)
+    created_collection = await repo.get(created_collection_id)
 
     # Check results
     assert isinstance(created_collection, CollectionModel)
@@ -70,7 +71,8 @@ async def test_collection_repository_create_with_dict(mocked_db):
         'owner_id': 'user1',
     }
 
-    created_collection = await repo.create(collection_data)
+    created_collection_id = await repo.create(collection_data)
+    created_collection = await repo.get(created_collection_id)
 
     assert isinstance(created_collection, CollectionModel)
     assert created_collection.title == 'Тестовая коллекция 2'

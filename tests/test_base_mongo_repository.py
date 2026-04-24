@@ -65,7 +65,8 @@ async def test_create_and_get(mocked_db):
 
     # Create a new object
     data = CreateUpdateModel(name='Test Object', description='Test Description')
-    created_obj = await repo.create(data)
+    created_obj_id = await repo.create(data)
+    created_obj = await repo.get(created_obj_id)
 
     # Check that the object is created correctly
     assert isinstance(created_obj, SampleModel)
@@ -89,7 +90,8 @@ async def test_create_with_dict(mocked_db):
 
     # Create a new object using dictionary
     data = {'name': 'Dict Object', 'description': 'Created from dict'}
-    created_obj = await repo.create(data)
+    created_obj_id = await repo.create(data)
+    created_obj = await repo.get(created_obj_id)
 
     assert created_obj.name == 'Dict Object'
     assert created_obj.description == 'Created from dict'
@@ -102,10 +104,10 @@ async def test_get_with_projection(mocked_db):
 
     # Create an object
     data = {'name': 'Projection Test', 'description': 'Testing projection'}
-    created_obj = await repo.create(data)
+    created_obj_id = await repo.create(data)
 
     # Get object with projection
-    projected_obj = await repo.get(created_obj.id, projection_model=SampleModelProjection)
+    projected_obj = await repo.get(created_obj_id, projection_model=SampleModelProjection)
 
     assert isinstance(projected_obj, SampleModelProjection)
     assert projected_obj.name == 'Projection Test'
@@ -162,10 +164,12 @@ async def test_update(mocked_db):
     repo = SampleRepository(mocked_db)
 
     # Create object
-    created_obj = await repo.create({'name': 'Update Test', 'description': 'Before update'})
+    created_obj_id = await repo.create({'name': 'Update Test', 'description': 'Before update'})
+    created_obj = await repo.get(created_obj_id)
 
     # Update object
-    updated_obj = await repo.update(created_obj.id, {'name': 'Updated Name', 'description': 'After update'})
+    updated_obj_id = await repo.update(created_obj.id, {'name': 'Updated Name', 'description': 'After update'})
+    updated_obj = await repo.get(updated_obj_id)
 
     assert updated_obj.id == created_obj.id
     assert updated_obj.name == 'Updated Name'
@@ -185,11 +189,12 @@ async def test_update_with_model(mocked_db):
     repo = SampleRepository(mocked_db)
 
     # Create object
-    created_obj = await repo.create({'name': 'Model Update Test', 'description': 'Before model update'})
+    created_obj_id = await repo.create({'name': 'Model Update Test', 'description': 'Before model update'})
 
     # Update using model
     update_data = CreateUpdateModel(name='Model Updated', description='After model update')
-    updated_obj = await repo.update(created_obj.id, update_data)
+    updated_obj_id = await repo.update(created_obj_id, update_data)
+    updated_obj = await repo.get(updated_obj_id)
 
     assert updated_obj.name == 'Model Updated'
     assert updated_obj.description == 'After model update'
@@ -201,12 +206,13 @@ async def test_update_with_projection(mocked_db):
     repo = SampleRepository(mocked_db)
 
     # Create object
-    created_obj = await repo.create({'name': 'Projection Update Test', 'description': 'Testing projection in update'})
+    created_obj_id = await repo.create(
+        {'name': 'Projection Update Test', 'description': 'Testing projection in update'}
+    )
 
     # Update object and get projection
-    projected_obj = await repo.update(
-        created_obj.id, {'name': 'Updated With Projection'}, projection_model=SampleModelProjection
-    )
+    updated_obj_id = await repo.update(created_obj_id, {'name': 'Updated With Projection'})
+    projected_obj = await repo.get(updated_obj_id, projection_model=SampleModelProjection)
 
     assert isinstance(projected_obj, SampleModelProjection)
     assert projected_obj.name == 'Updated With Projection'
@@ -231,15 +237,15 @@ async def test_delete(mocked_db):
     repo = SampleRepository(mocked_db)
 
     # Create object
-    created_obj = await repo.create({'name': 'Delete Test', 'description': 'To be deleted'})
+    created_obj_id = await repo.create({'name': 'Delete Test', 'description': 'To be deleted'})
 
     # Delete object
-    deleted_count = await repo.delete(created_obj.id)
+    deleted_count = await repo.delete(created_obj_id)
     assert deleted_count == 1
 
     # Check that the object was actually deleted
     with pytest.raises(ObjectNotFoundException):
-        await repo.get(created_obj.id)
+        await repo.get(created_obj_id)
 
 
 @pytest.mark.asyncio
