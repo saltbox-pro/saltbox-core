@@ -59,9 +59,7 @@ async def process_task_job_error(
         task = await task_service.get(query=PyObjectId(job.source.id))
         minions_ids = job.tgt if isinstance(job.tgt, list) else [job.tgt]
 
-        for task_minion in await task_minion_service.get_list(
-            query={'task_id': task.id, 'minion_id': {'$in': minions_ids}, 'master': job.salt_master}
-        ):
-            status = TaskMinionStatus.failed
-
-            await task_minion_service.update(query=task_minion.id, data={'status': status})
+        await task_minion_service.bulk_update(
+            query={'task_id': task.id, 'minion_id': {'$in': minions_ids}, 'master': job.salt_master},
+            data={'status': TaskMinionStatus.failed},
+        )

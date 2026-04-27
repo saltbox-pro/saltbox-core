@@ -118,10 +118,10 @@ class TaskLifespanService:
         task = await self.get_task()
 
         if task.status and task.status.type != TaskStatus.stopping:
-            for minion_id in minions_ids:
-                await self.task_minion_service.update(
-                    query=minion_id, data={'status': TaskMinionStatus.pending, 'check_unactive_last_job_dt': None}
-                )
+            await self.task_minion_service.bulk_update(
+                query={'_id': {'$in': minions_ids}},
+                data={'status': TaskMinionStatus.pending, 'check_unactive_last_job_dt': None},
+            )
 
             await self.update_task(status=TaskStatus.running)
 
@@ -184,16 +184,15 @@ class TaskLifespanService:
         )
 
         if minions:
-            minions_ids = []
-
-            for minion in minions:
-                minions_ids.append(minion.minion_id)
-                await self.task_minion_service.update(query=minion.id, data={'check_unactive_last_job_dt': utc_now()})
+            await self.task_minion_service.bulk_update(
+                query={'_id': {'$in': [minion.id for minion in minions]}},
+                data={'check_unactive_last_job_dt': utc_now()},
+            )
 
             await self.job_service.create(
                 data=JobCreateSchema.model_validate(
                     {
-                        'tgt': minions_ids,
+                        'tgt': [minion.minion_id for minion in minions],
                         'tgt_type': 'list',
                         'salt_master': master,
                         'fun': 'test.ping',
@@ -254,14 +253,13 @@ class TaskLifespanService:
                 extra_pillarenv=[f'task:{task.id!s}'],
             )
 
-            for minion in minions:
-                await self.task_minion_service.update(
-                    query=minion.id,
-                    data={
-                        'status': TaskMinionStatus.in_work,
-                        'start_last_dt': utc_now(),
-                    },
-                )
+            await self.task_minion_service.bulk_update(
+                query={'_id': {'$in': [minion.id for minion in minions]}},
+                data={
+                    'status': TaskMinionStatus.in_work,
+                    'start_last_dt': utc_now(),
+                },
+            )
 
         return len(minions)
 

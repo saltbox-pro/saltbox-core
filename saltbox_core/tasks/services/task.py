@@ -35,7 +35,6 @@ from saltbox_sdk.db.mongo.config import get_mongo_session_with_transaction
 from saltbox_sdk.db.mongo.repository_base import MongoUpdateOperator
 from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
 from saltbox_sdk.db.redis.config import get_redis
-from saltbox_sdk.exceptions import DuplicateKeyException
 from saltbox_sdk.serivces.mongo_base_with_notify_service import MongoBaseWithNotifyService
 
 ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
@@ -221,7 +220,6 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         notify: bool = True,
     ) -> int:
         collection = await self.collections_service.get(query=target_collection_id)
-        created_minions_count = 0
 
         minion_ids = await self.__get_minions_by_targeting(
             target_collection=collection,
@@ -230,23 +228,16 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
             session=session,
         )
 
-        for minion_id in minion_ids:
-            try:
-                await self.task_minion_service.create(
-                    data=TaskMinionCreateSchema.model_validate(
-                        {
-                            'task_id': task_id,
-                            'minion_inner_id': minion_id,
-                        }
-                    ),
-                    session=session,
-                    notify=notify,
-                )
-                created_minions_count += 1
-            except DuplicateKeyException:
-                continue
+        created_minions_ids = await self.task_minion_service.bulk_create(
+            data=[
+                TaskMinionCreateSchema.model_validate({'task_id': task_id, 'minion_inner_id': minion_id})
+                for minion_id in minion_ids
+            ],
+            session=session,
+            notify=notify,
+        )
 
-        return created_minions_count
+        return len(created_minions_ids)
 
     async def process(self, task_id: PyObjectId, *, session: MongoAsyncClientSession | None = None) -> None:
         async with self.rdb.lock(f'task-process-{task_id!s}'):

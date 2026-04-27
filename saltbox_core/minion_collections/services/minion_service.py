@@ -55,18 +55,10 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
         return UniqueGrainValuesResponse(total=len(full_data), data=data)
 
     async def process_presence(self, master_id: str, minions: list[str], stamp: float) -> None:
-        last_activity_dt = datetime.fromtimestamp(stamp, tz=UTC)
-
-        for minion_id in minions:
-            try:
-                minion: MinionModel = await self.get_by_master_and_id(master=master_id, minion_id=minion_id)
-                minion.last_activity = last_activity_dt
-                await self.update(
-                    query={'master': master_id, 'minion_id': minion_id},
-                    data={'last_activity': last_activity_dt},
-                )
-            except ObjectNotFoundException:
-                logger.info('Minion "%s" from presence not found in DB', minion_id)
+        await self.bulk_update(
+            query={'master': master_id, 'minion_id': {'$in': minions}},
+            data={'last_activity': datetime.fromtimestamp(stamp, tz=UTC)},
+        )
 
     async def process_grains(self, master_id: str, minion_id: str, grains: dict[str, Any]) -> None:
         try:
