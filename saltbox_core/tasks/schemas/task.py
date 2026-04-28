@@ -8,6 +8,7 @@ from saltbox_core.tasks.schemas.tasks_status import TaskStatus
 from saltbox_core.tasks.schemas.tasks_template import TaskTemplateDefaultsSchema
 from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId, QueryParams, SortParams
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams, Source, UserShort
+from saltbox_sdk.exceptions import SaltBoxValidationException
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
 from saltbox_sdk.utilities.helpers import utc_now
 
@@ -178,11 +179,11 @@ class TaskCreateRequestSchema(BaseModel):
     def validate_fun(self) -> 'TaskCreateRequestSchema':
         if self.task_template_id is None and self.fun is None:
             msg = 'One of `task_template` or `fun` must be set'
-            raise ValueError(msg)
+            raise SaltBoxValidationException(msg)
 
         if self.task_template_id is not None and self.fun is not None:
             msg = 'Only one of `task_template` or `fun` can be set'
-            raise ValueError(msg)
+            raise SaltBoxValidationException(msg)
 
         return self
 
@@ -190,11 +191,11 @@ class TaskCreateRequestSchema(BaseModel):
     def validate_collection(self) -> 'TaskCreateRequestSchema':
         if self.collection_id is None and self.collection_slug is None:
             msg = 'One of `collection_id` or `collection_slug` must be set'
-            raise ValueError(msg)
+            raise SaltBoxValidationException(msg)
 
         if self.collection_id is not None and self.collection_slug is not None:
             msg = 'Only one of `collection_id` or `collection_slug` can be set'
-            raise ValueError(msg)
+            raise SaltBoxValidationException(msg)
 
         return self
 

@@ -14,11 +14,6 @@ from saltbox_core.minion_collections.schemas.collection_schemas import Collectio
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from saltbox_core.pillars.services.pillar import PillarService, get_pillar_service
-from saltbox_core.tasks.exceptions import (
-    TaskCreateSchemaValidationException,
-    TaskCreateServiceException,
-    TaskServiceException,
-)
 from saltbox_core.tasks.repositories.task import TaskRepository, get_task_repository
 from saltbox_core.tasks.schemas.task import (
     TaskCreateInputSchema,
@@ -37,6 +32,7 @@ from saltbox_sdk.db.mongo.config import get_mongo_session_with_transaction
 from saltbox_sdk.db.mongo.repository_base import MongoUpdateOperator
 from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
 from saltbox_sdk.db.redis.config import get_redis
+from saltbox_sdk.exceptions import ObjectNotFoundException, SaltBoxValidationException
 from saltbox_sdk.serivces.mongo_base_with_notify_service import MongoBaseWithNotifyService
 
 ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
@@ -106,7 +102,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                     name=task_template.name, sid=task_template.repo_id, data=task_data
                 )
             except JsonSchemaValidationError as err:
-                raise TaskCreateSchemaValidationException(str(err)) from None
+                raise SaltBoxValidationException(str(err)) from err
 
         elif data.fun:
             fun = data.fun
@@ -114,10 +110,10 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
             try:
                 validated_data = await self.job_schema_service.get_validated_data(name=fun, data=task_data)
             except JsonSchemaValidationError as err:
-                raise TaskServiceException(str(err)) from err
+                raise SaltBoxValidationException(str(err)) from err
         else:
             msg = 'Task salt fun must be provided from direct fun or task template'
-            raise TaskCreateServiceException(msg)
+            raise SaltBoxValidationException(msg)
 
         task_arg = validated_data.get('args')
         task_kwarg = validated_data.get('kwargs')
@@ -131,16 +127,19 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         return fun, task_arg, task_kwarg
 
     async def __parse_input_create_schema(self, data: TaskCreateInputSchema) -> tuple[TaskCreateSchema, dict[str, Any]]:
-        if data.collection_slug:
-            collection = await self.collections_service.get_by_slug(
-                slug=data.collection_slug, projection_model=EmptyModel
-            )
-            collection_id = collection.id
-        elif data.collection_id:
-            collection_id = data.collection_id
-        else:
-            msg = 'Collection must be provided'
-            raise TaskCreateServiceException(msg)
+        try:
+            if data.collection_slug:
+                collection = await self.collections_service.get_by_slug(
+                    slug=data.collection_slug, projection_model=EmptyModel
+                )
+            elif data.collection_id:
+                collection = await self.collections_service.get(query=data.collection_id, projection_model=EmptyModel)
+            else:
+                msg = 'Collection must be provided'
+                raise SaltBoxValidationException(msg)
+        except ObjectNotFoundException as e:
+            msg = 'Collection not found'
+            raise SaltBoxValidationException(msg) from e
 
         task_template: TaskTemplateModel | None = None
 
@@ -171,7 +170,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                 'fun': fun,
                 'arg': task_arg,
                 'kwarg': task_kwarg,
-                'target_collection_id': collection_id,
+                'target_collection_id': collection.id,
                 'target_query': data.query,
                 'batch_size': data.batch_size if data.batch_size is not None else task_defaults['batch_size'],
                 'max_retries': data.max_retries if data.max_retries is not None else task_defaults['max_retries'],
