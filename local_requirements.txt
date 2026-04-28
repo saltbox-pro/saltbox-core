@@ -2,7 +2,7 @@
 # - Prefer tag or commit hash over branch to specify version.
 # - Prefer long hash over short hash for pip efficiency.
 
-saltbox-sdk @ git+https://dev.saltbox.pro/saltbox/saltbox-sdk/@9b5d106a5e829a1de70ba99ed694e62b884ce337
+saltbox-sdk @ git+https://dev.saltbox.pro/saltbox/saltbox-sdk/@f7878712f5fc71fbf94d3bb32523c1f7f93b8b07
 saltbox-bridge-messages @ git+https://dev.saltbox.pro/saltbox/saltbox-bridge-messages/@9bc089855d32a7afbb15fa21ca82b0e97c420006
 
 # vi: ft=requirements
