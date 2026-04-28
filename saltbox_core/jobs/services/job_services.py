@@ -1,4 +1,5 @@
 import json
+from collections.abc import Callable
 from typing import Annotated, Any, overload
 
 from fastapi import Depends
@@ -9,6 +10,7 @@ from redis.asyncio import Redis
 
 from saltbox_bridge_messages import MasterStatus
 from saltbox_core.config import SETTINGS, logger
+from saltbox_core.db.tiq_tasks import send_notify_by_mongo_service
 from saltbox_core.jobs.exceptions import JobCreateException, JobServiceException
 from saltbox_core.jobs.repositories.job_repository import JobRepository, get_job_repository
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnStatus
@@ -55,6 +57,14 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         self.master_service = master_service
         super().__init__(repo=job_repository, rdb=rdb)
 
+    @property
+    def notify_taskiq_task(self) -> Callable:
+        return send_notify_by_mongo_service
+
+    @property
+    def service_name(self) -> str:
+        return 'job_service'
+
     def _get_notify_channel(self, obj: JobModel | ProjectionModel, action: str) -> str | None:
         if not hasattr(obj, 'jid'):
             return None
@@ -77,7 +87,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
 
         return channels.get(action)
 
-    async def _notify(self, obj_id: PyObjectId, action: str) -> None:
+    async def run_notify(self, obj_id: PyObjectId, action: str) -> None:
         obj = await self.get(query=obj_id)
 
         try:

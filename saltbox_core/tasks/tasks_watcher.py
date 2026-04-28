@@ -26,6 +26,7 @@ from saltbox_core.tasks.services.tasks_lifespan import TaskLifespanService
 from saltbox_core.tasks.services.tasks_minion import TaskMinionService
 from saltbox_core.tasks.services.tasks_status import TaskStatusService
 from saltbox_core.tasks.services.tasks_template import TaskTemplateService
+from saltbox_core.tkq import broker
 from saltbox_sdk.config.redis_config import REDIS_SETTINGS
 from saltbox_sdk.db.mongo.config import get_mongo_db
 
@@ -111,9 +112,14 @@ class TasksWatcher:
 
 
 async def async_main() -> None:
-    logger.info('Starting watcher')
+    logger.info('Starting task watcher')
     watcher = TasksWatcher()
+
+    await broker.startup()
     await watcher.process()
+    await broker.shutdown()
+
+    logger.info('Task watcher stopped')
 
 
 def main() -> None:

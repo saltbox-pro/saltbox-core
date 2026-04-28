@@ -1,3 +1,4 @@
+from collections.abc import Callable
 from typing import Annotated, Any, TypeVar
 
 from fastapi import Depends
@@ -7,6 +8,7 @@ from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsync
 from redis.asyncio import Redis
 
 from saltbox_core.config import SETTINGS, logger
+from saltbox_core.db.tiq_tasks import send_notify_by_mongo_service
 from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
 from saltbox_core.minion_collections.schemas.collection_schemas import CollectionModel
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
@@ -65,6 +67,14 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         self.minion_service = minion_service
         self.pillar_service = pillar_service
         self.rdb = rdb
+
+    @property
+    def notify_taskiq_task(self) -> Callable:
+        return send_notify_by_mongo_service
+
+    @property
+    def service_name(self) -> str:
+        return 'task_service'
 
     def _get_notify_channel(self, obj: TaskModel | ProjectionModel, action: str) -> str | None:
         if not hasattr(obj, 'id'):

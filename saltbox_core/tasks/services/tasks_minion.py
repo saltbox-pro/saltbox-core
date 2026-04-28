@@ -1,9 +1,11 @@
+from collections.abc import Callable
 from typing import Annotated, TypeVar
 
 from fastapi import Depends
 from pydantic import BaseModel
 from redis.asyncio import Redis
 
+from saltbox_core.db.tiq_tasks import send_notify_by_mongo_service
 from saltbox_core.tasks.repositories.task import TaskRepository
 from saltbox_core.tasks.repositories.tasks_minion import TaskMinionRepository, get_task_minion_repository
 from saltbox_core.tasks.schemas.tasks_minion import TaskMinionCreateSchema, TaskMinionModel, TaskMinionUpdateSchema
@@ -28,6 +30,14 @@ class TaskMinionService(
 
         self.task_repository = TaskRepository(database=get_mongo_db())  # TODO (@): Temporary
 
+    @property
+    def notify_taskiq_task(self) -> Callable:
+        return send_notify_by_mongo_service
+
+    @property
+    def service_name(self) -> str:
+        return 'task_minion_service'
+
     def _get_notify_channel(self, obj: TaskMinionModel | ProjectionModel, action: str) -> str | None:
         if not hasattr(obj, 'id') or not hasattr(obj, 'task_id'):
             return None
@@ -39,7 +49,7 @@ class TaskMinionService(
         }.get(action)
 
     # TODO (@): Temporary
-    async def _notify(self, obj_id: PyObjectId, action: str) -> None:
+    async def run_notify(self, obj_id: PyObjectId, action: str) -> None:
         obj = await self.get(query=obj_id)
 
         async with self.rdb.pipeline() as pipe:
