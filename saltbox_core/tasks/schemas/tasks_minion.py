@@ -56,6 +56,11 @@ class TaskMinionModel(
 ): ...
 
 
+class TaskMinionInnerIdOnly(BaseModel, IDMixin):
+    task_id: PyObjectId = Field(title='Task ID')
+    minion_inner_id: PyObjectId = Field(title='Minion Mongo ID')
+
+
 # REST
 
 

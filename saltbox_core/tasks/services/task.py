@@ -22,7 +22,7 @@ from saltbox_core.tasks.schemas.task import (
     TaskTargetMinion,
     TaskUpdateSchema,
 )
-from saltbox_core.tasks.schemas.tasks_minion import TaskMinionCreateSchema
+from saltbox_core.tasks.schemas.tasks_minion import TaskMinionCreateSchema, TaskMinionInnerIdOnly
 from saltbox_core.tasks.schemas.tasks_status import TaskStatus, TaskStatusCreateSchema
 from saltbox_core.tasks.schemas.tasks_template import TaskTemplateModel
 from saltbox_core.tasks.services.tasks_minion import TaskMinionService, get_task_minion_service
@@ -188,6 +188,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
 
     async def __get_minions_by_targeting(
         self,
+        task_id: PyObjectId,
         target_collection: CollectionModel,
         target_query: dict | None = None,
         target_minions: list[TaskTargetMinion] | None = None,
@@ -207,12 +208,18 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                 }
             )
 
+        minions_in_task = await self.task_minion_service.get_list(
+            query={'task_id': task_id},
+            session=session,
+            projection_model=TaskMinionInnerIdOnly,
+        )
+        if minions_in_task:
+            queries.append({'_id': {'$nin': [minion.minion_inner_id for minion in minions_in_task]}})
+
         return [
             minion.id
             for minion in await self.minion_service.get_list(
                 query={'$and': queries} if queries else {},
-                limit=0,
-                skip=0,
                 session=session,
                 projection_model=EmptyModel,
             )
@@ -231,6 +238,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         collection = await self.collections_service.get(query=target_collection_id)
 
         minion_ids = await self.__get_minions_by_targeting(
+            task_id=task_id,
             target_collection=collection,
             target_query=target_query,
             target_minions=target_minions,
@@ -260,13 +268,15 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         notify: bool = True,
     ) -> PyObjectId:
         if isinstance(data, dict):
-            data = TaskCreateInputSchema.model_validate(data)
+            validated_data = TaskCreateInputSchema.model_validate(data)
+        else:
+            validated_data = data
 
         async with get_mongo_session_with_transaction(session) as s:
             try:
-                save_pillars_as_default = data.save_pillars_as_default
+                save_pillars_as_default = validated_data.save_pillars_as_default
                 logger.debug(f'Save as default: {save_pillars_as_default}')
-                creation_data, pillars = await self.__parse_input_create_schema(data=data)
+                creation_data, pillars = await self.__parse_input_create_schema(data=validated_data)
 
                 task_id = await self.repo.create(data=creation_data, session=s)
                 task = await self.get(query=task_id, session=s)
@@ -283,33 +293,29 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                         task_template_id=task.task_template_id,
                         pillars=pillars,
                         secret_pillar_names=secret_pillar_names,
-                        user=data.user,
+                        user=validated_data.user,
                         save_as_default=save_pillars_as_default,
                         session=s,
                     )
-                await self.task_status_service.create(
-                    data=TaskStatusCreateSchema.model_validate(
-                        {
-                            'task_id': task.id,
-                            'type': TaskStatus.created,
-                        }
-                    ),
-                    session=s,
-                )
-
-                await self.fill_task_minions(
-                    task_id=task.id,
-                    target_collection_id=task.target_collection_id,
-                    target_query=task.target_query,
-                    target_minions=data.minions,
-                    session=s,
-                    notify=False,
-                )
 
                 logger.debug(f'Transaction committed successfully for task {task.id}')
             except Exception:
                 logger.exception('Error during task creation, aborting transaction')
                 raise
+
+        await self.task_status_service.create(
+            data=TaskStatusCreateSchema.model_validate({'task_id': task.id, 'type': TaskStatus.created}),
+            session=session,
+        )
+
+        await self.fill_task_minions(
+            task_id=task.id,
+            target_collection_id=task.target_collection_id,
+            target_query=task.target_query,
+            target_minions=validated_data.minions,
+            session=session,
+            notify=False,
+        )
 
         if notify:
             await self._notify(obj_id=task_id, action='create')
