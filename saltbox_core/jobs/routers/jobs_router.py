@@ -157,18 +157,18 @@ async def job_returns_list(
     ).model_dump(by_alias=True),
 )
 async def job_return_data(
-    job_mongo_id: PyObjectId,
+    job_return_mongo_id: PyObjectId,
     opa_query: Annotated[dict, Depends(get_opa_query)],
     job_return_service: Annotated[JobReturnService, Depends(get_job_return_service)],
 ) -> Any:
-    query: dict[str, Any] = {'_id': job_mongo_id}
+    query: dict[str, Any] = {'_id': job_return_mongo_id}
 
     if opa_query:
         query = {'$and': [query, opa_query]}
 
-    job = await job_return_service.get(
+    job_return = await job_return_service.get(
         query=query,
         projection_model=JobReturnDataOnlyScheme,
     )
 
-    return job.data
+    return job_return.data

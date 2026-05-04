@@ -2,7 +2,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends
 
-from saltbox_core.jobs.schemas.job_return_schemas import JobReturnListResponse, JobReturnsListBody
+from saltbox_core.jobs.schemas.job_return_schemas import JobReturnModel
 from saltbox_core.jobs.schemas.job_schemas import JobListBody, JobsListResponse
 from saltbox_core.jobs.services.job_return_service import JobReturnService, get_job_return_service
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
@@ -19,7 +19,12 @@ from saltbox_core.tasks.schemas.task import (
     TaskModel,
     TasksActions,
 )
-from saltbox_core.tasks.schemas.tasks_minion import TaskMinionListBody, TaskMinionModel, TaskMinionStatus
+from saltbox_core.tasks.schemas.tasks_minion import (
+    TaskMinionListBody,
+    TaskMinionListResponse,
+    TaskMinionStatus,
+    TaskMinionTgtOnlySchema,
+)
 from saltbox_core.tasks.schemas.tasks_status import TaskStatusListBody, TaskStatusModel
 from saltbox_core.tasks.services.task import TaskService, get_task_service
 from saltbox_core.tasks.services.tasks_lifespan import TaskLifespanService, get_task_lifespan_service
@@ -152,14 +157,14 @@ async def task_minions_list(
     tid: PyObjectId,
     body: Annotated[TaskMinionListBody, Body()],
     task_minion_service: Annotated[TaskMinionService, Depends(get_task_minion_service)],
-) -> PaginatedResponse[TaskMinionModel]:
+) -> PaginatedResponse[TaskMinionListResponse]:
     query = {'$and': [{'task_id': tid}, body.query]}
 
     result = await task_minion_service.get_list_paginated(
         query=query,
         limit=body.limit,
         skip=body.skip,
-        projection_model=TaskMinionModel,
+        projection_model=TaskMinionListResponse,
         sort=body.sort,
     )
 
@@ -169,7 +174,6 @@ async def task_minions_list(
 @router.post(
     '/{tid}/jobs',
     operation_id='task_jobs',
-    deprecated=True,
     openapi_extra=GatewayEndpointConfig(
         policy='core.tasks.read',
         action=TasksActions.READ,
@@ -193,31 +197,36 @@ async def task_jobs(
     return task_jobs_list
 
 
-@router.post(
-    '/{tid}/returns',
-    operation_id='task_returns',
-    deprecated=True,
+@router.get(
+    '/{tid}/jobs/returns',
+    operation_id='task_jobs_returns',
     openapi_extra=GatewayEndpointConfig(
         policy='core.tasks.read',
         action=TasksActions.READ,
     ).model_dump(by_alias=True),
 )
-async def task_returns(
+async def task_return_data(
     tid: PyObjectId,
-    body: Annotated[JobReturnsListBody, Body()],
+    task_minion_mongo_id: PyObjectId,
+    opa_query: Annotated[dict, Depends(get_opa_query)],
+    task_minion_service: Annotated[TaskMinionService, Depends(get_task_minion_service)],
     job_return_service: Annotated[JobReturnService, Depends(get_job_return_service)],
-) -> PaginatedResponse[JobReturnListResponse]:
-    query = {'$and': [{'source.type': 'task', 'source.id': str(tid)}, body.query]}
-
-    task_jobs_returns_list = await job_return_service.get_list_paginated(
-        query=query,
-        limit=body.limit,
-        skip=body.skip,
-        projection_model=JobReturnListResponse,
-        sort=body.sort,
+) -> list[JobReturnModel]:
+    task_minion = await task_minion_service.get(
+        query={'_id': task_minion_mongo_id, 'task_id': tid}, projection_model=TaskMinionTgtOnlySchema
     )
 
-    return task_jobs_returns_list
+    query: dict[str, Any] = {
+        'source.type': 'task',
+        'source.id': str(tid),
+        'salt_master': task_minion.master,
+        'minion_id': task_minion.minion_id,
+    }
+
+    if opa_query:
+        query = {'$and': [query, opa_query]}
+
+    return await job_return_service.get_list(query=query, projection_model=JobReturnModel)
 
 
 @router.post(
