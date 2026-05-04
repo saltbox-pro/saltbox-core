@@ -1,9 +1,13 @@
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends
 from pydantic import Field
 
-from saltbox_core.jobs.schemas.job_return_schemas import JobReturnModel, JobReturnsListBody
+from saltbox_core.jobs.schemas.job_return_schemas import (
+    JobReturnDataOnlyScheme,
+    JobReturnListResponse,
+    JobReturnsListBody,
+)
 from saltbox_core.jobs.schemas.job_schemas import (
     CreateJobRequest,
     JobCreateSchema,
@@ -15,12 +19,10 @@ from saltbox_core.jobs.schemas.job_schemas import (
 )
 from saltbox_core.jobs.services.job_return_service import JobReturnService, get_job_return_service
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse, Source, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
-from saltbox_sdk.fastapi_utils.dependencies import get_current_user
-
-# from saltbox_sdk.fastapi_utils.dependencies import get_opa_query
-# from saltbox_sdk.utilities.helpers import match_query
+from saltbox_sdk.fastapi_utils.dependencies import get_current_user, get_opa_query
 
 router = APIRouter(prefix='/jobs', tags=['Jobs'])
 
@@ -34,15 +36,14 @@ router = APIRouter(prefix='/jobs', tags=['Jobs'])
     ).model_dump(by_alias=True),
 )
 async def jobs_list(
-    # opa_query: Annotated[dict, Depends(get_opa_query)],
+    opa_query: Annotated[dict, Depends(get_opa_query)],
     body: Annotated[JobListBody, Body()],
     job_service: Annotated[JobService, Depends(get_job_service)],
 ) -> PaginatedResponse[JobsListResponse]:
     query = body.query
 
-    # TODO (@): Apply OPA query filtering
-    # if opa_query:
-    #     query = {'$and': [query, opa_query]}
+    if opa_query:
+        query = {'$and': [query, opa_query]}
 
     jobs = await job_service.get_list_paginated(
         query=query,
@@ -119,7 +120,7 @@ async def job_returns_count(
 
 
 @router.post(
-    '/returns-list',
+    '/returns/list',
     operation_id='job_returns_list',
     openapi_extra=GatewayEndpointConfig(
         policy='core.jobs.base',
@@ -127,22 +128,47 @@ async def job_returns_count(
     ).model_dump(by_alias=True),
 )
 async def job_returns_list(
-    # opa_query: Annotated[dict, Depends(get_opa_query)],
+    opa_query: Annotated[dict, Depends(get_opa_query)],
     body: Annotated[JobReturnsListBody, Body()],
     job_return_service: Annotated[JobReturnService, Depends(get_job_return_service)],
-) -> PaginatedResponse[JobReturnModel]:
+) -> PaginatedResponse[JobReturnListResponse]:
     query = body.query
 
-    # TODO (@): Apply OPA query filtering
-    # if opa_query:
-    #     query = {'$and': [query, opa_query]}
+    if opa_query:
+        query = {'$and': [query, opa_query]}
 
     jobs = await job_return_service.get_list_paginated(
         query=query,
         skip=body.skip,
         limit=body.limit,
-        projection_model=JobReturnModel,
+        projection_model=JobReturnListResponse,
         sort=body.sort,
     )
 
     return jobs
+
+
+@router.get(
+    '/returns/data',
+    operation_id='job_return_data',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.jobs.base',
+        action=JobsActions.READ,
+    ).model_dump(by_alias=True),
+)
+async def job_return_data(
+    job_mongo_id: PyObjectId,
+    opa_query: Annotated[dict, Depends(get_opa_query)],
+    job_return_service: Annotated[JobReturnService, Depends(get_job_return_service)],
+) -> Any:
+    query: dict[str, Any] = {'_id': job_mongo_id}
+
+    if opa_query:
+        query = {'$and': [query, opa_query]}
+
+    job = await job_return_service.get(
+        query=query,
+        projection_model=JobReturnDataOnlyScheme,
+    )
+
+    return job.data
