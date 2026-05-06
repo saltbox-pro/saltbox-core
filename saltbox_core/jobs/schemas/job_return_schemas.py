@@ -77,6 +77,19 @@ class JobReturnModel(
 ): ...
 
 
+# Notify
+
+
+class JobReturnNotifySchema(
+    BaseModel,
+    JobReturnAggregatedFieldsMixin,
+    CreatedModifiedMixin,
+    JobReturnReadOnlyFieldsMixin,
+    JobReturnEditableFieldsMixin,
+    IDMixin,
+): ...
+
+
 # REST
 
 
