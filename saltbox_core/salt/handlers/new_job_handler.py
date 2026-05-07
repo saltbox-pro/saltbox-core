@@ -36,10 +36,8 @@ class JobNewMessageHandler(BaseJobMessageHandler):
 
     async def get_job(self, jid: str, master_id: str, data: MessageDataType) -> JobModel:
         try:
-            existed_job = await self.job_service.get(query={'jid': str(jid), 'salt_master': str(master_id)})
-
             obj_id = await self.job_service.update(
-                query=existed_job.id,
+                query={'jid': str(jid), 'salt_master': str(master_id)},
                 data={
                     'status': JobStatus.running,
                     'minions': data.get('minions', []),

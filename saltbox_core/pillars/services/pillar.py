@@ -6,6 +6,7 @@ from pydantic import JsonValue
 from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
 
 from saltbox_core.config import logger
+from saltbox_core.minion_collections.schemas.minion_schemas import MinionTgtOnlySchema
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from saltbox_core.pillars.exceptions import (
@@ -100,7 +101,7 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
 
         match data.tgt_type:
             case PillarTgtType.MINION:
-                minion = await self._minion_service.get(query={'_id': tgt_id})
+                minion = await self._minion_service.get(query={'_id': tgt_id}, projection_model=MinionTgtOnlySchema)
                 if not minion:
                     raise PillarTgtNotFoundException()
                 return tgt_id, f'minion_id:{minion.minion_id};master:{minion.master}'

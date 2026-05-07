@@ -13,7 +13,6 @@ from saltbox_core.jobs.schemas.job_sc_schemas import (
     JobSchemaModel,
     JobSchemaUpdateSchema,
 )
-from saltbox_core.jobs.tiq_tasks import job_schemas_sync_task
 from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 from saltbox_sdk.utilities.json_schema import Draft4ValidatorWithDefaults
@@ -59,6 +58,8 @@ class JobSchemaService(
             raise JobException(msg) from None
 
     async def sync(self) -> str:
+        from saltbox_core.jobs.tiq_tasks import job_schemas_sync_task
+
         logger.debug('Start task: %s', SETTINGS.salt_func_repo_url)
         task = await job_schemas_sync_task.kiq(repo_url=SETTINGS.salt_func_repo_url)
         logger.debug('task: %s', task)

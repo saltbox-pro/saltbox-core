@@ -23,8 +23,9 @@ from saltbox_core.salt.handlers.base_handler import MessageDataType
 from saltbox_core.salt.handlers.base_job_handler import BaseJobMessageHandler
 from saltbox_core.tasks.tiq_tasks import process_task_job_return
 from saltbox_core.utilities.jid import JID
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.event_bus.utils import send_message
-from saltbox_sdk.exceptions import DuplicateKeyException, NotFoundException
+from saltbox_sdk.exceptions import DuplicateKeyException, ObjectNotFoundException
 from saltbox_sdk.utilities.helpers import format_iso8601_z, make_aware
 
 
@@ -57,7 +58,6 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         self.broker = broker
 
     async def normalize_data(self, match: re.Match, master_id: str, tag: str, data: MessageDataType) -> MessageDataType:
-
         normalized_data = await super().normalize_data(match=match, master_id=master_id, tag=tag, data=data)
 
         system_user = normalized_data.pop('user', 'undefined')  # NOTE: KeyError - field `user` in 3005.1 does not exist
@@ -107,7 +107,7 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         else:
             logger.info('Job %s return for %s, function %s', jid, mid, function)
 
-        job_return = await self._save_job_return(
+        is_new_return, job_return = await self._update_or_create_job_return(
             master_id=master_id, jid=jid, mid=mid, job=job, data=data, return_data=return_data
         )
 
@@ -117,8 +117,11 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         if tid:
             await process_task_job_return.kiq(jid=jid, minion_id=mid)  # type: ignore
 
-        await self._process_return(job_return=job_return)
-        await self._send_presence(master_id=master_id, mid=mid, data=data)
+        process_return_coro = self._process_return(job_return=job_return, is_new_return=is_new_return)
+        send_presence_coro = self._send_presence(master_id=master_id, mid=mid, data=data)
+
+        await process_return_coro
+        await send_presence_coro
 
         raise StopProcessing()
 
@@ -145,7 +148,10 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
 
         return check_kwargs(job_return.fun_kwarg or {})
 
-    async def _process_return(self, job_return: JobReturnModel) -> None:
+    async def _process_return(self, job_return: JobReturnModel, is_new_return: bool) -> None:
+        if is_new_return and job_return.source and job_return.source.type == 'migration':
+            await self._send_to_migration(job_return)
+
         if job_return.fun == 'grains.items':
             await self._process_grains(job_return=job_return)
         elif job_return.fun == 'inventory.get':
@@ -155,9 +161,7 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
             logger.debug('Got inventory state return for %s', job_return.minion_id)
             await self._notify_on_inventory_state(job_return=job_return)
 
-    async def _save_job_return(
-        self, master_id: str, jid: str, mid: str, job: JobModel, data: dict, return_data: Any
-    ) -> JobReturnModel:
+    async def _save_job_return_data(self, master_id: str, jid: str, mid: str, return_data: Any) -> None:
         hash_name = f'master:{master_id}:job:{jid}:return-data'
         async with self.redis_client.pipeline() as pipe:
             pipe = pipe.hset(name=hash_name, key=mid, value=json.dumps(return_data))
@@ -165,6 +169,9 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
                 pipe = pipe.expire(name=hash_name, time=SETTINGS.jobs_return_data_expire_ttl)
             await pipe.execute()
 
+    async def _save_job_return_object(
+        self, master_id: str, jid: str, mid: str, job: JobModel, data: dict
+    ) -> tuple[bool, PyObjectId | None]:
         is_new_return = False
 
         try:
@@ -178,7 +185,6 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
                 data=JobReturnCreateSchema.model_validate(payload),
                 notify=True,
             )
-            job_return = await self.job_return_service.get(query=job_return_id)
             is_new_return = True
         except DuplicateKeyException:
             try:
@@ -189,19 +195,35 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
                     ),
                     notify=True,
                 )
-                job_return = await self.job_return_service.get(query=job_return_id)
                 is_new_return = True
-            except NotFoundException:
-                job_return = await self.job_return_service.get(
-                    query={'jid': jid, 'salt_master': master_id, 'minion_id': mid}
-                )
+            except ObjectNotFoundException:
+                return is_new_return, None
 
-        if is_new_return and job.source and job.source.type == 'migration':
-            await self.broker.connect()
-            job_return.data = return_data
-            await self.broker.publish(job_return, 'migration_job_return')
+        return is_new_return, job_return_id
 
-        return job_return
+    async def _update_or_create_job_return(
+        self, master_id: str, jid: str, mid: str, job: JobModel, data: dict, return_data: Any
+    ) -> tuple[bool, JobReturnModel]:
+        save_job_return_data_coro = self._save_job_return_data(
+            master_id=master_id, jid=jid, mid=mid, return_data=return_data
+        )
+        save_job_return_object = self._save_job_return_object(master_id=master_id, jid=jid, mid=mid, job=job, data=data)
+
+        await save_job_return_data_coro
+        is_new_return, job_return_id = await save_job_return_object
+
+        if job_return_id is None:
+            job_return = await self.job_return_service.get(
+                query={'jid': jid, 'salt_master': master_id, 'minion_id': mid}
+            )
+        else:
+            job_return = await self.job_return_service.get(query=job_return_id)
+
+        return is_new_return, job_return
+
+    async def _send_to_migration(self, job_return: JobReturnModel) -> None:
+        await self.broker.connect()
+        await self.broker.publish(job_return, 'migration_job_return')
 
     @staticmethod
     async def _send_inventory_data(job_return: JobReturnModel, path: list[str | int]) -> None:

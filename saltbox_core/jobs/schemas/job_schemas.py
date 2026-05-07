@@ -10,7 +10,7 @@ from saltbox_core.config import SETTINGS
 from saltbox_core.utilities.jid import JID, JidError
 from saltbox_core.utilities.salt import fill_salt_kwarg_from_arg
 from saltbox_sdk.db.mongo.schemas_base import IDMixin, QueryParams, SortParams
-from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER, CreatedModifiedMixin, SkipLimitParams, Source, UserShort
+from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER, CreatedModifiedMixin, SkipLimitParams, SourceMixin, UserShort
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
 
 
@@ -35,7 +35,7 @@ class JobStatus(StrEnum):
     launch_error = 'launch_error'
 
 
-class JobReadOnlyFieldsMixin:
+class JobReadOnlyFieldsMixin(SourceMixin):
     tgt: str | list[str]
     tgt_type: SaltTgtType
     salt_master: str
@@ -46,7 +46,6 @@ class JobReadOnlyFieldsMixin:
     ttl: int = Field(ge=1, le=SETTINGS.jobs_max_ttl, default=SETTINGS.jobs_default_ttl)
 
     user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
-    source: Source | None = None
 
 
 class JobEditableFieldsMixin:
@@ -111,14 +110,25 @@ class JobModel(
     jid: StrJid
 
 
+# System
+
+
 class JobSimpleSchema(BaseModel, IDMixin):
     jid: StrJid
     salt_master: str
     status: JobStatus
 
 
-class JobSimpleWithSourceSchema(JobSimpleSchema):
-    source: Source | None = None
+class JobSimpleWithSourceSchema(JobSimpleSchema, SourceMixin): ...
+
+
+class JobJidOnlySchema(BaseModel, IDMixin):
+    jid: StrJid
+
+
+class JobForTaskStatusUpdateSchema(BaseModel, SourceMixin, IDMixin):
+    tgt: str | list[str]
+    salt_master: str
 
 
 # Rest
@@ -130,7 +140,7 @@ class JobListBody(SkipLimitParams, QueryParams, SortParams):
     )
 
 
-class JobsListResponse(BaseModel, CreatedModifiedMixin, JobComputedFieldsMixin, IDMixin):
+class JobsListResponse(BaseModel, CreatedModifiedMixin, JobComputedFieldsMixin, SourceMixin, IDMixin):
     jid: StrJid
     tgt: str | list[str]
     tgt_type: SaltTgtType
@@ -142,7 +152,6 @@ class JobsListResponse(BaseModel, CreatedModifiedMixin, JobComputedFieldsMixin, 
     launch_error_type: str | None = None
 
     user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
-    source: Source | None = None
 
 
 class CreateJobRequest(BaseModel):

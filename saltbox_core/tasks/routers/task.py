@@ -31,7 +31,7 @@ from saltbox_core.tasks.services.tasks_lifespan import TaskLifespanService, get_
 from saltbox_core.tasks.services.tasks_minion import TaskMinionService, get_task_minion_service
 from saltbox_core.tasks.services.tasks_status import TaskStatusService, get_task_status_service
 from saltbox_core.utilities.model_schema import get_model_schema
-from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse, Source, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 from saltbox_sdk.fastapi_utils.dependencies import get_current_user, get_opa_query
@@ -293,7 +293,7 @@ async def restart_failed(
     if subqueries:
         query['$and'] = subqueries
 
-    task_minions = await task_minion_service.get_list(query=query)
+    task_minions = await task_minion_service.get_list(query=query, projection_model=EmptyModel)
 
     await task_lifespan_service.restart_on_minions(minions_ids=[minion.id for minion in task_minions])
 

@@ -165,6 +165,9 @@ class MinionModel(CreatedModifiedMixin, MinionReadonlyFieldsMixin, MinionEditabl
     pass
 
 
+# System
+
+
 class MinionDetailSchema(MinionModel):
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -184,6 +187,11 @@ class MinionShortSchema(
     pass
 
 
+class MinionTgtOnlySchema(BaseModel, IDMixin):
+    minion_id: str = Field(title='Minion ID')
+    master: str = Field(title='Master')
+
+
 class MinionSimpleSchema(BaseModel, IDMixin):
     minion_id: str = Field(title='Minion ID')
     master: str = Field(title='Master')
@@ -192,6 +200,9 @@ class MinionSimpleSchema(BaseModel, IDMixin):
 
 class MinionIDs(BaseModel, IDMixin):
     pass
+
+
+# REST
 
 
 class MinionListBody(SkipLimitParams, QueryParams, SortParams):
@@ -205,6 +216,9 @@ class MinionBulkDeleteBody(BaseModel):
     minions: list[PyObjectId]
 
     model_config = ConfigDict(extra='ignore')
+
+
+# Permissions
 
 
 class MinionsActions(StrEnum):

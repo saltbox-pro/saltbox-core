@@ -21,7 +21,7 @@ from saltbox_core.settings.schemas.sls_repos_schemas import (
 from saltbox_core.settings.tiq_tasks import cleanup_orphan_aux_files, sync_sls_repo_task, sync_sls_repos_to_serve_dir
 from saltbox_core.tasks.services.tasks_template import TaskTemplateService
 from saltbox_core.utilities.git_repo_helper import RepositoryLocker
-from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
+from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId, SortOrder
 from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.db.schemas_base import PaginatedResponse
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
@@ -137,7 +137,13 @@ class SettingsSlsRepoService(
         *,
         session: MongoAsyncClientSession | None = None,
     ) -> list[str]:
-        active_repos = await self.get_list(query={'is_active': True}, skip=0, limit=0, session=session)
+        active_repos = await self.get_list(
+            query={'is_active': True},
+            skip=0,
+            limit=0,
+            session=session,
+            projection_model=EmptyModel,
+        )
         task_ids = []
         for repo in active_repos:
             try:

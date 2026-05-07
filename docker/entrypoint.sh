@@ -47,7 +47,7 @@ cmd_uvicorn() {
 
 cmd_taskiq_worker() {
   cmd=(/usr/bin/taskiq worker saltbox_core.tkq:broker --fs-discover)
-  cmd+=("--tasks-pattern=${tiq_tasks_pattern}" --workers=1 --max-fails=1)
+  cmd+=("--tasks-pattern=${tiq_tasks_pattern}" --workers=${TASKIQ_WORKERS} --max-fails=1)
   if [ "$DEV_MODE" = 1 ]; then
     cmd+=(--reload)
     workdir='/mnt/saltbox-core/'

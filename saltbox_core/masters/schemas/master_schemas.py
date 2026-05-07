@@ -60,6 +60,13 @@ class MasterModel(
 ): ...
 
 
+class MasterMasterIdOnlySchema(BaseModel, IDMixin):
+    master_id: str = Field(title='Master ID')
+
+
+# REST
+
+
 class MasterViewSchema(
     BaseModel, CreatedModifiedMixin, MasterEditableFieldsMixin, MasterReadOnlyFieldsMixin, IDMixin
 ): ...
@@ -69,6 +76,9 @@ class MasterListBody(SkipLimitParams, QueryParams, SortParams):
     status: MasterStatus | None = Field(title='Status', default=None)
 
     model_config = ConfigDict(extra='ignore')
+
+
+# Permissions
 
 
 class MastersActions(StrEnum):

@@ -1,6 +1,6 @@
 import json
 from collections.abc import Callable
-from typing import Annotated, Any, overload
+from typing import Annotated, Any
 
 from fastapi import Depends
 from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
@@ -177,7 +177,6 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
 
         return job_id
 
-    @overload
     async def update_status(
         self,
         jid: JID,
@@ -185,28 +184,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         session: MongoAsyncClientSession | None = None,
         force: bool = False,
         notify: bool = True,
-    ) -> JobModel: ...
-
-    @overload
-    async def update_status(
-        self,
-        jid: JID,
-        *,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel],
-        force: bool = False,
-        notify: bool = True,
-    ) -> ProjectionModel: ...
-
-    async def update_status(
-        self,
-        jid: JID,
-        *,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel] | None = None,
-        force: bool = False,
-        notify: bool = True,
-    ) -> JobModel | ProjectionModel:
+    ) -> None:
         job = await self.get(query={'jid': str(jid)}, projection_model=JobSimpleSchema)
 
         data_to_update = {}
@@ -225,11 +203,6 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
                 session=session,
                 notify=notify,
             )
-
-        if projection_model:
-            return await self.get(query=job.id, session=session, projection_model=projection_model)
-
-        return await self.get(query=job.id, session=session)
 
     async def stop_job(self, jid: JID | PyObjectId) -> None: ...  # TODO (i.moshkov): stop jobs
 

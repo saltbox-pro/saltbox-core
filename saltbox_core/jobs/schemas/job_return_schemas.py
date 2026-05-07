@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from saltbox_core.jobs.schemas.job_schemas import StrJid
 from saltbox_core.utilities.salt import fill_salt_kwarg_from_arg
 from saltbox_sdk.db.mongo.schemas_base import IDMixin, QueryParams, SortParams
-from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER, CreatedModifiedMixin, SkipLimitParams, Source, UserShort
+from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER, CreatedModifiedMixin, SkipLimitParams, SourceMixin, UserShort
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
 
 # Job returns
@@ -20,13 +20,12 @@ class JobReturnStatus(StrEnum):
     ignored = 'ignored'
 
 
-class JobReturnReadOnlyFieldsMixin:
+class JobReturnReadOnlyFieldsMixin(SourceMixin):
     minion_id: str
     salt_master: str
     jid: StrJid
     fun: str
     user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
-    source: Source | None = None
 
 
 class JobReturnEditableFieldsMixin:
@@ -88,6 +87,20 @@ class JobReturnNotifySchema(
     JobReturnEditableFieldsMixin,
     IDMixin,
 ): ...
+
+
+# System
+
+
+class JobReturnForJobWatcherSchema(BaseModel, SourceMixin, IDMixin):
+    jid: StrJid
+    minion_id: str
+    salt_master: str
+
+
+class JobReturnForTaskStatusUpdate(BaseModel, SourceMixin, IDMixin):
+    salt_master: str
+    retcode: int | None = None
 
 
 # REST

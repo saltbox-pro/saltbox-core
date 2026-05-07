@@ -21,6 +21,7 @@ from saltbox_core.tasks.schemas.task import (
     TaskModel,
     TaskTargetMinion,
     TaskUpdateSchema,
+    TaskWithStatusOnlySchema,
 )
 from saltbox_core.tasks.schemas.tasks_minion import TaskMinionCreateSchema, TaskMinionInnerIdOnly
 from saltbox_core.tasks.schemas.tasks_status import TaskStatus, TaskStatusCreateSchema
@@ -332,7 +333,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         session: MongoAsyncClientSession | None = None,
         notify: bool = True,
     ) -> PyObjectId:
-        obj = await self.get(query=query, projection_model=TaskModel, session=session)
+        obj = await self.get(query=query, session=session, projection_model=TaskWithStatusOnlySchema)
 
         new_status = None
         if hasattr(data, 'status'):

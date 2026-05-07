@@ -1,6 +1,5 @@
 from typing import ClassVar
 
-from saltbox_core.jobs.services.job_sc_service import JobSchemaService
 from saltbox_core.tkq import broker
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.serivces.mongo_base_with_notify_service import MongoBaseWithNotifyService
@@ -23,6 +22,7 @@ class _NotifyServicesStoreSingleton:
         from saltbox_core.jobs.repositories.job_return_repository import JobReturnRepository
         from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository
         from saltbox_core.jobs.services.job_return_service import JobReturnService
+        from saltbox_core.jobs.services.job_sc_service import JobSchemaService
         from saltbox_core.jobs.services.job_services import JobService
         from saltbox_core.masters.repositories.master_repository import MasterRepository
         from saltbox_core.masters.services.master_service import MasterService

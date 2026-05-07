@@ -7,7 +7,7 @@ from saltbox_core.config import SETTINGS
 from saltbox_core.tasks.schemas.tasks_status import TaskStatus
 from saltbox_core.tasks.schemas.tasks_template import TaskTemplateDefaultsSchema
 from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId, QueryParams, SortParams
-from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams, Source, UserShort
+from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams, SourceMixin, UserShort
 from saltbox_sdk.exceptions import SaltBoxValidationException
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
 from saltbox_sdk.utilities.helpers import utc_now
@@ -38,7 +38,7 @@ class TaskStatusShort(BaseModel, CreatedModifiedMixin):
     data: dict = Field(title='Status data', default_factory=dict)
 
 
-class TaskReadOnlyFieldsMixin:
+class TaskReadOnlyFieldsMixin(SourceMixin):
     task_type: TaskType = Field(title='Task type')
 
     target_collection_id: PyObjectId = Field(title='Target ID')
@@ -51,7 +51,6 @@ class TaskReadOnlyFieldsMixin:
     kwarg: dict[str, Any] | None = Field(title='Kwarg', default=None)
 
     user: UserShort
-    source: Source | None = Field(title='Source', default=None)
 
 
 class TaskEditableFieldsMixin:
@@ -129,6 +128,9 @@ class TaskModel(
 ): ...
 
 
+# System
+
+
 class TaskForLifespanModel(
     BaseModel,
     CreatedModifiedMixin,
@@ -138,6 +140,13 @@ class TaskForLifespanModel(
     TaskReadOnlyFieldsMixin,
     IDMixin,
 ): ...
+
+
+class TaskForStatusUpdateSchema(BaseModel, IDMixin):
+    max_retries: int = Field(title='Max retries', default=SETTINGS.tasks_defaults_max_retries)
+
+
+class TaskWithStatusOnlySchema(BaseModel, TaskStatusJoinedFieldsMixin, IDMixin): ...
 
 
 # REST
@@ -200,9 +209,8 @@ class TaskCreateRequestSchema(BaseModel):
         return self
 
 
-class TaskCreateInputSchema(TaskCreateRequestSchema):
+class TaskCreateInputSchema(TaskCreateRequestSchema, SourceMixin):
     user: UserShort
-    source: Source
 
 
 class RestartFailedBody(BaseModel):

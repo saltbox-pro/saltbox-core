@@ -56,6 +56,9 @@ class TaskMinionModel(
 ): ...
 
 
+# System
+
+
 class TaskMinionInnerIdOnly(BaseModel, IDMixin):
     task_id: PyObjectId = Field(title='Task ID')
     minion_inner_id: PyObjectId = Field(title='Minion Mongo ID')
@@ -64,6 +67,10 @@ class TaskMinionInnerIdOnly(BaseModel, IDMixin):
 class TaskMinionTgtOnlySchema(BaseModel, IDMixin):
     minion_id: str = Field(title='Minion ID')
     master: str = Field(title='Master')
+
+
+class TaskMinionForTaskStatusUpdateSchema(BaseModel, IDMixin):
+    count_runs: int = Field(title='Count runs')
 
 
 # REST
