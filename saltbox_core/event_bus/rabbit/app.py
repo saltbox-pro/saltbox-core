@@ -27,6 +27,7 @@ from saltbox_core.tasks.services.task import get_task_service
 from saltbox_core.tasks.services.tasks_minion import get_task_minion_service
 from saltbox_core.tasks.services.tasks_status import get_task_status_service
 from saltbox_core.tasks.services.tasks_template import get_task_template_service
+from saltbox_core.tkq import broker as tkq_broker
 from saltbox_sdk.config.logger_config import logger
 from saltbox_sdk.db.mongo.config import get_mongo_db
 from saltbox_sdk.db.redis.config import get_redis_now
@@ -118,8 +119,10 @@ async def async_main() -> None:
         for exchange in exchanges.values():
             await broker.declare_exchange(exchange)
 
+    await tkq_broker.startup()
     logger.info('Starting faststream app')
     await app.run()
+    await tkq_broker.shutdown()
 
 
 def main() -> None:
