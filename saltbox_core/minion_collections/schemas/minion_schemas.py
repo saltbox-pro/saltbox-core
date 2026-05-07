@@ -137,6 +137,7 @@ class MinionEditableFieldsMixin[T](BaseModel):
     minion_id: str = Field(title='Minion ID')
     master: str = Field(title='Master')
     grains: T = Field(title='Grains')
+    extra: dict = Field(title='Extra data', default_factory=dict)
     last_activity: TimezoneAwareDatetime | None = Field(title='Last activity', default=None)
 
 
