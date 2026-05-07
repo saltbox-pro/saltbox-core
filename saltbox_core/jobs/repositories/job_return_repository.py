@@ -77,7 +77,7 @@ class JobReturnRepository(BaseMongoRepository[JobReturnModel]):
             return_data: Any = None
 
             try:
-                raw_return: bytes | None = await self.rdb.hget(
+                raw_return: str | bytes | None = await self.rdb.hget(
                     name=f'master:{data["salt_master"]}:job:{data["jid"]}:return-data', key=data['minion_id']
                 )
 

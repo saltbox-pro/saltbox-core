@@ -61,6 +61,11 @@ class TaskMinionInnerIdOnly(BaseModel, IDMixin):
     minion_inner_id: PyObjectId = Field(title='Minion Mongo ID')
 
 
+class TaskMinionTgtOnlySchema(BaseModel, IDMixin):
+    minion_id: str = Field(title='Minion ID')
+    master: str = Field(title='Master')
+
+
 # REST
 
 
@@ -68,3 +73,15 @@ class TaskMinionListBody(SkipLimitParams, QueryParams, SortParams):
     model_config = ConfigDict(
         extra='ignore',
     )
+
+
+class TaskMinionListResponse(BaseModel, CreatedModifiedMixin, IDMixin):
+    minion_inner_id: PyObjectId = Field(title='Minion Mongo ID')
+    status: TaskMinionStatus = Field(title='Status', default=TaskMinionStatus.pending)
+    start_last_dt: TimezoneAwareDatetime | None = Field(title='Last job start dt', default=None)
+    finished_dt: TimezoneAwareDatetime | None = Field(title='Processing finished dt', default=None)
+
+    # Joined fields
+    minion_id: str = Field(title='Minion ID')
+    master: str = Field(title='Master')
+    count_runs: int = Field(title='Count runs')

@@ -62,15 +62,32 @@ class JobReturnUpdateSchema(BaseModel, JobReturnEditableFieldsMixin):
     model_config = ConfigDict(extra='ignore')
 
 
+class JobReturnDataMixin:
+    data: Any = Field(default=None)
+
+
 class JobReturnModel(
     BaseModel,
     JobReturnAggregatedFieldsMixin,
     CreatedModifiedMixin,
     JobReturnReadOnlyFieldsMixin,
     JobReturnEditableFieldsMixin,
+    JobReturnDataMixin,
     IDMixin,
-):
-    data: Any = Field(default=None)
+): ...
+
+
+# Notify
+
+
+class JobReturnNotifySchema(
+    BaseModel,
+    JobReturnAggregatedFieldsMixin,
+    CreatedModifiedMixin,
+    JobReturnReadOnlyFieldsMixin,
+    JobReturnEditableFieldsMixin,
+    IDMixin,
+): ...
 
 
 # REST
@@ -80,6 +97,12 @@ class JobReturnsListBody(SkipLimitParams, QueryParams, SortParams):
     model_config = ConfigDict(extra='ignore')
 
 
+class JobReturnDataOnlyScheme(BaseModel, JobReturnDataMixin, IDMixin):
+    jid: StrJid
+    minion_id: str
+    salt_master: str
+
+
 class JobReturnListResponse(
     BaseModel,
     JobReturnAggregatedFieldsMixin,
@@ -87,7 +110,4 @@ class JobReturnListResponse(
     JobReturnReadOnlyFieldsMixin,
     JobReturnEditableFieldsMixin,
     IDMixin,
-):
-    data: Any = Field(
-        default=None
-    )  # TODO @: Temporary. Remove this after front will be get this from job return endpoint
+): ...
