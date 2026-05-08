@@ -113,6 +113,18 @@ class JobModel(
 # System
 
 
+class JobForSaltHandlerBaseSchema(BaseModel, SourceMixin, IDMixin): ...
+
+
+class JobForNewJobSaltHandlerSchema(JobForSaltHandlerBaseSchema):
+    user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
+
+
+class JobForJobReturnSaltHandlerSchema(JobForSaltHandlerBaseSchema):
+    stamp: TimezoneAwareDatetime | None = Field(default=None)
+    user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
+
+
 class JobSimpleSchema(BaseModel, IDMixin):
     jid: StrJid
     salt_master: str

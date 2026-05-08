@@ -5,13 +5,13 @@ import re
 
 import redis.asyncio as aioredis
 
-from saltbox_core.jobs.schemas.job_schemas import JobModel
+from saltbox_core.jobs.schemas.job_schemas import JobForSaltHandlerBaseSchema
 from saltbox_core.jobs.services.job_return_service import JobReturnService
 from saltbox_core.jobs.services.job_services import JobService
 from saltbox_core.salt.handlers.base_handler import BaseMessageHandler, MessageDataType
 
 
-class BaseJobMessageHandler(BaseMessageHandler, abc.ABC):
+class BaseJobMessageHandler[JobModel: JobForSaltHandlerBaseSchema](BaseMessageHandler, abc.ABC):
     """
     A base message handler for new job salt message when
     """

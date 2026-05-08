@@ -14,7 +14,7 @@ from saltbox_core.jobs.schemas.job_return_schemas import (
     JobReturnStatus,
     JobReturnUpdateSchema,
 )
-from saltbox_core.jobs.schemas.job_schemas import JobModel
+from saltbox_core.jobs.schemas.job_schemas import JobForJobReturnSaltHandlerSchema
 from saltbox_core.jobs.services.job_return_service import JobReturnService
 from saltbox_core.jobs.services.job_services import JobService
 from saltbox_core.minion_collections.services.minion_service import MinionService
@@ -29,7 +29,7 @@ from saltbox_sdk.exceptions import DuplicateKeyException, ObjectNotFoundExceptio
 from saltbox_sdk.utilities.helpers import format_iso8601_z, make_aware
 
 
-class JobReturnMessageHandler(BaseJobMessageHandler):
+class JobReturnMessageHandler(BaseJobMessageHandler[JobForJobReturnSaltHandlerSchema]):
     """
     A message handler that handles salt job return messages
     """
@@ -83,15 +83,17 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
 
         return enriched_data
 
-    async def get_job(self, jid: str, master_id: str, data: MessageDataType) -> JobModel:
-        return await self.job_service.get(query={'jid': str(jid), 'salt_master': str(master_id)})
+    async def get_job(self, jid: str, master_id: str, data: MessageDataType) -> JobForJobReturnSaltHandlerSchema:
+        return await self.job_service.get(
+            query={'jid': str(jid), 'salt_master': str(master_id)}, projection_model=JobForJobReturnSaltHandlerSchema
+        )
 
     async def process(
         self,
         match: re.Match,
         master_id: str,
         data: MessageDataType,
-        job: JobModel | None = None,
+        job: JobForJobReturnSaltHandlerSchema | None = None,
         tid: str | None = None,
     ) -> None:
         if not job:
@@ -99,13 +101,7 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
 
         jid: str = match.group('jid')
         mid: str = match.group('mid')
-        function = data['fun']
         return_data = data.pop('return')
-
-        if tid:
-            logger.info('Job %s (task %s) return for %s, function %s', jid, tid, mid, function)
-        else:
-            logger.info('Job %s return for %s, function %s', jid, mid, function)
 
         is_new_return, job_return = await self._update_or_create_job_return(
             master_id=master_id, jid=jid, mid=mid, job=job, data=data, return_data=return_data
@@ -170,7 +166,7 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
             await pipe.execute()
 
     async def _save_job_return_object(
-        self, master_id: str, jid: str, mid: str, job: JobModel, data: dict
+        self, master_id: str, jid: str, mid: str, job: JobForJobReturnSaltHandlerSchema, data: dict
     ) -> tuple[bool, PyObjectId | None]:
         is_new_return = False
 
@@ -202,7 +198,7 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         return is_new_return, job_return_id
 
     async def _update_or_create_job_return(
-        self, master_id: str, jid: str, mid: str, job: JobModel, data: dict, return_data: Any
+        self, master_id: str, jid: str, mid: str, job: JobForJobReturnSaltHandlerSchema, data: dict, return_data: Any
     ) -> tuple[bool, JobReturnModel]:
         save_job_return_data_coro = self._save_job_return_data(
             master_id=master_id, jid=jid, mid=mid, return_data=return_data
@@ -282,7 +278,6 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         await self._send_inventory_data(job_return=job_return, path=['return', mod_name, 'changes', 'ret'])
 
     async def _process_grains(self, job_return: JobReturnModel) -> None:
-        logger.debug('Processing grains for %s', job_return.minion_id)
         if not job_return.data:
             return
 

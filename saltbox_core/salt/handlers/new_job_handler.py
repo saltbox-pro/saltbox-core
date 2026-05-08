@@ -2,9 +2,8 @@ import re
 from datetime import datetime
 from typing import ClassVar
 
-from saltbox_core.config import logger
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnCreateSchema, JobReturnStatus
-from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel, JobStatus
+from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobForNewJobSaltHandlerSchema, JobStatus
 from saltbox_core.salt.exceptions import StopProcessing
 from saltbox_core.salt.handlers.base_handler import MessageDataType
 from saltbox_core.salt.handlers.base_job_handler import BaseJobMessageHandler
@@ -13,7 +12,7 @@ from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.utilities.helpers import format_iso8601_z, make_aware
 
 
-class JobNewMessageHandler(BaseJobMessageHandler):
+class JobNewMessageHandler(BaseJobMessageHandler[JobForNewJobSaltHandlerSchema]):
     """
     A message handler for new job salt message when
     """
@@ -34,7 +33,7 @@ class JobNewMessageHandler(BaseJobMessageHandler):
 
         return data
 
-    async def get_job(self, jid: str, master_id: str, data: MessageDataType) -> JobModel:
+    async def get_job(self, jid: str, master_id: str, data: MessageDataType) -> JobForNewJobSaltHandlerSchema:
         try:
             obj_id = await self.job_service.update(
                 query={'jid': str(jid), 'salt_master': str(master_id)},
@@ -53,39 +52,32 @@ class JobNewMessageHandler(BaseJobMessageHandler):
                 notify=False,
             )
 
-        return await self.job_service.get(query=obj_id)
+        return await self.job_service.get(query=obj_id, projection_model=JobForNewJobSaltHandlerSchema)
 
     async def process(
         self,
         match: re.Match,
         master_id: str,
         data: MessageDataType,
-        job: JobModel | None = None,
+        job: JobForNewJobSaltHandlerSchema | None = None,
         tid: str | None = None,
     ) -> None:
-        jid = match.group('jid')
-
-        if tid:
-            logger.info('New job (jid: %s) for task: %s', jid, tid)
-        else:
-            logger.info('New job: %s', jid)
-
         if job:
             job_return_data = {
                 'salt_master': master_id,
-                'jid': job.jid,
-                'fun': job.fun,
+                'jid': data['jid'],
+                'fun': data['fun'],
                 'source': job.source,
                 'user': job.user,
-                'stamp_job': job.stamp,
+                'stamp_job': data['stamp'],
             }
 
             minions_by_status = {}
 
-            if job.minions:
-                minions_by_status[JobReturnStatus.waiting] = job.minions
-            if job.missing:
-                minions_by_status[JobReturnStatus.ignored] = job.missing
+            if data['minions']:
+                minions_by_status[JobReturnStatus.waiting] = data['minions']
+            if data['missing']:
+                minions_by_status[JobReturnStatus.ignored] = data['missing'].missing
 
             job_returns_documents_to_create: list[JobReturnCreateSchema] = []
 

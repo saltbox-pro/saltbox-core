@@ -17,6 +17,7 @@ from saltbox_core.jobs.schemas.job_return_schemas import (
 )
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.redis.config import get_redis
+from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_with_notify_service import MongoBaseWithNotifyService
 
 
@@ -58,9 +59,9 @@ class JobReturnService(
         return channels.get(action)
 
     async def run_notify(self, obj_id: PyObjectId, action: str) -> None:
-        obj = await self.get(query=obj_id, projection_model=self.notify_schema)
-
         try:
+            obj = await self.get(query=obj_id, projection_model=self.notify_schema)
+
             channel = self._get_notify_channel(obj=obj, action=action)
             task_channel = self._get_notify_channel(obj=obj, action=f'{action}_task')
 
@@ -73,6 +74,8 @@ class JobReturnService(
                 await pipe.execute()
         except redis_exceptions.RedisError as e:
             logger.error(e)
+        except ObjectNotFoundException:
+            logger.debug(f'Object "{self.repo.Meta.collection_name}" for notifying not found by query: {obj_id}')
 
 
 def get_job_return_service(

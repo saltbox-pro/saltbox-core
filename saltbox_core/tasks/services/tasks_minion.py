@@ -3,8 +3,10 @@ from typing import Annotated, TypeVar
 
 from fastapi import Depends
 from pydantic import BaseModel
+from redis import exceptions as redis_exceptions
 from redis.asyncio import Redis
 
+from saltbox_core.config import logger
 from saltbox_core.db.tiq_tasks import send_notify_by_mongo_service
 from saltbox_core.tasks.repositories.task import TaskRepository
 from saltbox_core.tasks.repositories.tasks_minion import TaskMinionRepository, get_task_minion_repository
@@ -38,7 +40,7 @@ class TaskMinionService(
     def service_name(self) -> str:
         return 'task_minion_service'
 
-    def _get_notify_channel(self, obj: TaskMinionModel | ProjectionModel, action: str) -> str | None:
+    def _get_notify_channel(self, obj: BaseModel, action: str) -> str | None:
         if not hasattr(obj, 'id') or not hasattr(obj, 'task_id'):
             return None
 
@@ -50,7 +52,7 @@ class TaskMinionService(
 
     async def run_notify(self, obj_id: PyObjectId, action: str) -> None:
         try:
-            obj = await self.get(query=obj_id)
+            obj = await self.get(query=obj_id, projection_model=self.notify_schema)
 
             async with self.rdb.pipeline() as pipe:
                 channel = self._get_notify_channel(obj=obj, action=action)
@@ -63,8 +65,10 @@ class TaskMinionService(
                     pipe.publish(channel=f'task:{obj.task_id}:update', message=self._prepare_pub_message(obj=task))
 
                 await pipe.execute()
+        except redis_exceptions.RedisError as e:
+            logger.error(e)
         except ObjectNotFoundException:
-            ...
+            logger.debug(f'Object "{self.repo.Meta.collection_name}" for notifying not found by query: {obj_id}')
 
 
 def get_task_minion_service(

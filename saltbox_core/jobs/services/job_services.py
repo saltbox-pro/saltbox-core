@@ -4,6 +4,7 @@ from typing import Annotated, Any
 
 from fastapi import Depends
 from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
+from pydantic import BaseModel
 from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
 from redis import exceptions as redis_exceptions
 from redis.asyncio import Redis
@@ -22,7 +23,7 @@ from saltbox_core.utilities.context import replace_raised
 from saltbox_core.utilities.jid import JID
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.redis.config import get_redis
-from saltbox_sdk.serivces.mongo_base_service import ProjectionModel
+from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_with_notify_service import MongoBaseWithNotifyService
 
 JOBS_TO_CREATE_SET_NAME: str = 'jobs:{master_id}:to_create'
@@ -65,7 +66,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
     def service_name(self) -> str:
         return 'job_service'
 
-    def _get_notify_channel(self, obj: JobModel | ProjectionModel, action: str) -> str | None:
+    def _get_notify_channel(self, obj: BaseModel, action: str) -> str | None:
         if not hasattr(obj, 'jid'):
             return None
 
@@ -88,9 +89,9 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         return channels.get(action)
 
     async def run_notify(self, obj_id: PyObjectId, action: str) -> None:
-        obj = await self.get(query=obj_id)
-
         try:
+            obj = await self.get(query=obj_id, projection_model=self.notify_schema)
+
             channel = self._get_notify_channel(obj=obj, action=action)
             task_channel = self._get_notify_channel(obj=obj, action=f'{action}_task')
 
@@ -103,6 +104,8 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
                 await pipe.execute()
         except redis_exceptions.RedisError as e:
             logger.error(e)
+        except ObjectNotFoundException:
+            logger.debug(f'Object "{self.repo.Meta.collection_name}" for notifying not found by query: {obj_id}')
 
     async def __prepare_create_obj(self, data: JobCreateSchema) -> None:
         if not data.jid:
