@@ -103,7 +103,7 @@ class JobReturnMessageHandler(BaseJobMessageHandler[JobForJobReturnSaltHandlerSc
         mid: str = match.group('mid')
         return_data = data.pop('return')
 
-        is_new_return, job_return = await self._update_or_create_job_return(
+        is_new_return, job_return = await self._update_job_return(
             master_id=master_id, jid=jid, mid=mid, job=job, data=data, return_data=return_data
         )
 
@@ -165,45 +165,33 @@ class JobReturnMessageHandler(BaseJobMessageHandler[JobForJobReturnSaltHandlerSc
                 pipe = pipe.expire(name=hash_name, time=SETTINGS.jobs_return_data_expire_ttl)
             await pipe.execute()
 
-    async def _save_job_return_object(
+    async def _update_job_return_object(
         self, master_id: str, jid: str, mid: str, job: JobForJobReturnSaltHandlerSchema, data: dict
     ) -> tuple[bool, PyObjectId | None]:
-        is_new_return = False
-
         try:
-            payload = {
-                **data,
-                'source': job.source,
-                'user': job.user,
-                'stamp_job': job.stamp,
-            }
-            job_return_id = await self.job_return_service.create(
-                data=JobReturnCreateSchema.model_validate(payload),
+            job_return_id = await self.job_return_service.update(
+                query={'jid': jid, 'salt_master': master_id, 'minion_id': mid, 'retcode': None},
+                data=JobReturnUpdateSchema.model_validate(
+                    {'source': job.source, 'user': job.user, 'stamp_job': job.stamp, **data}
+                ),
                 notify=True,
             )
-            is_new_return = True
-        except DuplicateKeyException:
-            try:
-                job_return_id = await self.job_return_service.update(
-                    query={'jid': jid, 'salt_master': master_id, 'minion_id': mid, 'retcode': None},
-                    data=JobReturnUpdateSchema.model_validate(
-                        {'source': job.source, 'user': job.user, 'stamp_job': job.stamp, **data}
-                    ),
-                    notify=True,
-                )
-                is_new_return = True
-            except ObjectNotFoundException:
-                return is_new_return, None
+            return True, job_return_id
+        except ObjectNotFoundException as e:
+            if await self.job_return_service.exists(query={'jid': jid, 'salt_master': master_id, 'minion_id': mid}):
+                return False, None
 
-        return is_new_return, job_return_id
+            raise e
 
-    async def _update_or_create_job_return(
+    async def _update_job_return(
         self, master_id: str, jid: str, mid: str, job: JobForJobReturnSaltHandlerSchema, data: dict, return_data: Any
     ) -> tuple[bool, JobReturnModel]:
         save_job_return_data_coro = self._save_job_return_data(
             master_id=master_id, jid=jid, mid=mid, return_data=return_data
         )
-        save_job_return_object = self._save_job_return_object(master_id=master_id, jid=jid, mid=mid, job=job, data=data)
+        save_job_return_object = self._update_job_return_object(
+            master_id=master_id, jid=jid, mid=mid, job=job, data=data
+        )
 
         await save_job_return_data_coro
         is_new_return, job_return_id = await save_job_return_object

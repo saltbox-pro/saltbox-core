@@ -49,6 +49,8 @@ class JobNewMessageHandler(BaseJobMessageHandler[JobForNewJobSaltHandlerSchema])
         except ObjectNotFoundException:
             obj_id = await self.job_service.create(
                 data=JobCreateSchema.model_validate({**data, 'status': JobStatus.running, 'user': SYSTEM_USER}),
+                check_master=False,
+                validate_data=False,
                 notify=False,
             )
 

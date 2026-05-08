@@ -107,14 +107,22 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         except ObjectNotFoundException:
             logger.debug(f'Object "{self.repo.Meta.collection_name}" for notifying not found by query: {obj_id}')
 
-    async def __prepare_create_obj(self, data: JobCreateSchema) -> None:
+    async def __prepare_create_obj(
+        self,
+        data: JobCreateSchema,
+        validate_data: bool = True,
+        session: MongoAsyncClientSession | None = None,
+    ) -> None:
         if not data.jid:
             data.jid = str(JID.generate())
 
         if data.ttl is None:
-            data.ttl = await self.job_schema_service.get_ttl(name=data.fun)
+            data.ttl = await self.job_schema_service.get_ttl(name=data.fun, session=session)
         elif data.ttl == 0:
             data.ttl = SETTINGS.jobs_max_ttl
+
+        if not validate_data:
+            return
 
         try:
             data_to_validate: dict[str, Any] = {}
@@ -122,37 +130,15 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
                 data_to_validate['args'] = data.arg
             if data.kwarg:
                 data_to_validate['kwargs'] = data.kwarg
-            validated_data = await self.job_schema_service.get_validated_data(name=data.fun, data=data_to_validate)
+            validated_data = await self.job_schema_service.get_validated_data(
+                name=data.fun, data=data_to_validate, session=session
+            )
             data.arg = validated_data.get('args')
             data.kwarg = validated_data.get('kwargs')
         except JsonSchemaValidationError as e:
             raise JobCreateException(str(e)) from e
 
-    async def create(
-        self,
-        data: JobCreateSchema | dict[str, Any],
-        *,
-        extra_pillarenv: list[str] | None = None,
-        session: MongoAsyncClientSession | None = None,
-        notify: bool = True,
-    ) -> PyObjectId:
-        if isinstance(data, dict):
-            data = JobCreateSchema.model_validate(data)
-
-        if not await self.master_service.exists(
-            query={'status': MasterStatus.ACCEPTED, 'master_id': data.salt_master}, session=session
-        ):
-            msg = 'Master not found'
-            raise JobCreateException(msg)
-
-        await self.__prepare_create_obj(data=data)
-
-        create_args: dict[str, Any] = {'data': data}
-        if notify:
-            create_args['notify'] = notify
-
-        job_id = await super().create(**create_args, session=session)
-
+    async def __send_job_to_master(self, data: JobCreateSchema, extra_pillarenv: list[str] | None = None) -> None:
         job_salt_data: dict[str, Any] = {
             'jid': data.jid,
             'tgt': data.tgt,
@@ -176,7 +162,38 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
 
             job_salt_data['kwarg']['pillarenv'] = ','.join(pillarenv)
 
-        await self.rdb.rpush(JOBS_TO_CREATE_SET_NAME.format(master_id=data.salt_master), json.dumps(job_salt_data))
+        await self.rdb.rpush(
+            JOBS_TO_CREATE_SET_NAME.format(master_id=data.salt_master),
+            json.dumps(job_salt_data),
+        )
+
+    async def create(
+        self,
+        data: JobCreateSchema | dict[str, Any],
+        *,
+        check_master: bool = True,
+        validate_data: bool = True,
+        extra_pillarenv: list[str] | None = None,
+        session: MongoAsyncClientSession | None = None,
+        notify: bool = True,
+    ) -> PyObjectId:
+        if isinstance(data, dict):
+            data = JobCreateSchema.model_validate(data)
+
+        if check_master and not await self.master_service.exists(
+            query={'status': MasterStatus.ACCEPTED, 'master_id': data.salt_master}, session=session
+        ):
+            msg = 'Master not found'
+            raise JobCreateException(msg)
+
+        await self.__prepare_create_obj(data=data, validate_data=validate_data, session=session)
+        job_id = await super().create(data=data, session=session, notify=False)
+
+        if data.status == JobStatus.starting:
+            await self.__send_job_to_master(data=data, extra_pillarenv=extra_pillarenv)
+
+        if isinstance(notify, bool) and notify:
+            await self._notify(obj_id=job_id, action='create')
 
         return job_id
 

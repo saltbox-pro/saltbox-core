@@ -32,6 +32,7 @@ from saltbox_core.tkq import broker
 from saltbox_sdk.config.redis_config import REDIS_SETTINGS
 from saltbox_sdk.db.mongo.config import get_mongo_db
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.utilities.helpers import utc_now
 
 
@@ -112,29 +113,32 @@ class JobsWatcher:
                             f'Task job has timeout job {job_return.source.id} for minion {job_return.minion_id}'
                         )
 
-                        task = await task_service.get(
-                            query=PyObjectId(job_return.source.id), projection_model=TaskForStatusUpdateSchema
-                        )
-                        task_minion = await task_minion_service.get(
-                            query={
-                                'task_id': task.id,
-                                'minion_id': job_return.minion_id,
-                                'master': job_return.salt_master,
-                                'status': {'ne': TaskMinionStatus.pending},
-                            },
-                            projection_model=TaskMinionForTaskStatusUpdateSchema,
-                        )
+                        try:
+                            task = await task_service.get(
+                                query=PyObjectId(job_return.source.id), projection_model=TaskForStatusUpdateSchema
+                            )
+                            task_minion = await task_minion_service.get(
+                                query={
+                                    'task_id': task.id,
+                                    'minion_id': job_return.minion_id,
+                                    'master': job_return.salt_master,
+                                    'status': {'ne': TaskMinionStatus.pending},
+                                },
+                                projection_model=TaskMinionForTaskStatusUpdateSchema,
+                            )
 
-                        data_to_update: dict[str, Any] = {}
+                            data_to_update: dict[str, Any] = {}
 
-                        if task_minion.count_runs >= task.max_retries:
-                            data_to_update['status'] = TaskMinionStatus.failed
-                            data_to_update['finished_dt'] = utc_now()
-                        else:
-                            data_to_update['status'] = TaskMinionStatus.pending
+                            if task_minion.count_runs >= task.max_retries:
+                                data_to_update['status'] = TaskMinionStatus.failed
+                                data_to_update['finished_dt'] = utc_now()
+                            else:
+                                data_to_update['status'] = TaskMinionStatus.pending
 
-                        await task_minion_service.update(query=task_minion.id, data=data_to_update)
-                        await task_service.update(query=task.id, data={})
+                            await task_minion_service.update(query=task_minion.id, data=data_to_update)
+                            await task_service.update(query=task.id, data={})
+                        except ObjectNotFoundException:
+                            ...
 
                     await job_return_service.update(query=job_return.id, data={'status': JobReturnStatus.timeout})
 

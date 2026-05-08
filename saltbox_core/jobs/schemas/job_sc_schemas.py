@@ -37,8 +37,25 @@ class JobSchemaBaseSchema(BaseModel, JobSchemaReadOnlyFieldsMixin, JobSchemaEdit
 class JobSchemaModel(JobSchemaBaseSchema, CreatedModifiedMixin, IDMixin): ...
 
 
+# System
+
+
+class JobSchemaTTLOnlySchema(BaseModel, IDMixin):
+    default_ttl: int | None = Field(ge=0, le=SETTINGS.jobs_max_ttl, default=None)
+
+
+class JobSchemaJSONSchemaOnlySchema(BaseModel, IDMixin):
+    json_schema: dict = Field(title='JSON schema')
+
+
+# REST
+
+
 class JobSchemaListBody(SkipLimitParams, QueryParams, SortParams):
     model_config = ConfigDict(extra='ignore')
+
+
+# Permissions
 
 
 class JobSchemasActions(StrEnum):
