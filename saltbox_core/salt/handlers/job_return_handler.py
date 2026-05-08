@@ -8,12 +8,7 @@ from faststream.rabbit import RabbitBroker
 
 from saltbox_core.config import SETTINGS, logger
 from saltbox_core.event_bus.rabbit.common_messages import InventoryPutEventBusMessage, InventoryPutForMinion
-from saltbox_core.jobs.schemas.job_return_schemas import (
-    JobReturnCreateSchema,
-    JobReturnModel,
-    JobReturnStatus,
-    JobReturnUpdateSchema,
-)
+from saltbox_core.jobs.schemas.job_return_schemas import JobReturnModel, JobReturnStatus, JobReturnUpdateSchema
 from saltbox_core.jobs.schemas.job_schemas import JobForJobReturnSaltHandlerSchema
 from saltbox_core.jobs.services.job_return_service import JobReturnService
 from saltbox_core.jobs.services.job_services import JobService
@@ -25,7 +20,7 @@ from saltbox_core.tasks.tiq_tasks import process_task_job_return
 from saltbox_core.utilities.jid import JID
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.event_bus.utils import send_message
-from saltbox_sdk.exceptions import DuplicateKeyException, ObjectNotFoundException
+from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.utilities.helpers import format_iso8601_z, make_aware
 
 
