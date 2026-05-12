@@ -6,6 +6,7 @@ import taskiq_fastapi
 from redis.asyncio import Redis
 from taskiq import Context, TaskiqDepends
 from taskiq.exceptions import NoResultError
+from taskiq.middlewares import SmartRetryMiddleware
 from taskiq_aio_pika import AioPikaBroker
 from taskiq_redis import RedisAsyncResultBackend
 
@@ -14,8 +15,24 @@ from saltbox_sdk.config.rabbitmq_config import RABBIT_SETTINGS
 from saltbox_sdk.utilities.taskiq import UniqueIdMiddleware
 
 logger = logging.getLogger(__name__)
+
 result_backend: RedisAsyncResultBackend = RedisAsyncResultBackend(SETTINGS.taskiq_redis_url)
-broker = AioPikaBroker(RABBIT_SETTINGS.url).with_result_backend(result_backend).with_middlewares(UniqueIdMiddleware())
+broker = (
+    AioPikaBroker(RABBIT_SETTINGS.url)
+    .with_result_backend(result_backend)
+    .with_middlewares(
+        UniqueIdMiddleware(),
+        SmartRetryMiddleware(
+            default_retry_count=SETTINGS.taskiq_retry_default_retry_count,
+            default_retry_label=SETTINGS.taskiq_retry_default_retry_label,
+            no_result_on_retry=SETTINGS.taskiq_retry_no_result_on_retry,
+            default_delay=SETTINGS.taskiq_retry_default_delay,
+            use_jitter=SETTINGS.taskiq_retry_use_jitter,
+            use_delay_exponent=SETTINGS.taskiq_retry_use_delay_exponent,
+            max_delay_exponent=SETTINGS.taskiq_retry_max_delay_exponent,
+        ),
+    )
+)
 
 
 taskiq_fastapi.init(broker, 'saltbox_core.main:app')
