@@ -107,7 +107,7 @@ class SaltEventsHandler:
                 f'{data}'
             )
         else:
-            await self.redis.lpush(
+            await self.redis.rpush(
                 self.BUFFER_LIST_PATTERN.format(master_id=master_id),
                 json.dumps({'master_id': master_id, 'tag': tag, 'data': data, 'retries': retries}),
             )
