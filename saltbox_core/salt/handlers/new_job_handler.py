@@ -79,7 +79,7 @@ class JobNewMessageHandler(BaseJobMessageHandler[JobForNewJobSaltHandlerSchema])
             if data['minions']:
                 minions_by_status[JobReturnStatus.waiting] = data['minions']
             if data['missing']:
-                minions_by_status[JobReturnStatus.ignored] = data['missing'].missing
+                minions_by_status[JobReturnStatus.ignored] = data['missing']
 
             job_returns_documents_to_create: list[JobReturnCreateSchema] = []
 
