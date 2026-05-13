@@ -4,6 +4,7 @@ from typing import Annotated, Any, overload
 
 from anyio import Path
 from fastapi import Depends
+from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
 
 from saltbox_core.config import logger
 from saltbox_core.minion_collections.repositories.minion_repository import MinionRepository, get_minion_repository
@@ -13,14 +14,30 @@ from saltbox_core.minion_collections.schemas.minion_schemas import (
     MinionCreateSchema,
     MinionIDs,
     MinionModel,
+    MinionTgtOnlySchema,
     MinionUpdateSchema,
 )
 from saltbox_core.minion_collections.services.pipeline_builder import MongoPipelineBuilder
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService, ProjectionModel
 
 
 class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreateSchema, MinionUpdateSchema]):
+    async def delete(
+        self,
+        query: dict[str, Any] | PyObjectId,
+        *,
+        session: MongoAsyncClientSession | None = None,
+    ) -> int:
+        from saltbox_core.salt.tiq_tasks import delete_minion_salt_keys_task
+
+        minion = await self.get(query=query, session=session, projection_model=MinionTgtOnlySchema)
+        await delete_minion_salt_keys_task.kiq(minion_id=minion.minion_id, master_id=minion.master)  # type: ignore
+        deleted_count = await super().delete(query=query, session=session)
+
+        return deleted_count
+
     @overload
     async def get_by_master_and_id(self, master: str, minion_id: str) -> MinionModel: ...
 
