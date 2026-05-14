@@ -18,6 +18,7 @@ from saltbox_core.salt.handlers.base_handler import MessageDataType
 from saltbox_core.salt.handlers.base_job_handler import BaseJobMessageHandler
 from saltbox_core.tasks.tiq_tasks import process_task_job_return
 from saltbox_core.utilities.jid import JID
+from saltbox_core.utilities.salt import fill_salt_kwarg_from_arg
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.event_bus.utils import send_message
 from saltbox_sdk.exceptions import ObjectNotFoundException
@@ -58,6 +59,10 @@ class JobReturnMessageHandler(BaseJobMessageHandler[JobForJobReturnSaltHandlerSc
         system_user = normalized_data.pop('user', 'undefined')  # NOTE: KeyError - field `user` in 3005.1 does not exist
         minion_id = normalized_data.pop('id', match.group('mid'))
         salt_master = normalized_data.pop('master_id', master_id)
+
+        normalized_data['fun_args'], normalized_data['fun_kwarg'] = fill_salt_kwarg_from_arg(
+            normalized_data.get('fun_args'), normalized_data.get('fun_kwarg')
+        )
 
         enriched_data = {
             **normalized_data,
