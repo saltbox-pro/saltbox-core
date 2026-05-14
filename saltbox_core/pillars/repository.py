@@ -102,6 +102,7 @@ class PillarRepository(BaseMongoRepository[PillarModel]):
                                                     'id': '$tgt_id',
                                                     'title': '$tgt_collection.title',
                                                     'slug': '$tgt_collection.slug',
+                                                    'display_name': '$tgt_collection.title',
                                                 },
                                             },
                                             {
@@ -111,6 +112,7 @@ class PillarRepository(BaseMongoRepository[PillarModel]):
                                                     'id': '$tgt_id',
                                                     'minion_id': '$tgt_minion.minion_id',
                                                     'master': '$tgt_minion.master',
+                                                    'display_name': '$tgt_minion.minion_id',
                                                 },
                                             },
                                         ],

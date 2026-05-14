@@ -59,6 +59,7 @@ class PillarListBody(SkipLimitParams, QueryParams, SortParams):
 class PillarTargetInfoBase(BaseModel):
     type: PillarTgtType = Field(default=PillarTgtType.ROOT)
     id: PyObjectId | None = None
+    display_name: str | None = None
 
 
 class PillarTargetInfoCollection(PillarTargetInfoBase):
