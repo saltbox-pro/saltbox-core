@@ -129,10 +129,7 @@ class TaskLifespanService:
 
         task = await self.get_task()
 
-        if task.batch_size:
-            return task.batch_size
-
-        return 100
+        return task.batch_size
 
     async def sync_jobs(self) -> None:
         task = await self.get_task()
@@ -295,7 +292,7 @@ class TaskLifespanService:
                 if minions_in_job_count > 0:
                     active_jobs_count += 1
 
-                if minions_in_job_count < batch_size:
+                if minions_in_job_count < batch_size or (batch_size == 0 and minions_in_job_count == 0):
                     await self.check_unactive_minions(master=master.master_id, batch_size=batch_size)
                     break
 
