@@ -2,20 +2,13 @@ from typing import Annotated, Any
 
 from taskiq import TaskiqDepends
 
-from saltbox_core.config import SETTINGS
 from saltbox_core.salt.events_handler import salt_events_handler
 from saltbox_core.salt.schemas.salt_keys import SaltKeyMinion
 from saltbox_core.salt.services.salt_key import SaltKeysService, get_salt_key_service
 from saltbox_core.tkq import broker
 
 
-@broker.task(
-    retry_on_error=True,
-    max_retries=SETTINGS.salt_taskiq_task_retries_count,
-    use_jitter=True,
-    use_delay_exponent=True,
-    max_delay_exponent=3,
-)
+@broker.task()
 async def process_salt_event_task(
     master_id: str,
     tag: str,
@@ -28,6 +21,7 @@ async def process_salt_event_task(
 @broker.task(
     retry_on_error=True,
     max_retries=10,
+    retry_delay=3,
     use_jitter=True,
     use_delay_exponent=True,
     max_delay_exponent=30,

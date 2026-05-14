@@ -6,13 +6,12 @@ import taskiq_fastapi
 from redis.asyncio import Redis
 from taskiq import Context, TaskiqDepends
 from taskiq.exceptions import NoResultError
-from taskiq.middlewares import SmartRetryMiddleware
 from taskiq_aio_pika import AioPikaBroker
 from taskiq_redis import RedisAsyncResultBackend
 
 from saltbox_core.config import SETTINGS
 from saltbox_sdk.config.rabbitmq_config import RABBIT_SETTINGS
-from saltbox_sdk.utilities.taskiq import UniqueIdMiddleware
+from saltbox_sdk.utilities.taskiq import SmartRetryMiddleware, UniqueIdMiddleware
 
 logger = logging.getLogger(__name__)
 
