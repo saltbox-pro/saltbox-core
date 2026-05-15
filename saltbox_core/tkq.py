@@ -1,4 +1,5 @@
 import logging
+import uuid
 from collections.abc import AsyncGenerator
 from contextlib import suppress
 
@@ -42,9 +43,15 @@ broker = (
             max_delay_exponent=SETTINGS.taskiq_retry_max_delay_exponent,
         ),
     )
+    .with_id_generator(lambda: uuid.uuid4().hex)
 )
 
 
+queue_fail = Queue(
+    name='queue-fail',
+    type=QueueType.CLASSIC,
+    durable=False,
+)  # TODO (@): Temporary!!! This queue for fix bug https://github.com/taskiq-python/taskiq-aio-pika/issues/51
 queue_default = Queue(
     name='queue-default',
     type=QueueType.CLASSIC,
@@ -63,29 +70,31 @@ queue_notify = Queue(
 
 
 async def startup_broker() -> AsyncBroker:
-    broker.with_queues(queue_default, queue_salt, queue_notify)
-    await broker.startup()
+    if not broker.is_worker_process:
+        broker.with_queues(queue_default, queue_salt, queue_notify)
+        await broker.startup()
     return broker
 
 
 async def shutdown_broker() -> AsyncBroker:
-    await broker.shutdown()
+    if not broker.is_worker_process:
+        await broker.shutdown()
     return broker
 
 
 def broker_for_default_worker() -> AioPikaBroker:
     logger.info('Starting default broker')
-    return broker.with_queue(queue_default)
+    return broker.with_queues(queue_fail, queue_default)
 
 
 def broker_for_salt_worker() -> AioPikaBroker:
     logger.info('Starting salt broker')
-    return broker.with_queue(queue_salt)
+    return broker.with_queues(queue_fail, queue_salt)
 
 
 def broker_for_notify_worker() -> AioPikaBroker:
     logger.info('Starting notify broker')
-    return broker.with_queue(queue_notify)
+    return broker.with_queues(queue_fail, queue_notify)
 
 
 taskiq_fastapi.init(broker, 'saltbox_core.main:app')
