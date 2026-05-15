@@ -2,7 +2,6 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends, status
 
-from saltbox_core.config import logger
 from saltbox_core.salt.schemas.salt_keys import (
     SaltKeyActions,
     SaltKeyListRequestBody,
@@ -12,6 +11,7 @@ from saltbox_core.salt.schemas.salt_keys import (
     SaltKeyUpdateResultSchema,
 )
 from saltbox_core.salt.services.salt_key import SaltKeysService, get_salt_key_service
+from saltbox_sdk.db.schemas_base import PaginatedResponse
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 
 router = APIRouter(prefix='/salt/keys', tags=['Salt keys'])
@@ -29,12 +29,10 @@ router = APIRouter(prefix='/salt/keys', tags=['Salt keys'])
 async def salt_keys_list(
     body: Annotated[SaltKeyListRequestBody, Body()],
     service: Annotated[SaltKeysService, Depends(get_salt_key_service)],
-) -> list[SaltKeyMinionWithStatus]:
+) -> PaginatedResponse[SaltKeyMinionWithStatus]:
     data = await service.list_keys(masters=body.masters, status=body.status)
 
-    logger.warning(data)
-
-    return data
+    return PaginatedResponse(total=len(data), data=data)
 
 
 @router.post(
