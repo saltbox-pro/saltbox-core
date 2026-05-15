@@ -10,12 +10,12 @@ from saltbox_core.tasks.schemas.task import TaskForStatusUpdateSchema
 from saltbox_core.tasks.schemas.tasks_minion import TaskMinionForTaskStatusUpdateSchema, TaskMinionStatus
 from saltbox_core.tasks.services.task import TaskService, get_task_service
 from saltbox_core.tasks.services.tasks_minion import TaskMinionService, get_task_minion_service
-from saltbox_core.tkq import broker
+from saltbox_core.tkq import broker, queue_default
 from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
 from saltbox_sdk.utilities.helpers import utc_now
 
 
-@broker.task()
+@broker.task(queue_name=queue_default.name)
 async def process_task_job_return(
     jid: str,
     minion_id: str,
@@ -52,7 +52,7 @@ async def process_task_job_return(
         await task_minion_service.update(query=task_minion.id, data=data_to_update)
 
 
-@broker.task()
+@broker.task(queue_name=queue_default.name)
 async def process_task_job_error(
     jid: str,
     job_service: Annotated[JobService, TaskiqDepends(get_job_service)],

@@ -1,6 +1,6 @@
 from typing import ClassVar
 
-from saltbox_core.tkq import broker
+from saltbox_core.tkq import broker, queue_notify
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.serivces.mongo_base_with_notify_service import MongoBaseWithNotifyService
 
@@ -90,7 +90,11 @@ class _NotifyServicesStoreSingleton:
         }
 
 
-@broker.task(unique_kwargs=['service_name', 'document_id', 'action'], unique_lock_timeout=120)
+@broker.task(
+    queue_name=queue_notify.name,
+    unique_kwargs=['service_name', 'document_id', 'action'],
+    unique_lock_timeout=120,
+)
 async def send_notify_by_mongo_service(
     service_name: str,
     document_id: str,

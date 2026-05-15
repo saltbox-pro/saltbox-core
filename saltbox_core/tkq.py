@@ -3,10 +3,11 @@ from collections.abc import AsyncGenerator
 from contextlib import suppress
 
 import taskiq_fastapi
+from aio_pika.abc import ExchangeType
 from redis.asyncio import Redis
-from taskiq import Context, TaskiqDepends
+from taskiq import AsyncBroker, Context, TaskiqDepends
 from taskiq.exceptions import NoResultError
-from taskiq_aio_pika import AioPikaBroker
+from taskiq_aio_pika import AioPikaBroker, Exchange, Queue, QueueType
 from taskiq_redis import RedisAsyncResultBackend
 
 from saltbox_core.config import SETTINGS
@@ -17,7 +18,17 @@ logger = logging.getLogger(__name__)
 
 result_backend: RedisAsyncResultBackend = RedisAsyncResultBackend(SETTINGS.taskiq_redis_url)
 broker = (
-    AioPikaBroker(RABBIT_SETTINGS.url)
+    AioPikaBroker(
+        url=RABBIT_SETTINGS.url,
+        exchange=Exchange(
+            name='topic_exchange',
+            type=ExchangeType.TOPIC,
+        ),
+        delay_queue=Queue(
+            name='taskiq.delay',
+            routing_key='queue-default',
+        ),
+    )
     .with_result_backend(result_backend)
     .with_middlewares(
         UniqueIdMiddleware(),
@@ -32,6 +43,49 @@ broker = (
         ),
     )
 )
+
+
+queue_default = Queue(
+    name='queue-default',
+    type=QueueType.CLASSIC,
+    durable=False,
+)
+queue_salt = Queue(
+    name='queue-salt',
+    type=QueueType.CLASSIC,
+    durable=False,
+)
+queue_notify = Queue(
+    name='queue-notify',
+    type=QueueType.CLASSIC,
+    durable=False,
+)
+
+
+async def startup_broker() -> AsyncBroker:
+    broker.with_queues(queue_default, queue_salt, queue_notify)
+    await broker.startup()
+    return broker
+
+
+async def shutdown_broker() -> AsyncBroker:
+    await broker.shutdown()
+    return broker
+
+
+def broker_for_default_worker() -> AioPikaBroker:
+    logger.info('Starting default broker')
+    return broker.with_queue(queue_default)
+
+
+def broker_for_salt_worker() -> AioPikaBroker:
+    logger.info('Starting salt broker')
+    return broker.with_queue(queue_salt)
+
+
+def broker_for_notify_worker() -> AioPikaBroker:
+    logger.info('Starting notify broker')
+    return broker.with_queue(queue_notify)
 
 
 taskiq_fastapi.init(broker, 'saltbox_core.main:app')

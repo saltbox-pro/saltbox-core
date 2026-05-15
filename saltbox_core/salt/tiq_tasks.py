@@ -5,10 +5,10 @@ from taskiq import TaskiqDepends
 from saltbox_core.salt.events_handler import salt_events_handler
 from saltbox_core.salt.schemas.salt_keys import SaltKeyMinion
 from saltbox_core.salt.services.salt_key import SaltKeysService, get_salt_key_service
-from saltbox_core.tkq import broker
+from saltbox_core.tkq import broker, queue_salt
 
 
-@broker.task()
+@broker.task(queue_name=queue_salt.name)
 async def process_salt_event_task(
     master_id: str,
     tag: str,
@@ -19,6 +19,7 @@ async def process_salt_event_task(
 
 
 @broker.task(
+    queue_name=queue_salt.name,
     retry_on_error=True,
     max_retries=10,
     retry_delay=3,

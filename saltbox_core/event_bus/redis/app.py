@@ -32,7 +32,7 @@ from saltbox_core.minion_collections.services.minion_service import MinionServic
 from saltbox_core.pillars.repository import PillarRepository, get_pillar_repository
 from saltbox_core.pillars.services.pillar import PillarService, get_pillar_service
 from saltbox_core.pillars.services.pillar_crypto import PillarCryptoService, get_pillar_crypto_service
-from saltbox_core.tkq import broker as tkq_broker
+from saltbox_core.tkq import shutdown_broker, startup_broker
 from saltbox_sdk.config.redis_config import REDIS_SETTINGS
 from saltbox_sdk.db.mongo.config import get_mongo_db
 
@@ -123,11 +123,11 @@ def get_faststream_app() -> FastStream:
 
 
 async def async_main() -> None:
-    await tkq_broker.startup()
+    await startup_broker()
     app: FastStream = get_faststream_app()
     logger.info('Starting faststream app')
     await app.run()
-    await tkq_broker.shutdown()
+    await shutdown_broker()
 
 
 def main() -> None:
