@@ -47,8 +47,8 @@ broker = (
 )
 
 
-queue_fail = Queue(
-    name='queue-fail',
+queue_common = Queue(
+    name='queue-common',
     type=QueueType.CLASSIC,
     durable=False,
 )  # TODO (@): Temporary!!! This queue for fix bug https://github.com/taskiq-python/taskiq-aio-pika/issues/51
@@ -84,17 +84,17 @@ async def shutdown_broker() -> AsyncBroker:
 
 def broker_for_default_worker() -> AioPikaBroker:
     logger.info('Starting default broker')
-    return broker.with_queues(queue_fail, queue_default)
+    return broker.with_queues(queue_common, queue_default)
 
 
 def broker_for_salt_worker() -> AioPikaBroker:
     logger.info('Starting salt broker')
-    return broker.with_queues(queue_fail, queue_salt)
+    return broker.with_queues(queue_common, queue_salt)
 
 
 def broker_for_notify_worker() -> AioPikaBroker:
     logger.info('Starting notify broker')
-    return broker.with_queues(queue_fail, queue_notify)
+    return broker.with_queues(queue_common, queue_notify)
 
 
 taskiq_fastapi.init(broker, 'saltbox_core.main:app')
