@@ -15,7 +15,7 @@ from saltbox_core.tasks.repositories.tasks_template import (
     get_task_template_repository,
 )
 from saltbox_core.tasks.schemas.tasks_template import TaskTemplateCreateSchema, TaskTemplateUpdateSchema
-from saltbox_core.tkq import ConcurrencyLocker, broker
+from saltbox_core.tkq import ConcurrencyLocker, broker, queue_default
 from saltbox_core.utilities.git_repo_helper import (
     OrphanAuxFilesCleaner,
     SlsRepoService,
@@ -76,7 +76,12 @@ async def sync_schemas(
 # TODO (a.baikov): Deal with retries and timeouts
 # If we set timeout, rabbitmq will be waiting for acks for this time. After restart worker try to
 # re-execute task, but locker in redis not released (it has ttl=timeout).
-@broker.task(timeout=SETTINGS.local_repo_sync_timeout_sec, retry_on_error=True, _retries=3)
+@broker.task(
+    queue_name=queue_default.name,
+    timeout=SETTINGS.local_repo_sync_timeout_sec,
+    retry_on_error=True,
+    _retries=3,
+)
 async def sync_sls_repo_task(
     repo_id: str,
     progress: ProgressTracker[Any] = TaskiqDepends(),
@@ -148,7 +153,7 @@ async def sync_sls_repo_task(
         raise
 
 
-@broker.task()
+@broker.task(queue_name=queue_default.name)
 async def sync_sls_repos_to_serve_dir(
     sls_repo_model: SettingsSlsRepoRepository = TaskiqDepends(get_sls_repo_repository),
     limiter: None = TaskiqDepends(ConcurrencyLocker(expire=SYNC_SERVE_DIR_LOCK_EXPIRATION_SEC)),
@@ -159,7 +164,7 @@ async def sync_sls_repos_to_serve_dir(
     await notify_accepted_masters_on_repos_update()
 
 
-@broker.task()
+@broker.task(queue_name=queue_default.name)
 async def cleanup_orphan_aux_files(
     sls_repo_model: SettingsSlsRepoRepository = TaskiqDepends(get_sls_repo_repository),
     limiter: None = TaskiqDepends(ConcurrencyLocker(expire=CLEANUP_ORPHAN_AUX_FILES_LOCK_EXPIRATION_SEC)),

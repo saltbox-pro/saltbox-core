@@ -46,7 +46,29 @@ cmd_uvicorn() {
 }
 
 cmd_taskiq_worker() {
-  cmd=(/usr/bin/taskiq worker saltbox_core.tkq:broker --fs-discover)
+  cmd=(/usr/bin/taskiq worker saltbox_core.tkq:broker_for_default_worker --fs-discover)
+  cmd+=("--tasks-pattern=${tiq_tasks_pattern}" --workers=${TASKIQ_WORKERS} --max-fails=1)
+  if [ "$DEV_MODE" = 1 ]; then
+    cmd+=(--reload)
+    workdir='/mnt/saltbox-core/'
+  else
+    workdir='/usr/lib/python3/site-packages/'
+  fi
+}
+
+cmd_taskiq_salt_worker() {
+  cmd=(/usr/bin/taskiq worker saltbox_core.tkq:broker_for_salt_worker --fs-discover)
+  cmd+=("--tasks-pattern=${tiq_tasks_pattern}" --workers=${TASKIQ_WORKERS} --max-fails=1)
+  if [ "$DEV_MODE" = 1 ]; then
+    cmd+=(--reload)
+    workdir='/mnt/saltbox-core/'
+  else
+    workdir='/usr/lib/python3/site-packages/'
+  fi
+}
+
+cmd_taskiq_notify_worker() {
+  cmd=(/usr/bin/taskiq worker saltbox_core.tkq:broker_for_notify_worker --fs-discover)
   cmd+=("--tasks-pattern=${tiq_tasks_pattern}" --workers=${TASKIQ_WORKERS} --max-fails=1)
   if [ "$DEV_MODE" = 1 ]; then
     cmd+=(--reload)
@@ -76,6 +98,8 @@ wrong_cmd() {
 case $1 in
   uvicorn) cmd_uvicorn ;;
   taskiq-worker) cmd_taskiq_worker ;;
+  taskiq-salt-worker) cmd_taskiq_salt_worker ;;
+  taskiq-notify-worker) cmd_taskiq_notify_worker ;;
   taskiq-scheduler) cmd_taskiq_scheduler ;;
   shell) cmd_shell "$@" ;;
   *) wrong_cmd "$@" ;;

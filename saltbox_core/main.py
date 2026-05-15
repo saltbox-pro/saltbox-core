@@ -21,7 +21,7 @@ from saltbox_core.settings.routers.gitlab_router import router as gitlab_router
 from saltbox_core.settings.routers.sls_repos_router import router as settings_sls_router
 from saltbox_core.tasks.routers.task import router as task_router
 from saltbox_core.tasks.routers.tasks_template import router as template_router
-from saltbox_core.tkq import broker
+from saltbox_core.tkq import broker, shutdown_broker, startup_broker
 from saltbox_core.utilities.httpx_client import HttpxClientSingletoneFactory
 from saltbox_core.utilities.redis_cache import CustomRedisCache
 from saltbox_sdk.config.discovery_config import DISCOVERY_SETTINGS
@@ -38,7 +38,7 @@ from saltbox_sdk.fastapi_utils.promethes_metrics.exporter import PrometheusExpor
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator:
     if not broker.is_worker_process:
-        await broker.startup()
+        await startup_broker()
 
         discovery_client = DiscoveryClient(
             openapi_schema=app.openapi(),
@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator:
     yield
     await CustomRedisCache.clear_cache(get_redis_now())
     if not broker.is_worker_process:
-        await broker.shutdown()
+        await shutdown_broker()
     await POOL.aclose()  # type: ignore[attr-defined]
 
 
