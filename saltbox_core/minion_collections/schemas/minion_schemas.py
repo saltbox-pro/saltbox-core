@@ -142,7 +142,7 @@ class MinionEditableFieldsMixin[T](BaseModel):
 
 
 class MinionReadonlyFieldsMixin(BaseModel):
-    @computed_field(title='Seconds from last activity')  # type: ignore
+    @computed_field(title='Seconds from last activity')  # type: ignore[prop-decorator]
     @property
     def last_activity_seconds(self) -> float | None:
         if not self.last_activity:  # type: ignore
@@ -161,7 +161,9 @@ class MinionUpdateSchema(MinionEditableFieldsMixin[GrainsSchema]):
     )
 
 
-class MinionModel(CreatedModifiedMixin, MinionReadonlyFieldsMixin, MinionEditableFieldsMixin[GrainsSchema], IDMixin):
+class MinionModel(
+    CreatedModifiedMixin, MinionReadonlyFieldsMixin, MinionEditableFieldsMixin[GrainsSchema], IDMixin, BaseModel
+):
     pass
 
 
@@ -182,23 +184,23 @@ class MinionDetailSchema(MinionModel):
 
 
 class MinionShortSchema(
-    CreatedModifiedMixin, MinionReadonlyFieldsMixin, MinionEditableFieldsMixin[GrainsShortSchema], IDMixin
+    CreatedModifiedMixin, MinionReadonlyFieldsMixin, MinionEditableFieldsMixin[GrainsShortSchema], IDMixin, BaseModel
 ):
     pass
 
 
-class MinionTgtOnlySchema(BaseModel, IDMixin):
+class MinionTgtOnlySchema(IDMixin):
     minion_id: str = Field(title='Minion ID')
     master: str = Field(title='Master')
 
 
-class MinionSimpleSchema(BaseModel, IDMixin):
+class MinionSimpleSchema(IDMixin):
     minion_id: str = Field(title='Minion ID')
     master: str = Field(title='Master')
     last_activity: TimezoneAwareDatetime | None = Field(title='Last activity', default=None)
 
 
-class MinionIDs(BaseModel, IDMixin):
+class MinionIDs(IDMixin):
     pass
 
 

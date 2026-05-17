@@ -18,12 +18,12 @@ class TaskMinionStatus(StrEnum):
     failed = 'failed'
 
 
-class TaskMinionReadOnlyFieldsMixin:
+class TaskMinionReadOnlyFieldsMixin(BaseModel):
     task_id: PyObjectId = Field(title='Task ID')
     minion_inner_id: PyObjectId = Field(title='Minion Mongo ID')
 
 
-class TaskMinionEditableFieldsMixin:
+class TaskMinionEditableFieldsMixin(BaseModel):
     status: TaskMinionStatus = Field(title='Status', default=TaskMinionStatus.pending)
 
     start_last_dt: TimezoneAwareDatetime | None = Field(title='Last job start dt', default=None)
@@ -31,14 +31,14 @@ class TaskMinionEditableFieldsMixin:
     check_unactive_last_job_dt: TimezoneAwareDatetime | None = Field(title='Last check unactive dt', default=None)
 
 
-class TaskMinionCreateSchema(BaseModel, TaskMinionReadOnlyFieldsMixin, TaskMinionEditableFieldsMixin): ...
+class TaskMinionCreateSchema(TaskMinionReadOnlyFieldsMixin, TaskMinionEditableFieldsMixin): ...
 
 
-class TaskMinionUpdateSchema(BaseModel, TaskMinionEditableFieldsMixin):
+class TaskMinionUpdateSchema(TaskMinionEditableFieldsMixin):
     model_config = ConfigDict(extra='ignore')
 
 
-class TaskMinionJoinedFieldsMixin:
+class TaskMinionJoinedFieldsMixin(BaseModel):
     minion_id: str = Field(title='Minion ID')
     master: str = Field(title='Master')
     last_activity: TimezoneAwareDatetime | None = Field(title='Last activity', default=None)
@@ -47,7 +47,6 @@ class TaskMinionJoinedFieldsMixin:
 
 
 class TaskMinionModel(
-    BaseModel,
     TaskMinionJoinedFieldsMixin,
     CreatedModifiedMixin,
     TaskMinionReadOnlyFieldsMixin,
@@ -59,17 +58,17 @@ class TaskMinionModel(
 # System
 
 
-class TaskMinionInnerIdOnly(BaseModel, IDMixin):
+class TaskMinionInnerIdOnly(IDMixin):
     task_id: PyObjectId = Field(title='Task ID')
     minion_inner_id: PyObjectId = Field(title='Minion Mongo ID')
 
 
-class TaskMinionTgtOnlySchema(BaseModel, IDMixin):
+class TaskMinionTgtOnlySchema(IDMixin):
     minion_id: str = Field(title='Minion ID')
     master: str = Field(title='Master')
 
 
-class TaskMinionForTaskStatusUpdateSchema(BaseModel, IDMixin):
+class TaskMinionForTaskStatusUpdateSchema(IDMixin):
     count_runs: int = Field(title='Count runs')
 
 
@@ -82,7 +81,7 @@ class TaskMinionListBody(SkipLimitParams, QueryParams, SortParams):
     )
 
 
-class TaskMinionListResponse(BaseModel, CreatedModifiedMixin, IDMixin):
+class TaskMinionListResponse(CreatedModifiedMixin, IDMixin):
     minion_inner_id: PyObjectId = Field(title='Minion Mongo ID')
     status: TaskMinionStatus = Field(title='Status', default=TaskMinionStatus.pending)
     start_last_dt: TimezoneAwareDatetime | None = Field(title='Last job start dt', default=None)

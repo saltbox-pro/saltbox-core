@@ -121,7 +121,7 @@ class SaltEventsHandler:
             except StopProcessing:
                 break
             except Exception as e:
-                logger.debug('Process salt event failed: %s', str(e))
+                logger.debug('Process salt event failed: %s', e)
                 await self.push_failed_event(master_id=master_id, tag=tag, data=data, retries=retries)
                 break
 

@@ -22,16 +22,16 @@ def validate_is_ascii(value: str) -> str:
     return value
 
 
-class MasterReadOnlyFieldsMixin:
+class MasterReadOnlyFieldsMixin(BaseModel):
     master_id: str = Field(title='Master ID', min_length=3)
 
 
-class MasterSshPubkeysMixin:
+class MasterSshPubkeysMixin(BaseModel):
     salt_conf_pubkey: SshPubKeyModel
     sshfs_pubkey: SshPubKeyModel
 
 
-class MasterEditableFieldsMixin:
+class MasterEditableFieldsMixin(BaseModel):
     title: str = Field(title='Title', min_length=3)
     status: MasterStatus = Field(title='Status', default=MasterStatus.NEW)
     last_sync_timestamp: TimezoneAwareDatetime | None = None
@@ -39,19 +39,17 @@ class MasterEditableFieldsMixin:
 
 
 class MasterCreateSchema(
-    BaseModel,
     MasterEditableFieldsMixin,
     MasterReadOnlyFieldsMixin,
     MasterSshPubkeysMixin,
 ): ...
 
 
-class MasterUpdateSchema(BaseModel, MasterEditableFieldsMixin):
+class MasterUpdateSchema(MasterEditableFieldsMixin):
     model_config = ConfigDict(extra='ignore')
 
 
 class MasterModel(
-    BaseModel,
     CreatedModifiedMixin,
     MasterEditableFieldsMixin,
     MasterReadOnlyFieldsMixin,
@@ -60,7 +58,7 @@ class MasterModel(
 ): ...
 
 
-class MasterMasterIdOnlySchema(BaseModel, IDMixin):
+class MasterMasterIdOnlySchema(IDMixin):
     master_id: str = Field(title='Master ID')
 
 
@@ -68,7 +66,7 @@ class MasterMasterIdOnlySchema(BaseModel, IDMixin):
 
 
 class MasterViewSchema(
-    BaseModel, CreatedModifiedMixin, MasterEditableFieldsMixin, MasterReadOnlyFieldsMixin, IDMixin
+    CreatedModifiedMixin, MasterEditableFieldsMixin, MasterReadOnlyFieldsMixin, IDMixin, BaseModel
 ): ...
 
 

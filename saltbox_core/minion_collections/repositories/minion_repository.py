@@ -1,5 +1,5 @@
 from datetime import UTC, datetime, timedelta
-from typing import Annotated, Any, ClassVar, overload
+from typing import Annotated, Any, ClassVar, cast, overload
 
 import pymongo
 from fastapi import Depends
@@ -18,8 +18,8 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
         if field_name != 'last_activity_seconds':
             return field_name, field_value
 
-        if type(field_value) is dict:
-            lookup: str = next(iter(field_value))
+        if isinstance(field_value, dict):
+            lookup = cast(str, next(iter(field_value)))
             value = field_value[lookup]
 
             if lookup in ['$in', '$nin']:

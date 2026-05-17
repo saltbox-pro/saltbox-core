@@ -20,7 +20,7 @@ class MastersAuthMiddleware(BaseMiddleware):
         super().__init__(msg)
 
     async def consume_scope(self, call_next: AsyncFuncAny, msg: StreamMessage[Any]) -> Any:
-        message = CoreMessageBase(**await msg.decode())  # type: ignore[arg-type]
+        message = CoreMessageBase.model_validate(await msg.decode())
 
         try:
             await self.master_service.get_by_master_id(master_id=message.master)

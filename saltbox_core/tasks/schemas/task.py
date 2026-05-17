@@ -20,7 +20,7 @@ class TaskType(StrEnum):
     policy = 'policy'
 
 
-class TaskTemplateShort(BaseModel, IDMixin):
+class TaskTemplateShort(IDMixin):
     title: str = Field(title='Template title')
     name: str = Field(title='Template name')
     repo_id: PyObjectId | None = Field(title='Repository id', default=None)
@@ -28,12 +28,12 @@ class TaskTemplateShort(BaseModel, IDMixin):
     defaults: TaskTemplateDefaultsSchema | None = Field(title='Default values', default=None)
 
 
-class CollectionShort(BaseModel, IDMixin):
+class CollectionShort(IDMixin):
     slug: str = Field(title='Collection slug')
     title: str = Field(title='Collection title')
 
 
-class TaskStatusShort(BaseModel, CreatedModifiedMixin):
+class TaskStatusShort(CreatedModifiedMixin):
     type: TaskStatus = Field(title='Status')
     data: dict = Field(title='Status data', default_factory=dict)
 
@@ -53,7 +53,7 @@ class TaskReadOnlyFieldsMixin(SourceMixin):
     user: UserShort
 
 
-class TaskEditableFieldsMixin:
+class TaskEditableFieldsMixin(BaseModel):
     batch_size: int = Field(title='Batch size', ge=0, default=SETTINGS.tasks_defaults_batch_size)
     max_jobs_count_at_same_time: int = Field(
         title='Max jobs count at some time', ge=1, default=SETTINGS.tasks_defaults_max_jobs_count_at_same_time
@@ -68,21 +68,21 @@ class TaskEditableFieldsMixin:
     last_sync_dt: TimezoneAwareDatetime | None = Field(title='Last sync datetime', default=None)
 
 
-class TaskTemplateJoinedFieldsMixin:
+class TaskTemplateJoinedFieldsMixin(BaseModel):
     task_template: TaskTemplateShort | None = Field(title='Task template', default=None)
 
 
-class TaskTargetCollectionJoinedFieldsMixin:
+class TaskTargetCollectionJoinedFieldsMixin(BaseModel):
     target_collection: CollectionShort = Field(title='Target collection')
 
 
-class TaskStatusJoinedFieldsMixin:
+class TaskStatusJoinedFieldsMixin(BaseModel):
     status: TaskStatusShort = Field(
         title='Status', default=TaskStatusShort(type=TaskStatus.created, created=utc_now(), modified=utc_now())
     )
 
 
-class TaskJobJoinedFieldsMixin[TaskJobJoinedSchema: BaseModel]:
+class TaskJobJoinedFieldsMixin[TaskJobJoinedSchema: BaseModel](BaseModel):
     jobs: list[TaskJobJoinedSchema] = Field(title='Jobs', default=[])
 
 
@@ -95,18 +95,18 @@ class TaskMinionsCountAggregation(BaseModel):
     failed: int = Field(title='Failed', default=0)
 
 
-class TaskAggregatedFieldsMixin:
+class TaskAggregatedFieldsMixin(BaseModel):
     minions_count: TaskMinionsCountAggregation = Field()
     pillars: dict[str, JsonValue] = Field(title='Pillars', default_factory=dict)
 
 
-class TaskComputedFieldsMixin: ...
+class TaskComputedFieldsMixin(BaseModel): ...
 
 
-class TaskCreateSchema(BaseModel, TaskEditableFieldsMixin, TaskReadOnlyFieldsMixin): ...
+class TaskCreateSchema(TaskEditableFieldsMixin, TaskReadOnlyFieldsMixin): ...
 
 
-class TaskUpdateSchema(BaseModel, TaskEditableFieldsMixin):
+class TaskUpdateSchema(TaskEditableFieldsMixin):
     status: TaskStatus | None = Field(title='Status', default=None, exclude=True)
 
     model_config = ConfigDict(
@@ -115,7 +115,6 @@ class TaskUpdateSchema(BaseModel, TaskEditableFieldsMixin):
 
 
 class TaskModel(
-    BaseModel,
     CreatedModifiedMixin,
     TaskTemplateJoinedFieldsMixin,
     TaskTargetCollectionJoinedFieldsMixin,
@@ -132,7 +131,6 @@ class TaskModel(
 
 
 class TaskForLifespanModel(
-    BaseModel,
     CreatedModifiedMixin,
     TaskTemplateJoinedFieldsMixin,
     TaskStatusJoinedFieldsMixin,
@@ -142,11 +140,11 @@ class TaskForLifespanModel(
 ): ...
 
 
-class TaskForStatusUpdateSchema(BaseModel, IDMixin):
+class TaskForStatusUpdateSchema(IDMixin):
     max_retries: int = Field(title='Max retries', default=SETTINGS.tasks_defaults_max_retries)
 
 
-class TaskWithStatusOnlySchema(BaseModel, TaskStatusJoinedFieldsMixin, IDMixin): ...
+class TaskWithStatusOnlySchema(TaskStatusJoinedFieldsMixin, IDMixin): ...
 
 
 # REST
@@ -157,7 +155,7 @@ class TaskTargetMinion(BaseModel):
     salt_master: str = Field(title='Target minion master')
 
 
-class TaskData(BaseModel):  # type: ignore
+class TaskData(BaseModel):  # type: ignore[no-redef]
     args: list[str] | None = Field(title='Arg', default=None)
     kwargs: dict[str, Any] | None = Field(title='Kwarg', default=None)
 
@@ -219,7 +217,6 @@ class RestartFailedBody(BaseModel):
 
 
 class TaskListResponseSchema(
-    BaseModel,
     CreatedModifiedMixin,
     TaskTemplateJoinedFieldsMixin,
     TaskTargetCollectionJoinedFieldsMixin,

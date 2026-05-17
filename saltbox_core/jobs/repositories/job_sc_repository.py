@@ -50,7 +50,8 @@ class JobSchemaRepository(BaseMongoRepository[JobSchemaModel]):
 
     async def _load_default_schema(self, path: anyio.Path) -> JobSchemaModel:
         async with await path.open('r') as f:
-            return json.loads(await f.read())  # type: ignore
+            data: dict = json.loads(await f.read())
+            return JobSchemaModel.model_validate(data)
 
 
 def get_job_schema_repository(db: Annotated[AsyncDatabase, Depends(get_mongo)]) -> JobSchemaRepository:

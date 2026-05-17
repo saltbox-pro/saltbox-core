@@ -27,7 +27,9 @@ def log_duration(label: str | None = None, log_level: int = logging.INFO) -> Cal
                 return func(*args, **kwargs)
             finally:
                 elapsed = time.perf_counter() - start
-                name = label or f'{func.__qualname__}()'
+                name = label or f'{getattr(func, "__qualname__", repr(func))}()'
                 logger.log(log_level, '%s duration: %s', name, humanize_time(elapsed))
+
         return wrapper
+
     return decorator

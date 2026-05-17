@@ -24,6 +24,7 @@ from saltbox_core.utilities.git_repo_helper import (
     repository_lock,
     update_sshfs_permissions,
 )
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.exceptions import ObjectNotFoundException, SaltBoxBaseException
 
@@ -33,7 +34,7 @@ CLEANUP_ORPHAN_AUX_FILES_LOCK_EXPIRATION_SEC = 15
 
 
 async def sync_schemas(
-    sls_repo_id: ObjectId, repo: TaskTemplateRepository, schemas: list[dict[str, Any]], parsed_schema_names: list[str]
+    sls_repo_id: PyObjectId, repo: TaskTemplateRepository, schemas: list[dict[str, Any]], parsed_schema_names: list[str]
 ) -> tuple[list[str], list[str], int]:
     """Synchronizes schemas with the database."""
     # remove old templates
@@ -63,7 +64,7 @@ async def sync_schemas(
             created.append(schema_create_obj.name)
         elif existing_schema.commit_hash != schema['commit_hash'] and existing_schema.repo_id == sls_repo_id:
             logger.debug('Try update: %s', schema['name'])
-            schema_update_obj = TaskTemplateUpdateSchema(**schema, repo_id=sls_repo_id)
+            schema_update_obj = TaskTemplateUpdateSchema(**schema)
             await repo.update(
                 {'name': schema['name']},
                 schema_update_obj,

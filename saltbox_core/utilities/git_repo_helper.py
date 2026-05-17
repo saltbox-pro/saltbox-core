@@ -514,7 +514,7 @@ class SlsRepoService:
                 raise SlsRepoManifestException(err) from None
 
         try:
-            return ManifestSchema.parse_obj(manifest_data)
+            return ManifestSchema.model_validate(manifest_data)
         except ValidationError as err:
             raise SlsRepoManifestException(err) from None
 
@@ -767,7 +767,7 @@ class OrphanAuxFilesCleaner:
     @classmethod
     @log_duration()
     def cleanup(cls, keep_for_repos: list[SettingsSlsRepoModel]) -> None:
-        fun_name = f'{cls.cleanup.__name__}()'
+        fun_name = f'{getattr(cls.cleanup, "__name__", repr(cls.cleanup))}()'
         logger.debug('%s has been called', fun_name)
 
         root = cls.SSHFS_DIR

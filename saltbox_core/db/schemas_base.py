@@ -7,7 +7,7 @@ class TaskiqTaskIdResponse(BaseModel):
     task_id: str = Field(title='Taskiq task ID')
 
 
-class TaskiqTaskResult(TaskiqResult):
+class TaskiqTaskResult(TaskiqResult):  # ty: ignore[unsupported-base]
     task_id: str = Field(title='Taskiq task ID')
     progress: TaskState | None = Field(title='Task progress')
     progress_meta: str | None = Field(title='Task progress meta')

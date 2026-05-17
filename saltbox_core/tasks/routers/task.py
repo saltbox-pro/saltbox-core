@@ -93,8 +93,8 @@ async def task_create(
     task_service: Annotated[TaskService, Depends(get_task_service)],
 ) -> TaskModel:
     obj_id = await task_service.create(
-        data=TaskCreateInputSchema(
-            **{
+        data=TaskCreateInputSchema.model_validate(
+            {
                 'user': user.model_dump(),
                 'source': Source.model_validate({'type': 'rest', 'id': user.sub}),
                 **item.model_dump(by_alias=True),

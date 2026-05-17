@@ -1,6 +1,5 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
-from functools import partial
 from typing import Any
 
 from fastapi import FastAPI
@@ -50,7 +49,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator:
     await CustomRedisCache.clear_cache(get_redis_now())
     if not broker.is_worker_process:
         await shutdown_broker()
-    await POOL.aclose()  # type: ignore[attr-defined]
+    await POOL.aclose()  # type: ignore[attr-defined] # ty: ignore[unresolved-attribute]
 
 
 app_config: dict[str, Any] = {
@@ -66,7 +65,13 @@ app_config: dict[str, Any] = {
 
 app_config = patch_swagger_config(app_config)
 
-app = FastAPI(**app_config)
+
+class _App(FastAPI):
+    def openapi(self) -> dict[str, Any]:
+        return custom_openapi(self, app_config, servers=[{'url': SETTINGS.base_url_root_path}])
+
+
+app = _App(**app_config)
 
 app.add_middleware(
     AuditContextMiddleware,
@@ -111,5 +116,3 @@ app.include_router(pillars_router)
 app.include_router(salt_keys_router)
 app.include_router(router=settings_sls_router, prefix='/settings', tags=['Settings'])
 app.include_router(router=gitlab_router, prefix='/settings')
-
-app.openapi = partial(custom_openapi, app, app_config, servers=[{'url': SETTINGS.base_url_root_path}])  # type: ignore[method-assign]

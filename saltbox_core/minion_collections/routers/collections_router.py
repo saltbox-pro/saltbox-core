@@ -1,8 +1,7 @@
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Body, Depends, Response, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Response, status
 
-from saltbox_core.config import logger
 from saltbox_core.minion_collections.schemas.collection_schemas import (
     CollectionActions,
     CollectionCreateRequestSchema,
@@ -35,8 +34,6 @@ async def collections_list(
     opa_query: Annotated[dict, Depends(get_opa_query)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
 ) -> PaginatedResponse[CollectionModel]:
-    logger.info(f'OPA query: {opa_query}')
-
     query: dict[str, Any] = {}
     queries: list[dict[str, Any]] = []
 
@@ -71,8 +68,6 @@ async def collections_tree(
     opa_query: Annotated[dict, Depends(get_opa_query)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
 ) -> list[CollectionTreeNodeSchema]:
-    logger.info(f'OPA query: {opa_query}')
-
     return await collection_service.get_tree(query=opa_query, projection_model=CollectionTreeNodeSchema)
 
 
@@ -89,10 +84,11 @@ async def collection_default(
     opa_query: Annotated[dict, Depends(get_opa_query)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
 ) -> CollectionDetailSchema:
-    logger.info(f'OPA query: {opa_query}')
-
     response = await collection_service.get_list(query=opa_query, limit=1, skip=0)
-    return CollectionDetailSchema(**{**response[0].model_dump(), '_id': response[0].id, 'allowed_actions': []})
+    first_collection = response[0] if response else None
+    if not first_collection or not first_collection.id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail='No collections found')
+    return CollectionDetailSchema(**first_collection.model_dump(exclude={'id'}), _id=first_collection.id)
 
 
 @router.get(
@@ -109,7 +105,7 @@ async def collection_retrieve(
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
 ) -> CollectionDetailSchema:
     response = await collection_service.get(query={'slug': slug})
-    return CollectionDetailSchema(**{**response.model_dump(), '_id': response.id, 'allowed_actions': []})
+    return CollectionDetailSchema(**response.model_dump(exclude={'id'}), _id=response.id)
 
 
 @router.post(
@@ -151,7 +147,7 @@ async def collection_update(
 ) -> CollectionDetailSchema:
     response = await collection_service.update_by_slug(slug, collection)
     # TODO (a.baikov): Add allowed actions to response
-    return CollectionDetailSchema(**{**response.model_dump(), '_id': response.id, 'allowed_actions': []})
+    return CollectionDetailSchema(**response.model_dump(exclude={'id'}), _id=response.id)
 
 
 @router.delete(

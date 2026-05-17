@@ -46,15 +46,20 @@ class JobReturnService(
             'delete': f'job-return:{obj.jid}:delete',
         }
 
-        if hasattr(obj, 'source') and obj.source:
-            if obj.source.type == 'task':
-                channels.update(
-                    {
-                        'create_task': f'task:{obj.source.id}:job-return:{obj.jid}:create',
-                        'update_task': f'task:{obj.source.id}:job-return:{obj.jid}:update',
-                        'delete_task': f'task:{obj.source.id}:job-return:{obj.jid}:delete',
-                    }
-                )
+        if (
+            hasattr(obj, 'source')
+            and obj.source
+            and hasattr(obj.source, 'type')
+            and hasattr(obj.source, 'id')
+            and obj.source.type == 'task'
+        ):
+            channels.update(
+                {
+                    'create_task': f'task:{obj.source.id}:job-return:{obj.jid}:create',
+                    'update_task': f'task:{obj.source.id}:job-return:{obj.jid}:update',
+                    'delete_task': f'task:{obj.source.id}:job-return:{obj.jid}:delete',
+                }
+            )
 
         return channels.get(action)
 

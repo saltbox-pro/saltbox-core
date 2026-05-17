@@ -16,6 +16,7 @@ from saltbox_sdk.db.mongo.aggregations import (
 )
 from saltbox_sdk.db.mongo.config import get_mongo
 from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
+from saltbox_sdk.db.schemas_base import UserShort
 
 
 class PillarRepository(BaseMongoRepository[PillarModel]):
@@ -132,9 +133,7 @@ class PillarRepository(BaseMongoRepository[PillarModel]):
         pass
 
     async def create_test_data(self) -> None:
-        root_collection: dict = await self._BaseMongoRepository_database['minion_collections'].find_one(  # type: ignore[attr-defined]
-            {'slug': 'root'}, {'_id': 1}
-        )
+        root_collection: dict | None = await self._database['minion_collections'].find_one({'slug': 'root'}, {'_id': 1})
         root_id = root_collection.get('_id') if root_collection else None
         is_test_pillar_exists = await self.exists(
             query={
@@ -156,7 +155,7 @@ class PillarRepository(BaseMongoRepository[PillarModel]):
                 tgt_id=root_id,
                 pillarenv='base',
                 value='This is a test pillar value',
-                created_by={'sub': 'system', 'username': 'system'},
+                created_by=UserShort(sub='system', name='system'),
             )
             created_pillar = await self.create(data=test_pillar)
             logger.info('Created test pillar: %s', created_pillar)

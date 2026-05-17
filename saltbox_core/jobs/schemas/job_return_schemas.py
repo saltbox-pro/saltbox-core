@@ -27,7 +27,7 @@ class JobReturnReadOnlyFieldsMixin(SourceMixin):
     user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
 
 
-class JobReturnEditableFieldsMixin:
+class JobReturnEditableFieldsMixin(BaseModel):
     status: JobReturnStatus = Field(default=JobReturnStatus.waiting)
     retcode: int | None = None
     fun_args: list | None = None
@@ -37,24 +37,23 @@ class JobReturnEditableFieldsMixin:
     stamp_job: TimezoneAwareDatetime | None = Field(default=None)
 
 
-class JobReturnAggregatedFieldsMixin:
+class JobReturnAggregatedFieldsMixin(BaseModel):
     success: bool | None = None
 
 
-class JobReturnCreateSchema(BaseModel, JobReturnReadOnlyFieldsMixin, JobReturnEditableFieldsMixin):
+class JobReturnCreateSchema(JobReturnReadOnlyFieldsMixin, JobReturnEditableFieldsMixin):
     model_config = ConfigDict(extra='ignore')
 
 
-class JobReturnUpdateSchema(BaseModel, JobReturnEditableFieldsMixin):
+class JobReturnUpdateSchema(JobReturnEditableFieldsMixin):
     model_config = ConfigDict(extra='ignore')
 
 
-class JobReturnDataMixin:
+class JobReturnDataMixin(BaseModel):
     data: Any = Field(default=None)
 
 
 class JobReturnModel(
-    BaseModel,
     JobReturnAggregatedFieldsMixin,
     CreatedModifiedMixin,
     JobReturnReadOnlyFieldsMixin,
@@ -68,7 +67,6 @@ class JobReturnModel(
 
 
 class JobReturnNotifySchema(
-    BaseModel,
     JobReturnAggregatedFieldsMixin,
     CreatedModifiedMixin,
     JobReturnReadOnlyFieldsMixin,
@@ -80,13 +78,13 @@ class JobReturnNotifySchema(
 # System
 
 
-class JobReturnForJobWatcherSchema(BaseModel, SourceMixin, IDMixin):
+class JobReturnForJobWatcherSchema(SourceMixin, IDMixin):
     jid: StrJid
     minion_id: str
     salt_master: str
 
 
-class JobReturnForTaskStatusUpdate(BaseModel, SourceMixin, IDMixin):
+class JobReturnForTaskStatusUpdate(SourceMixin, IDMixin):
     salt_master: str
     retcode: int | None = None
 
@@ -98,14 +96,13 @@ class JobReturnsListBody(SkipLimitParams, QueryParams, SortParams):
     model_config = ConfigDict(extra='ignore')
 
 
-class JobReturnDataOnlyScheme(BaseModel, JobReturnDataMixin, IDMixin):
+class JobReturnDataOnlyScheme(JobReturnDataMixin, IDMixin):
     jid: StrJid
     minion_id: str
     salt_master: str
 
 
 class JobReturnListResponse(
-    BaseModel,
     JobReturnAggregatedFieldsMixin,
     CreatedModifiedMixin,
     JobReturnReadOnlyFieldsMixin,

@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import Annotated
+from typing import Annotated, Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.functional_validators import AfterValidator
@@ -48,7 +48,7 @@ class JobReadOnlyFieldsMixin(SourceMixin):
     user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
 
 
-class JobEditableFieldsMixin:
+class JobEditableFieldsMixin(BaseModel):
     system_user: str | None = None
     minions: list[str] = Field(default=[])
     missing: list[str] = Field(default=[])
@@ -57,7 +57,7 @@ class JobEditableFieldsMixin:
     launch_error_type: str | None = None
 
 
-class JobComputedFieldsMixin: ...
+class JobComputedFieldsMixin(BaseModel): ...
 
 
 class JobMinionsCountAggregation(BaseModel):
@@ -69,14 +69,14 @@ class JobMinionsCountAggregation(BaseModel):
     ignored: int = Field(title='Ignored', default=0)
 
 
-class JobAggregateFieldsMixin:
+class JobAggregateFieldsMixin(BaseModel):
     minions_count: JobMinionsCountAggregation = Field()
     waiting_expires_at_dt: datetime
 
 
-class JobCreateSchema(BaseModel, JobReadOnlyFieldsMixin, JobEditableFieldsMixin):
+class JobCreateSchema(JobReadOnlyFieldsMixin, JobEditableFieldsMixin):
     jid: StrJid | None = Field(default=None)
-    ttl: int | None = Field(ge=0, le=SETTINGS.jobs_max_ttl, default=None)  # type: ignore
+    ttl: int | None = Field(ge=0, le=SETTINGS.jobs_max_ttl, default=None)  # type: ignore[assignment]
 
     model_config = ConfigDict(extra='ignore')
 
@@ -86,20 +86,19 @@ class JobCreateSchema(BaseModel, JobReadOnlyFieldsMixin, JobEditableFieldsMixin)
         # data may be an instantiated Job or potentially any object
         if not isinstance(data, dict):
             return data
-
-        data['arg'], data['kwarg'] = fill_salt_kwarg_from_arg(data.get('arg'), data.get('kwarg'))
+        dict_data = cast(dict[Any, Any], data)
+        dict_data['arg'], dict_data['kwarg'] = fill_salt_kwarg_from_arg(dict_data.get('arg'), dict_data.get('kwarg'))
 
         return data
 
 
-class JobUpdateSchema(BaseModel, JobEditableFieldsMixin):
+class JobUpdateSchema(JobEditableFieldsMixin):
     jid: StrJid
 
     model_config = ConfigDict(extra='ignore')
 
 
 class JobModel(
-    BaseModel,
     CreatedModifiedMixin,
     JobReadOnlyFieldsMixin,
     JobEditableFieldsMixin,
@@ -113,7 +112,7 @@ class JobModel(
 # System
 
 
-class JobForSaltHandlerBaseSchema(BaseModel, SourceMixin, IDMixin): ...
+class JobForSaltHandlerBaseSchema(SourceMixin, IDMixin): ...
 
 
 class JobForNewJobSaltHandlerSchema(JobForSaltHandlerBaseSchema):
@@ -125,7 +124,7 @@ class JobForJobReturnSaltHandlerSchema(JobForSaltHandlerBaseSchema):
     user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
 
 
-class JobSimpleSchema(BaseModel, IDMixin):
+class JobSimpleSchema(IDMixin):
     jid: StrJid
     salt_master: str
     status: JobStatus
@@ -134,11 +133,11 @@ class JobSimpleSchema(BaseModel, IDMixin):
 class JobSimpleWithSourceSchema(JobSimpleSchema, SourceMixin): ...
 
 
-class JobJidOnlySchema(BaseModel, IDMixin):
+class JobJidOnlySchema(IDMixin):
     jid: StrJid
 
 
-class JobForTaskStatusUpdateSchema(BaseModel, SourceMixin, IDMixin):
+class JobForTaskStatusUpdateSchema(SourceMixin, IDMixin):
     tgt: str | list[str]
     salt_master: str
 
@@ -152,7 +151,7 @@ class JobListBody(SkipLimitParams, QueryParams, SortParams):
     )
 
 
-class JobsListResponse(BaseModel, CreatedModifiedMixin, JobComputedFieldsMixin, SourceMixin, IDMixin):
+class JobsListResponse(CreatedModifiedMixin, JobComputedFieldsMixin, SourceMixin, IDMixin):
     jid: StrJid
     tgt: str | list[str]
     tgt_type: SaltTgtType

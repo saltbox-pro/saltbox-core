@@ -1,7 +1,7 @@
 import asyncio
 import shutil
 from pathlib import Path
-from typing import Annotated, Any, TypeVar, overload, override
+from typing import Annotated, Any, TypeVar, cast, overload, override
 
 from fastapi import Depends
 from pydantic import BaseModel
@@ -75,7 +75,6 @@ class SettingsSlsRepoService(
         total = await self.repo.count(query)
 
         lockers = await self._get_repo_lockers()
-
         data = await self.repo.get_list(
             query,
             limit=limit,
@@ -87,11 +86,9 @@ class SettingsSlsRepoService(
         for item in data:
             if hasattr(item, 'repo_url') and hasattr(item, 'locked'):
                 item.locked = True if item.repo_url in lockers else False
-
         if projection_model is None:
             return PaginatedResponse[SettingsSlsRepoModel](total=total, data=data)
-
-        return PaginatedResponse[ProjectionModel](total=total, data=data)
+        return PaginatedResponse[ProjectionModel](total=total, data=cast(list[ProjectionModel], data))
 
     async def _get_repo_lockers(self) -> list[str]:
         """Get list of locked repositories.

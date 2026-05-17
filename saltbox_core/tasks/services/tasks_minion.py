@@ -1,5 +1,5 @@
 from collections.abc import Callable
-from typing import Annotated, TypeVar
+from typing import Annotated, TypeVar, cast
 
 from fastapi import Depends
 from pydantic import BaseModel
@@ -61,7 +61,7 @@ class TaskMinionService(
                     pipe.publish(channel=channel, message=self._prepare_pub_message(obj=obj))
 
                 if action in ['create', 'update', 'delete'] and hasattr(obj, 'task_id'):
-                    task = await self.task_repository.get(query=obj.task_id)
+                    task = await self.task_repository.get(query=cast(PyObjectId, obj.task_id))
                     pipe.publish(channel=f'task:{obj.task_id}:update', message=self._prepare_pub_message(obj=task))
 
                 await pipe.execute()
