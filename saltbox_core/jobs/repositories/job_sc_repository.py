@@ -1,5 +1,5 @@
 import json
-from typing import Annotated, ClassVar
+from typing import Annotated, Any, ClassVar, cast
 
 import anyio
 import pymongo
@@ -48,10 +48,9 @@ class JobSchemaRepository(BaseMongoRepository[JobSchemaModel]):
         else:
             logger.debug('Default schema already exists')
 
-    async def _load_default_schema(self, path: anyio.Path) -> JobSchemaModel:
+    async def _load_default_schema(self, path: anyio.Path) -> dict[str, Any]:
         async with await path.open('r') as f:
-            data: dict = json.loads(await f.read())
-            return JobSchemaModel.model_validate(data)
+            return cast(dict[str, Any], json.loads(await f.read()))
 
 
 def get_job_schema_repository(db: Annotated[AsyncDatabase, Depends(get_mongo)]) -> JobSchemaRepository:
