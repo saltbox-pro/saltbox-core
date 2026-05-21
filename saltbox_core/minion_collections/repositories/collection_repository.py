@@ -61,12 +61,11 @@ class CollectionRepository(BaseTreeMongoRepository[CollectionModel]):
 
     async def validate_object_data(self, data: ModelType | dict[str, Any]) -> ModelType | dict[str, Any]:
         if isinstance(data, BaseModel):
-            if hasattr(data, 'parent_id'):
-                parent_id = data.parent_id
-            else:
-                parent_id = None
+            raw = getattr(data, 'parent_id', None)
         else:
-            parent_id = data.get('parent_id')
+            raw = data.get('parent_id')
+
+        parent_id = str(raw) if raw is not None else None
 
         if parent_id:
             try:
@@ -87,7 +86,7 @@ class CollectionRepository(BaseTreeMongoRepository[CollectionModel]):
                 title='Root collection',
                 slug='root',
                 query={},
-                owner='system',
+                owner_id='system',
             )
             _ = await self.create(obj)
             msg = f'{self.__class__.__name__} with `{obj.slug}` slug created'

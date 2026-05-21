@@ -17,25 +17,25 @@ class TaskStatus(StrEnum):
     finished = 'finished'
 
 
-class TaskStatusReadOnlyFieldsMixin:
+class TaskStatusReadOnlyFieldsMixin(BaseModel):
     task_id: PyObjectId = Field(title='Task ID')
 
     type: TaskStatus = Field(title='Status')
 
 
-class TaskStatusEditableFieldsMixin:
+class TaskStatusEditableFieldsMixin(BaseModel):
     data: dict = Field(title='Status data', default_factory=dict)
 
 
-class TaskStatusCreateSchema(BaseModel, TaskStatusReadOnlyFieldsMixin, TaskStatusEditableFieldsMixin): ...
+class TaskStatusCreateSchema(TaskStatusReadOnlyFieldsMixin, TaskStatusEditableFieldsMixin): ...
 
 
-class TaskStatusUpdateSchema(BaseModel, TaskStatusEditableFieldsMixin):
+class TaskStatusUpdateSchema(TaskStatusEditableFieldsMixin):
     model_config = ConfigDict(extra='ignore')
 
 
 class TaskStatusModel(
-    BaseModel, CreatedModifiedMixin, TaskStatusReadOnlyFieldsMixin, TaskStatusEditableFieldsMixin, IDMixin
+    TaskStatusReadOnlyFieldsMixin, TaskStatusEditableFieldsMixin, CreatedModifiedMixin, IDMixin, BaseModel
 ): ...
 
 

@@ -25,7 +25,7 @@ from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatet
 logger = logging.getLogger(__name__)
 
 
-class ReadOnlyFieldsShortMixin:
+class ReadOnlyFieldsShortMixin(BaseModel):
     repo_url: PathLike
     local_path: str = Field(max_length=32, default='', pattern='(^[a-z0-9_-]+$|^$)')
     last_synced: TimezoneAwareDatetime | None = None
@@ -41,7 +41,7 @@ class ReadOnlyFieldsShortMixin:
 class ReadOnlyFieldsFullMixin(ReadOnlyFieldsShortMixin): ...
 
 
-class EditableFieldsShortMixin:
+class EditableFieldsShortMixin(BaseModel):
     name: str = Field(min_length=3, max_length=100)
     description: str = Field(default='', max_length=500)
     is_active: StrictBool = Field(default=False)
@@ -61,7 +61,7 @@ class CreateUpdateSerializerMixin:
 
 
 class SettingsSlsRepoCreateSchema(
-    BaseModel, CreateUpdateSerializerMixin, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin
+    CreateUpdateSerializerMixin, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin, BaseModel
 ):
     @field_serializer('repo_url')
     def serialize_url(self, url: PathLike) -> str:
@@ -74,13 +74,13 @@ class SettingsSlsRepoCreateSchema(
         return self
 
 
-class SettingsSlsRepoUpdateSchema(BaseModel, CreateUpdateSerializerMixin, EditableFieldsFullMixin):
+class SettingsSlsRepoUpdateSchema(CreateUpdateSerializerMixin, EditableFieldsFullMixin):
     model_config = ConfigDict(
         extra='forbid',
     )
 
 
-class SettingsSlsRepoShortSchema(BaseModel, ReadOnlyFieldsShortMixin, EditableFieldsShortMixin, IDMixin): ...
+class SettingsSlsRepoShortSchema(ReadOnlyFieldsShortMixin, EditableFieldsShortMixin, IDMixin): ...
 
 
 class SettingsSlsRepoListBody(SkipLimitParams, QueryParams, SortParams):
@@ -177,7 +177,7 @@ class ManifestSchema(BaseModel):
 
 
 class SettingsSlsRepoModel(
-    BaseModel, CreatedModifiedMixin, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin, IDMixin
+    CreatedModifiedMixin, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin, IDMixin, BaseModel
 ): ...
 
 

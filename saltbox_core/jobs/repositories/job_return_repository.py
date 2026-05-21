@@ -35,6 +35,12 @@ class JobReturnRepository(BaseMongoRepository[JobReturnModel]):
                 ('minion_id', pymongo.ASCENDING),
             ],
             'source_asc': [('source.type', pymongo.ASCENDING), ('source.id', pymongo.ASCENDING)],
+            'source_with_tgt_asc': [
+                ('source.type', pymongo.ASCENDING),
+                ('source.id', pymongo.ASCENDING),
+                ('salt_master', pymongo.ASCENDING),
+                ('minion_id', pymongo.ASCENDING),
+            ],
         }
         aggregations: ClassVar[AggregationsStore] = AggregationsStore(
             aggregations=[
@@ -71,7 +77,7 @@ class JobReturnRepository(BaseMongoRepository[JobReturnModel]):
             return_data: Any = None
 
             try:
-                raw_return: bytes | None = await self.rdb.hget(
+                raw_return: str | bytes | None = await self.rdb.hget(
                     name=f'master:{data["salt_master"]}:job:{data["jid"]}:return-data', key=data['minion_id']
                 )
 

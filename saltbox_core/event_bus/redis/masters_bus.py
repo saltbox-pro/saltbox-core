@@ -5,7 +5,7 @@ from faststream.redis import RedisBroker, RedisMessage
 from saltbox_bridge_messages import CoreEmptyMessage, CoreMessageBase, MasterStatus
 from saltbox_core.masters.exceptions import TimeoutResponseToMasterException
 from saltbox_core.masters.repositories.master_repository import MasterRepository
-from saltbox_core.masters.schemas.master_schemas import MasterModel
+from saltbox_core.masters.schemas.master_schemas import MasterMasterIdOnlySchema, MasterModel
 from saltbox_core.masters.services.master_service import MasterService
 from saltbox_sdk.db.mongo.config import get_mongo_db
 
@@ -17,7 +17,8 @@ async def send_message_to_master(message: CoreMessageBase, message_tag: str, bro
         broker = default_master_broker
 
     async with broker as br:
-        await br.publish(message=message, channel=f'master_{message_tag}')
+        br_channel = f'master_{message.master}_{message_tag}'
+        await br.publish(message=message, channel=br_channel)
 
 
 async def send_message_and_wait_response_to_master(
@@ -30,9 +31,10 @@ async def send_message_and_wait_response_to_master(
 
     async with broker as br:
         try:
+            br_channel = f'master_{message.master}_{message_tag}'
             response: RedisMessage = await br.request(  # type: ignore
                 message,
-                channel=f'master_{message_tag}',
+                channel=br_channel,
                 timeout=response_timeout,
             )
         except TimeoutError:
@@ -56,10 +58,13 @@ async def send_message_to_every_master(
     message_kwargs.pop('master', None)
     mongo_db = get_mongo_db()
     master_repo = MasterRepository(mongo_db)
-    masters = await MasterService(master_repo).get_list(query=query, skip=0, limit=0)
+    masters = await MasterService(master_repo).get_list(
+        query=query, skip=0, limit=0, projection_model=MasterMasterIdOnlySchema
+    )
+
     for m_obj in masters:
         msg = message_type(master=m_obj.master_id, **message_kwargs)
-        await send_message_to_master(msg, 'sync_saltbox')
+        await send_message_to_master(message=msg, message_tag=message_tag)
 
 
 async def notify_master_on_repos_update(master: MasterModel) -> None:
@@ -68,4 +73,4 @@ async def notify_master_on_repos_update(master: MasterModel) -> None:
 
 
 async def notify_accepted_masters_on_repos_update() -> None:
-    await send_message_to_every_master('sync_saltbox', CoreEmptyMessage)
+    await send_message_to_every_master(message_tag='sync_saltbox', message_type=CoreEmptyMessage)

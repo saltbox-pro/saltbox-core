@@ -41,7 +41,7 @@ class MongoPipelineBuilder:
 
     @property
     def _field_handler_map(self) -> dict[str, Callable[..., None]]:
-        handler_mapping = {
+        handler_mapping: dict[str, Callable[..., None]] = {
             'grains.hwaddr_interfaces': self._unique_keys_handler,
             'created': self._datetime_handler,
             'modified': self._datetime_handler,
@@ -157,7 +157,6 @@ class MongoPipelineBuilder:
 
     def _build_pipeline(self) -> None:
         if self.field_name in self._field_handler_map:
-            logger.debug('Apply custom handler %s', self._field_handler_map[self.field_name].__name__)
             self._field_handler_map[self.field_name]()
             return
         if self._is_allowed_field_types():

@@ -7,7 +7,8 @@ from saltbox_core.config import SETTINGS
 from saltbox_core.tasks.schemas.tasks_status import TaskStatus
 from saltbox_core.tasks.schemas.tasks_template import TaskTemplateDefaultsSchema
 from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId, QueryParams, SortParams
-from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams, Source, UserShort
+from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams, SourceMixin, UserShort
+from saltbox_sdk.exceptions import SaltBoxValidationException
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
 from saltbox_sdk.utilities.helpers import utc_now
 
@@ -19,7 +20,7 @@ class TaskType(StrEnum):
     policy = 'policy'
 
 
-class TaskTemplateShort(BaseModel, IDMixin):
+class TaskTemplateShort(IDMixin):
     title: str = Field(title='Template title')
     name: str = Field(title='Template name')
     repo_id: PyObjectId | None = Field(title='Repository id', default=None)
@@ -27,17 +28,17 @@ class TaskTemplateShort(BaseModel, IDMixin):
     defaults: TaskTemplateDefaultsSchema | None = Field(title='Default values', default=None)
 
 
-class CollectionShort(BaseModel, IDMixin):
+class CollectionShort(IDMixin):
     slug: str = Field(title='Collection slug')
     title: str = Field(title='Collection title')
 
 
-class TaskStatusShort(BaseModel, CreatedModifiedMixin):
+class TaskStatusShort(CreatedModifiedMixin):
     type: TaskStatus = Field(title='Status')
     data: dict = Field(title='Status data', default_factory=dict)
 
 
-class TaskReadOnlyFieldsMixin:
+class TaskReadOnlyFieldsMixin(SourceMixin):
     task_type: TaskType = Field(title='Task type')
 
     target_collection_id: PyObjectId = Field(title='Target ID')
@@ -50,10 +51,9 @@ class TaskReadOnlyFieldsMixin:
     kwarg: dict[str, Any] | None = Field(title='Kwarg', default=None)
 
     user: UserShort
-    source: Source | None = Field(title='Source', default=None)
 
 
-class TaskEditableFieldsMixin:
+class TaskEditableFieldsMixin(BaseModel):
     batch_size: int = Field(title='Batch size', ge=0, default=SETTINGS.tasks_defaults_batch_size)
     max_jobs_count_at_same_time: int = Field(
         title='Max jobs count at some time', ge=1, default=SETTINGS.tasks_defaults_max_jobs_count_at_same_time
@@ -68,21 +68,21 @@ class TaskEditableFieldsMixin:
     last_sync_dt: TimezoneAwareDatetime | None = Field(title='Last sync datetime', default=None)
 
 
-class TaskTemplateJoinedFieldsMixin:
+class TaskTemplateJoinedFieldsMixin(BaseModel):
     task_template: TaskTemplateShort | None = Field(title='Task template', default=None)
 
 
-class TaskTargetCollectionJoinedFieldsMixin:
+class TaskTargetCollectionJoinedFieldsMixin(BaseModel):
     target_collection: CollectionShort = Field(title='Target collection')
 
 
-class TaskStatusJoinedFieldsMixin:
+class TaskStatusJoinedFieldsMixin(BaseModel):
     status: TaskStatusShort = Field(
         title='Status', default=TaskStatusShort(type=TaskStatus.created, created=utc_now(), modified=utc_now())
     )
 
 
-class TaskJobJoinedFieldsMixin[TaskJobJoinedSchema: BaseModel]:
+class TaskJobJoinedFieldsMixin[TaskJobJoinedSchema: BaseModel](BaseModel):
     jobs: list[TaskJobJoinedSchema] = Field(title='Jobs', default=[])
 
 
@@ -95,18 +95,18 @@ class TaskMinionsCountAggregation(BaseModel):
     failed: int = Field(title='Failed', default=0)
 
 
-class TaskAggregatedFieldsMixin:
+class TaskAggregatedFieldsMixin(BaseModel):
     minions_count: TaskMinionsCountAggregation = Field()
     pillars: dict[str, JsonValue] = Field(title='Pillars', default_factory=dict)
 
 
-class TaskComputedFieldsMixin: ...
+class TaskComputedFieldsMixin(BaseModel): ...
 
 
-class TaskCreateSchema(BaseModel, TaskEditableFieldsMixin, TaskReadOnlyFieldsMixin): ...
+class TaskCreateSchema(TaskEditableFieldsMixin, TaskReadOnlyFieldsMixin): ...
 
 
-class TaskUpdateSchema(BaseModel, TaskEditableFieldsMixin):
+class TaskUpdateSchema(TaskEditableFieldsMixin):
     status: TaskStatus | None = Field(title='Status', default=None, exclude=True)
 
     model_config = ConfigDict(
@@ -115,7 +115,6 @@ class TaskUpdateSchema(BaseModel, TaskEditableFieldsMixin):
 
 
 class TaskModel(
-    BaseModel,
     CreatedModifiedMixin,
     TaskTemplateJoinedFieldsMixin,
     TaskTargetCollectionJoinedFieldsMixin,
@@ -128,8 +127,10 @@ class TaskModel(
 ): ...
 
 
+# System
+
+
 class TaskForLifespanModel(
-    BaseModel,
     CreatedModifiedMixin,
     TaskTemplateJoinedFieldsMixin,
     TaskStatusJoinedFieldsMixin,
@@ -137,6 +138,13 @@ class TaskForLifespanModel(
     TaskReadOnlyFieldsMixin,
     IDMixin,
 ): ...
+
+
+class TaskForStatusUpdateSchema(IDMixin):
+    max_retries: int = Field(title='Max retries', default=SETTINGS.tasks_defaults_max_retries)
+
+
+class TaskWithStatusOnlySchema(TaskStatusJoinedFieldsMixin, IDMixin): ...
 
 
 # REST
@@ -147,7 +155,7 @@ class TaskTargetMinion(BaseModel):
     salt_master: str = Field(title='Target minion master')
 
 
-class TaskData(BaseModel):  # type: ignore
+class TaskData(BaseModel):  # type: ignore[no-redef]
     args: list[str] | None = Field(title='Arg', default=None)
     kwargs: dict[str, Any] | None = Field(title='Kwarg', default=None)
 
@@ -178,11 +186,11 @@ class TaskCreateRequestSchema(BaseModel):
     def validate_fun(self) -> 'TaskCreateRequestSchema':
         if self.task_template_id is None and self.fun is None:
             msg = 'One of `task_template` or `fun` must be set'
-            raise ValueError(msg)
+            raise SaltBoxValidationException(msg)
 
         if self.task_template_id is not None and self.fun is not None:
             msg = 'Only one of `task_template` or `fun` can be set'
-            raise ValueError(msg)
+            raise SaltBoxValidationException(msg)
 
         return self
 
@@ -190,18 +198,17 @@ class TaskCreateRequestSchema(BaseModel):
     def validate_collection(self) -> 'TaskCreateRequestSchema':
         if self.collection_id is None and self.collection_slug is None:
             msg = 'One of `collection_id` or `collection_slug` must be set'
-            raise ValueError(msg)
+            raise SaltBoxValidationException(msg)
 
         if self.collection_id is not None and self.collection_slug is not None:
             msg = 'Only one of `collection_id` or `collection_slug` can be set'
-            raise ValueError(msg)
+            raise SaltBoxValidationException(msg)
 
         return self
 
 
-class TaskCreateInputSchema(TaskCreateRequestSchema):
+class TaskCreateInputSchema(TaskCreateRequestSchema, SourceMixin):
     user: UserShort
-    source: Source
 
 
 class RestartFailedBody(BaseModel):
@@ -210,7 +217,6 @@ class RestartFailedBody(BaseModel):
 
 
 class TaskListResponseSchema(
-    BaseModel,
     CreatedModifiedMixin,
     TaskTemplateJoinedFieldsMixin,
     TaskTargetCollectionJoinedFieldsMixin,

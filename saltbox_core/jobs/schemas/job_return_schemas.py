@@ -1,12 +1,11 @@
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 from saltbox_core.jobs.schemas.job_schemas import StrJid
-from saltbox_core.utilities.salt import fill_salt_kwarg_from_arg
 from saltbox_sdk.db.mongo.schemas_base import IDMixin, QueryParams, SortParams
-from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER, CreatedModifiedMixin, SkipLimitParams, Source, UserShort
+from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER, CreatedModifiedMixin, SkipLimitParams, SourceMixin, UserShort
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
 
 # Job returns
@@ -20,16 +19,15 @@ class JobReturnStatus(StrEnum):
     ignored = 'ignored'
 
 
-class JobReturnReadOnlyFieldsMixin:
+class JobReturnReadOnlyFieldsMixin(SourceMixin):
     minion_id: str
     salt_master: str
     jid: StrJid
     fun: str
     user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
-    source: Source | None = None
 
 
-class JobReturnEditableFieldsMixin:
+class JobReturnEditableFieldsMixin(BaseModel):
     status: JobReturnStatus = Field(default=JobReturnStatus.waiting)
     retcode: int | None = None
     fun_args: list | None = None
@@ -39,38 +37,56 @@ class JobReturnEditableFieldsMixin:
     stamp_job: TimezoneAwareDatetime | None = Field(default=None)
 
 
-class JobReturnAggregatedFieldsMixin:
+class JobReturnAggregatedFieldsMixin(BaseModel):
     success: bool | None = None
 
 
-class JobReturnCreateSchema(BaseModel, JobReturnReadOnlyFieldsMixin, JobReturnEditableFieldsMixin):
+class JobReturnCreateSchema(JobReturnReadOnlyFieldsMixin, JobReturnEditableFieldsMixin):
     model_config = ConfigDict(extra='ignore')
 
-    @model_validator(mode='before')
-    @classmethod
-    def _extract_kwargs[T](cls, data: T) -> T:
-        # data may be an instantiated Job or potentially any object
-        if not isinstance(data, dict):
-            return data
 
-        data['fun_args'], data['fun_kwarg'] = fill_salt_kwarg_from_arg(data.get('fun_args'), data.get('fun_kwarg'))
-
-        return data
-
-
-class JobReturnUpdateSchema(BaseModel, JobReturnEditableFieldsMixin):
+class JobReturnUpdateSchema(JobReturnEditableFieldsMixin):
     model_config = ConfigDict(extra='ignore')
+
+
+class JobReturnDataMixin(BaseModel):
+    data: Any = Field(default=None)
 
 
 class JobReturnModel(
-    BaseModel,
+    JobReturnAggregatedFieldsMixin,
+    CreatedModifiedMixin,
+    JobReturnReadOnlyFieldsMixin,
+    JobReturnEditableFieldsMixin,
+    JobReturnDataMixin,
+    IDMixin,
+): ...
+
+
+# Notify
+
+
+class JobReturnNotifySchema(
     JobReturnAggregatedFieldsMixin,
     CreatedModifiedMixin,
     JobReturnReadOnlyFieldsMixin,
     JobReturnEditableFieldsMixin,
     IDMixin,
-):
-    data: Any = Field(default=None)
+): ...
+
+
+# System
+
+
+class JobReturnForJobWatcherSchema(SourceMixin, IDMixin):
+    jid: StrJid
+    minion_id: str
+    salt_master: str
+
+
+class JobReturnForTaskStatusUpdate(SourceMixin, IDMixin):
+    salt_master: str
+    retcode: int | None = None
 
 
 # REST
@@ -80,14 +96,16 @@ class JobReturnsListBody(SkipLimitParams, QueryParams, SortParams):
     model_config = ConfigDict(extra='ignore')
 
 
+class JobReturnDataOnlyScheme(JobReturnDataMixin, IDMixin):
+    jid: StrJid
+    minion_id: str
+    salt_master: str
+
+
 class JobReturnListResponse(
-    BaseModel,
     JobReturnAggregatedFieldsMixin,
     CreatedModifiedMixin,
     JobReturnReadOnlyFieldsMixin,
     JobReturnEditableFieldsMixin,
     IDMixin,
-):
-    data: Any = Field(
-        default=None
-    )  # TODO @: Temporary. Remove this after front will be get this from job return endpoint
+): ...

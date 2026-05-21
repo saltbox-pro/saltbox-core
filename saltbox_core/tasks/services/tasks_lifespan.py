@@ -5,16 +5,15 @@ from fastapi import Depends
 from redis.asyncio import Redis
 
 from saltbox_core.config import logger
-from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobSimpleSchema, JobStatus
+from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobJidOnlySchema, JobStatus
 from saltbox_core.jobs.services.job_return_service import JobReturnService, get_job_return_service
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
-from saltbox_core.minion_collections.schemas.minion_schemas import MinionSimpleSchema
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from saltbox_core.tasks.exceptions import TaskServiceException
 from saltbox_core.tasks.schemas.task import TaskForLifespanModel, TaskModel, TaskType
-from saltbox_core.tasks.schemas.tasks_minion import TaskMinionStatus
+from saltbox_core.tasks.schemas.tasks_minion import TaskMinionStatus, TaskMinionTgtOnlySchema
 from saltbox_core.tasks.schemas.tasks_status import TaskStatus
 from saltbox_core.tasks.services.task import TaskService, get_task_service
 from saltbox_core.tasks.services.tasks_minion import TaskMinionService, get_task_minion_service
@@ -118,10 +117,10 @@ class TaskLifespanService:
         task = await self.get_task()
 
         if task.status and task.status.type != TaskStatus.stopping:
-            for minion_id in minions_ids:
-                await self.task_minion_service.update(
-                    query=minion_id, data={'status': TaskMinionStatus.pending, 'check_unactive_last_job_dt': None}
-                )
+            await self.task_minion_service.bulk_update(
+                query={'_id': {'$in': minions_ids}},
+                data={'status': TaskMinionStatus.pending, 'check_unactive_last_job_dt': None},
+            )
 
             await self.update_task(status=TaskStatus.running)
 
@@ -130,10 +129,7 @@ class TaskLifespanService:
 
         task = await self.get_task()
 
-        if task.batch_size:
-            return task.batch_size
-
-        return 100
+        return task.batch_size
 
     async def sync_jobs(self) -> None:
         task = await self.get_task()
@@ -148,7 +144,7 @@ class TaskLifespanService:
             },
             limit=0,
             skip=0,
-            projection_model=JobSimpleSchema,
+            projection_model=JobJidOnlySchema,
         )
 
         for task_job in task_jobs:
@@ -180,20 +176,19 @@ class TaskLifespanService:
             },
             limit=batch_size * 3,
             skip=0,
-            projection_model=MinionSimpleSchema,
+            projection_model=TaskMinionTgtOnlySchema,
         )
 
         if minions:
-            minions_ids = []
-
-            for minion in minions:
-                minions_ids.append(minion.minion_id)
-                await self.task_minion_service.update(query=minion.id, data={'check_unactive_last_job_dt': utc_now()})
+            await self.task_minion_service.bulk_update(
+                query={'_id': {'$in': [minion.id for minion in minions]}},
+                data={'check_unactive_last_job_dt': utc_now()},
+            )
 
             await self.job_service.create(
                 data=JobCreateSchema.model_validate(
                     {
-                        'tgt': minions_ids,
+                        'tgt': [minion.minion_id for minion in minions],
                         'tgt_type': 'list',
                         'salt_master': master,
                         'fun': 'test.ping',
@@ -201,7 +196,6 @@ class TaskLifespanService:
                         'user': task.user,
                     },
                 ),
-                projection_model=EmptyModel,
             )
 
     @staticmethod
@@ -230,6 +224,7 @@ class TaskLifespanService:
             },
             skip=0,
             limit=batch_size,
+            projection_model=TaskMinionTgtOnlySchema,
         )
 
         if minions:
@@ -253,17 +248,15 @@ class TaskLifespanService:
                     }
                 ),
                 extra_pillarenv=[f'task:{task.id!s}'],
-                projection_model=EmptyModel,
             )
 
-            for minion in minions:
-                await self.task_minion_service.update(
-                    query=minion.id,
-                    data={
-                        'status': TaskMinionStatus.in_work,
-                        'start_last_dt': utc_now(),
-                    },
-                )
+            await self.task_minion_service.bulk_update(
+                query={'_id': {'$in': [minion.id for minion in minions]}},
+                data={
+                    'status': TaskMinionStatus.in_work,
+                    'start_last_dt': utc_now(),
+                },
+            )
 
         return len(minions)
 
@@ -299,7 +292,7 @@ class TaskLifespanService:
                 if minions_in_job_count > 0:
                     active_jobs_count += 1
 
-                if minions_in_job_count < batch_size:
+                if minions_in_job_count < batch_size or (batch_size == 0 and minions_in_job_count == 0):
                     await self.check_unactive_minions(master=master.master_id, batch_size=batch_size)
                     break
 

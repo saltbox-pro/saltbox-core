@@ -37,7 +37,9 @@ class MasterService(MongoBaseService[MasterRepository, MasterModel, MasterCreate
         *,
         session: MongoAsyncClientSession | None = None,
     ) -> MasterModel:
-        return await self.update(query=query, data={'status': MasterStatus.ACCEPTED}, session=session)
+        obj_id = await self.update(query=query, data={'status': MasterStatus.ACCEPTED}, session=session)
+
+        return await self.get(query=obj_id, session=session)
 
     async def reject(
         self,
@@ -45,7 +47,9 @@ class MasterService(MongoBaseService[MasterRepository, MasterModel, MasterCreate
         *,
         session: MongoAsyncClientSession | None = None,
     ) -> MasterModel:
-        return await self.update(query=query, data={'status': MasterStatus.REJECTED}, session=session)
+        obj_id = await self.update(query=query, data={'status': MasterStatus.REJECTED}, session=session)
+
+        return await self.get(query=obj_id, session=session)
 
     async def get_accepted_list(
         self,

@@ -1,195 +1,75 @@
 [project]
-dynamic = ["dependencies", "version"]
 name = "saltbox-core"
-requires-python = ">=3.12"
-license = { file = 'LICENSE.txt' }
 description = ""
 readme = "README.md"
+requires-python = ">=3.12"
+license-files = ["LICENSE.txt"]
 classifiers = [
   "Topic :: System :: Systems Administration",
 ]
+dynamic = ["dependencies", "version"]
 
 [project.urls]
-Homepage = "https://saltbox.pro"
 Documentation = "https://saltbox.pro"
+Homepage = "https://saltbox.pro"
 Repository = "https://dev.saltbox.pro/saltbox/saltbox-core"
+
+[project.scripts]
+saltbox-faststream-rabbit = "saltbox_core.event_bus.rabbit.app:main"
+saltbox-faststream-redis = "saltbox_core.event_bus.redis.app:main"
+saltbox-jobs-watcher = "saltbox_core.jobs.jobs_watcher:main"
+saltbox-module-init = "saltbox_core.module_init.main:main"
+saltbox-salt-buffer-manager = "saltbox_core.salt.buffer_manager:main"
+saltbox-tasks-watcher = "saltbox_core.tasks.tasks_watcher:main"
 
 [project.optional-dependencies]
 dev = [
+  "coverage[toml]>=7.6.11",
+  "mongomock>=4.3.0",
   "mypy>=1.20.0",
   "pre-commit>=4.2.0",
-  "types-redis",
-  "python-lsp-server[all]",
-  "types-PyYAML",
-  "ruff>=0.12.3",
-  "taskiq[reload]",
-  "coverage[toml]>=7.6.11",
   "pytest>=8.3.4",
   "pytest-asyncio>=0.25.3",
   "pytest-cov>=6.0.0",
   "pytest-mock>=3.14.0",
   "pytest-sugar>=1.0.0",
-  "mongomock>=4.3.0",
+  "python-lsp-server[all]",
+  "ruff>=0.12.3",
+  "saltbox-bridge-messages",
+  "saltbox-sdk",
+  "taskiq[reload]",
+  "ty>=0.0.35",
+  "types-PyYAML",
+  "types-redis",
 ]
 reload = [
   "taskiq[reload]",
 ]
 
-[project.scripts]
-saltbox-module-init = "saltbox_core.module_init.main:main"
-saltbox-faststream-redis = "saltbox_core.event_bus.redis.app:main"
-saltbox-faststream-rabbit = "saltbox_core.event_bus.rabbit.app:main"
-saltbox-jobs-watcher = "saltbox_core.jobs.jobs_watcher:main"
-saltbox-tasks-watcher = "saltbox_core.tasks.tasks_watcher:main"
-saltbox-salt-buffer-manager = "saltbox_core.salt.buffer_manager:main"
-
-# [metadata]
-# url = "https://gitlab.com/saltbox/saltbox-core"
-# version = "attr: package.__version__"
+[dependency-groups]
+dev = [
+  "coverage[toml]>=7.6.11",
+  "mongomock>=4.3.0",
+  "mypy>=1.20.0",
+  "pre-commit>=4.2.0",
+  "pytest>=8.3.4",
+  "pytest-asyncio>=0.25.3",
+  "pytest-cov>=6.0.0",
+  "pytest-mock>=3.14.0",
+  "pytest-sugar>=1.0.0",
+  "python-lsp-server[all]",
+  "ruff>=0.12.3",
+  "saltbox-bridge-messages",
+  "saltbox-sdk",
+  "taskiq[reload]",
+  "ty>=0.0.35",
+  "types-PyYAML",
+  "types-redis",
+]
 
 [build-system]
 requires = ["setuptools>=75.1.0", "setuptools-scm>=8"]
 build-backend = "setuptools.build_meta"
-
-[tool.setuptools]
-include-package-data = true
-
-[tool.setuptools.package-data]
-"saltbox_core.db.fixtures" = ["*"]
-"saltbox_core.scheduler.templates" = ["*"]
-
-[tool.setuptools_scm]
-fallback_version = "0.0.0"
-
-[tool.setuptools.packages.find]
-# Explicit package dir for flat-layout
-include = ["saltbox_core", "saltbox_core.*"]
-
-[tool.setuptools.dynamic]
-dependencies = { file = ["requirements.txt", "local_requirements.txt"] }
-version = { attr = "saltbox_core.__version__" }
-
-[tool.ruff]
-target-version = "py312"
-line-length = 120
-src = ["saltbox_core", "tests"]
-extend-exclude = ["docs", "env", "__pycache__", "*.egg", "htmlcov"]
-respect-gitignore = true
-unsafe-fixes = false
-
-[tool.ruff.format]
-quote-style = "single"
-docstring-code-format = true
-
-[tool.ruff.lint]
-preview = true
-select = [
-  "B",     # flake8-bugbear
-  "C90",   # mccabe
-  "C4",    # flake8-comprehensions
-  "DTZ",   # flake8-datetimez https://docs.astral.sh/ruff/rules/#flake8-datetimez-dtz
-  "EM",    # flake8-errmsg
-  "UP",    # pyupgrade
-  "FA",    # flake8-future-annotations
-  "LOG",   # flake8-logging
-  "PTH",   # flake8-use-pathlib
-  "ASYNC", # flake8-async
-  "G",     # flake8-logging-format
-  "E",     # pycodestyle errors
-  "F",     # pyflakes
-  "I",     # isort
-  "S",     # flake8-bandit
-  "W",     # pycodestyle warnings
-  "N",     # pep8-naming
-  "RUF",   # ruff checks
-  "TD",    # flake8-todo
-]
-ignore = [
-  # "E402",   # module level import not at top of file
-  "E701",   # Multiple statements on one line (colon)
-  "E722",   # do not use bare except
-  "ERA",    # do not autoremove commented out code
-  "N818",   # error-suffix-on-exception-name
-  "RUF029", # declared `async`, but doesn't `await`: is usual for async framework
-  "RUF036", # none-not-at-end-of-union
-  "S404",   # `subprocess` module is possibly insecure
-  "TD001",  # Invalid TODO tag
-  "TD002",  # Author name in TODO
-  "TD003",  # Found TODO in code
-  "TD004",  # Missing colon in TODO
-  "UP017",  # Use datetime.UTC alias (not available for 3.10)
-  "UP040",  # type instead of TypeAlias PEP 695"
-]
-fixable = ["ALL"]
-unfixable = [
-  "F401", # Unused import
-  "F841", # Unused variable
-  "UP035", # Deprecated import
-]
-
-[tool.ruff.lint.flake8-bugbear]
-extend-immutable-calls = [
-    "taskiq_dependencies.Depends",
-    "taskiq.TaskiqDepends",
-]
-
-[tool.ruff.lint.flake8-quotes]
-docstring-quotes = "single"
-inline-quotes = "single"
-multiline-quotes = "single"
-
-[tool.ruff.lint.pydocstyle]
-convention = "google"
-
-[tool.ruff.lint.per-file-ignores]
-"tests/**/*.*" = ["S101", "DTZ", "EM101", "RUF012", "E712"]
-# "*/models.py" = ["UP007"]
-# "*/schemas.py" = ["UP007"]
-
-[tool.ruff.lint.isort]
-known-first-party = [
-    "saltbox_core",
-    "saltbox_sdk",
-    "saltbox_bridge_messages",
-    "tests",
-]
-
-[tool.ruff.lint.mccabe]
-max-complexity = 10
-
-[tool.mypy]
-check_untyped_defs = true
-plugins = ["pydantic.mypy"]
-python_version = "3.12"
-ignore_missing_imports = false
-color_output = true
-warn_redundant_casts = true
-warn_unused_configs = true
-exclude = ["venv/", ".venv/", "tests/*"]
-strict = true
-disallow_any_generics = false
-disallow_incomplete_defs = true
-disallow_untyped_decorators = true
-disallow_untyped_defs = true
-implicit_reexport = false
-show_error_codes = true
-warn_return_any = true
-warn_unreachable = true
-warn_unused_ignores = true
-mypy_path = '../saltbox-bridge-messages/,../saltbox-sdk/'
-
-[tool.pytest.ini_options]
-asyncio_default_fixture_loop_scope = "function"
-minversion = "8.0"
-addopts = [
-  "--cov=saltbox_core",
-  "--cov-report=term-missing",
-  "--durations=5",
-  # "--maxfail=1",
-  # "--disable-warnings -q",
-]
-testpaths = ["tests"]
-# env_files = [".env.example"]
 
 [tool.coverage.run]
 # concurrency = ["gevent"]
@@ -213,3 +93,155 @@ exclude_lines = [
   "if __name__ == '__main__':",
 ]
 # skip_covered = true
+
+[tool.mypy]
+check_untyped_defs = true
+plugins = ["pydantic.mypy"]
+python_version = "3.12"
+ignore_missing_imports = false
+color_output = true
+warn_redundant_casts = true
+warn_unused_configs = true
+exclude = ["venv/", ".venv/", "tests/*"]
+strict = true
+disallow_any_generics = false
+disallow_incomplete_defs = true
+disallow_untyped_decorators = true
+disallow_untyped_defs = true
+implicit_reexport = false
+warn_return_any = true
+warn_unreachable = true
+warn_unused_ignores = true
+mypy_path = "../saltbox-bridge-messages/,../saltbox-sdk/"
+
+[tool.pytest]
+addopts = [
+  "--cov-report=term-missing",
+  "--cov=saltbox_core",
+  "--durations=5",
+  # "--maxfail=1",
+  # "--disable-warnings -q",
+]
+minversion = "8.0"
+testpaths = ["tests"]
+asyncio_default_fixture_loop_scope = "function"
+# env_files = [".env.example"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+src = ["saltbox_core", "tests"]
+extend-exclude = ["docs", "env", "__pycache__", "*.egg", "htmlcov"]
+respect-gitignore = true
+unsafe-fixes = false
+
+[tool.ruff.format]
+quote-style = "single"
+docstring-code-format = true
+
+[tool.ruff.lint]
+preview = true
+logger-objects = ["saltbox_core.config.logger"]
+select = [
+  "B",  # flake8-bugbear
+  "C90",  # mccabe
+  "C4",  # flake8-comprehensions
+  "DTZ",  # flake8-datetimez https://docs.astral.sh/ruff/rules/#flake8-datetimez-dtz
+  "EM",  # flake8-errmsg
+  "UP",  # pyupgrade
+  "FA",  # flake8-future-annotations
+  "LOG",  # flake8-logging
+  "PTH",  # flake8-use-pathlib
+  "ASYNC",  # flake8-async
+  "G",  # flake8-logging-format
+  "E",  # pycodestyle errors
+  "F",  # pyflakes
+  "I",  # isort
+  "S",  # flake8-bandit
+  "W",  # pycodestyle warnings
+  "N",  # pep8-naming
+  "RUF",  # ruff checks
+  "TD",  # flake8-todo
+]
+ignore = [
+  # "E402",   # module level import not at top of file
+  "E701",  # Multiple statements on one line (colon)
+  "E722",  # do not use bare except
+  "ERA",  # do not autoremove commented out code
+  "N818",  # error-suffix-on-exception-name
+  "RUF029",  # declared `async`, but doesn't `await`: is usual for async framework
+  "RUF036",  # none-not-at-end-of-union
+  "S404",  # `subprocess` module is possibly insecure
+  "TD001",  # Invalid TODO tag
+  "TD002",  # Author name in TODO
+  "TD003",  # Found TODO in code
+  "TD004",  # Missing colon in TODO
+  "UP017",  # Use datetime.UTC alias (not available for 3.10)
+  "UP040",  # type instead of TypeAlias PEP 695"
+  "G004",  # use % formatting in logging functions
+]
+fixable = ["ALL"]
+unfixable = [
+  "F401",  # Unused import
+  "F841",  # Unused variable
+  "UP035",  # Deprecated import
+]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+  "taskiq_dependencies.Depends",
+  "taskiq.TaskiqDepends",
+]
+
+[tool.ruff.lint.flake8-quotes]
+docstring-quotes = "single"
+inline-quotes = "single"
+multiline-quotes = "single"
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.*" = ["S101", "DTZ", "EM101", "RUF012", "E712"]
+# "*/models.py" = ["UP007"]
+# "*/schemas.py" = ["UP007"]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+  "saltbox_core",
+  "saltbox_sdk",
+  "saltbox_bridge_messages",
+  "tests",
+]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"saltbox_core.db.fixtures" = ["*"]
+"saltbox_core.scheduler.templates" = ["*"]
+
+[tool.setuptools.packages.find]
+# Explicit package dir for flat-layout
+include = ["saltbox_core", "saltbox_core.*"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements.txt", "local_requirements.txt"] }
+version = { attr = "saltbox_core.__version__" }
+
+[tool.setuptools_scm]
+fallback_version = "0.0.0"
+
+[tool.ty.environment]
+python-version = "3.12"
+extra-paths = ["../saltbox-bridge-messages/", "../saltbox-sdk/"]
+
+[tool.ty.terminal]
+error-on-warning = false
+
+[tool.uv.sources]
+saltbox-sdk = { path = "../saltbox-sdk", editable = true }
+saltbox-bridge-messages = { path = "../saltbox-bridge-messages", editable = true }

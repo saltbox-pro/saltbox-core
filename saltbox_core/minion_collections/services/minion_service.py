@@ -4,6 +4,7 @@ from typing import Annotated, Any, overload
 
 from anyio import Path
 from fastapi import Depends
+from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
 
 from saltbox_core.config import logger
 from saltbox_core.minion_collections.repositories.minion_repository import MinionRepository, get_minion_repository
@@ -13,15 +14,30 @@ from saltbox_core.minion_collections.schemas.minion_schemas import (
     MinionCreateSchema,
     MinionIDs,
     MinionModel,
+    MinionTgtOnlySchema,
     MinionUpdateSchema,
 )
 from saltbox_core.minion_collections.services.pipeline_builder import MongoPipelineBuilder
-from saltbox_sdk.db.mongo.schemas_base import EmptyModel
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService, ProjectionModel
 
 
 class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreateSchema, MinionUpdateSchema]):
+    async def delete(
+        self,
+        query: dict[str, Any] | PyObjectId,
+        *,
+        session: MongoAsyncClientSession | None = None,
+    ) -> int:
+        from saltbox_core.salt.tiq_tasks import delete_minion_salt_keys_task
+
+        minion = await self.get(query=query, session=session, projection_model=MinionTgtOnlySchema)
+        await delete_minion_salt_keys_task.kiq(minion_id=minion.minion_id, master_id=minion.master)  # type: ignore
+        deleted_count = await super().delete(query=query, session=session)
+
+        return deleted_count
+
     @overload
     async def get_by_master_and_id(self, master: str, minion_id: str) -> MinionModel: ...
 
@@ -56,26 +72,16 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
         return UniqueGrainValuesResponse(total=len(full_data), data=data)
 
     async def process_presence(self, master_id: str, minions: list[str], stamp: float) -> None:
-        last_activity_dt = datetime.fromtimestamp(stamp, tz=UTC)
-
-        for minion_id in minions:
-            try:
-                minion: MinionModel = await self.get_by_master_and_id(master=master_id, minion_id=minion_id)
-                minion.last_activity = last_activity_dt
-                await self.update(
-                    query={'master': master_id, 'minion_id': minion_id},
-                    data={'last_activity': last_activity_dt},
-                    projection_model=EmptyModel,
-                )
-            except ObjectNotFoundException:
-                logger.info('Minion "%s" from presence not found in DB', minion_id)
+        await self.bulk_update(
+            query={'master': master_id, 'minion_id': {'$in': minions}},
+            data={'last_activity': datetime.fromtimestamp(stamp, tz=UTC)},
+        )
 
     async def process_grains(self, master_id: str, minion_id: str, grains: dict[str, Any]) -> None:
         try:
             await self.update(
                 query={'master': master_id, 'minion_id': minion_id},
-                data={'grains': GrainsSchema(**grains).model_dump(by_alias=True)},
-                projection_model=EmptyModel,
+                data={'grains': GrainsSchema.model_validate(grains).model_dump(by_alias=True)},
             )
         except ObjectNotFoundException:
             minion_obj = {
@@ -83,9 +89,7 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
                 'master': master_id,
                 'grains': grains,
             }
-            await self.create(
-                data=MinionCreateSchema(**minion_obj).model_dump(by_alias=True), projection_model=EmptyModel
-            )
+            await self.create(data=MinionCreateSchema.model_validate(minion_obj).model_dump(by_alias=True))
 
     async def export_to_csv(self, query: dict[str, Any], skip: int = 0, limit: int = 0) -> str:
         data = await self.get_list(query, skip=skip, limit=limit)

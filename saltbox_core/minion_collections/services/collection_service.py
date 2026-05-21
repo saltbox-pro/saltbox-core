@@ -1,4 +1,4 @@
-from typing import Annotated, Any, TypeVar, overload, override
+from typing import Annotated, Any, TypeVar, overload
 from uuid import uuid4
 
 from fastapi import Depends
@@ -58,8 +58,9 @@ class CollectionService(
         *,
         session: MongoAsyncClientSession | None = None,
     ) -> CollectionModel:
-        result = await self.update(query={'slug': slug}, data=data, session=session)
-        return result
+        obj_id = await self.update(query={'slug': slug}, data=data, session=session)
+
+        return await self.get(query=obj_id, session=session)
 
     async def delete_by_slug(
         self,
@@ -82,31 +83,12 @@ class CollectionService(
             query=query, projection_model=projection_model, children_field_name=children_field_name, session=session
         )
 
-    @overload
     async def create(
         self,
         data: CollectionCreateSchema | dict[str, Any],
         *,
         session: MongoAsyncClientSession | None = None,
-    ) -> CollectionModel: ...
-
-    @overload
-    async def create(
-        self,
-        data: CollectionCreateSchema | dict[str, Any],
-        *,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel],
-    ) -> ProjectionModel: ...
-
-    @override
-    async def create(
-        self,
-        data: CollectionCreateSchema | dict[str, Any],
-        *,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel] | None = None,
-    ) -> CollectionModel | ProjectionModel:
+    ) -> PyObjectId:
         if not isinstance(data, CollectionCreateSchema):
             data = CollectionCreateSchema.model_validate(data)
 
@@ -115,8 +97,7 @@ class CollectionService(
             if not existing:
                 break
             data.slug = f'{data.slug.split("-")[0]}-{uuid4().hex[:8]}'
-        if projection_model:
-            return await super().create(data=data, projection_model=projection_model, session=session)
+
         return await super().create(data=data, session=session)
 
     async def get_root_collection_id(self) -> PyObjectId:
@@ -128,6 +109,3 @@ def get_collection_service(
     repo: Annotated[CollectionRepository, Depends(get_collection_repository)],
 ) -> CollectionService:
     return CollectionService(repo)
-
-
-CollectionServiceDependency = Annotated[CollectionService, Depends(get_collection_service)]

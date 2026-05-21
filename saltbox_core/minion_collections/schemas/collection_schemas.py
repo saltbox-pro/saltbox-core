@@ -15,29 +15,29 @@ from saltbox_sdk.db.mongo.schemas_base import (
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
 
 
-class CollectionComputedFieldsMixin:
+class CollectionComputedFieldsMixin(BaseModel):
     full_query: MongoQuery = MongoQueryField
 
 
-class CollectionReadOnlyFieldsMixin:
+class CollectionReadOnlyFieldsMixin(BaseModel):
     slug: str = Field(title='Slug', pattern=r'^[a-z0-9-]+$', min_length=3, max_length=30)
     owner_id: str | None = Field(title='Owner', min_length=3, max_length=50, default=None)
 
 
-class CollectionEditableFieldsMixin:
+class CollectionEditableFieldsMixin(BaseModel):
     title: str = Field(title='Title', min_length=3, max_length=50)
     query: MongoQuery = MongoQueryField
 
 
-class CollectionCreateSchema(BaseModel, CollectionEditableFieldsMixin, CollectionReadOnlyFieldsMixin, TreeMixin):
+class CollectionCreateSchema(CollectionEditableFieldsMixin, CollectionReadOnlyFieldsMixin, TreeMixin):
     pass
 
 
-class CollectionCreateRequestSchema(BaseModel, CollectionEditableFieldsMixin, CollectionReadOnlyFieldsMixin):
+class CollectionCreateRequestSchema(CollectionEditableFieldsMixin, CollectionReadOnlyFieldsMixin):
     parent_slug: str = Field(title='Slug', pattern=r'^[a-z0-9-]+$', min_length=3, max_length=30)
 
 
-class CollectionUpdateSchema(BaseModel, CollectionEditableFieldsMixin):
+class CollectionUpdateSchema(CollectionEditableFieldsMixin):
     model_config = ConfigDict(
         extra='forbid',
     )
@@ -61,8 +61,7 @@ class CollectionModel(
     )
 
 
-class CollectionDetailSchema(CollectionModel):
-    allowed_actions: list[str] = Field(title='Allowed actions')
+class CollectionDetailSchema(CollectionModel): ...
 
 
 class CollectionBaseTreeModel(BaseTreeModel):
@@ -72,7 +71,7 @@ class CollectionBaseTreeModel(BaseTreeModel):
     title: str
 
 
-class CollectionTreeNodeSchema(BaseModel, IDMixin):
+class CollectionTreeNodeSchema(IDMixin):
     title: str = Field(title='Title', min_length=3, max_length=50)
     slug: str = Field(title='Slug', pattern=r'^[a-z0-9-]+$', min_length=3, max_length=30)
 

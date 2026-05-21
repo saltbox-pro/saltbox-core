@@ -8,7 +8,7 @@ from taskiq.depends.progress_tracker import ProgressTracker, TaskState
 from saltbox_core.config import SETTINGS, logger
 from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository, get_job_schema_repository
 from saltbox_core.jobs.schemas.job_sc_schemas import JobSchemaCreateSchema, JobSchemaUpdateSchema
-from saltbox_core.tkq import broker
+from saltbox_core.tkq import broker, queue_default
 from saltbox_core.utilities.git_repo_helper import GitRepoService, parse_schemas, repository_lock
 from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.exceptions import ObjectNotFoundException, TaskiqException, TaskiqTimeoutException
@@ -46,7 +46,7 @@ async def sync_schemas(
 
 
 # TODO (a.baikov): Deal with retries
-@broker.task(timeout=30, retry_on_error=True, _retries=3)
+@broker.task(queue_name=queue_default.name, timeout=30, retry_on_error=True, _retries=3)
 async def job_schemas_sync_task(
     repo_url: str,
     progress: ProgressTracker[Any] = TaskiqDepends(),

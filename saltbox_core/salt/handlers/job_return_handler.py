@@ -8,13 +8,8 @@ from faststream.rabbit import RabbitBroker
 
 from saltbox_core.config import SETTINGS, logger
 from saltbox_core.event_bus.rabbit.common_messages import InventoryPutEventBusMessage, InventoryPutForMinion
-from saltbox_core.jobs.schemas.job_return_schemas import (
-    JobReturnCreateSchema,
-    JobReturnModel,
-    JobReturnStatus,
-    JobReturnUpdateSchema,
-)
-from saltbox_core.jobs.schemas.job_schemas import JobModel
+from saltbox_core.jobs.schemas.job_return_schemas import JobReturnModel, JobReturnStatus, JobReturnUpdateSchema
+from saltbox_core.jobs.schemas.job_schemas import JobForJobReturnSaltHandlerSchema
 from saltbox_core.jobs.services.job_return_service import JobReturnService
 from saltbox_core.jobs.services.job_services import JobService
 from saltbox_core.minion_collections.services.minion_service import MinionService
@@ -23,12 +18,14 @@ from saltbox_core.salt.handlers.base_handler import MessageDataType
 from saltbox_core.salt.handlers.base_job_handler import BaseJobMessageHandler
 from saltbox_core.tasks.tiq_tasks import process_task_job_return
 from saltbox_core.utilities.jid import JID
+from saltbox_core.utilities.salt import fill_salt_kwarg_from_arg
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.event_bus.utils import send_message
-from saltbox_sdk.exceptions import DuplicateKeyException, NotFoundException
+from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.utilities.helpers import format_iso8601_z, make_aware
 
 
-class JobReturnMessageHandler(BaseJobMessageHandler):
+class JobReturnMessageHandler(BaseJobMessageHandler[JobForJobReturnSaltHandlerSchema]):
     """
     A message handler that handles salt job return messages
     """
@@ -57,12 +54,15 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         self.broker = broker
 
     async def normalize_data(self, match: re.Match, master_id: str, tag: str, data: MessageDataType) -> MessageDataType:
-
         normalized_data = await super().normalize_data(match=match, master_id=master_id, tag=tag, data=data)
 
         system_user = normalized_data.pop('user', 'undefined')  # NOTE: KeyError - field `user` in 3005.1 does not exist
         minion_id = normalized_data.pop('id', match.group('mid'))
         salt_master = normalized_data.pop('master_id', master_id)
+
+        normalized_data['fun_args'], normalized_data['fun_kwarg'] = fill_salt_kwarg_from_arg(
+            normalized_data.get('fun_args'), normalized_data.get('fun_kwarg')
+        )
 
         enriched_data = {
             **normalized_data,
@@ -83,15 +83,17 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
 
         return enriched_data
 
-    async def get_job(self, jid: str, master_id: str, data: MessageDataType) -> JobModel:
-        return await self.job_service.get(query={'jid': str(jid), 'salt_master': str(master_id)})
+    async def get_job(self, jid: str, master_id: str, data: MessageDataType) -> JobForJobReturnSaltHandlerSchema:
+        return await self.job_service.get(
+            query={'jid': str(jid), 'salt_master': str(master_id)}, projection_model=JobForJobReturnSaltHandlerSchema
+        )
 
     async def process(
         self,
         match: re.Match,
         master_id: str,
         data: MessageDataType,
-        job: JobModel | None = None,
+        job: JobForJobReturnSaltHandlerSchema | None = None,
         tid: str | None = None,
     ) -> None:
         if not job:
@@ -99,15 +101,9 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
 
         jid: str = match.group('jid')
         mid: str = match.group('mid')
-        function = data['fun']
         return_data = data.pop('return')
 
-        if tid:
-            logger.info('Job %s (task %s) return for %s, function %s', jid, tid, mid, function)
-        else:
-            logger.info('Job %s return for %s, function %s', jid, mid, function)
-
-        job_return = await self._save_job_return(
+        is_new_return, job_return = await self._update_job_return(
             master_id=master_id, jid=jid, mid=mid, job=job, data=data, return_data=return_data
         )
 
@@ -117,8 +113,11 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         if tid:
             await process_task_job_return.kiq(jid=jid, minion_id=mid)  # type: ignore
 
-        await self._process_return(job_return=job_return)
-        await self._send_presence(master_id=master_id, mid=mid, data=data)
+        process_return_coro = self._process_return(job_return=job_return, is_new_return=is_new_return)
+        send_presence_coro = self._send_presence(master_id=master_id, mid=mid, data=data)
+
+        await process_return_coro
+        await send_presence_coro
 
         raise StopProcessing()
 
@@ -145,7 +144,10 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
 
         return check_kwargs(job_return.fun_kwarg or {})
 
-    async def _process_return(self, job_return: JobReturnModel) -> None:
+    async def _process_return(self, job_return: JobReturnModel, is_new_return: bool) -> None:
+        if is_new_return and job_return.source and job_return.source.type == 'migration':
+            await self._send_to_migration(job_return)
+
         if job_return.fun == 'grains.items':
             await self._process_grains(job_return=job_return)
         elif job_return.fun == 'inventory.get':
@@ -155,9 +157,7 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
             logger.debug('Got inventory state return for %s', job_return.minion_id)
             await self._notify_on_inventory_state(job_return=job_return)
 
-    async def _save_job_return(
-        self, master_id: str, jid: str, mid: str, job: JobModel, data: dict, return_data: Any
-    ) -> JobReturnModel:
+    async def _save_job_return_data(self, master_id: str, jid: str, mid: str, return_data: Any) -> None:
         hash_name = f'master:{master_id}:job:{jid}:return-data'
         async with self.redis_client.pipeline() as pipe:
             pipe = pipe.hset(name=hash_name, key=mid, value=json.dumps(return_data))
@@ -165,41 +165,49 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
                 pipe = pipe.expire(name=hash_name, time=SETTINGS.jobs_return_data_expire_ttl)
             await pipe.execute()
 
-        is_new_return = False
-
+    async def _update_job_return_object(
+        self, master_id: str, jid: str, mid: str, job: JobForJobReturnSaltHandlerSchema, data: dict
+    ) -> tuple[bool, PyObjectId | None]:
         try:
-            payload = {
-                **data,
-                'source': job.source,
-                'user': job.user,
-                'stamp_job': job.stamp,
-            }
-            job_return = await self.job_return_service.create(
-                data=JobReturnCreateSchema.model_validate(payload),
+            job_return_id = await self.job_return_service.update(
+                query={'jid': jid, 'salt_master': master_id, 'minion_id': mid, 'retcode': None},
+                data=JobReturnUpdateSchema.model_validate(
+                    {'source': job.source, 'user': job.user, 'stamp_job': job.stamp, **data}
+                ),
                 notify=True,
             )
-            is_new_return = True
-        except DuplicateKeyException:
-            try:
-                job_return = await self.job_return_service.update(
-                    query={'jid': jid, 'salt_master': master_id, 'minion_id': mid, 'retcode': None},
-                    data=JobReturnUpdateSchema.model_validate(
-                        {'source': job.source, 'user': job.user, 'stamp_job': job.stamp, **data}
-                    ),
-                    notify=True,
-                )
-                is_new_return = True
-            except NotFoundException:
-                job_return = await self.job_return_service.get(
-                    query={'jid': jid, 'salt_master': master_id, 'minion_id': mid}
-                )
+            return True, job_return_id
+        except ObjectNotFoundException as e:
+            if await self.job_return_service.exists(query={'jid': jid, 'salt_master': master_id, 'minion_id': mid}):
+                return False, None
 
-        if is_new_return and job.source and job.source.type == 'migration':
-            await self.broker.connect()
-            job_return.data = return_data
-            await self.broker.publish(job_return, 'migration_job_return')
+            raise e
 
-        return job_return
+    async def _update_job_return(
+        self, master_id: str, jid: str, mid: str, job: JobForJobReturnSaltHandlerSchema, data: dict, return_data: Any
+    ) -> tuple[bool, JobReturnModel]:
+        save_job_return_data_coro = self._save_job_return_data(
+            master_id=master_id, jid=jid, mid=mid, return_data=return_data
+        )
+        save_job_return_object = self._update_job_return_object(
+            master_id=master_id, jid=jid, mid=mid, job=job, data=data
+        )
+
+        await save_job_return_data_coro
+        is_new_return, job_return_id = await save_job_return_object
+
+        if job_return_id is None:
+            job_return = await self.job_return_service.get(
+                query={'jid': jid, 'salt_master': master_id, 'minion_id': mid}
+            )
+        else:
+            job_return = await self.job_return_service.get(query=job_return_id)
+
+        return is_new_return, job_return
+
+    async def _send_to_migration(self, job_return: JobReturnModel) -> None:
+        await self.broker.connect()
+        await self.broker.publish(job_return, 'migration_job_return')
 
     @staticmethod
     async def _send_inventory_data(job_return: JobReturnModel, path: list[str | int]) -> None:
@@ -258,7 +266,6 @@ class JobReturnMessageHandler(BaseJobMessageHandler):
         await self._send_inventory_data(job_return=job_return, path=['return', mod_name, 'changes', 'ret'])
 
     async def _process_grains(self, job_return: JobReturnModel) -> None:
-        logger.debug('Processing grains for %s', job_return.minion_id)
         if not job_return.data:
             return
 

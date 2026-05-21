@@ -1,5 +1,5 @@
 import json
-from typing import Annotated, ClassVar
+from typing import Annotated, Any, ClassVar, cast
 
 import anyio
 import pymongo
@@ -14,7 +14,6 @@ from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
 
 
 class JobSchemaRepository(BaseMongoRepository[JobSchemaModel]):
-
     _PATH_TO_DEFAULT_SCHEMA = anyio.Path(__file__).parent.joinpath('fixtures/default_func_schema.json')
     _PATH_TO_DEFAULT_UI_SCHEMA = anyio.Path(__file__).parent.joinpath('fixtures/default_func_ui_schema.json')
 
@@ -34,23 +33,24 @@ class JobSchemaRepository(BaseMongoRepository[JobSchemaModel]):
             default_schema = await self._load_default_schema(self._PATH_TO_DEFAULT_SCHEMA)
             default_ui_schema = await self._load_default_schema(self._PATH_TO_DEFAULT_UI_SCHEMA)
 
-            created_schema: JobSchemaModel = await self.create(
+            created_schema_id = await self.create(
                 data=JobSchemaCreateSchema.model_validate(
                     obj={
                         'name': 'default',
                         'json_schema': default_schema,
                         'ui_schema': default_ui_schema,
-                        'commit_hash': ''
+                        'commit_hash': '',
                     }
                 )
             )
+            created_schema: JobSchemaModel = await self.get(query=created_schema_id)
             logger.info('Created default schema: %s', created_schema)
         else:
             logger.debug('Default schema already exists')
 
-    async def _load_default_schema(self, path: anyio.Path) -> JobSchemaModel:
+    async def _load_default_schema(self, path: anyio.Path) -> dict[str, Any]:
         async with await path.open('r') as f:
-            return json.loads(await f.read())  # type: ignore
+            return cast(dict[str, Any], json.loads(await f.read()))
 
 
 def get_job_schema_repository(db: Annotated[AsyncDatabase, Depends(get_mongo)]) -> JobSchemaRepository:

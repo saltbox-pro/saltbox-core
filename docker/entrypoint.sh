@@ -12,6 +12,7 @@ err() {
 
 REDIS_PASSWORD="$(cat "$REDIS_USER_PASSWORD_FILE")"
 MONGO_PASSWORD="$(cat "$MONGO_USER_PASSWORD_FILE")"
+RABBITMQ_AMQP_PASSWORD="$(cat "$RABBITMQ_AMQP_PASSWORD_FILE")"
 KEYCLOAK_CLIENT_SECRET="$(cat "$KEYCLOAK_CLIENT_SECRET_FILE")"
 
 TASKIQ_BROKER_URL="redis://${REDIS_TASKIQ_USERNAME}"
@@ -25,7 +26,7 @@ fi
 TASKIQ_BROKER_URL="${TASKIQ_BROKER_URL}@${REDIS_TASKIQ_HOST}:${REDIS_TASKIQ_PORT}"
 TASKIQ_BROKER_URL="${TASKIQ_BROKER_URL}/${REDIS_TASKIQ_DB}"
 
-export REDIS_PASSWORD MONGO_PASSWORD TASKIQ_BROKER_URL KEYCLOAK_CLIENT_SECRET
+export REDIS_PASSWORD MONGO_PASSWORD RABBITMQ_AMQP_PASSWORD TASKIQ_BROKER_URL KEYCLOAK_CLIENT_SECRET
 
 if [ "$DEV_MODE" = 1 ]; then
     uv --no-progress pip install --system --editable .[reload]
@@ -45,8 +46,30 @@ cmd_uvicorn() {
 }
 
 cmd_taskiq_worker() {
-  cmd=(/usr/bin/taskiq worker saltbox_core.tkq:broker --fs-discover)
-  cmd+=("--tasks-pattern=${tiq_tasks_pattern}" --workers=1 --max-fails=1)
+  cmd=(/usr/bin/taskiq worker saltbox_core.tkq:broker_for_default_worker --fs-discover)
+  cmd+=("--tasks-pattern=${tiq_tasks_pattern}" --workers=${TASKIQ_WORKERS} --max-fails=1)
+  if [ "$DEV_MODE" = 1 ]; then
+    cmd+=(--reload)
+    workdir='/mnt/saltbox-core/'
+  else
+    workdir='/usr/lib/python3/site-packages/'
+  fi
+}
+
+cmd_taskiq_salt_worker() {
+  cmd=(/usr/bin/taskiq worker saltbox_core.tkq:broker_for_salt_worker --fs-discover)
+  cmd+=("--tasks-pattern=${tiq_tasks_pattern}" --workers=${TASKIQ_WORKERS} --max-fails=1)
+  if [ "$DEV_MODE" = 1 ]; then
+    cmd+=(--reload)
+    workdir='/mnt/saltbox-core/'
+  else
+    workdir='/usr/lib/python3/site-packages/'
+  fi
+}
+
+cmd_taskiq_notify_worker() {
+  cmd=(/usr/bin/taskiq worker saltbox_core.tkq:broker_for_notify_worker --fs-discover)
+  cmd+=("--tasks-pattern=${tiq_tasks_pattern}" --workers=${TASKIQ_WORKERS} --max-fails=1)
   if [ "$DEV_MODE" = 1 ]; then
     cmd+=(--reload)
     workdir='/mnt/saltbox-core/'
@@ -75,6 +98,8 @@ wrong_cmd() {
 case $1 in
   uvicorn) cmd_uvicorn ;;
   taskiq-worker) cmd_taskiq_worker ;;
+  taskiq-salt-worker) cmd_taskiq_salt_worker ;;
+  taskiq-notify-worker) cmd_taskiq_notify_worker ;;
   taskiq-scheduler) cmd_taskiq_scheduler ;;
   shell) cmd_shell "$@" ;;
   *) wrong_cmd "$@" ;;

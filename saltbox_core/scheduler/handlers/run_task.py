@@ -24,7 +24,7 @@ async def run_task_handler(message: RunTaskEventBusMessage, context: ContextRepo
         msg = f'Task type "{task_type}" is not supported for scheduled tasks'
         raise Exception(msg)
 
-    task = await task_service.create(
+    task_id = await task_service.create(
         data=TaskCreateInputSchema.model_validate(
             {
                 'task_type': task_type,
@@ -54,8 +54,8 @@ async def run_task_handler(message: RunTaskEventBusMessage, context: ContextRepo
         job_return_service=job_return_service,
         minion_service=minion_service,
         collection_service=collection_service,
-        tid=task.id,
+        tid=task_id,
     )
     await task_lifespan_service.run()
 
-    return {'task_id': str(task.id)}
+    return {'task_id': str(task_id)}

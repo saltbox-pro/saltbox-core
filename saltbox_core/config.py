@@ -60,7 +60,6 @@ class Settings(BaseSettings):
     base_url_root_path: str = '/'
     max_count: int = Field(default=1000, description='Max array length to request')
     origins: list[str] = Field(['*'], description='CORS allowed resources')
-    rabbitmq_url: str = 'amqp://guest:guest@rabbitmq:5672'
     is_module_inventory_on: bool = Field(default=False, description='Provide data for Inventory extension module')
     is_module_metric_on: bool = Field(default=False, description='Provide data for Metric extension module')
 
@@ -124,6 +123,15 @@ class Settings(BaseSettings):
         description='Key identifier for pillars encryption (used for rotation)',
     )
 
+    # TaskIQ
+    taskiq_retry_default_retry_count: int = Field(default=3, description='TaskIQ retry default retry count')
+    taskiq_retry_default_retry_label: bool = Field(default=False, description='TaskIQ retry default retry label')
+    taskiq_retry_no_result_on_retry: bool = Field(default=True, description='TaskIQ retry no result on retry')
+    taskiq_retry_default_delay: float = Field(default=5, description='TaskIQ retry default delay')
+    taskiq_retry_use_jitter: bool = Field(default=False, description='TaskIQ retry use jitter')
+    taskiq_retry_use_delay_exponent: bool = Field(default=False, description='TaskIQ retry use delay exponent')
+    taskiq_retry_max_delay_exponent: float = Field(default=60, description='TaskIQ retry max delay exponent')
+
     # TASKS
     tasks_job_create_cooldown: int = Field(
         default=5, description='Number of seconds to wait from tasks job creation to new job'
@@ -146,6 +154,7 @@ class Settings(BaseSettings):
     salt_buffer_manager_event_process_retries: int = Field(
         default=3, description='Number of retries to process buffer manager event'
     )
+    salt_taskiq_task_retries_count: int = Field(default=5, description='Number of retries to process taskiq task')
 
     model_config = SettingsConfigDict(env_file=ENV_FILE, extra='ignore')
 

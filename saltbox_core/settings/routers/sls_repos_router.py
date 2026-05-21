@@ -127,7 +127,8 @@ async def sls_repo_settings_create(
     doc: SettingsSlsRepoCreateSchema,
     service: Annotated[SettingsSlsRepoService, Depends(get_sls_repo_service)],
 ) -> SettingsSlsRepoModel:
-    return await service.create(doc)
+    obj_id = await service.create(doc)
+    return await service.get(query=obj_id)
 
 
 @router.put(
@@ -143,7 +144,8 @@ async def sls_repo_settings_update(
     doc: SettingsSlsRepoUpdateSchema,
     service: Annotated[SettingsSlsRepoService, Depends(get_sls_repo_service)],
 ) -> SettingsSlsRepoModel:
-    return await service.update(sid, doc)
+    obj_id = await service.update(sid, doc)
+    return await service.get(query=obj_id)
 
 
 @router.delete(

@@ -9,6 +9,7 @@ from saltbox_core.jobs.services.job_services import JobService
 from saltbox_core.salt.exceptions import StopProcessing
 from saltbox_core.salt.handlers.base_handler import BaseMessageHandler, MessageDataType
 from saltbox_core.tasks.tiq_tasks import process_task_job_error
+from saltbox_sdk.db.mongo.schemas_base import SourceWithIdOnlySchema
 from saltbox_sdk.exceptions import ObjectNotFoundException
 
 
@@ -29,7 +30,9 @@ class JobErrorHandler(BaseMessageHandler):
         master_id = str(master_id)
 
         try:
-            job = await self.job_service.get(query={'jid': jid, 'salt_master': master_id})
+            job = await self.job_service.get(
+                query={'jid': jid, 'salt_master': master_id}, projection_model=SourceWithIdOnlySchema
+            )
             tid: str | None = (
                 job.source.id if job and job.source and job.source.type in ['task', 'task_system'] else None
             )

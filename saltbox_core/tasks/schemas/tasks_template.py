@@ -15,7 +15,7 @@ class TaskTemplateDefaultsSchema(BaseModel):
     ttl: int | None = Field(ge=0, le=SETTINGS.jobs_max_ttl, default=None)
 
 
-class ReadOnlyFieldsShortMixin:
+class ReadOnlyFieldsShortMixin(BaseModel):
     name: str = Field(title='SLS name')
     repo_id: PyObjectId | None = Field(title='Repository ID', default=None)
 
@@ -23,7 +23,7 @@ class ReadOnlyFieldsShortMixin:
 class ReadOnlyFieldsFullMixin(ReadOnlyFieldsShortMixin): ...
 
 
-class EditableFieldsShortMixin:
+class EditableFieldsShortMixin(BaseModel):
     title: str = Field(title='Template title')
     description: str | dict[str, str] | None = Field(title='Template description', default=None)
     fun: str = Field(title='Salt fun', examples=['salt.ping'])
@@ -38,10 +38,10 @@ class EditableFieldsFullMixin(EditableFieldsShortMixin):
     sls_content: str | None = Field(title='SLS content', default=None)
 
 
-class TaskTemplateCreateSchema(BaseModel, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin): ...
+class TaskTemplateCreateSchema(EditableFieldsFullMixin, ReadOnlyFieldsFullMixin): ...
 
 
-class TaskTemplateUpdateSchema(BaseModel, EditableFieldsFullMixin):
+class TaskTemplateUpdateSchema(EditableFieldsFullMixin):
     model_config = ConfigDict(extra='ignore')
 
 
@@ -50,15 +50,17 @@ class RepoInTaskTemplateSchema(BaseModel):
     repo_url: str = Field(title='Repository URL')
 
 
-class TaskTemplateShortSchema(BaseModel, ReadOnlyFieldsShortMixin, EditableFieldsShortMixin, IDMixin):
+class TaskTemplateShortSchema(ReadOnlyFieldsShortMixin, EditableFieldsShortMixin, IDMixin):
     defaults: TaskTemplateDefaultsSchema = Field(title='Default values')
     repo_info: RepoInTaskTemplateSchema | None = Field(title='Repository info', default=None)
 
 
-class TaskTemplateModel(BaseModel, CreatedModifiedMixin, EditableFieldsFullMixin, ReadOnlyFieldsFullMixin, IDMixin): ...
+class TaskTemplateModel(ReadOnlyFieldsFullMixin, EditableFieldsFullMixin, CreatedModifiedMixin, IDMixin): ...
 
 
-class TaskTemplateExcludeSlsSchema(BaseModel, CreatedModifiedMixin, ReadOnlyFieldsFullMixin, IDMixin):
+class TaskTemplateExcludeSlsSchema(
+    CreatedModifiedMixin, EditableFieldsShortMixin, ReadOnlyFieldsFullMixin, IDMixin, BaseModel
+):
     defaults: TaskTemplateDefaultsSchema | None = Field(title='Default values', default=None)
     json_schema: dict = Field(title='JSON schema', default_factory=dict)
     ui_schema: dict = Field(title='UI schema', default_factory=dict)

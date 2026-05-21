@@ -2,18 +2,17 @@ import re
 from datetime import datetime
 from typing import ClassVar
 
-from saltbox_core.config import logger
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnCreateSchema, JobReturnStatus
-from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel, JobStatus
+from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobForNewJobSaltHandlerSchema, JobStatus
 from saltbox_core.salt.exceptions import StopProcessing
 from saltbox_core.salt.handlers.base_handler import MessageDataType
 from saltbox_core.salt.handlers.base_job_handler import BaseJobMessageHandler
 from saltbox_sdk.db.schemas_base import SYSTEM_USER
-from saltbox_sdk.exceptions import DuplicateKeyException, ObjectNotFoundException
+from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.utilities.helpers import format_iso8601_z, make_aware
 
 
-class JobNewMessageHandler(BaseJobMessageHandler):
+class JobNewMessageHandler(BaseJobMessageHandler[JobForNewJobSaltHandlerSchema]):
     """
     A message handler for new job salt message when
     """
@@ -34,12 +33,10 @@ class JobNewMessageHandler(BaseJobMessageHandler):
 
         return data
 
-    async def get_job(self, jid: str, master_id: str, data: MessageDataType) -> JobModel:
+    async def get_job(self, jid: str, master_id: str, data: MessageDataType) -> JobForNewJobSaltHandlerSchema:
         try:
-            existed_job = await self.job_service.get(query={'jid': str(jid), 'salt_master': str(master_id)})
-
-            return await self.job_service.update(
-                query=existed_job.id,
+            obj_id = await self.job_service.update(
+                query={'jid': str(jid), 'salt_master': str(master_id)},
                 data={
                     'status': JobStatus.running,
                     'minions': data.get('minions', []),
@@ -47,56 +44,55 @@ class JobNewMessageHandler(BaseJobMessageHandler):
                     'stamp': data.get('stamp'),
                     'system_user': data.get('system_user'),
                 },
+                notify=False,
             )
         except ObjectNotFoundException:
-            return await self.job_service.create(
+            obj_id = await self.job_service.create(
                 data=JobCreateSchema.model_validate({**data, 'status': JobStatus.running, 'user': SYSTEM_USER}),
-                notify=True,
+                check_master=False,
+                validate_data=False,
+                notify=False,
             )
+
+        return await self.job_service.get(query=obj_id, projection_model=JobForNewJobSaltHandlerSchema)
 
     async def process(
         self,
         match: re.Match,
         master_id: str,
         data: MessageDataType,
-        job: JobModel | None = None,
+        job: JobForNewJobSaltHandlerSchema | None = None,
         tid: str | None = None,
     ) -> None:
-        jid = match.group('jid')
-
-        if tid:
-            logger.info('New job (jid: %s) for task: %s', jid, tid)
-        else:
-            logger.info('New job: %s', jid)
-
         if job:
             job_return_data = {
                 'salt_master': master_id,
-                'jid': job.jid,
-                'fun': job.fun,
+                'jid': data['jid'],
+                'fun': data['fun'],
                 'source': job.source,
                 'user': job.user,
-                'stamp_job': job.stamp,
+                'stamp_job': data['stamp'],
             }
 
             minions_by_status = {}
 
-            if job.minions:
-                minions_by_status[JobReturnStatus.waiting] = job.minions
-            if job.missing:
-                minions_by_status[JobReturnStatus.ignored] = job.missing
+            if data['minions']:
+                minions_by_status[JobReturnStatus.waiting] = data['minions']
+            if data['missing']:
+                minions_by_status[JobReturnStatus.ignored] = data['missing']
+
+            job_returns_documents_to_create: list[JobReturnCreateSchema] = []
 
             for job_return_status, minion_ids in minions_by_status.items():
                 for minion_id in minion_ids:
-                    try:
-                        await self.job_return_service.create(
-                            data=JobReturnCreateSchema.model_validate(
-                                {'minion_id': minion_id, 'status': job_return_status, **job_return_data}
-                            ),
-                            notify=True,
+                    job_returns_documents_to_create.append(
+                        JobReturnCreateSchema.model_validate(
+                            {'minion_id': minion_id, 'status': job_return_status, **job_return_data}
                         )
-                    except DuplicateKeyException:
-                        continue
+                    )
+
+            await self.job_return_service.bulk_create(job_returns_documents_to_create)
+            await self.job_service.update(query=job.id, data={}, notify=True)
 
         raise StopProcessing()
 

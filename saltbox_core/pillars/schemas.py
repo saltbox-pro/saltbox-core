@@ -15,7 +15,7 @@ class PillarTgtType(StrEnum):
     TASK = 'task'
 
 
-class ReadOnlyShortFieldsMixin:
+class ReadOnlyShortFieldsMixin(BaseModel):
     name: str
     is_secret: bool = False
 
@@ -25,28 +25,28 @@ class ReadOnlyFieldsMixin(ReadOnlyShortFieldsMixin):
     tgt_id: PyObjectId | None = None
 
 
-class ExtraFieldsMixin:
+class ExtraFieldsMixin(BaseModel):
     pillarenv: str = Field(default='base', title='Pillar environment')
     created_by: UserShort | None = None
 
 
-class EditableFieldsMixin:
+class EditableFieldsMixin(BaseModel):
     value: JsonValue
 
 
-class PillarCreateRequestSchema(BaseModel, ReadOnlyFieldsMixin, EditableFieldsMixin):
+class PillarCreateRequestSchema(ReadOnlyFieldsMixin, EditableFieldsMixin):
     pass
 
 
-class PillarCreateSchema(BaseModel, ReadOnlyFieldsMixin, EditableFieldsMixin, ExtraFieldsMixin):
+class PillarCreateSchema(ReadOnlyFieldsMixin, EditableFieldsMixin, ExtraFieldsMixin):
     pass
 
 
-class PillarUpdateSchema(BaseModel, EditableFieldsMixin):
+class PillarUpdateSchema(EditableFieldsMixin):
     pass
 
 
-class PillarModel(BaseModel, ReadOnlyFieldsMixin, EditableFieldsMixin, ExtraFieldsMixin, CreatedModifiedMixin, IDMixin):
+class PillarModel(ReadOnlyFieldsMixin, EditableFieldsMixin, ExtraFieldsMixin, CreatedModifiedMixin, IDMixin):
     pass
 
 
@@ -59,6 +59,7 @@ class PillarListBody(SkipLimitParams, QueryParams, SortParams):
 class PillarTargetInfoBase(BaseModel):
     type: PillarTgtType = Field(default=PillarTgtType.ROOT)
     id: PyObjectId | None = None
+    display_name: str | None = None
 
 
 class PillarTargetInfoCollection(PillarTargetInfoBase):
@@ -71,7 +72,7 @@ class PillarTargetInfoMinion(PillarTargetInfoBase):
     master: str | None = None
 
 
-class PillarWithTgtInfoSchema(BaseModel, ReadOnlyShortFieldsMixin, EditableFieldsMixin, CreatedModifiedMixin, IDMixin):
+class PillarWithTgtInfoSchema(ReadOnlyShortFieldsMixin, EditableFieldsMixin, CreatedModifiedMixin, IDMixin):
     tgt_info: PillarTargetInfoCollection | PillarTargetInfoMinion
 
     @model_validator(mode='after')

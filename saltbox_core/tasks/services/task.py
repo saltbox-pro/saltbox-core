@@ -1,4 +1,5 @@
-from typing import Annotated, Any, TypeVar, overload, override
+from collections.abc import Callable
+from typing import Annotated, Any, TypeVar
 
 from fastapi import Depends
 from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
@@ -7,16 +8,12 @@ from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsync
 from redis.asyncio import Redis
 
 from saltbox_core.config import SETTINGS, logger
+from saltbox_core.db.tiq_tasks import send_notify_by_mongo_service
 from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
 from saltbox_core.minion_collections.schemas.collection_schemas import CollectionModel
 from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
 from saltbox_core.pillars.services.pillar import PillarService, get_pillar_service
-from saltbox_core.tasks.exceptions import (
-    TaskCreateSchemaValidationException,
-    TaskCreateServiceException,
-    TaskServiceException,
-)
 from saltbox_core.tasks.repositories.task import TaskRepository, get_task_repository
 from saltbox_core.tasks.schemas.task import (
     TaskCreateInputSchema,
@@ -24,17 +21,19 @@ from saltbox_core.tasks.schemas.task import (
     TaskModel,
     TaskTargetMinion,
     TaskUpdateSchema,
+    TaskWithStatusOnlySchema,
 )
-from saltbox_core.tasks.schemas.tasks_minion import TaskMinionCreateSchema, TaskMinionModel
+from saltbox_core.tasks.schemas.tasks_minion import TaskMinionCreateSchema, TaskMinionInnerIdOnly
 from saltbox_core.tasks.schemas.tasks_status import TaskStatus, TaskStatusCreateSchema
 from saltbox_core.tasks.schemas.tasks_template import TaskTemplateModel
 from saltbox_core.tasks.services.tasks_minion import TaskMinionService, get_task_minion_service
 from saltbox_core.tasks.services.tasks_status import TaskStatusService, get_task_status_service
 from saltbox_core.tasks.services.tasks_template import TaskTemplateService, get_task_template_service
 from saltbox_sdk.db.mongo.config import get_mongo_session_with_transaction
+from saltbox_sdk.db.mongo.repository_base import MongoUpdateOperator
 from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
 from saltbox_sdk.db.redis.config import get_redis
-from saltbox_sdk.exceptions import DuplicateKeyException
+from saltbox_sdk.exceptions import ObjectNotFoundException, SaltBoxValidationException
 from saltbox_sdk.serivces.mongo_base_with_notify_service import MongoBaseWithNotifyService
 
 ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
@@ -66,6 +65,14 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         self.pillar_service = pillar_service
         self.rdb = rdb
 
+    @property
+    def notify_taskiq_task(self) -> Callable:
+        return send_notify_by_mongo_service
+
+    @property
+    def service_name(self) -> str:
+        return 'task_service'
+
     def _get_notify_channel(self, obj: TaskModel | ProjectionModel, action: str) -> str | None:
         if not hasattr(obj, 'id'):
             return None
@@ -96,7 +103,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                     name=task_template.name, sid=task_template.repo_id, data=task_data
                 )
             except JsonSchemaValidationError as err:
-                raise TaskCreateSchemaValidationException(str(err)) from None
+                raise SaltBoxValidationException(str(err)) from err
 
         elif data.fun:
             fun = data.fun
@@ -104,10 +111,10 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
             try:
                 validated_data = await self.job_schema_service.get_validated_data(name=fun, data=task_data)
             except JsonSchemaValidationError as err:
-                raise TaskServiceException(str(err)) from err
+                raise SaltBoxValidationException(str(err)) from err
         else:
             msg = 'Task salt fun must be provided from direct fun or task template'
-            raise TaskCreateServiceException(msg)
+            raise SaltBoxValidationException(msg)
 
         task_arg = validated_data.get('args')
         task_kwarg = validated_data.get('kwargs')
@@ -121,16 +128,19 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         return fun, task_arg, task_kwarg
 
     async def __parse_input_create_schema(self, data: TaskCreateInputSchema) -> tuple[TaskCreateSchema, dict[str, Any]]:
-        if data.collection_slug:
-            collection = await self.collections_service.get_by_slug(
-                slug=data.collection_slug, projection_model=EmptyModel
-            )
-            collection_id = collection.id
-        elif data.collection_id:
-            collection_id = data.collection_id
-        else:
-            msg = 'Collection must be provided'
-            raise TaskCreateServiceException(msg)
+        try:
+            if data.collection_slug:
+                collection = await self.collections_service.get_by_slug(
+                    slug=data.collection_slug, projection_model=EmptyModel
+                )
+            elif data.collection_id:
+                collection = await self.collections_service.get(query=data.collection_id, projection_model=EmptyModel)
+            else:
+                msg = 'Collection must be provided'
+                raise SaltBoxValidationException(msg)
+        except ObjectNotFoundException as e:
+            msg = 'Collection not found'
+            raise SaltBoxValidationException(msg) from e
 
         task_template: TaskTemplateModel | None = None
 
@@ -161,7 +171,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                 'fun': fun,
                 'arg': task_arg,
                 'kwarg': task_kwarg,
-                'target_collection_id': collection_id,
+                'target_collection_id': collection.id,
                 'target_query': data.query,
                 'batch_size': data.batch_size if data.batch_size is not None else task_defaults['batch_size'],
                 'max_retries': data.max_retries if data.max_retries is not None else task_defaults['max_retries'],
@@ -179,6 +189,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
 
     async def __get_minions_by_targeting(
         self,
+        task_id: PyObjectId,
         target_collection: CollectionModel,
         target_query: dict | None = None,
         target_minions: list[TaskTargetMinion] | None = None,
@@ -198,12 +209,18 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                 }
             )
 
+        minions_in_task = await self.task_minion_service.get_list(
+            query={'task_id': task_id},
+            session=session,
+            projection_model=TaskMinionInnerIdOnly,
+        )
+        if minions_in_task:
+            queries.append({'_id': {'$nin': [minion.minion_inner_id for minion in minions_in_task]}})
+
         return [
             minion.id
             for minion in await self.minion_service.get_list(
                 query={'$and': queries} if queries else {},
-                limit=0,
-                skip=0,
                 session=session,
                 projection_model=EmptyModel,
             )
@@ -220,78 +237,52 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         notify: bool = True,
     ) -> int:
         collection = await self.collections_service.get(query=target_collection_id)
-        created_minions_count = 0
 
         minion_ids = await self.__get_minions_by_targeting(
+            task_id=task_id,
             target_collection=collection,
             target_query=target_query,
             target_minions=target_minions,
             session=session,
         )
 
-        for minion_id in minion_ids:
-            try:
-                await self.task_minion_service.create(
-                    data=TaskMinionCreateSchema.model_validate(
-                        {
-                            'task_id': task_id,
-                            'minion_inner_id': minion_id,
-                        }
-                    ),
-                    session=session,
-                    projection_model=TaskMinionModel if notify else EmptyModel,
-                    notify=notify,
-                )
-                created_minions_count += 1
-            except DuplicateKeyException:
-                continue
+        created_minions_ids = await self.task_minion_service.bulk_create(
+            data=[
+                TaskMinionCreateSchema.model_validate({'task_id': task_id, 'minion_inner_id': minion_id})
+                for minion_id in minion_ids
+            ],
+            session=session,
+            notify=notify,
+        )
 
-        return created_minions_count
+        return len(created_minions_ids)
 
     async def process(self, task_id: PyObjectId, *, session: MongoAsyncClientSession | None = None) -> None:
         async with self.rdb.lock(f'task-process-{task_id!s}'):
             logger.debug(f'Task process {task_id} started')
 
-    @overload
     async def create(
         self,
         data: TaskCreateInputSchema | dict[str, Any],
         *,
         session: MongoAsyncClientSession | None = None,
-        projection_model: None = None,
         notify: bool = True,
-    ) -> TaskModel: ...
-
-    @overload
-    async def create(
-        self,
-        data: TaskCreateInputSchema | dict[str, Any],
-        *,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel],
-        notify: bool = True,
-    ) -> ProjectionModel: ...
-
-    @override
-    async def create(
-        self,
-        data: TaskCreateInputSchema | dict[str, Any],
-        *,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel] | None = None,
-        notify: bool = True,
-    ) -> TaskModel | ProjectionModel:
+    ) -> PyObjectId:
         if isinstance(data, dict):
-            data = TaskCreateInputSchema.model_validate(data)
+            validated_data = TaskCreateInputSchema.model_validate(data)
+        else:
+            validated_data = data
 
         async with get_mongo_session_with_transaction(session) as s:
             try:
-                save_pillars_as_default = data.save_pillars_as_default
+                save_pillars_as_default = validated_data.save_pillars_as_default
                 logger.debug(f'Save as default: {save_pillars_as_default}')
-                creation_data, pillars = await self.__parse_input_create_schema(data=data)
+                creation_data, pillars = await self.__parse_input_create_schema(data=validated_data)
 
-                task = await self.repo.create(data=creation_data, session=s)
+                task_id = await self.repo.create(data=creation_data, session=s)
+                task = await self.get(query=task_id, session=s)
                 secret_pillar_names = None
+
                 if task.task_template_id:
                     tpl = await self.task_template_service.get(query=task.task_template_id)
                     secret_pillar_names = tpl.secret_pillars
@@ -303,80 +294,46 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                         task_template_id=task.task_template_id,
                         pillars=pillars,
                         secret_pillar_names=secret_pillar_names,
-                        user=data.user,
+                        user=validated_data.user,
                         save_as_default=save_pillars_as_default,
                         session=s,
                     )
-                _status = await self.task_status_service.create(
-                    data=TaskStatusCreateSchema.model_validate(
-                        {
-                            'task_id': task.id,
-                            'type': TaskStatus.created,
-                        }
-                    ),
-                    projection_model=EmptyModel,
-                    session=s,
-                )
 
-                await self.fill_task_minions(
-                    task_id=task.id,
-                    target_collection_id=task.target_collection_id,
-                    target_query=task.target_query,
-                    target_minions=data.minions,
-                    session=s,
-                    notify=False,
-                )
-
-                obj: TaskModel | ProjectionModel
-                if projection_model:
-                    obj = await self.get(query=task.id, session=s, projection_model=projection_model)
-                else:
-                    obj = await self.get(query=task.id, session=s)
                 logger.debug(f'Transaction committed successfully for task {task.id}')
             except Exception:
                 logger.exception('Error during task creation, aborting transaction')
                 raise
 
-        if notify and hasattr(obj, 'id'):
-            await self._notify(obj=task, action='create')
+        await self.task_status_service.create(
+            data=TaskStatusCreateSchema.model_validate({'task_id': task.id, 'type': TaskStatus.created}),
+            session=session,
+        )
 
-        return obj
+        await self.fill_task_minions(
+            task_id=task.id,
+            target_collection_id=task.target_collection_id,
+            target_query=task.target_query,
+            target_minions=validated_data.minions,
+            session=session,
+            notify=False,
+        )
 
-    @overload
+        if notify:
+            await self._notify(obj_id=task_id, action='create')
+
+        return task_id
+
     async def update(
         self,
         query: dict[str, Any] | PyObjectId,
         data: TaskUpdateSchema | dict[str, Any],
         exclude_unset: bool = True,
         *,
+        operator: MongoUpdateOperator = MongoUpdateOperator.set,
         session: MongoAsyncClientSession | None = None,
         notify: bool = True,
-    ) -> TaskModel: ...
-
-    @overload
-    async def update(
-        self,
-        query: dict[str, Any] | PyObjectId,
-        data: TaskUpdateSchema | dict[str, Any],
-        exclude_unset: bool = True,
-        *,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel],
-        notify: bool = True,
-    ) -> ProjectionModel: ...
-
-    @override
-    async def update(
-        self,
-        query: dict[str, Any] | PyObjectId,
-        data: TaskUpdateSchema | dict[str, Any],
-        exclude_unset: bool = True,
-        *,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel] | None = None,
-        notify: bool = True,
-    ) -> TaskModel | ProjectionModel:
-        obj = await self.get(query=query, projection_model=TaskModel, session=session)
+    ) -> PyObjectId:
+        obj = await self.get(query=query, session=session, projection_model=TaskWithStatusOnlySchema)
 
         new_status = None
         if hasattr(data, 'status'):
@@ -385,33 +342,23 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
             new_status = data.pop('status')
 
         if new_status and obj.status.type != new_status:
-            _status = await self.task_status_service.create(
+            await self.task_status_service.create(
                 data=TaskStatusCreateSchema.model_validate(
                     {
                         'task_id': obj.id,
                         'type': new_status,
                     }
                 ),
-                projection_model=EmptyModel,
             )
 
-        if projection_model:
-            return await super().update(
-                query=query,
-                data=data,
-                exclude_unset=exclude_unset,
-                session=session,
-                projection_model=projection_model,
-                notify=notify,
-            )
-        else:
-            return await super().update(
-                query=query,
-                data=data,
-                exclude_unset=exclude_unset,
-                session=session,
-                notify=notify,
-            )
+        return await super().update(
+            query=query,
+            data=data,
+            exclude_unset=exclude_unset,
+            operator=operator,
+            session=session,
+            notify=notify,
+        )
 
 
 def get_task_service(

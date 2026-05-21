@@ -1,19 +1,100 @@
 import logging
+import uuid
 from collections.abc import AsyncGenerator
 from contextlib import suppress
 
 import taskiq_fastapi
+from aio_pika.abc import ExchangeType
 from redis.asyncio import Redis
-from taskiq import Context, TaskiqDepends
+from taskiq import AsyncBroker, Context, TaskiqDepends
 from taskiq.exceptions import NoResultError
-from taskiq_aio_pika import AioPikaBroker
+from taskiq_aio_pika import AioPikaBroker, Exchange, Queue, QueueType
 from taskiq_redis import RedisAsyncResultBackend
 
 from saltbox_core.config import SETTINGS
+from saltbox_sdk.config.rabbitmq_config import RABBIT_SETTINGS
+from saltbox_sdk.utilities.taskiq import SmartRetryMiddleware, UniqueIdMiddleware
 
 logger = logging.getLogger(__name__)
+
 result_backend: RedisAsyncResultBackend = RedisAsyncResultBackend(SETTINGS.taskiq_redis_url)
-broker = AioPikaBroker(SETTINGS.rabbitmq_url).with_result_backend(result_backend)
+broker = (
+    AioPikaBroker(
+        url=RABBIT_SETTINGS.url,
+        exchange=Exchange(
+            name='topic_exchange',
+            type=ExchangeType.TOPIC,
+        ),
+        delay_queue=Queue(
+            name='taskiq.delay',
+            routing_key='queue-default',
+        ),
+    )
+    .with_result_backend(result_backend)
+    .with_middlewares(
+        UniqueIdMiddleware(),
+        SmartRetryMiddleware(
+            default_retry_count=SETTINGS.taskiq_retry_default_retry_count,
+            default_retry_label=SETTINGS.taskiq_retry_default_retry_label,
+            no_result_on_retry=SETTINGS.taskiq_retry_no_result_on_retry,
+            default_delay=SETTINGS.taskiq_retry_default_delay,
+            use_jitter=SETTINGS.taskiq_retry_use_jitter,
+            use_delay_exponent=SETTINGS.taskiq_retry_use_delay_exponent,
+            max_delay_exponent=SETTINGS.taskiq_retry_max_delay_exponent,
+        ),
+    )
+    .with_id_generator(lambda: uuid.uuid4().hex)
+)
+
+
+queue_common = Queue(
+    name='queue-common',
+    type=QueueType.CLASSIC,
+    durable=False,
+)  # TODO (@): Temporary!!! This queue for fix bug https://github.com/taskiq-python/taskiq-aio-pika/issues/51
+queue_default = Queue(
+    name='queue-default',
+    type=QueueType.CLASSIC,
+    durable=False,
+)
+queue_salt = Queue(
+    name='queue-salt',
+    type=QueueType.CLASSIC,
+    durable=False,
+)
+queue_notify = Queue(
+    name='queue-notify',
+    type=QueueType.CLASSIC,
+    durable=False,
+)
+
+
+async def startup_broker() -> AsyncBroker:
+    if not broker.is_worker_process:
+        broker.with_queues(queue_default, queue_salt, queue_notify)
+        await broker.startup()
+    return broker
+
+
+async def shutdown_broker() -> AsyncBroker:
+    if not broker.is_worker_process:
+        await broker.shutdown()
+    return broker
+
+
+def broker_for_default_worker() -> AioPikaBroker:
+    logger.info('Starting default broker')
+    return broker.with_queues(queue_common, queue_default)
+
+
+def broker_for_salt_worker() -> AioPikaBroker:
+    logger.info('Starting salt broker')
+    return broker.with_queues(queue_common, queue_salt)
+
+
+def broker_for_notify_worker() -> AioPikaBroker:
+    logger.info('Starting notify broker')
+    return broker.with_queues(queue_common, queue_notify)
 
 
 taskiq_fastapi.init(broker, 'saltbox_core.main:app')

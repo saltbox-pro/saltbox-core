@@ -13,7 +13,7 @@ class ModelWithoutId(BaseModel):
 
 
 # Тестовая модель данных
-class SampleModel(BaseModel, IDMixin):
+class SampleModel(IDMixin):
     name: str
     description: str | None = None
     created: TimezoneAwareDatetime
@@ -21,7 +21,7 @@ class SampleModel(BaseModel, IDMixin):
 
 
 # Проекция модели для тестирования projection
-class SampleModelProjection(BaseModel, IDMixin):
+class SampleModelProjection(IDMixin):
     name: str
 
 

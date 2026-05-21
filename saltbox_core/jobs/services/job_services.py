@@ -1,14 +1,17 @@
 import json
-from typing import Annotated, Any, overload, override
+from collections.abc import Callable
+from typing import Annotated, Any
 
 from fastapi import Depends
 from jsonschema.exceptions import ValidationError as JsonSchemaValidationError
+from pydantic import BaseModel
 from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
 from redis import exceptions as redis_exceptions
 from redis.asyncio import Redis
 
 from saltbox_bridge_messages import MasterStatus
 from saltbox_core.config import SETTINGS, logger
+from saltbox_core.db.tiq_tasks import send_notify_by_mongo_service
 from saltbox_core.jobs.exceptions import JobCreateException, JobServiceException
 from saltbox_core.jobs.repositories.job_repository import JobRepository, get_job_repository
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnStatus
@@ -18,9 +21,9 @@ from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_core.utilities.context import replace_raised
 from saltbox_core.utilities.jid import JID
-from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.redis.config import get_redis
-from saltbox_sdk.serivces.mongo_base_service import ProjectionModel
+from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_with_notify_service import MongoBaseWithNotifyService
 
 JOBS_TO_CREATE_SET_NAME: str = 'jobs:{master_id}:to_create'
@@ -55,7 +58,15 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         self.master_service = master_service
         super().__init__(repo=job_repository, rdb=rdb)
 
-    def _get_notify_channel(self, obj: JobModel | ProjectionModel, action: str) -> str | None:
+    @property
+    def notify_taskiq_task(self) -> Callable:
+        return send_notify_by_mongo_service
+
+    @property
+    def service_name(self) -> str:
+        return 'job_service'
+
+    def _get_notify_channel(self, obj: BaseModel, action: str) -> str | None:
         if not hasattr(obj, 'jid'):
             return None
 
@@ -65,20 +76,27 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
             'delete': f'job:{obj.jid}:delete',
         }
 
-        if hasattr(obj, 'source') and obj.source:
-            if obj.source.type == 'task':
-                channels.update(
-                    {
-                        'create_task': f'task:{obj.source.id}:job:{obj.jid}:create',
-                        'update_task': f'task:{obj.source.id}:job:{obj.jid}:update',
-                        'delete_task': f'task:{obj.source.id}:job:{obj.jid}:delete',
-                    }
-                )
+        if (
+            hasattr(obj, 'source')
+            and obj.source
+            and hasattr(obj.source, 'type')
+            and hasattr(obj.source, 'id')
+            and obj.source.type == 'task'
+        ):
+            channels.update(
+                {
+                    'create_task': f'task:{obj.source.id}:job:{obj.jid}:create',
+                    'update_task': f'task:{obj.source.id}:job:{obj.jid}:update',
+                    'delete_task': f'task:{obj.source.id}:job:{obj.jid}:delete',
+                }
+            )
 
         return channels.get(action)
 
-    async def _notify(self, obj: JobModel | ProjectionModel, action: str) -> None:
+    async def run_notify(self, obj_id: PyObjectId, action: str) -> None:
         try:
+            obj = await self.get(query=obj_id, projection_model=self.notify_schema)
+
             channel = self._get_notify_channel(obj=obj, action=action)
             task_channel = self._get_notify_channel(obj=obj, action=f'{action}_task')
 
@@ -91,15 +109,25 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
                 await pipe.execute()
         except redis_exceptions.RedisError as e:
             logger.error(e)
+        except ObjectNotFoundException:
+            logger.debug(f'Object "{self.repo.Meta.collection_name}" for notifying not found by query: {obj_id}')
 
-    async def __prepare_create_obj(self, data: JobCreateSchema) -> None:
+    async def __prepare_create_obj(
+        self,
+        data: JobCreateSchema,
+        validate_data: bool = True,
+        session: MongoAsyncClientSession | None = None,
+    ) -> None:
         if not data.jid:
             data.jid = str(JID.generate())
 
         if data.ttl is None:
-            data.ttl = await self.job_schema_service.get_ttl(name=data.fun)
+            data.ttl = await self.job_schema_service.get_ttl(name=data.fun, session=session)
         elif data.ttl == 0:
             data.ttl = SETTINGS.jobs_max_ttl
+
+        if not validate_data:
+            return
 
         try:
             data_to_validate: dict[str, Any] = {}
@@ -107,62 +135,15 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
                 data_to_validate['args'] = data.arg
             if data.kwarg:
                 data_to_validate['kwargs'] = data.kwarg
-            validated_data = await self.job_schema_service.get_validated_data(name=data.fun, data=data_to_validate)
+            validated_data = await self.job_schema_service.get_validated_data(
+                name=data.fun, data=data_to_validate, session=session
+            )
             data.arg = validated_data.get('args')
             data.kwarg = validated_data.get('kwargs')
         except JsonSchemaValidationError as e:
             raise JobCreateException(str(e)) from e
 
-    @overload
-    async def create(
-        self,
-        data: JobCreateSchema | dict[str, Any],
-        *,
-        extra_pillarenv: list[str] | None = None,
-        session: MongoAsyncClientSession | None = None,
-        notify: bool = True,
-    ) -> JobModel: ...
-
-    @overload
-    async def create(
-        self,
-        data: JobCreateSchema | dict[str, Any],
-        *,
-        extra_pillarenv: list[str] | None = None,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel],
-        notify: bool = True,
-    ) -> ProjectionModel: ...
-
-    @override
-    async def create(
-        self,
-        data: JobCreateSchema | dict[str, Any],
-        *,
-        extra_pillarenv: list[str] | None = None,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel] | None = None,
-        notify: bool = True,
-    ) -> JobModel | ProjectionModel:
-        if isinstance(data, dict):
-            data = JobCreateSchema.model_validate(data)
-
-        if not await self.master_service.exists(
-            query={'status': MasterStatus.ACCEPTED, 'master_id': data.salt_master}, session=session
-        ):
-            msg = 'Master not found'
-            raise JobCreateException(msg)
-
-        await self.__prepare_create_obj(data=data)
-
-        job: JobModel | ProjectionModel
-        create_args: dict[str, Any] = {'data': data}
-        if projection_model:
-            create_args['projection_model'] = projection_model
-        if notify:
-            create_args['notify'] = notify
-
-        job = await super().create(**create_args, session=session)
+    async def __send_job_to_master(self, data: JobCreateSchema, extra_pillarenv: list[str] | None = None) -> None:
         job_salt_data: dict[str, Any] = {
             'jid': data.jid,
             'tgt': data.tgt,
@@ -186,11 +167,41 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
 
             job_salt_data['kwarg']['pillarenv'] = ','.join(pillarenv)
 
-        await self.rdb.rpush(JOBS_TO_CREATE_SET_NAME.format(master_id=data.salt_master), json.dumps(job_salt_data))
+        await self.rdb.rpush(
+            JOBS_TO_CREATE_SET_NAME.format(master_id=data.salt_master),
+            json.dumps(job_salt_data),
+        )
 
-        return job
+    async def create(
+        self,
+        data: JobCreateSchema | dict[str, Any],
+        *,
+        check_master: bool = True,
+        validate_data: bool = True,
+        extra_pillarenv: list[str] | None = None,
+        session: MongoAsyncClientSession | None = None,
+        notify: bool = True,
+    ) -> PyObjectId:
+        if isinstance(data, dict):
+            data = JobCreateSchema.model_validate(data)
 
-    @overload
+        if check_master and not await self.master_service.exists(
+            query={'status': MasterStatus.ACCEPTED, 'master_id': data.salt_master}, session=session
+        ):
+            msg = 'Master not found'
+            raise JobCreateException(msg)
+
+        await self.__prepare_create_obj(data=data, validate_data=validate_data, session=session)
+        job_id = await super().create(data=data, session=session, notify=False)
+
+        if data.status == JobStatus.starting:
+            await self.__send_job_to_master(data=data, extra_pillarenv=extra_pillarenv)
+
+        if isinstance(notify, bool) and notify:
+            await self._notify(obj_id=job_id, action='create')
+
+        return job_id
+
     async def update_status(
         self,
         jid: JID,
@@ -198,28 +209,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         session: MongoAsyncClientSession | None = None,
         force: bool = False,
         notify: bool = True,
-    ) -> JobModel: ...
-
-    @overload
-    async def update_status(
-        self,
-        jid: JID,
-        *,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel],
-        force: bool = False,
-        notify: bool = True,
-    ) -> ProjectionModel: ...
-
-    async def update_status(
-        self,
-        jid: JID,
-        *,
-        session: MongoAsyncClientSession | None = None,
-        projection_model: type[ProjectionModel] | None = None,
-        force: bool = False,
-        notify: bool = True,
-    ) -> JobModel | ProjectionModel:
+    ) -> None:
         job = await self.get(query={'jid': str(jid)}, projection_model=JobSimpleSchema)
 
         data_to_update = {}
@@ -237,13 +227,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
                 data=data_to_update,
                 session=session,
                 notify=notify,
-                projection_model=JobModel if notify else EmptyModel,
             )
-
-        if projection_model:
-            return await self.get(query=job.id, session=session, projection_model=projection_model)
-
-        return await self.get(query=job.id, session=session)
 
     async def stop_job(self, jid: JID | PyObjectId) -> None: ...  # TODO (i.moshkov): stop jobs
 

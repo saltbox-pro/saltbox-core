@@ -4,7 +4,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-from saltbox_sdk.db.mongo.schemas_base import IDMixin, QueryParams, SortParams
+from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId, QueryParams, SortParams
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
 
@@ -137,11 +137,12 @@ class MinionEditableFieldsMixin[T](BaseModel):
     minion_id: str = Field(title='Minion ID')
     master: str = Field(title='Master')
     grains: T = Field(title='Grains')
+    extra: dict = Field(title='Extra data', default_factory=dict)
     last_activity: TimezoneAwareDatetime | None = Field(title='Last activity', default=None)
 
 
 class MinionReadonlyFieldsMixin(BaseModel):
-    @computed_field(title='Seconds from last activity')  # type: ignore
+    @computed_field(title='Seconds from last activity')  # type: ignore[prop-decorator]
     @property
     def last_activity_seconds(self) -> float | None:
         if not self.last_activity:  # type: ignore
@@ -160,8 +161,13 @@ class MinionUpdateSchema(MinionEditableFieldsMixin[GrainsSchema]):
     )
 
 
-class MinionModel(CreatedModifiedMixin, MinionReadonlyFieldsMixin, MinionEditableFieldsMixin[GrainsSchema], IDMixin):
+class MinionModel(
+    CreatedModifiedMixin, MinionReadonlyFieldsMixin, MinionEditableFieldsMixin[GrainsSchema], IDMixin, BaseModel
+):
     pass
+
+
+# System
 
 
 class MinionDetailSchema(MinionModel):
@@ -178,25 +184,43 @@ class MinionDetailSchema(MinionModel):
 
 
 class MinionShortSchema(
-    CreatedModifiedMixin, MinionReadonlyFieldsMixin, MinionEditableFieldsMixin[GrainsShortSchema], IDMixin
+    CreatedModifiedMixin, MinionReadonlyFieldsMixin, MinionEditableFieldsMixin[GrainsShortSchema], IDMixin, BaseModel
 ):
     pass
 
 
-class MinionSimpleSchema(BaseModel, IDMixin):
+class MinionTgtOnlySchema(IDMixin):
+    minion_id: str = Field(title='Minion ID')
+    master: str = Field(title='Master')
+
+
+class MinionSimpleSchema(IDMixin):
     minion_id: str = Field(title='Minion ID')
     master: str = Field(title='Master')
     last_activity: TimezoneAwareDatetime | None = Field(title='Last activity', default=None)
 
 
-class MinionIDs(BaseModel, IDMixin):
+class MinionIDs(IDMixin):
     pass
+
+
+# REST
 
 
 class MinionListBody(SkipLimitParams, QueryParams, SortParams):
     collection_slug: str
 
     model_config = ConfigDict(extra='ignore')
+
+
+class MinionBulkDeleteBody(BaseModel):
+    collection_slug: str
+    minions: list[PyObjectId]
+
+    model_config = ConfigDict(extra='ignore')
+
+
+# Permissions
 
 
 class MinionsActions(StrEnum):

@@ -5,7 +5,6 @@ from fastapi import APIRouter, Body, Depends, Response, status
 from saltbox_core.pillars.schemas import PillarTgtType
 from saltbox_core.pillars.services.pillar import PillarService, get_pillar_service
 from saltbox_core.pillars.utils import PillarSchemaUpdater
-from saltbox_core.settings.schemas.sls_repos_schemas import SettingsSlsRepoShortSchema
 from saltbox_core.settings.services.sls_repo_service import SettingsSlsRepoService, get_sls_repo_service
 from saltbox_core.tasks.schemas.tasks_template import (
     TaskTemplateCreateSchema,
@@ -19,7 +18,7 @@ from saltbox_core.tasks.schemas.tasks_template import (
     TaskTemplateUpdateSchema,
 )
 from saltbox_core.tasks.services.tasks_template import TaskTemplateService, get_task_template_service
-from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 from saltbox_sdk.fastapi_utils.dependencies import get_current_user, get_opa_query
@@ -42,7 +41,7 @@ async def task_template_list(
     repo_settings_service: Annotated[SettingsSlsRepoService, Depends(get_sls_repo_service)],
 ) -> PaginatedResponse[TaskTemplateShortSchema]:
     active_repos = await repo_settings_service.get_list(
-        query={'is_active': True}, skip=0, limit=0, projection_model=SettingsSlsRepoShortSchema
+        query={'is_active': True}, skip=0, limit=0, projection_model=EmptyModel
     )
 
     query_filters: list[dict[str, Any]] = [
@@ -117,7 +116,8 @@ async def task_template_create(
     item: TaskTemplateCreateSchema,
     service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
 ) -> TaskTemplateModel:
-    return await service.create(item)
+    obj_id = await service.create(item)
+    return await service.get(query=obj_id)
 
 
 @router.get(
@@ -188,4 +188,5 @@ async def task_template_update(
     item: TaskTemplateUpdateSchema,
     service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
 ) -> TaskTemplateModel:
-    return await service.update(query={'_id': tpl_id, 'repo_id': None}, data=item)
+    obj_id = await service.update(query={'_id': tpl_id, 'repo_id': None}, data=item)
+    return await service.get(query=obj_id)
