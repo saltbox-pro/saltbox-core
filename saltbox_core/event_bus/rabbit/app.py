@@ -88,26 +88,27 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
     context.set_global('task_minion_service', task_minion_service)
     context.set_global('task_service', task_service)
 
-    yield
-
-    del task_service
-    del task_repository
-    del task_minion_service
-    del task_minion_repository
-    del task_template_service
-    del task_template_repository
-    del job_return_service
-    del job_return_repository
-    del job_service
-    del job_repository
-    del job_schema_service
-    del job_schema_repository
-    del minion_service
-    del minion_repository
-    del collection_service
-    del collection_repository
-    del master_service
-    del master_repository
+    try:
+        yield
+    finally:
+        del task_service
+        del task_repository
+        del task_minion_service
+        del task_minion_repository
+        del task_template_service
+        del task_template_repository
+        del job_return_service
+        del job_return_repository
+        del job_service
+        del job_repository
+        del job_schema_service
+        del job_schema_repository
+        del minion_service
+        del minion_repository
+        del collection_service
+        del collection_repository
+        del master_service
+        del master_repository
 
 
 async def async_main() -> None:

@@ -45,11 +45,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator:
         )
         await discovery_client.register()
 
-    yield
-    await CustomRedisCache.clear_cache(get_redis_now())
-    if not broker.is_worker_process:
-        await shutdown_broker()
-    await POOL.aclose()  # type: ignore[attr-defined] # ty: ignore[unresolved-attribute]
+    try:
+        yield
+    finally:
+        await CustomRedisCache.clear_cache(get_redis_now())
+        if not broker.is_worker_process:
+            await shutdown_broker()
+        await POOL.aclose()  # type: ignore[attr-defined] # ty: ignore[unresolved-attribute]
 
 
 app_config: dict[str, Any] = {
