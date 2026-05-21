@@ -1,0 +1,139 @@
+import os
+from enum import StrEnum
+
+from git.types import PathLike
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_serializer
+
+from saltbox_sdk.db.mongo.schemas_base import IDMixin, QueryParams, SortParams
+from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
+from saltbox_sdk.utilities.helpers import Iso8601ZDatetime
+
+
+class SourceType(StrEnum):
+    GIT_REPO = 'git_repo'
+    ARCHIVE_BUNDLE = 'archive_bundle'
+    LOCAL_BUNDLE = 'local_bundle'
+
+
+class SourceState(StrEnum):
+    """State of the template source.
+    PENDING - just created, not yet discovered)
+    DISCOVERED - pulled with depth=1, templates parsed and saved, manifest parsed, files instances created
+    PLUGGED - templates rsync to serve_dir, files downloaded to SSHFS, ready to be served to masters
+    ACTIVE - templates and files served to masters
+    BROKEN - last operation failed, needs attention
+    """
+
+    PENDING = 'pending'
+    DISCOVERED = 'discovered'
+    PLUGGED = 'plugged'
+    ACTIVE = 'active'
+    BROKEN = 'broken'
+
+
+class SourceOperation(StrEnum):
+    """Operation in progress for the template source. None means no operation in progress."""
+
+    DISCOVER = 'discover'
+    PREPARE_SLS = 'prepare_sls'
+    PREPARE_FILES = 'prepare_files'
+    SYNC = 'sync'
+
+
+class TemplateSourceCreateSchema(BaseModel):
+    source_type: SourceType = Field(title='Source type')
+    name: str = Field(min_length=1, max_length=100, title='Display name')
+    description: str = Field(default='', max_length=500, title='Description')
+    # is_active: bool = Field(default=False, title='Is active (publish to serve_dir)')
+    # Ненулевой namespace даёт: serve_dir/<namespace>/... и name (mods) = "<namespace>.<dot_path>"
+    namespace: str = Field(
+        default='',
+        max_length=64,
+        pattern=r'^[a-z0-9_]*$',
+        title='Namespace',
+        description='Prefix for template names and serve_dir subdirectory. Empty means no prefix.',
+    )
+    repo_url: PathLike | None = Field(default=None, title='Git repository URL')
+    repo_user: str | None = Field(default=None, title='Git user (basic auth)')
+    repo_pass: SecretStr | None = Field(default=None, title='Git password (basic auth)')
+    branch: str | None = Field(default='master', max_length=100, title='Git branch')
+
+    @field_serializer('repo_pass')
+    def serialize_repo_pass(self, value: SecretStr | None) -> str | None:
+        return value.get_secret_value() if value else None
+
+    @field_serializer('repo_url')
+    def serialize_url(self, url: PathLike | None) -> str | None:
+        return os.fspath(url) if url else None
+
+
+class TemplateSourceUpdateSchema(BaseModel):
+    name: str | None = None
+    description: str | None = None
+    # is_active: bool | None = None
+
+
+class TemplateSourceModel(CreatedModifiedMixin, IDMixin):
+    name: str = Field(min_length=1, max_length=100, title='Display name')
+    description: str = Field(default='', max_length=500, title='Description')
+    # is_active: bool = Field(default=False, title='Is active (publish to serve_dir)')
+    namespace: str = Field(
+        default='',
+        max_length=64,
+        pattern=r'^[a-z0-9_]*$',
+        title='Namespace',
+        description='Prefix for template names and serve_dir subdirectory. Empty means no prefix.',
+    )
+    source_type: SourceType = Field(title='Source type')
+    repo_url: PathLike | None = Field(default=None, title='Git repository URL')
+    repo_user: str | None = Field(default=None, title='Git user (basic auth)')
+    repo_pass: SecretStr | None = Field(default=None, title='Git password (basic auth)')
+    branch: str = Field(default='master', max_length=100, title='Git branch')
+    local_path: str = Field(default='', max_length=32, pattern=r'^[a-z0-9_\-]*$', title='Local storage path')
+    root: str = Field(default='', title='Path in repository to serve for masters')
+    state: SourceState = Field(title='State of the template source')
+    current_operation: SourceOperation | None = Field(default=None, title='Current operation in progress')
+    last_error: str | None = Field(default=None, title='Last error message if state is BROKEN')
+    synced_at: Iso8601ZDatetime | None = Field(default=None, title='Last sync time')
+
+    @field_serializer('repo_url')
+    def serialize_url(self, url: PathLike | None) -> str | None:
+        return os.fspath(url) if url else None
+
+
+class TemplateSourcePublicSchema(CreatedModifiedMixin, IDMixin):
+    name: str
+    description: str
+    # is_active: bool
+    namespace: str
+    source_type: SourceType
+    repo_url: PathLike | None = None
+    repo_user: str | None = None
+    repo_pass: SecretStr | None = None
+    branch: str
+    local_path: str
+    state: SourceState
+    current_operation: SourceOperation | None
+    last_error: str | None
+    synced_at: Iso8601ZDatetime | None
+
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_serializer('repo_url')
+    def serialize_url(self, url: PathLike | None) -> str | None:
+        return os.fspath(url) if url else None
+
+
+class TemplateSourceListBody(SkipLimitParams, QueryParams, SortParams):
+    model_config = ConfigDict(extra='ignore')
+
+
+class TemplateSourceActions(StrEnum):
+    LIST = 'list'
+    READ = 'read'
+    CREATE = 'create'
+    UPDATE = 'update'
+    DELETE = 'delete'
+    PLUG = 'plug'
+    SYNC = 'sync'
+    DISCOVER = 'discover'

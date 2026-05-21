@@ -18,6 +18,9 @@ from saltbox_core.pillars.routers import router as pillars_router
 from saltbox_core.salt.routers.salt_keys import router as salt_keys_router
 from saltbox_core.settings.routers.gitlab_router import router as gitlab_router
 from saltbox_core.settings.routers.sls_repos_router import router as settings_sls_router
+from saltbox_core.task_templates.routers.source import router as task_tpl_source_router
+from saltbox_core.task_templates.routers.sshfs_file import router as sshfs_file_router
+from saltbox_core.task_templates.routers.template import router as new_template_router
 from saltbox_core.tasks.routers.task import router as task_router
 from saltbox_core.tasks.routers.tasks_template import router as template_router
 from saltbox_core.tkq import broker, shutdown_broker, startup_broker
@@ -103,6 +106,9 @@ async def health_check() -> HealthCheckResponse:
     )
 
 
+app.include_router(router=task_tpl_source_router)
+app.include_router(router=new_template_router)
+app.include_router(router=sshfs_file_router)
 app.include_router(filters_router)
 app.include_router(jobs_router)
 app.include_router(job_schemas_router)

@@ -6,6 +6,7 @@ from saltbox_core.minion_collections.repositories.collection_repository import C
 from saltbox_core.minion_collections.repositories.minion_repository import MinionRepository
 from saltbox_core.pillars.repository import PillarRepository
 from saltbox_core.settings.repository import SettingsSlsRepoRepository
+from saltbox_core.task_templates.repositories.source import TemplateSourceRepository
 from saltbox_core.tasks.repositories.task import TaskRepository
 from saltbox_core.tasks.repositories.tasks_minion import TaskMinionRepository
 from saltbox_core.tasks.repositories.tasks_status import TaskStatusRepository
@@ -34,6 +35,7 @@ async def init_mongo_db() -> None:
         TaskStatusRepository(database),
         TaskTemplateRepository(database),
         PillarRepository(database),
+        TemplateSourceRepository(database),
     ]
     for repo in reps:
         await repo.create_collection()
