@@ -17,9 +17,8 @@ from saltbox_core.task_templates.schemas.source import (
     TemplateSourceUpdateSchema,
 )
 from saltbox_core.task_templates.services.sshfs_file import SshfsFileService, get_sshfs_file_service
-from saltbox_core.task_templates.services.template import TaskTemplateService
+from saltbox_core.task_templates.services.template import TaskTemplateService, get_task_tpl_service
 from saltbox_core.tasks.services.task import TaskService, get_task_service
-from saltbox_core.tasks.services.tasks_template import get_task_template_service
 from saltbox_sdk.db.mongo.config import get_mongo_session_with_transaction
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 
@@ -80,33 +79,11 @@ class TemplateSourceService(
         session: AsyncClientSession | None = None,
     ) -> int:
         async with get_mongo_session_with_transaction(session) as s:
-            # Remove all related templates and files
-            if isinstance(query, PyObjectId):
-                source = await self.get(query=query, session=s)
-            else:
-                source = await self.get(query=query, session=s)
-            source_id = source.id
-            delete_query = {
-                'source_id': source_id,
-            }
-            # Check for dependent tasks before deleting templates
-            # if await self._task_repo.exists(
-            #     query={
-            #         'template_id': {
-            #             '$in': await self._template_repo.get_list(
-            #                 query=delete_query,
-            #                 session=s,
-            #             )
-            #         },
-            #         '$or': [
-            #             {'task_type': 'policy'},
-            #             {'status': {'$in': ['running', 'wait_minions']}},
-            #         ],
-            #     },
-            #     session=s,
-            # ):
-            #     msg = 'Cannot delete source because there are tasks depending on its templates.'
-            #     raise Exception(msg)
+            source = await self.get(query=query, session=s)
+            delete_query = {'source_id': source.id}
+
+            # TODO: Check for dependent tasks before deleting templates
+
             await self._template_service.delete_many(query=delete_query, session=s)
             await self._file_service.delete_many(query=delete_query, session=s)
 
@@ -130,7 +107,7 @@ class TemplateSourceService(
 
 def get_tpl_source_service(
     repo: Annotated[TemplateSourceRepository, Depends(get_template_source_repository)],
-    template_service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
+    template_service: Annotated[TaskTemplateService, Depends(get_task_tpl_service)],
     file_service: Annotated[SshfsFileService, Depends(get_sshfs_file_service)],
     task_service: Annotated[TaskService, Depends(get_task_service)],
 ) -> TemplateSourceService:
