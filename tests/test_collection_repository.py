@@ -2,11 +2,8 @@ from datetime import datetime
 
 import pytest
 
-from saltbox_core.minion_collections.repositories.collection_repository import (
-    CollectionRepository,
-    get_collection_repository,
-)
-from saltbox_core.minion_collections.schemas.collection_schemas import CollectionCreateSchema, CollectionModel
+from saltbox_core.minion_collections.repositories.collection import CollectionRepository, get_collection_repository
+from saltbox_core.minion_collections.schemas.collection import CollectionCreateSchema, CollectionModel
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.exceptions import DuplicateKeyException
 
