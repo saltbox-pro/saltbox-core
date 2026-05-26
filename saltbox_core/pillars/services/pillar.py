@@ -6,9 +6,9 @@ from pydantic import JsonValue
 from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
 
 from saltbox_core.config import logger
-from saltbox_core.minion_collections.schemas.minion_schemas import MinionTgtOnlySchema
-from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
-from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
+from saltbox_core.minion_collections.schemas.minion import MinionTgtOnlySchema
+from saltbox_core.minion_collections.services.collection import CollectionService, get_collection_service
+from saltbox_core.minion_collections.services.minion import MinionService, get_minion_service
 from saltbox_core.pillars.exceptions import (
     PillarCreatedByRequiredException,
     PillarTargetIdRequiredException,

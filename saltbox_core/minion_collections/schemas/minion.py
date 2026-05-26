@@ -137,8 +137,12 @@ class MinionEditableFieldsMixin[T](BaseModel):
     minion_id: str = Field(title='Minion ID')
     master: str = Field(title='Master')
     grains: T = Field(title='Grains')
-    extra: dict = Field(title='Extra data', default_factory=dict)
+    extra_ids: list[PyObjectId] = Field(title='Extra data IDs', alias='_extra', default_factory=list, exclude=True)
     last_activity: TimezoneAwareDatetime | None = Field(title='Last activity', default=None)
+
+
+class MinionAggregatedFieldsMixin(BaseModel):
+    extra: dict = Field(title='Extra data', default_factory=dict)
 
 
 class MinionReadonlyFieldsMixin(BaseModel):
@@ -162,7 +166,12 @@ class MinionUpdateSchema(MinionEditableFieldsMixin[GrainsSchema]):
 
 
 class MinionModel(
-    CreatedModifiedMixin, MinionReadonlyFieldsMixin, MinionEditableFieldsMixin[GrainsSchema], IDMixin, BaseModel
+    CreatedModifiedMixin,
+    MinionReadonlyFieldsMixin,
+    MinionEditableFieldsMixin[GrainsSchema],
+    MinionAggregatedFieldsMixin,
+    IDMixin,
+    BaseModel,
 ):
     pass
 

@@ -11,9 +11,9 @@ from saltbox_core.jobs.routers.job_sc_router import router as job_schemas_router
 from saltbox_core.jobs.routers.jobs_router import router as jobs_router
 from saltbox_core.masters.routers.master_route import router as masters_router
 from saltbox_core.masters.routers.system_route import router as system_router
-from saltbox_core.minion_collections.routers.collections_router import router as collections_router
-from saltbox_core.minion_collections.routers.filters_router import router as filters_router
-from saltbox_core.minion_collections.routers.minion_router import router as minions_router
+from saltbox_core.minion_collections.routers.collections import router as collections_router
+from saltbox_core.minion_collections.routers.filters import router as filters_router
+from saltbox_core.minion_collections.routers.minion import router as minions_router
 from saltbox_core.pillars.routers import router as pillars_router
 from saltbox_core.salt.routers.salt_keys import router as salt_keys_router
 from saltbox_core.settings.routers.gitlab_router import router as gitlab_router

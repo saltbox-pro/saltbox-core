@@ -2,7 +2,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Response, status
 
-from saltbox_core.minion_collections.schemas.collection_schemas import (
+from saltbox_core.minion_collections.schemas.collection import (
     CollectionActions,
     CollectionCreateRequestSchema,
     CollectionCreateSchema,
@@ -12,7 +12,7 @@ from saltbox_core.minion_collections.schemas.collection_schemas import (
     CollectionTreeNodeSchema,
     CollectionUpdateSchema,
 )
-from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
+from saltbox_core.minion_collections.services.collection import CollectionService, get_collection_service
 from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 from saltbox_sdk.fastapi_utils.dependencies import get_current_user, get_opa_query

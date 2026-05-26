@@ -9,8 +9,8 @@ from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobJidOnlySch
 from saltbox_core.jobs.services.job_return_service import JobReturnService, get_job_return_service
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
-from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
-from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
+from saltbox_core.minion_collections.services.collection import CollectionService, get_collection_service
+from saltbox_core.minion_collections.services.minion import MinionService, get_minion_service
 from saltbox_core.tasks.exceptions import TaskServiceException
 from saltbox_core.tasks.schemas.task import TaskForLifespanModel, TaskModel, TaskType
 from saltbox_core.tasks.schemas.tasks_minion import TaskMinionStatus, TaskMinionTgtOnlySchema

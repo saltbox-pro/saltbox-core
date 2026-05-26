@@ -1,7 +1,7 @@
 import json
 from typing import Any, ClassVar
 
-from saltbox_core.minion_collections.schemas.collection_schemas import CollectionModel
+from saltbox_core.minion_collections.schemas.collection import CollectionModel
 
 
 class MongoQueryToSaltTgtConverterUnknownKey(Exception):

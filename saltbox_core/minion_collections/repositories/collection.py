@@ -7,7 +7,7 @@ from pymongo.asynchronous.database import AsyncDatabase
 from pymongo.operations import _IndexKeyHint
 
 from saltbox_core.config import logger
-from saltbox_core.minion_collections.schemas.collection_schemas import (
+from saltbox_core.minion_collections.schemas.collection import (
     CollectionBaseTreeModel,
     CollectionCreateSchema,
     CollectionModel,

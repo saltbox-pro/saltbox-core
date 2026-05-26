@@ -6,10 +6,7 @@ from saltbox_core.jobs.schemas.job_return_schemas import JobReturnModel
 from saltbox_core.jobs.schemas.job_schemas import JobListBody, JobsListResponse
 from saltbox_core.jobs.services.job_return_service import JobReturnService, get_job_return_service
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
-from saltbox_core.minion_collections.schemas.filter_schemas import (
-    FiltersActions,
-    MinionFilterSchema,
-)
+from saltbox_core.minion_collections.schemas.filter import FiltersActions, MinionFilterSchema
 from saltbox_core.tasks.schemas.task import (
     RestartFailedBody,
     TaskCreateInputSchema,

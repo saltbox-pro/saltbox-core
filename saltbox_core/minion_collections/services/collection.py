@@ -5,11 +5,8 @@ from fastapi import Depends
 from pydantic import BaseModel
 from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
 
-from saltbox_core.minion_collections.repositories.collection_repository import (
-    CollectionRepository,
-    get_collection_repository,
-)
-from saltbox_core.minion_collections.schemas.collection_schemas import (
+from saltbox_core.minion_collections.repositories.collection import CollectionRepository, get_collection_repository
+from saltbox_core.minion_collections.schemas.collection import (
     CollectionCreateSchema,
     CollectionModel,
     CollectionUpdateSchema,
