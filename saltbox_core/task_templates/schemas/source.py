@@ -31,12 +31,20 @@ class SourceState(StrEnum):
     BROKEN = 'broken'
 
 
+class SourceStateNew(StrEnum):
+    DISCOVERED = 'discovered'
+    SYNC_NEEDED = 'sync_needed'
+    SYNCED = 'synced'
+    BROKEN = 'broken'
+
+
 class SourceOperation(StrEnum):
     """Operation in progress for the template source. None means no operation in progress."""
 
     DISCOVER = 'discover'
     PREPARE_SLS = 'prepare_sls'
     PREPARE_FILES = 'prepare_files'
+    ADD_USER_FILE = 'add_user_file'
     SYNC = 'sync'
 
 
@@ -104,7 +112,6 @@ class TemplateSourceModel(CreatedModifiedMixin, IDMixin):
 class TemplateSourcePublicSchema(CreatedModifiedMixin, IDMixin):
     name: str
     description: str
-    # is_active: bool
     namespace: str
     source_type: SourceType
     repo_url: PathLike | None = None
@@ -137,3 +144,6 @@ class TemplateSourceActions(StrEnum):
     PLUG = 'plug'
     SYNC = 'sync'
     DISCOVER = 'discover'
+    DELETE_USER_FILE = 'delete_user_file'
+    ADD_USER_FILE = 'add_user_file'
+    FILES_LIST = 'files_list'

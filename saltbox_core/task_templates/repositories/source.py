@@ -24,7 +24,10 @@ class TemplateSourceRepository(BaseMongoRepository[TemplateSourceModel]):
             'local_path_unique_index_asc': [('local_path', pymongo.ASCENDING)],
         }
         collection_index_options: ClassVar[dict[str, dict[str, Any]]] = {
-            'url_unique_index_asc': {'unique': True, 'sparse': True},
+            'url_unique_index_asc': {
+                'unique': True,
+                'partialFilterExpression': {'repo_url': {'$type': 'string'}},
+            },
             'name_unique_index': {'unique': True},
             'local_path_unique_index_asc': {'unique': True},
         }

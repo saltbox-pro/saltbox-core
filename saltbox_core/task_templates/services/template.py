@@ -3,6 +3,7 @@ from typing import Annotated, Any, override
 from fastapi import Depends
 from pymongo.asynchronous.client_session import AsyncClientSession
 
+from saltbox_core.config import SETTINGS, logger
 from saltbox_core.pillars.repository import PillarRepository, get_pillar_repository
 from saltbox_core.pillars.schemas import PillarTgtType
 from saltbox_core.task_templates.repositories.template import get_task_template_repository
@@ -40,20 +41,22 @@ class TaskTemplateService(
     ) -> int:
         async with get_mongo_session_with_transaction(session) as s:
             # Remove all related pillars
-            if isinstance(query, PyObjectId):
-                tpl_id = query
-            else:
-                tpl = await self.get(query=query, session=s)
-                tpl_id = tpl.id
+            tpl = await self.get(query=query, session=s)
             pillar_query = {
                 'tgt_type': PillarTgtType.TASK_TPL,
                 'pillarenv': {
-                    '$regex': f'task_tpl:{tpl_id}.*',
+                    '$regex': f'task_tpl:{tpl.id}.*',
                 },
             }
             await self._pillar_repo.delete_many(query=pillar_query, session=s)
 
-            return await super().delete(query=query, session=s)
+            result = await super().delete(query=query, session=s)
+
+        sls_file = SETTINGS.salt_modules_serve_dir / tpl.sls_rel_path
+        logger.debug('Attempting to remove SLS file: %s', sls_file)
+        sls_file.unlink(missing_ok=True)
+
+        return result
 
     @override
     async def delete_many(
@@ -72,7 +75,15 @@ class TaskTemplateService(
                 },
             }
             await self._pillar_repo.delete_many(query=pillar_query, session=s)
-        return await super().delete_many(query=query, session=session)
+
+            result = await super().delete_many(query=query, session=s)
+
+        for tpl in tpls:
+            sls_file = SETTINGS.salt_modules_serve_dir / tpl.sls_rel_path
+            logger.debug('Attempting to remove SLS file: %s', sls_file)
+            sls_file.unlink(missing_ok=True)
+
+        return result
 
 
 def get_task_tpl_service(

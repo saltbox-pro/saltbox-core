@@ -21,12 +21,17 @@ from saltbox_core.masters.services.master_service import MasterService, get_mast
 from saltbox_core.pillars.services.pillar import PillarService, get_pillar_service
 from saltbox_core.task_templates.exceptions import RepoURLMissingException
 from saltbox_core.task_templates.schemas.source import SourceOperation, SourceState, SourceType
-from saltbox_core.task_templates.schemas.sshfs_file import ManifestSchema, SshfsFileCreateSchema, SshfsFileUpdateSchema
+from saltbox_core.task_templates.schemas.sshfs_file import (
+    ManifestDigest,
+    ManifestSchema,
+    SshfsFileCreateSchema,
+    SshfsFileType,
+)
 from saltbox_core.task_templates.schemas.template import TaskTemplateCreateSchema
 from saltbox_core.task_templates.services.source import TemplateSourceService, get_tpl_source_service
 from saltbox_core.task_templates.services.sshfs_file import SshfsFileService, get_sshfs_file_service
 from saltbox_core.task_templates.services.template import TaskTemplateService, get_task_tpl_service
-from saltbox_core.task_templates.utils.manifest import OrphanAuxFilesCleaner, SourceServeUpdater, create_sshfs_sync
+from saltbox_core.task_templates.utils.manifest import SourceServeUpdater, SshfsSync, get_sshfs_sync
 from saltbox_core.utilities.filesystem import TreePermissionsApplicator
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.exceptions import ObjectNotFoundException
@@ -39,17 +44,22 @@ class SyncOrchestrator:
         self,
         source_service: TemplateSourceService,
         template_service: TaskTemplateService,
-        sshfs_files_service: SshfsFileService,
+        sshfs_file_service: SshfsFileService,
         pillar_service: PillarService,
         master_service: MasterService,
+        sshfs_sync_service: SshfsSync,
+        # httpx_client: httpx.AsyncClient | None = None,
     ) -> None:
         self._source_service = source_service
         self._template_service = template_service
-        self._sshfs_files_service = sshfs_files_service
+        self._sshfs_file_service = sshfs_file_service
         self._pillar_service = pillar_service
         self._master_service = master_service
+        # self._httpx_client = httpx_client or httpx.AsyncClient()
+        self._sshfs_sync_service = sshfs_sync_service
         self._manifest: ManifestSchema | None = None
         self._local_path: Path | None = None
+        self._tmp_filename_digest_size = 16
 
     async def _inject_credentials(self, repo_url: str, login: str | None, password: str | None) -> str:
         if not login or not password:
@@ -255,55 +265,60 @@ class SyncOrchestrator:
 
     async def _save_sshfs_files_from_manifest(self, source_id: PyObjectId) -> None:
         if not self._manifest:
-            msg = 'Manifest is not loaded. Cannot save SSHFS files.'
-            logger.warning(msg)
+            logger.warning('Manifest is not loaded. Cannot save SSHFS files.')
             return
 
-        for file_schema in self._manifest.sshfs_files.values():
-            try:
-                existing_file = await self._sshfs_files_service.get(
-                    {'source_id': source_id, 'url': str(file_schema.url)}
-                )
-            except ObjectNotFoundException:
-                existing_file = None
+        # Only diff against MANIFEST-managed files; USER-added files are never touched here
+        existing_files = await self._sshfs_file_service.get_list(
+            query={'source_id': source_id, 'file_type': SshfsFileType.MANIFEST}, skip=0, limit=0
+        )
+        existing_files_map = {file.rel_path: file for file in existing_files}
+        manifest_keys = set(self._manifest.sshfs_files.keys())
 
-            if existing_file:
-                if existing_file.checksum == file_schema.checksum:
-                    logger.debug('SSHFS file already exists and is up to date: %s', file_schema.url)
-                    continue
-                else:
-                    logger.debug('SSHFS file already exists but is outdated, updating: %s', file_schema.url)
-                    await self._sshfs_files_service.update(
-                        query={'source_id': source_id, 'url': str(file_schema.url)},
-                        data=SshfsFileUpdateSchema(**file_schema.model_dump()),
-                    )
-                    continue
-            else:
-                file_create_schema = SshfsFileCreateSchema(
-                    source_id=source_id,
-                    **file_schema.model_dump(),
-                )
-                await self._sshfs_files_service.create(data=file_create_schema)
+        for rel_path in set(existing_files_map.keys()) - manifest_keys:
+            await self._sshfs_file_service.delete(existing_files_map[rel_path].id)
 
-    async def _sync_files_to_sshfs(self, source_id: PyObjectId) -> None:
-        files = await self._sshfs_files_service.get_list(query={'source_id': source_id}, skip=0, limit=0)
-        for file in files:
+        for rel_path, file_schema in self._manifest.sshfs_files.items():
+            existing_file = existing_files_map.get(rel_path)
+            if existing_file is None:
+                await self._sshfs_file_service.create(
+                    data=SshfsFileCreateSchema(source_id=source_id, **file_schema.model_dump())
+                )
+            elif (
+                existing_file.checksum != file_schema.checksum
+                # or existing_file.checksum_type != file_schema.checksum_type
+                or existing_file.url != file_schema.url
+                or existing_file.unpack_as != file_schema.unpack_as
+            ):
+                await self._sshfs_file_service.delete(existing_file.id)
+                await self._sshfs_file_service.create(
+                    data=SshfsFileCreateSchema(source_id=source_id, **file_schema.model_dump())
+                )
+
+    async def _sync_manifest_files_to_sshfs(self, source_id: PyObjectId) -> list[dict[str, str]]:
+        missing_manifest_files = await self._sshfs_file_service.get_list(
+            query={'source_id': source_id, 'file_type': SshfsFileType.MANIFEST, 'synced_on_sshfs': False},
+            skip=0,
+            limit=0,
+        )
+        sync_file_errors: list[dict[str, str]] = []
+        for file in missing_manifest_files:
             try:
-                await create_sshfs_sync(file).sync()
-                await self._sshfs_files_service.update(
+                await self._sshfs_sync_service.save_to_sshfs(file)
+                await self._sshfs_file_service.update(
                     query=file.id,
                     data={'synced_on_sshfs': True, 'last_sync_error': None},
                 )
+                logger.info('Synced manifest file: %s', file.rel_path)
             except Exception as e:
-                logger.error('Failed to sync file %s: %s', file.url, e)
-                await self._sshfs_files_service.update(
+                logger.error('Failed to sync file to SSHFS: %s', e)
+                await self._sshfs_file_service.update(
                     query=file.id,
-                    data={
-                        'synced_on_sshfs': False,
-                        'last_sync_error': str(e),
-                    },
+                    data={'synced_on_sshfs': False, 'last_sync_error': str(e)},
                 )
-                raise
+                sync_file_errors.append({'file': file.rel_path, 'error': str(e)})
+                continue
+        return sync_file_errors
 
     async def _serve_templates_to_serve_dir(self) -> None:
         active_sources = await self._source_service.get_list(
@@ -315,16 +330,6 @@ class SyncOrchestrator:
             salt_modules_serve_updater.update()
         except Exception as e:
             logger.error('Failed to update serve dir: %s', e)
-
-    async def _cleanup_orphan_aux_files(self) -> None:
-        active_sources = await self._source_service.get_list(
-            query={'state': {'$in': [SourceState.DISCOVERED, SourceState.PLUGGED, SourceState.ACTIVE]}}, skip=0, limit=0
-        )
-        active_files = []
-        for source in active_sources:
-            files = await self._sshfs_files_service.get_list(query={'source_id': source.id}, skip=0, limit=0)
-            active_files.extend(files)
-        OrphanAuxFilesCleaner.cleanup(active_files)
 
     async def _update_sshfs_permissions(self) -> None:
         if not SETTINGS.sshfs_permissions:
@@ -388,27 +393,27 @@ class SyncOrchestrator:
         await self._source_service.update(source_id, {'current_operation': SourceOperation.PREPARE_FILES})
         try:
             logger.info('Syncing files to serve dir...')
-            await self._sync_files_to_sshfs(source_id)
+            sync_file_errors = await self._sync_manifest_files_to_sshfs(source_id)
 
             logger.info('Updating SSHFS files permissions...')
             await self._update_sshfs_permissions()
 
-            logger.info('Cleaning up orphan aux files...')
-            await self._cleanup_orphan_aux_files()
         except Exception as e:
             logger.error('Failed to sync files to serve dir: %s', e)
             await self._source_service.update(source_id, {'state': SourceState.BROKEN, 'last_error': str(e)})
             raise
-        await self._source_service.update(
-            source_id, {'state': SourceState.PLUGGED, 'current_operation': None, 'last_error': None}
-        )
+        if sync_file_errors:
+            error_msg = '; '.join(f'{err["file"]}: {err["error"]}' for err in sync_file_errors)
+            await self._source_service.update(source_id, {'state': SourceState.BROKEN, 'last_error': error_msg})
+        else:
+            await self._source_service.update(
+                source_id, {'state': SourceState.PLUGGED, 'current_operation': None, 'last_error': None}
+            )
 
-    async def sync(self, source_id: PyObjectId, master_ids: list[PyObjectId]) -> None:
+    async def sync(self, source_id: PyObjectId) -> None:
         # Get list of accepted masters and send them rpc notification in parallel
         await self._source_service.update(source_id, {'current_operation': SourceOperation.SYNC})
-        accepted_masters = await self._master_service.get_list(
-            query={'status': MasterStatus.ACCEPTED, '_id': {'$in': master_ids}}, skip=0, limit=0
-        )
+        accepted_masters = await self._master_service.get_list(query={'status': MasterStatus.ACCEPTED}, skip=0, limit=0)
         if not accepted_masters:
             msg = f'No accepted masters found for source {source_id}. Skipping notification.'
             logger.warning(msg)
@@ -434,7 +439,7 @@ class SyncOrchestrator:
             error_msg = '; '.join(str(e) for e in errors)
             await self._source_service.update(
                 source_id,
-                {'state': SourceState.BROKEN, 'last_error': error_msg, 'current_operation': None},
+                {'state': SourceState.BROKEN, 'last_error': error_msg},
             )
             raise errors[0]
 
@@ -447,6 +452,38 @@ class SyncOrchestrator:
                 'synced_at': datetime.now(UTC),
             },
         )
+
+    async def compute_checksum(self, file_path: Path, checksum_type: ManifestDigest | None = None) -> str:
+        if checksum_type is None:
+            checksum_type = ManifestDigest.SHA256
+        with file_path.open('rb') as file_stream:
+            digest_obj = hashlib.file_digest(file_stream, checksum_type.value)
+        return digest_obj.hexdigest()
+
+    async def add_user_file(
+        self,
+        source_id: PyObjectId,
+        file_id: PyObjectId,
+        tmp_path: Path | None = None,
+    ) -> None:
+        file_instance = await self._sshfs_file_service.get(file_id)
+        await self._source_service.update(source_id, {'current_operation': SourceOperation.ADD_USER_FILE})
+
+        try:
+            update_data: dict[str, Any] = {'synced_on_sshfs': True, 'last_sync_error': None}
+            if tmp_path:
+                checksum = await self.compute_checksum(tmp_path, file_instance.checksum_type)
+                update_data['checksum'] = checksum
+            await self._sshfs_sync_service.save_to_sshfs(file_instance, tmp_path)
+            await self._sshfs_file_service.update(query=file_id, data=update_data)
+            await self._source_service.update(
+                source_id, {'state': SourceState.PLUGGED, 'current_operation': None, 'last_error': None}
+            )
+        except Exception as e:
+            logger.error('Failed to save file to SSHFS: %s', e)
+            await self._sshfs_file_service.delete(file_id)
+            await self._source_service.update(source_id, {'state': SourceState.BROKEN, 'last_error': str(e)})
+            raise
 
     async def remove(self, source_id: PyObjectId) -> None:
         await self._source_service.delete(source_id)
@@ -468,14 +505,16 @@ class SyncOrchestrator:
 async def get_sync_orchestrator(
     source_service: Annotated[TemplateSourceService, Depends(get_tpl_source_service)],
     template_service: Annotated[TaskTemplateService, Depends(get_task_tpl_service)],
-    sshfs_files_service: Annotated[SshfsFileService, Depends(get_sshfs_file_service)],
+    sshfs_file_service: Annotated[SshfsFileService, Depends(get_sshfs_file_service)],
     pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
     master_service: Annotated[MasterService, Depends(get_master_service)],
+    sshfs_sync_service: Annotated[SshfsSync, Depends(get_sshfs_sync)],
 ) -> SyncOrchestrator:
     return SyncOrchestrator(
         source_service=source_service,
         template_service=template_service,
-        sshfs_files_service=sshfs_files_service,
+        sshfs_file_service=sshfs_file_service,
         pillar_service=pillar_service,
         master_service=master_service,
+        sshfs_sync_service=sshfs_sync_service,
     )

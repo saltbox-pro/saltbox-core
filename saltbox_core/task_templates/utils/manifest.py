@@ -1,7 +1,6 @@
 import hashlib
 import shutil
 import subprocess
-from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import ClassVar
 
@@ -10,47 +9,26 @@ import httpx
 from saltbox_core.config import MANIFEST_FILE_ALLOWED_NAMES, SETTINGS, logger
 from saltbox_core.task_templates.exceptions import ManifestFileSyncHttpException, TaskTemplateSourceServeUpdateException
 from saltbox_core.task_templates.schemas.source import TemplateSourceModel
-from saltbox_core.task_templates.schemas.sshfs_file import ManifestDigest, SshfsFileModel
-from saltbox_core.utilities.filesystem import TreePermissionsApplicator, get_latest_ctime, recursive_force_remove
+from saltbox_core.task_templates.schemas.sshfs_file import SshfsFileModel, SshfsFileType
+from saltbox_core.utilities.filesystem import TreePermissionsApplicator, recursive_force_remove
+from saltbox_core.utilities.httpx_client import HttpxClientSingletoneFactory
 
 
-class SshfsSyncBase(ABC):
-    TMP_FILENAME_DIGEST_SIZE = 16
+class SshfsSync:
+    def __init__(self, httpx_client: httpx.AsyncClient | None = None) -> None:
+        self._tmp_filename_digest_size = 16
+        self._httpx_client = httpx_client or httpx.AsyncClient()
 
-    def __init__(self, file_entry: SshfsFileModel) -> None:
-        SETTINGS.sshfs_tmp_dir.mkdir(exist_ok=True)
-        self.file_entry = file_entry
-        self.dest_path = SETTINGS.sshfs_dir / file_entry.rel_path
-        self.dest_digest_path = self._make_digest_path(self.dest_path)
+    def _get_dest_path(self, rel_path: str) -> Path:
+        SETTINGS.sshfs_dir.mkdir(parents=True, exist_ok=True)
+        dest_path = SETTINGS.sshfs_dir / rel_path
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        return dest_path
 
-    @abstractmethod
-    def _make_digest_path(self, file: Path) -> Path: ...
-
-    def _is_checksum_matches(self, digest_file: Path) -> bool:
-        return digest_file.read_text().strip() == self.file_entry.checksum
-
-    def _compute_and_write_checksum(self, file_path: Path) -> str:
-        with file_path.open('rb') as fh:
-            digest = hashlib.file_digest(fh, self.file_entry.checksum_type)
-        checksum = digest.hexdigest()
-        digest_path = self._make_digest_path(file_path)
-        digest_path.write_text(checksum)
-        return checksum
-
-    def _purge_mismatched_digest_files(self) -> None:
-        for algo in ManifestDigest:
-            if algo.value == self.file_entry.checksum_type:
-                continue
-            stale = self.dest_digest_path.with_suffix(f'.{algo.value}')
-            if stale.exists():
-                logger.info('Removing stale digest file: %s', stale)
-                stale.unlink()
-
-    @abstractmethod
-    def _needs_update(self) -> bool: ...
-
-    @abstractmethod
-    def _move_to_destination(self, downloaded_path: Path) -> None: ...
+    def _get_download_path(self, url: str) -> Path:
+        SETTINGS.sshfs_tmp_dir.mkdir(parents=True, exist_ok=True)
+        url_hash = hashlib.blake2b(url.encode(), digest_size=self._tmp_filename_digest_size).hexdigest()
+        return SETTINGS.sshfs_tmp_dir / f'{url_hash}.download'
 
     def _chunk_size(self, response: httpx.Response) -> int:
         content_length = response.headers.get('content-length')
@@ -59,35 +37,45 @@ class SshfsSyncBase(ABC):
             return 8 * 1024 * 1024
         return 512 * 1024
 
-    async def sync(self) -> None:
-        """Download and place file if checksum has changed."""
-        self._purge_mismatched_digest_files()
-        if not self._needs_update():
-            logger.debug('No update needed for %s', self.dest_path)
-            return
+    def _move(self, src: Path, dst: Path, unpack_as: str | None = None) -> None:
+        if unpack_as is not None:
+            try:
+                logger.info('Unpacking file %s as %s to %s', src, unpack_as, dst)
+                shutil.unpack_archive(src, format=unpack_as, extract_dir=dst)
+            except shutil.ReadError as exc:
+                raise ManifestFileSyncHttpException(
+                    detail=f'Failed to unpack as "{unpack_as}": {exc}',
+                ) from exc
+            src.unlink()
+        else:
+            shutil.move(src, dst)
 
-        self.dest_path.parent.mkdir(parents=True, exist_ok=True)
+    async def save_to_sshfs(self, file_entry: SshfsFileModel, tmp_path: Path | None = None) -> None:
+        if tmp_path is not None:
+            logger.debug('Saving file from temporary path to SSHFS: %s', tmp_path)
+            self._move(tmp_path, self._get_dest_path(file_entry.rel_path), unpack_as=file_entry.unpack_as)
+        elif file_entry.url is not None:
+            await self._download_and_move_to_sshfs(file_entry)
+        else:
+            msg = 'Either tmp_path or file_entry.url must be provided'
+            raise ValueError(msg)
+
+    async def _download_and_move_to_sshfs(self, file_entry: SshfsFileModel) -> str:
+        """Download URL to sshfs_dir without checksum verification. Returns computed checksum."""
+        dest_path = self._get_dest_path(file_entry.rel_path)
 
         headers: dict[str, str] = {}
-        if self.file_entry.token:
-            headers['private-token'] = self.file_entry.token.get_secret_value()
+        if file_entry.token:
+            headers['private-token'] = file_entry.token.get_secret_value()
 
-        url_str = str(self.file_entry.url)
-        url_hash = hashlib.blake2b(url_str.encode(), digest_size=self.TMP_FILENAME_DIGEST_SIZE).hexdigest()
-        download_path = SETTINGS.sshfs_tmp_dir / f'{url_hash}.download'
+        url_str = str(file_entry.url)
+        download_path = self._get_download_path(url_str)
         logger.info('Syncing manifest file to SSHFS: %s', download_path)
 
         try:
-            async with (
-                httpx.AsyncClient() as client,
-                client.stream('GET', url_str, headers=headers) as response,
-            ):
+            async with self._httpx_client.stream(method='GET', url=url_str, headers=headers) as response:
                 if response.status_code != httpx.codes.OK:
-                    await response.aread()
-                    try:
-                        content_text = response.json()
-                    except ValueError:
-                        content_text = response.text
+                    content_text = await response.aread()
                     raise ManifestFileSyncHttpException(
                         url=url_str,
                         status_code=response.status_code,
@@ -95,102 +83,38 @@ class SshfsSyncBase(ABC):
                     )
 
                 chunk_size = self._chunk_size(response)
+                digest = hashlib.new(file_entry.checksum_type)
                 with download_path.open('wb') as fh:
                     async for chunk in response.aiter_bytes(chunk_size):
                         fh.write(chunk)
+                        digest.update(chunk)
+                actual_checksum = digest.hexdigest()
         except httpx.HTTPError as exc:
             raise ManifestFileSyncHttpException(url=url_str, detail=str(exc)) from exc
-
-        actual_checksum = self._compute_and_write_checksum(download_path)
-        if actual_checksum != self.file_entry.checksum:
+        except OSError as exc:
+            logger.error('Failed to write downloaded file: %s', exc)
+            raise
+        if file_entry.file_type == SshfsFileType.MANIFEST and actual_checksum != file_entry.checksum:
             download_path.unlink(missing_ok=True)
             raise ManifestFileSyncHttpException(
                 url=url_str,
-                detail=f'Checksum mismatch for {self.dest_path}:'
-                f' expected {self.file_entry.checksum}, got {actual_checksum}',
+                detail=f'Checksum mismatch for {dest_path}: expected {file_entry.checksum}, got {actual_checksum}',
             )
+        self._move(download_path, dest_path, unpack_as=file_entry.unpack_as)
+        return actual_checksum
 
-        self._move_to_destination(download_path)
-        logger.info('Synced manifest file: %s', self.dest_path)
-
-    # TODO: check if needed to remove digest file as well
-    async def remove(self) -> None:
-        if self.dest_path.exists():
-            if self.dest_path.is_file():
-                self.dest_path.unlink()
+    async def remove(self, file_entry: SshfsFileModel) -> None:
+        dest_path = self._get_dest_path(file_entry.rel_path)
+        if dest_path.exists():
+            if dest_path.is_file():
+                dest_path.unlink()
+                parent = dest_path.parent
+                while parent != SETTINGS.sshfs_dir and not any(parent.iterdir()):
+                    logger.debug('Removing empty directory: %s', parent)
+                    parent.rmdir()
+                    parent = parent.parent
             else:
-                recursive_force_remove(self.dest_path)
-        if self.dest_digest_path.exists():
-            self.dest_digest_path.unlink()
-
-
-class SshfsSyncPlainFile(SshfsSyncBase):
-    def _make_digest_path(self, file: Path) -> Path:
-        return file.parent / f'{file.name}.{self.file_entry.checksum_type}'
-
-    def _needs_update(self) -> bool:
-        if self.dest_path.exists() and not self.dest_path.is_file():
-            recursive_force_remove(self.dest_path)
-
-        if self.dest_path.exists():
-            if self.dest_digest_path.exists():
-                if self.dest_path.stat().st_ctime >= self.dest_digest_path.stat().st_ctime:
-                    self._compute_and_write_checksum(self.dest_path)
-            else:
-                self._compute_and_write_checksum(self.dest_path)
-        else:
-            if self.dest_digest_path.exists():
-                self.dest_digest_path.unlink()
-            return True
-
-        return not self._is_checksum_matches(self.dest_digest_path)
-
-    def _move_to_destination(self, downloaded_path: Path) -> None:
-        digest_path = self._make_digest_path(downloaded_path)
-        shutil.move(downloaded_path, self.dest_path)
-        shutil.move(digest_path, self.dest_digest_path)
-
-
-class SshfsSyncArchive(SshfsSyncBase):
-    def _make_digest_path(self, file: Path) -> Path:
-        return file.parent / f'{file.name}.archive.{self.file_entry.checksum_type}'
-
-    def _needs_update(self) -> bool:
-        if self.dest_path.exists() and not self.dest_path.is_dir():
-            recursive_force_remove(self.dest_path)
-
-        if (
-            self.dest_path.exists()
-            and self.dest_digest_path.exists()
-            and self._is_checksum_matches(self.dest_digest_path)
-        ):
-            if self.dest_digest_path.stat().st_ctime > get_latest_ctime(self.dest_path):
-                return False
-
-        if self.dest_path.exists():
-            recursive_force_remove(self.dest_path)
-        if self.dest_digest_path.exists():
-            self.dest_digest_path.unlink()
-        return True
-
-    def _move_to_destination(self, downloaded_path: Path) -> None:
-        assert self.file_entry.unpack_as is not None  # noqa: S101
-        digest_path = self._make_digest_path(downloaded_path)
-        try:
-            shutil.unpack_archive(downloaded_path, format=self.file_entry.unpack_as, extract_dir=self.dest_path)
-        except shutil.ReadError as exc:
-            raise ManifestFileSyncHttpException(
-                url=str(self.file_entry.url),
-                detail=f'Failed to unpack as "{self.file_entry.unpack_as}": {exc}',
-            ) from exc
-        downloaded_path.unlink()
-        shutil.move(digest_path, self.dest_digest_path)
-
-
-def create_sshfs_sync(file_entry: SshfsFileModel) -> SshfsSyncBase:
-    if file_entry.unpack_as is not None:
-        return SshfsSyncArchive(file_entry)
-    return SshfsSyncPlainFile(file_entry)
+                recursive_force_remove(dest_path)
 
 
 class SourceServeUpdater:
@@ -328,89 +252,6 @@ class SourceServeUpdater:
         self._update_permissions()
 
 
-class OrphanAuxFilesCleaner:
-    """
-    Delete ALL file in SSHFS dir EXCEPT listed in keep_for_repos Manifests.
-
-    Prefer to not run directly, beter use cleanup_orphan_aux_files() task which is
-    safe from concurrent runs.
-    """
-
-    SSHFS_DIR = SETTINGS.sshfs_dir
-    DRY_RUN = SETTINGS.orphan_aux_files_cleanup_dry_run
-
-    # Following entries in SSHFS_DIR will be kept anyway
-    IGNORE_LIST: ClassVar[tuple[str | Path, ...]] = ('.ssh',)
-
-    @classmethod
-    def _rm_rf(cls, path: Path) -> None:
-        if not cls.DRY_RUN:
-            recursive_force_remove(path)
-        else:
-            type_pref = 'Directory' if path.is_dir() else 'File'
-            l_tpl = '%s "%s" will be deleted when dry run option will be disabled'
-            logger.info(l_tpl, type_pref, path)
-
-    @classmethod
-    def get_parented_files(cls, files: list[SshfsFileModel]) -> set[Path]:
-        keep_list = set()
-        repo_keep_list: list[Path] = []
-
-        for file in files:
-            sync = create_sshfs_sync(file)
-            repo_keep_list.append(sync.dest_path)
-            repo_keep_list.append(sync.dest_digest_path)
-
-        # Checking on Path.exists() does not affect cleanup() result
-        # but may optimize matching a bit.
-        keep_list |= {path for path in repo_keep_list if path.exists()}
-
-        return keep_list
-
-    @classmethod
-    # @log_duration()
-    def cleanup(cls, keep_for_repos: list[SshfsFileModel]) -> None:
-        fun_name = f'{cls.cleanup.__name__}()'
-        logger.debug('%s has been called', fun_name)
-
-        root = cls.SSHFS_DIR
-        keep_list = cls.get_parented_files(files=keep_for_repos)
-        keep_list |= {root / entry for entry in cls.IGNORE_LIST}
-        logger.debug('%s ingore list: %s', fun_name, cls.IGNORE_LIST)
-
-        par_list = set()
-        for i in keep_list:
-            par_list |= set(i.parents)
-        par_list -= set(cls.SSHFS_DIR.parents)
-
-        stack = sorted(root.iterdir(), reverse=True)
-        while stack:
-            path = stack.pop()
-            if path in keep_list:
-                logger.debug('%s keeps %s', fun_name, path)
-            elif path in par_list:  # entry contains some of keep_list items
-                if not cls.is_outbounding_symlink(path):
-                    l_tpl = '%s found symlink "%s" which leads upper, skipping'
-                    logger.warning(l_tpl, fun_name, path)
-                    continue
-                try:
-                    logger.debug('%s goes deep into %s', fun_name, path)
-                    stack.extend(sorted(path.iterdir(), reverse=True))
-                except NotADirectoryError:
-                    l_tpl = '%s expected "%s" to be a directory, but it is not, deleting now'
-                    logger.warning(l_tpl, fun_name, path)
-                    cls._rm_rf(path)
-            else:
-                logger.info('%s deletes %s', fun_name, path)
-                cls._rm_rf(path)
-
-    @classmethod
-    def is_outbounding_symlink(cls, path: Path) -> bool:
-        if not path.is_absolute():
-            msg = f'The {cls.is_outbounding_symlink.__name__}() works with absolute paths only'
-            raise ValueError(msg)
-        if not path.is_symlink():
-            return True
-        if path.parent not in path.resolve().parents:
-            return False
-        return True
+async def get_sshfs_sync() -> SshfsSync:
+    httpx_client = HttpxClientSingletoneFactory.get_instance()
+    return SshfsSync(httpx_client=httpx_client)

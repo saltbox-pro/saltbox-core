@@ -1,5 +1,4 @@
 from enum import StrEnum
-from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, HttpUrl, SecretStr, field_serializer, model_validator
 
@@ -13,14 +12,31 @@ class ManifestDigest(StrEnum):
     SHA512 = 'sha512'
 
 
+class SshfsFileType(StrEnum):
+    MANIFEST = 'manifest'
+    USER = 'user'
+
+
+class UnpackAs(StrEnum):
+    BZTAR = 'bztar'
+    GZTAR = 'gztar'
+    TAR = 'tar'
+    XZTAR = 'xztar'
+    ZIP = 'zip'
+
+
 class SshfsFileCreateSchema(BaseModel):
     source_id: PyObjectId
+    file_type: SshfsFileType = Field(
+        default=SshfsFileType.MANIFEST,
+        title='Whether the file comes from a manifest (auto-managed) or was added by a user',
+    )
     rel_path: str
-    url: HttpUrl
+    url: HttpUrl | None = Field(default=None)
     checksum: str
     checksum_type: ManifestDigest = Field(default=ManifestDigest.SHA256, title='Checksum type')
-    token: SecretStr | None
-    unpack_as: Literal['bztar', 'gztar', 'tar', 'xztar', 'zip'] | None = Field(
+    token: SecretStr | None = Field(default=None, title='Token for accessing the file on the url')
+    unpack_as: UnpackAs | None = Field(
         default=None,
         description='Unpack as arhive of specified format rather than place as is',
     )
@@ -34,31 +50,18 @@ class SshfsFileCreateSchema(BaseModel):
         return value.get_secret_value() if value else None
 
     @field_serializer('url')
-    def serialize_url(self, url: HttpUrl) -> str:
-        return str(url)
+    def serialize_url(self, url: HttpUrl | None) -> str | None:
+        return str(url) if url is not None else None
 
 
-class SshfsFileUpdateSchema(BaseModel):
-    rel_path: str | None = None
-    checksum: str | None = None
-    checksum_type: ManifestDigest = Field(default=ManifestDigest.SHA256, title='Checksum type')
-    token: SecretStr | None
-    unpack_as: Literal['bztar', 'gztar', 'tar', 'xztar', 'zip'] | None = Field(
-        default=None,
-        description='Unpack as arhive of specified format rather than place as is',
-    )
-
-    model_config = ConfigDict(extra='forbid')
-
-    @field_serializer('token')
-    def serialize_token(self, value: SecretStr | None) -> str | None:
-        return value.get_secret_value() if value else None
+class SshfsFileUpdateSchema(BaseModel): ...
 
 
 class SshfsFilePublicSchema(CreatedModifiedMixin, IDMixin):
     source_id: PyObjectId
+    file_type: SshfsFileType
     rel_path: str
-    url: HttpUrl
+    url: HttpUrl | None
     checksum: str
     checksum_type: ManifestDigest
     synced_on_sshfs: bool
@@ -67,12 +70,15 @@ class SshfsFilePublicSchema(CreatedModifiedMixin, IDMixin):
 
 class SshfsFileModel(CreatedModifiedMixin, IDMixin):
     source_id: PyObjectId = Field(title='ID of the TemplateSource this file belongs to')
+    file_type: SshfsFileType = Field(
+        title='Whether the file comes from a manifest (auto-managed) or was added by a user',
+    )
     rel_path: str = Field(title='File path relative to manifest root')
-    url: HttpUrl
+    url: HttpUrl | None = Field(default=None)
     checksum: str = Field(title='Checksum of the file on the url')
     checksum_type: ManifestDigest = Field(default=ManifestDigest.SHA256, title='Checksum type')
     token: SecretStr | None = Field(default=None, title='Token for accessing the file on the url')
-    unpack_as: Literal['bztar', 'gztar', 'tar', 'xztar', 'zip'] | None = Field(
+    unpack_as: UnpackAs | None = Field(
         default=None,
         description='Unpack as arhive of specified format rather than place as is',
     )
@@ -88,13 +94,13 @@ class FileInManifestSchema(BaseModel):
     checksum: str
     checksum_type: ManifestDigest | None = None
     token: SecretStr | None = None
-    unpack_as: Literal['bztar', 'gztar', 'tar', 'xztar', 'zip'] | None = None
+    unpack_as: UnpackAs | None = None
 
     model_config = ConfigDict(extra='forbid')
 
 
 class ManifestSchema(BaseModel):
-    root: str
+    root: str = Field(default='', title='Path in repository to serve for masters')
     sshfs_files: dict[str, FileInManifestSchema]
     sshfs_files_checksum_type: ManifestDigest = ManifestDigest.SHA256
     sshfs_files_token: SecretStr | None = None
@@ -113,3 +119,5 @@ class ManifestSchema(BaseModel):
 
 class SshfsFileActions(StrEnum):
     LIST = 'list'
+    CREATE = 'create'
+    DELETE = 'delete'

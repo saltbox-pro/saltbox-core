@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any
 
 from redis.asyncio import Redis
@@ -74,12 +75,11 @@ async def source_prepare_task(
 @broker.task(queue_name=queue_default.name)
 async def source_sync_task(
     source_id: str,
-    master_ids: list[str],
     progress: ProgressTracker[Any] = TaskiqDepends(),
     orchestrator: SyncOrchestrator = TaskiqDepends(get_sync_orchestrator),
     redis: Redis = TaskiqDepends(get_redis),
 ) -> dict[str, Any]:
-    lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=60, prefix='template_source')
+    lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=600, prefix='template_source')
     lock = lock_factory.create(source_id)
     logger.info('is_locked: %s', await lock.locked())
 
@@ -98,7 +98,7 @@ async def source_sync_task(
             raise
 
         try:
-            await orchestrator.sync(PyObjectId(source_id), [PyObjectId(m_id) for m_id in master_ids])
+            await orchestrator.sync(PyObjectId(source_id))
             await progress.set_progress(TaskState.SUCCESS, 'Sync successful')
             return {'status': 'synced'}
         except Exception:
@@ -130,6 +130,35 @@ async def source_remove_task(
             return {'status': 'removed'}
         except Exception:
             await progress.set_progress(TaskState.FAILURE, 'Remove failed')
+            raise
+
+
+@broker.task(queue_name=queue_default.name)
+async def add_user_file_to_source_task(
+    source_id: str,
+    file_id: str,
+    tmp_path: Path | None = None,
+    progress: ProgressTracker[Any] = TaskiqDepends(),
+    orchestrator: SyncOrchestrator = TaskiqDepends(get_sync_orchestrator),
+    redis: Redis = TaskiqDepends(get_redis),
+) -> dict[str, Any]:
+    lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=60, prefix='template_source')
+    lock = lock_factory.create(source_id)
+    logger.info('is_locked: %s', await lock.locked())
+
+    if await lock.locked():
+        msg = f'Source {source_id} is already being fetched by another task.'
+        logger.warning(msg)
+        raise TaskTemplateSourceLockException(source_id=source_id)
+
+    async with lock:
+        await progress.set_progress(TaskState.STARTED, 'Adding user file started')
+        try:
+            await orchestrator.add_user_file(PyObjectId(source_id), PyObjectId(file_id), tmp_path=tmp_path)
+            await progress.set_progress(TaskState.SUCCESS, 'User file added')
+            return {'status': 'added', 'file_id': str(file_id)}
+        except Exception:
+            await progress.set_progress(TaskState.FAILURE, 'Adding user file failed')
             raise
 
 

@@ -10,7 +10,7 @@ from saltbox_core.task_templates.schemas.sshfs_file import (
     SshfsFileModel,
     SshfsFileUpdateSchema,
 )
-from saltbox_core.task_templates.utils.manifest import create_sshfs_sync
+from saltbox_core.task_templates.utils.manifest import SshfsSync, get_sshfs_sync
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 
@@ -23,6 +23,14 @@ class SshfsFileService(
         SshfsFileUpdateSchema,
     ]
 ):
+    def __init__(
+        self,
+        repo: SshfsFileRepository,
+        sshfs_sync_service: SshfsSync,
+    ) -> None:
+        super().__init__(repo=repo)
+        self._sshfs_sync_service = sshfs_sync_service
+
     @override
     async def delete(
         self,
@@ -36,7 +44,7 @@ class SshfsFileService(
         if not file:
             return 0
         try:
-            await create_sshfs_sync(file).remove()
+            await self._sshfs_sync_service.remove(file)
         except Exception as e:
             logger.error('Failed to remove file from SSHFS: %s', e)
             raise
@@ -55,7 +63,7 @@ class SshfsFileService(
         # Remove files from SSHFS
         for file in files:
             try:
-                await create_sshfs_sync(file).remove()
+                await self._sshfs_sync_service.remove(file)
             except Exception as e:
                 logger.error('Failed to remove file from SSHFS: %s', e)
                 raise
@@ -65,5 +73,6 @@ class SshfsFileService(
 
 def get_sshfs_file_service(
     repo: Annotated[SshfsFileRepository, Depends(get_sshfs_file_repository)],
+    sshfs_sync_service: Annotated[SshfsSync, Depends(get_sshfs_sync)],
 ) -> SshfsFileService:
-    return SshfsFileService(repo=repo)
+    return SshfsFileService(repo=repo, sshfs_sync_service=sshfs_sync_service)

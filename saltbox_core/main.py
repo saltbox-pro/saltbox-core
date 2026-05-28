@@ -19,6 +19,7 @@ from saltbox_core.salt.routers.salt_keys import router as salt_keys_router
 from saltbox_core.settings.routers.gitlab_router import router as gitlab_router
 from saltbox_core.settings.routers.sls_repos_router import router as settings_sls_router
 from saltbox_core.task_templates.routers.source import router as task_tpl_source_router
+from saltbox_core.task_templates.routers.sshfs_file import router as task_tpl_file_router
 from saltbox_core.task_templates.routers.template import router as new_template_router
 from saltbox_core.tasks.routers.task import router as task_router
 from saltbox_core.tasks.routers.tasks_template import router as template_router
@@ -47,11 +48,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator:
         )
         await discovery_client.register()
 
-    yield
-    await CustomRedisCache.clear_cache(get_redis_now())
-    if not broker.is_worker_process:
-        await shutdown_broker()
-    await POOL.aclose()  # type: ignore[attr-defined] # ty: ignore[unresolved-attribute]
+    try:
+        yield
+    finally:
+        await CustomRedisCache.clear_cache(get_redis_now())
+        if not broker.is_worker_process:
+            await shutdown_broker()
+        await POOL.aclose()  # type: ignore[attr-defined] # ty: ignore[unresolved-attribute]
 
 
 app_config: dict[str, Any] = {
@@ -107,6 +110,7 @@ async def health_check() -> HealthCheckResponse:
 
 app.include_router(router=task_tpl_source_router)
 app.include_router(router=new_template_router)
+app.include_router(router=task_tpl_file_router)
 app.include_router(filters_router)
 app.include_router(jobs_router)
 app.include_router(job_schemas_router)
