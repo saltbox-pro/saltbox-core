@@ -2,8 +2,9 @@ from saltbox_core.jobs.repositories.job_repository import JobRepository
 from saltbox_core.jobs.repositories.job_return_repository import JobReturnRepository
 from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository
 from saltbox_core.masters.repositories.master_repository import MasterRepository
-from saltbox_core.minion_collections.repositories.collection_repository import CollectionRepository
-from saltbox_core.minion_collections.repositories.minion_repository import MinionRepository
+from saltbox_core.minion_collections.repositories.collection import CollectionRepository
+from saltbox_core.minion_collections.repositories.minion import MinionRepository
+from saltbox_core.minion_collections.repositories.minion_extra_data import MinionExtraDataItemRepository
 from saltbox_core.pillars.repository import PillarRepository
 from saltbox_core.settings.repository import SettingsSlsRepoRepository
 from saltbox_core.task_templates.repositories.source import TemplateSourceRepository
@@ -29,6 +30,7 @@ async def init_mongo_db() -> None:
         MasterRepository(database),
         MinionRepository(database),
         CollectionRepository(database),
+        MinionExtraDataItemRepository(database),
         SettingsSlsRepoRepository(database),
         TaskRepository(database),
         TaskMinionRepository(database),

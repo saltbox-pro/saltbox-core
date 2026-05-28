@@ -5,6 +5,47 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+
+## [0.2.1] - 2026-05-21
+
+### Added
+
+- Salt key management: list, accept, reject and delete keys; auto-delete salt key on minion removal
+- Paginated response schema for salt keys list endpoint
+- TaskIQ workers with named queue support; separate worker processes per queue
+- Dedicated job return data endpoint; remove `data` field from job returns list response
+- `JobReturnNotifySchema` for serializing job return event-bus notify messages
+- `display_name` field to pillar target schemas
+- Bulk delete minions endpoint
+- MongoDB index on job returns for aggregations by `source` and `tgt`
+- Extend Redis pub/sub channel name with master ID
+- Initialize TaskIQ broker in Redis faststream app and in migration startup
+- RabbitMQ and Redis credentials stub envs to test environment
+- Fix missing `TaskTemplateExcludeSlsSchema` fields (hotfix)
+
+### Changed
+
+- Refactor services and repos to use `create`/`update` without `projection_model` argument; adopt `bulk_create`/`bulk_update` across tasks, collections and minions
+- Optimize job creation and job return processing; tune MongoDB projections in salt event handlers
+- Move task-filling notification to a dedicated TaskIQ task
+- Split job return arguments from Salt into separate `args` and `kwargs` fields
+- Replace hardcoded `rabbitmq_url` in `Settings` with `RABBIT_SETTINGS.url` from SDK
+- Rename TaskIQ queue `queue_fail` → `queue_common`
+- Update schemas and types across jobs, tasks, pillars, masters, collections and settings for new SDK contract
+- Replace `functools.partial` monkey-patching with `_App` subclass override for `openapi()` in `main.py`
+- Update SDK dependency version (multiple commits)
+
+### Fixed
+
+- Fix and optimize filling tasks by minions
+- Fix `batch_size` usage in tasks
+- Fix creating job returns for missed clients
+- Fix pushing back failed salt events to buffer; add smart TaskIQ task retry
+- Fix catching exceptions on task create
+- Fix `bulk_create` on duplicate or empty data via SDK update
+- Fix MongoDB aggregation pipeline preparation
+
+
 ## [0.2.0] - 2026-04-06
 
 ### Added

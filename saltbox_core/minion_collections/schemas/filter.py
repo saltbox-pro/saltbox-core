@@ -4,7 +4,7 @@ from typing import TypedDict
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from saltbox_core.minion_collections.schemas.minion_schemas import GrainsSchema, MinionModel
+from saltbox_core.minion_collections.schemas.minion import GrainsSchema, MinionModel
 from saltbox_sdk.db.mongo.schemas_base import PipelineMongoQuery
 
 

@@ -8,15 +8,15 @@ from saltbox_core.config import logger
 from saltbox_core.event_bus.redis.masters_bus import send_message_and_wait_response_to_master
 from saltbox_core.masters.schemas.master_schemas import MasterModel
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
-from saltbox_core.minion_collections.schemas.minion_schemas import (
+from saltbox_core.minion_collections.schemas.minion import (
     MinionBulkDeleteBody,
     MinionDetailSchema,
     MinionListBody,
     MinionsActions,
     MinionShortSchema,
 )
-from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
-from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
+from saltbox_core.minion_collections.services.collection import CollectionService, get_collection_service
+from saltbox_core.minion_collections.services.minion import MinionService, get_minion_service
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig

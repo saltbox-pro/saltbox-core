@@ -12,7 +12,7 @@ from saltbox_core.jobs.schemas.job_return_schemas import JobReturnModel, JobRetu
 from saltbox_core.jobs.schemas.job_schemas import JobForJobReturnSaltHandlerSchema
 from saltbox_core.jobs.services.job_return_service import JobReturnService
 from saltbox_core.jobs.services.job_services import JobService
-from saltbox_core.minion_collections.services.minion_service import MinionService
+from saltbox_core.minion_collections.services.minion import MinionService
 from saltbox_core.salt.exceptions import StopProcessing
 from saltbox_core.salt.handlers.base_handler import MessageDataType
 from saltbox_core.salt.handlers.base_job_handler import BaseJobMessageHandler

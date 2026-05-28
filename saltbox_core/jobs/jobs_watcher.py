@@ -14,10 +14,10 @@ from saltbox_core.jobs.services.job_sc_service import JobSchemaService
 from saltbox_core.jobs.services.job_services import JobService
 from saltbox_core.masters.repositories.master_repository import MasterRepository
 from saltbox_core.masters.services.master_service import MasterService
-from saltbox_core.minion_collections.repositories.collection_repository import CollectionRepository
-from saltbox_core.minion_collections.repositories.minion_repository import MinionRepository
-from saltbox_core.minion_collections.services.collection_service import CollectionService
-from saltbox_core.minion_collections.services.minion_service import MinionService
+from saltbox_core.minion_collections.repositories.collection import CollectionRepository
+from saltbox_core.minion_collections.repositories.minion import MinionRepository
+from saltbox_core.minion_collections.services.collection import CollectionService
+from saltbox_core.minion_collections.services.minion import MinionService
 from saltbox_core.tasks.repositories.task import TaskRepository
 from saltbox_core.tasks.repositories.tasks_minion import TaskMinionRepository
 from saltbox_core.tasks.repositories.tasks_status import TaskStatusRepository

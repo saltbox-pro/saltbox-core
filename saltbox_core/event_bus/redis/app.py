@@ -22,13 +22,10 @@ from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.masters.repositories.master_repository import MasterRepository, get_master_repository
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
-from saltbox_core.minion_collections.repositories.collection_repository import (
-    CollectionRepository,
-    get_collection_repository,
-)
-from saltbox_core.minion_collections.repositories.minion_repository import MinionRepository, get_minion_repository
-from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
-from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
+from saltbox_core.minion_collections.repositories.collection import CollectionRepository, get_collection_repository
+from saltbox_core.minion_collections.repositories.minion import MinionRepository, get_minion_repository
+from saltbox_core.minion_collections.services.collection import CollectionService, get_collection_service
+from saltbox_core.minion_collections.services.minion import MinionService, get_minion_service
 from saltbox_core.pillars.repository import PillarRepository, get_pillar_repository
 from saltbox_core.pillars.services.pillar import PillarService, get_pillar_service
 from saltbox_core.pillars.services.pillar_crypto import PillarCryptoService, get_pillar_crypto_service

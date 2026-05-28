@@ -7,9 +7,9 @@ from fastapi import Depends
 from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
 
 from saltbox_core.config import logger
-from saltbox_core.minion_collections.repositories.minion_repository import MinionRepository, get_minion_repository
-from saltbox_core.minion_collections.schemas.filter_schemas import UniqueGrainValuesResponse
-from saltbox_core.minion_collections.schemas.minion_schemas import (
+from saltbox_core.minion_collections.repositories.minion import MinionRepository, get_minion_repository
+from saltbox_core.minion_collections.schemas.filter import UniqueGrainValuesResponse
+from saltbox_core.minion_collections.schemas.minion import (
     GrainsSchema,
     MinionCreateSchema,
     MinionIDs,

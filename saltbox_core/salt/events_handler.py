@@ -11,10 +11,10 @@ from saltbox_core.jobs.services.job_sc_service import get_job_schema_service
 from saltbox_core.jobs.services.job_services import get_job_service
 from saltbox_core.masters.repositories.master_repository import get_master_repository
 from saltbox_core.masters.services.master_service import get_master_service
-from saltbox_core.minion_collections.repositories.collection_repository import get_collection_repository
-from saltbox_core.minion_collections.repositories.minion_repository import get_minion_repository
-from saltbox_core.minion_collections.services.collection_service import get_collection_service
-from saltbox_core.minion_collections.services.minion_service import get_minion_service
+from saltbox_core.minion_collections.repositories.collection import get_collection_repository
+from saltbox_core.minion_collections.repositories.minion import get_minion_repository
+from saltbox_core.minion_collections.services.collection import get_collection_service
+from saltbox_core.minion_collections.services.minion import get_minion_service
 from saltbox_core.salt.exceptions import StopProcessing
 from saltbox_core.salt.handlers.base_handler import BaseMessageHandler
 from saltbox_core.salt.handlers.job_error import JobErrorHandler

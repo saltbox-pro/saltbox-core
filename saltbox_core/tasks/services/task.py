@@ -10,9 +10,9 @@ from redis.asyncio import Redis
 from saltbox_core.config import SETTINGS, logger
 from saltbox_core.db.tiq_tasks import send_notify_by_mongo_service
 from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
-from saltbox_core.minion_collections.schemas.collection_schemas import CollectionModel
-from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
-from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
+from saltbox_core.minion_collections.schemas.collection import CollectionModel
+from saltbox_core.minion_collections.services.collection import CollectionService, get_collection_service
+from saltbox_core.minion_collections.services.minion import MinionService, get_minion_service
 from saltbox_core.pillars.services.pillar import PillarService, get_pillar_service
 from saltbox_core.tasks.repositories.task import TaskRepository, get_task_repository
 from saltbox_core.tasks.schemas.task import (

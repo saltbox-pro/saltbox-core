@@ -4,7 +4,7 @@ from typing import ClassVar
 
 import redis.asyncio as aioredis
 
-from saltbox_core.minion_collections.services.minion_service import MinionService
+from saltbox_core.minion_collections.services.minion import MinionService
 from saltbox_core.salt.exceptions import StopProcessing
 from saltbox_core.salt.handlers.base_handler import BaseMessageHandler, MessageDataType
 

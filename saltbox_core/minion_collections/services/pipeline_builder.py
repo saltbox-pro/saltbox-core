@@ -4,7 +4,7 @@ from typing import Any, Union, get_args, get_origin
 
 from saltbox_core.config import logger
 from saltbox_core.minion_collections.exceptions import UnsupportedFieldTypeException
-from saltbox_core.minion_collections.schemas.minion_schemas import GrainsSchema, MinionModel
+from saltbox_core.minion_collections.schemas.minion import GrainsSchema, MinionModel
 
 LIST_HANDLER_FIELDS = [
     'grains.fqdns',

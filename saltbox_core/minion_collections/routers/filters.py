@@ -2,15 +2,15 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from saltbox_core.minion_collections.schemas.filter_schemas import (
+from saltbox_core.minion_collections.schemas.filter import (
     FiltersActions,
     MinionFilterSchema,
     MinionFilterValuesBody,
     UniqueGrainValuesResponse,
 )
-from saltbox_core.minion_collections.schemas.minion_schemas import MinionModel
-from saltbox_core.minion_collections.services.collection_service import CollectionService, get_collection_service
-from saltbox_core.minion_collections.services.minion_service import MinionService, get_minion_service
+from saltbox_core.minion_collections.schemas.minion import MinionModel
+from saltbox_core.minion_collections.services.collection import CollectionService, get_collection_service
+from saltbox_core.minion_collections.services.minion import MinionService, get_minion_service
 from saltbox_core.utilities.model_schema import get_model_schema
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 
