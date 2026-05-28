@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import StrEnum
-from typing import Any
+from typing import Any, ClassVar
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
@@ -137,12 +137,14 @@ class MinionEditableFieldsMixin[T](BaseModel):
     minion_id: str = Field(title='Minion ID')
     master: str = Field(title='Master')
     grains: T = Field(title='Grains')
-    extra_ids: list[PyObjectId] = Field(title='Extra data IDs', alias='_extra', default_factory=list, exclude=True)
+    extra_static: dict[str, Any] = Field(title='Extra static data', default_factory=dict)
     last_activity: TimezoneAwareDatetime | None = Field(title='Last activity', default=None)
 
 
 class MinionAggregatedFieldsMixin(BaseModel):
-    extra: dict = Field(title='Extra data', default_factory=dict)
+    extra_static: ClassVar[dict[str, Any]] = Field(exclude=True)
+    extra_aggregated: ClassVar[dict] = Field(exclude=True)
+    extra: dict = Field(title='Extra aggregated data', default_factory=dict)
 
 
 class MinionReadonlyFieldsMixin(BaseModel):
@@ -167,9 +169,9 @@ class MinionUpdateSchema(MinionEditableFieldsMixin[GrainsSchema]):
 
 class MinionModel(
     CreatedModifiedMixin,
+    MinionAggregatedFieldsMixin,
     MinionReadonlyFieldsMixin,
     MinionEditableFieldsMixin[GrainsSchema],
-    MinionAggregatedFieldsMixin,
     IDMixin,
     BaseModel,
 ):
@@ -195,7 +197,8 @@ class MinionDetailSchema(MinionModel):
 class MinionShortSchema(
     CreatedModifiedMixin, MinionReadonlyFieldsMixin, MinionEditableFieldsMixin[GrainsShortSchema], IDMixin, BaseModel
 ):
-    pass
+    extra_static: ClassVar[dict[str, Any]] = Field(exclude=True)  # type: ignore
+    extra_aggregated: ClassVar[dict] = Field(exclude=True)
 
 
 class MinionTgtOnlySchema(IDMixin):
