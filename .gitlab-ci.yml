@@ -91,7 +91,7 @@ Trigger API Client pipeline:
     MODULE_NAME: saltbox_core
     SALTBOX_ENV_FILE: 'tests/test.env'
   trigger:
-    include: 
+    include:
       - project: 'saltbox/ci-lib'
         file: 'gen-api-client.yml'
     strategy: mirror
