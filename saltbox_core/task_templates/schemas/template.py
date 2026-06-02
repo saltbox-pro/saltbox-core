@@ -76,6 +76,10 @@ class TaskTemplatePublicSchema(CreatedModifiedMixin, IDMixin):
     name: str
 
 
+class TaskTemplatePublicWithContentSchema(TaskTemplatePublicSchema):
+    sls_content: str
+
+
 class TaskTemplateActions(StrEnum):
     LIST = 'list'
     READ = 'read'

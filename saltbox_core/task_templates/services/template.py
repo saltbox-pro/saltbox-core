@@ -10,6 +10,7 @@ from saltbox_core.task_templates.repositories.template import get_task_template_
 from saltbox_core.task_templates.schemas.template import (
     TaskTemplateCreateSchema,
     TaskTemplateModel,
+    TaskTemplatePublicWithContentSchema,
     TaskTemplateUpdateSchema,
 )
 from saltbox_core.tasks.repositories.tasks_template import TaskTemplateRepository
@@ -31,6 +32,30 @@ class TaskTemplateService(
     def __init__(self, repo: TaskTemplateRepository, pillar_repo: PillarRepository) -> None:
         super().__init__(repo)
         self._pillar_repo = pillar_repo
+
+    async def get_with_content(
+        self,
+        tpl_id: PyObjectId,
+        *,
+        session: AsyncClientSession | None = None,
+    ) -> TaskTemplatePublicWithContentSchema:
+        tpl = await self.get(query={'_id': tpl_id}, session=session)
+
+        sls_file = SETTINGS.salt_modules_serve_dir / tpl.sls_rel_path
+        logger.debug('Attempting to read SLS file: %s', sls_file)
+        try:
+            sls_content = sls_file.read_text()
+        except Exception as e:
+            logger.error('Failed to read SLS file %s: %s', sls_file, e)
+            sls_content = ''
+
+        return TaskTemplatePublicWithContentSchema.model_validate(
+            {
+                **tpl.model_dump(),
+                'sls_content': sls_content,
+                '_id': tpl.id,
+            }
+        )
 
     @override
     async def delete(
