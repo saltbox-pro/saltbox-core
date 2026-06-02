@@ -18,9 +18,11 @@ from saltbox_core.masters.repositories.master_repository import get_master_repos
 from saltbox_core.masters.services.master_service import get_master_service
 from saltbox_core.minion_collections.repositories.collection import get_collection_repository
 from saltbox_core.minion_collections.repositories.extra_data import get_extra_data_repository
+from saltbox_core.minion_collections.repositories.extra_data_category import get_extra_data_category_repository
 from saltbox_core.minion_collections.repositories.minion import get_minion_repository
 from saltbox_core.minion_collections.services.collection import get_collection_service
 from saltbox_core.minion_collections.services.extra_data import get_extra_data_service
+from saltbox_core.minion_collections.services.extra_data_category import get_extra_data_category_service
 from saltbox_core.minion_collections.services.minion import get_minion_service
 from saltbox_core.tasks.repositories.task import get_task_repository
 from saltbox_core.tasks.repositories.tasks_minion import get_task_minion_repository
@@ -46,9 +48,13 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
     master_service = get_master_service(repo=master_repository)
     collection_repository = get_collection_repository(db=mongo_db)
     collection_service = get_collection_service(repo=collection_repository)
-    extra_data_repository = get_extra_data_repository(db=mongo_db)
+    extra_data_category_repository = get_extra_data_category_repository(db=mongo_db)
+    extra_data_category_service = get_extra_data_category_service(repo=extra_data_category_repository)
+    extra_data_repository = get_extra_data_repository(
+        db=mongo_db, extra_data_category_repository=extra_data_category_repository
+    )
     extra_data_service = get_extra_data_service(repo=extra_data_repository)
-    minion_repository = get_minion_repository(db=mongo_db)
+    minion_repository = get_minion_repository(db=mongo_db, extra_data_repository=extra_data_repository)
     minion_service = get_minion_service(repo=minion_repository)
     job_schema_repository = get_job_schema_repository(db=mongo_db)
     job_schema_service = get_job_schema_service(repo=job_schema_repository)
@@ -85,6 +91,7 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
     context.set_global('mongo_db', mongo_db)
     context.set_global('master_service', master_service)
     context.set_global('collection_service', collection_service)
+    context.set_global('extra_data_category_service', extra_data_category_service)
     context.set_global('extra_data_service', extra_data_service)
     context.set_global('minion_service', minion_service)
     context.set_global('job_schema_service', job_schema_service)
@@ -113,6 +120,8 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
         del minion_repository
         del extra_data_service
         del extra_data_repository
+        del extra_data_category_service
+        del extra_data_category_repository
         del collection_service
         del collection_repository
         del master_service

@@ -5,23 +5,33 @@ from typing import Annotated, Any, ClassVar, cast, overload
 import pymongo
 from fastapi import Depends
 from pymongo.asynchronous.database import AsyncDatabase
+from pymongo.asynchronous.database import AsyncDatabase as MongoAsyncDatabase
 from pymongo.operations import _IndexKeyHint
 
+from saltbox_core.minion_collections.repositories.extra_data import ExtraDataRepository, get_extra_data_repository
 from saltbox_core.minion_collections.schemas.minion import MinionModel
 from saltbox_sdk.db.mongo.aggregations import (
     AddFieldsAggregationStage,
     AggregatedField,
     AggregationsStore,
+    GroupAggregationStage,
     LookupAggregationStage,
     MatchAggregationStage,
+    ProjectAggregationStage,
+    UnsetAggregationStage,
 )
 from saltbox_sdk.db.mongo.config import get_mongo
 from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository, ProjectionModel
-from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 
 
 class MinionRepository(BaseMongoRepository[MinionModel]):
-    def last_activity_seconds_query_override(
+    def __init__(
+        self, database: MongoAsyncDatabase[Any], extra_data_repository: ExtraDataRepository, **kwargs: Any
+    ) -> None:
+        super().__init__(database=database)
+        self.extra_data_repository = extra_data_repository
+
+    async def last_activity_seconds_query_override(
         self, field_name: str, field_match: re.Match, field_value: Any, full_raw_query: dict
     ) -> dict[str, Any]:
         field_name_override = 'last_activity'
@@ -42,15 +52,21 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
         else:
             return {field_name_override: datetime.now(UTC) - timedelta(seconds=float(field_value))}
 
-    def extra_static_query_override(
+    async def extra_static_query_override(
         self, field_name: str, field_match: re.Match, field_value: Any, full_raw_query: dict
     ) -> dict[str, Any]:
         return {f'extra_static.{field_match.group("sub_field")}': field_value}
 
-    def extra_aggregated_query_override(
+    async def extra_aggregated_query_override(
         self, field_name: str, field_match: re.Match, field_value: Any, full_raw_query: dict
     ) -> dict[str, Any]:
-        return {}  # TODO (i.moshkov): Add filtering by aggregated extra data
+        minion_ids = await self.extra_data_repository.get_minion_ids_by_filter(
+            source=field_match.group('source'),
+            name=field_match.group('name'),
+            query={field_match.group('sub_field'): field_value},
+        )
+
+        return {'_id': {'$in': minion_ids}}
 
     @overload
     async def get_by_master_and_id(self, master: str, minion_id: str) -> MinionModel: ...
@@ -70,11 +86,6 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
         else:
             return await self.get(query=query)
 
-    def __prepare_query__(self, query: PyObjectId | dict[str, Any] | None) -> dict[str, Any]:
-        prepared_query = super().__prepare_query__(query=query)
-
-        return prepared_query
-
     class Meta:
         collection_name = 'minions'
         auto_now_add_fields: ClassVar[list[str]] = ['created']
@@ -82,7 +93,9 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
         query_overrides: ClassVar[dict[re.Pattern, str]] = {
             re.compile(r'^last_activity_seconds$'): 'last_activity_seconds_query_override',
             re.compile(r'^extra\.static\.(?P<sub_field>.+)$'): 'extra_static_query_override',
-            re.compile(r'^extra\.aggregated\.(?P<sub_field>.+)$'): 'extra_aggregated_query_override',
+            re.compile(
+                r'^extra\.aggregated\.(?P<source>[^.]+)\.(?P<name>[^.]+)\.(?P<sub_field>.+)$'
+            ): 'extra_aggregated_query_override',
         }
         collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
             'minion_id_master_unique_index_asc': [('minion_id', pymongo.ASCENDING), ('master', pymongo.ASCENDING)],
@@ -98,42 +111,45 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
                     stages=[
                         LookupAggregationStage(
                             from_collection='minion_extra_data',
-                            let={'minion_id_str': {'$toString': '$_id'}},
+                            let={'minion_id': '$_id'},
                             pipeline=[
+                                MatchAggregationStage(query={'$expr': {'$in': ['$$minion_id', '$minions.minion_id']}}),
                                 AddFieldsAggregationStage(
                                     fields={
                                         '_minion_entry': {
                                             '$first': {
                                                 '$filter': {
-                                                    'input': {'$objectToArray': '$minions'},
+                                                    'input': '$minions',
                                                     'as': 'm',
-                                                    'cond': {'$eq': ['$$m.k', '$$minion_id_str']},
+                                                    'cond': {'$eq': ['$$m.minion_id', '$$minion_id']},
                                                 }
                                             }
                                         }
                                     }
                                 ),
-                                MatchAggregationStage(query={'$expr': {'$ne': ['$_minion_entry', None]}}),
                                 AddFieldsAggregationStage(
-                                    fields={'_merged_value': {'$mergeObjects': ['$data', '$_minion_entry.v']}}
+                                    fields={'_merged_value': {'$mergeObjects': ['$data', '$_minion_entry.data']}}
                                 ),
-                                {
-                                    '$group': {
-                                        '_id': {'source': '$source', 'name': '$name'},
+                                GroupAggregationStage(
+                                    group_id={'source': '$source', 'name': '$name'},
+                                    fields={
                                         'values': {'$push': '$_merged_value'},
-                                    }
-                                },
-                                {
-                                    '$group': {
-                                        '_id': '$_id.source',
+                                    },
+                                ),
+                                GroupAggregationStage(
+                                    group_id='$_id.source',
+                                    fields={
                                         'names': {'$push': {'k': '$_id.name', 'v': '$values'}},
-                                    }
-                                },
-                                {'$project': {'_id': 0, 'k': '$_id', 'v': {'$arrayToObject': '$names'}}},
+                                    },
+                                ),
+                                ProjectAggregationStage(
+                                    fields={'_id': 0, 'k': '$_id', 'v': {'$arrayToObject': '$names'}}
+                                ),
                             ],
                             as_field='_extra_grouped',
                         ),
                         AddFieldsAggregationStage(fields={'extra_aggregated': {'$arrayToObject': '$_extra_grouped'}}),
+                        UnsetAggregationStage(fields=['_extra_grouped']),
                     ],
                 ),
                 AggregatedField(
@@ -152,5 +168,8 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
         )
 
 
-def get_minion_repository(db: Annotated[AsyncDatabase, Depends(get_mongo)]) -> MinionRepository:
-    return MinionRepository(db)
+def get_minion_repository(
+    db: Annotated[AsyncDatabase, Depends(get_mongo)],
+    extra_data_repository: Annotated[ExtraDataRepository, Depends(get_extra_data_repository)],
+) -> MinionRepository:
+    return MinionRepository(database=db, extra_data_repository=extra_data_repository)

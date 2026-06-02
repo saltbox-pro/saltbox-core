@@ -62,7 +62,7 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
     async def get_unique_grain_values_by_field(
         self, field: str, query: dict[str, Any], skip: int = 0, limit: int | None = None
     ) -> UniqueGrainValuesResponse:
-        query = self.repo.__prepare_query__(query)
+        query = await self.repo.__prepare_query__(query)
         pipeline_builder = MongoPipelineBuilder(field, query, skip, limit)
         pipeline = pipeline_builder.build()
         full_pipeline = [stage for stage in pipeline if '$skip' not in stage and '$limit' not in stage]
