@@ -1,43 +1,77 @@
+from typing import Any
+
 from faststream import Logger
 from faststream.rabbit import RabbitRouter
-from faststream.rabbit.annotations import ContextRepo
+from faststream.rabbit.annotations import ContextRepo, RabbitMessage
 
+from saltbox_core.minion_collections.services.extra_data import ExtraDataService
 from saltbox_core.minion_collections.services.minion import MinionService
-from saltbox_core.minion_collections.services.minion_extra_data import MinionExtraDataItemService
 from saltbox_sdk.db.mongo.repository_base import MongoUpdateOperator
 from saltbox_sdk.db.mongo.schemas_base import EmptyModel
 from saltbox_sdk.event_bus.schemas import (
     MinionAddOrUpdateExtraDataRequestMessage,
+    MinionExtraDataType,
     MinionRemoveExtraDataRequestMessage,
 )
+from saltbox_sdk.exceptions import ObjectNotFoundException
+from saltbox_sdk.utilities.helpers import utc_now
 
 router = RabbitRouter(prefix='minions_')
 
 
 @router.subscriber('add_extra_data')
 async def add_extra_data(
-    message: MinionAddOrUpdateExtraDataRequestMessage, context: ContextRepo, logger: Logger
+    message: MinionAddOrUpdateExtraDataRequestMessage, msg: RabbitMessage, context: ContextRepo, logger: Logger
 ) -> None:
     if message.target != 'core':
         return None
 
+    await msg.ack()
+
     minion_service: MinionService = context.get('minion_service')
-    minion_extra_data_item_service: MinionExtraDataItemService = context.get('minion_extra_data_item_service')
+    extra_data_service: ExtraDataService = context.get('extra_data_service')
 
-    data_items = [
-        await minion_extra_data_item_service.get_or_create(
-            source=message.sender, name=message.category_name, value=value, projection_model=EmptyModel
+    try:
+        minion = await minion_service.get(
+            query={'minion_id': message.minion_id, 'master': message.master}, projection_model=EmptyModel
         )
-        for value in message.values
-    ]
+        minion_id = minion.id
+    except ObjectNotFoundException:
+        return None
 
-    await minion_service.update(
-        query={'minion_id': message.minion_id, 'master': message.master},
-        data={
-            '_extra': {'$each': [data_item.id for data_item in data_items]},
-        },
-        operator=MongoUpdateOperator.add_to_set,
-    )
+    static_items: dict[str, list[Any]] = {}
+    updated_categories: list[str] = []
+    updated_at = utc_now()
+
+    for category_data in message.data_list:
+        updated_categories.append(category_data.category_name)
+
+        if category_data.category_type == MinionExtraDataType.STATIC:
+            static_items.setdefault(f'extra_static.{message.sender}.{category_data.category_name}', []).extend(
+                [
+                    {**value.category_data, **value.minion_data, 'updated_at': updated_at}
+                    for value in category_data.items
+                ]
+            )
+        elif category_data.category_type == MinionExtraDataType.AGGREGATED:
+            # TODO (i.moshkov): Remove old category extra data for this minion!!!
+
+            # TODO (i.moshkov): May use bulk ops?
+            for extra_data_item in category_data.items:
+                await extra_data_service.update_or_create(
+                    query={
+                        'source': message.sender,
+                        'name': category_data.category_name,
+                        'data': extra_data_item.category_data,
+                    },
+                    data={f'minions.{minion_id!s}': {**extra_data_item.minion_data, 'updated_at': updated_at}},
+                )
+
+    try:
+        if static_items:
+            await minion_service.update(query=minion_id, data=static_items)
+    except ObjectNotFoundException:
+        return None
 
     return None
 

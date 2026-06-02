@@ -21,17 +21,24 @@ include:
     file: 'def-branch-merge-guard.yml'
 
 
-.lint-job:
-  stage: lint
+.python-base:
   variables:
     PIP_CACHE_DIR: '$CI_PROJECT_DIR/.cache/pip'
+    APK_CACHE_DIR: '$CI_PROJECT_DIR/.cache/apk'
   image: python:3.12-alpine
   before_script:
-    - apk add git
+    - mkdir --parents "$APK_CACHE_DIR"
+    - apk add --cache-dir "$APK_CACHE_DIR" git
     - pip3 install -e .[dev]
   cache:
     paths:
-      - '.cache/pip/'
+      - '$PIP_CACHE_DIR'
+      - '$APK_CACHE_DIR'
+
+
+.lint-job:
+  stage: lint
+  extends: .python-base
   rules:
     - if: $LINTING_ENABLED == 'true'
 
@@ -48,22 +55,12 @@ Mypy:
 
 Pytest:
   stage: test
+  extends: .python-base
   variables:
-    PIP_CACHE_DIR: '$CI_PROJECT_DIR/.cache/pip'
-    APK_CACHE_DIR: '$CI_PROJECT_DIR/.cache/apk'
     SALTBOX_ENV_FILE: 'tests/test.env'
-  image: python:3.12-alpine
-  before_script:
-    - mkdir --parents "$APK_CACHE_DIR"
-    - apk add --cache-dir "$APK_CACHE_DIR" git
-    - pip3 install -e .[dev]
   script:
     - pytest
   coverage: '/^TOTAL.+?(\d+\%)$/'
-  cache:
-    paths:
-      - '$PIP_CACHE_DIR'
-      - '$APK_CACHE_DIR'
   rules:
     - if: $TESTING_ENABLED == 'true'
 
@@ -94,7 +91,7 @@ Trigger API Client pipeline:
     MODULE_NAME: saltbox_core
     SALTBOX_ENV_FILE: 'tests/test.env'
   trigger:
-    include: 
+    include:
       - project: 'saltbox/ci-lib'
         file: 'gen-api-client.yml'
     strategy: mirror

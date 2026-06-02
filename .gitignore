@@ -22,4 +22,5 @@ openapi.json
 /.idea
 
 # Other
+/.gitlab-ci-local
 /_*
