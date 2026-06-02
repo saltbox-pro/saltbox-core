@@ -88,7 +88,21 @@ class TemplateSourceService(
             await self._file_service.delete_many(query=delete_query, session=s)
 
             local_path = Path(SETTINGS.local_repos_dir) / source.local_path
-            if local_path and local_path.exists() and local_path.is_dir():
+            if local_path.exists() and local_path.is_dir():
+                src_root = local_path / source.root
+                if src_root.exists() and src_root.is_dir():
+                    serve_dir = SETTINGS.salt_modules_serve_dir
+                    for entry in src_root.iterdir():
+                        serve_entry = serve_dir / entry.name
+                        if serve_entry.exists() or serve_entry.is_symlink():
+                            try:
+                                if serve_entry.is_dir() and not serve_entry.is_symlink():
+                                    shutil.rmtree(serve_entry)
+                                else:
+                                    serve_entry.unlink(missing_ok=True)
+                            except OSError as e:
+                                logger.error('Failed to remove entry from serve_dir: %s', e)
+                                raise
                 try:
                     shutil.rmtree(local_path)
                 except OSError as e:

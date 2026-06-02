@@ -64,7 +64,7 @@ class TemplateSourceCreateSchema(BaseModel):
     repo_url: PathLike | None = Field(default=None, title='Git repository URL')
     repo_user: str | None = Field(default=None, title='Git user (basic auth)')
     repo_pass: SecretStr | None = Field(default=None, title='Git password (basic auth)')
-    branch: str | None = Field(default='master', max_length=100, title='Git branch')
+    branch: str | None = Field(default=None, max_length=100, title='Git branch')
 
     @field_serializer('repo_pass')
     def serialize_repo_pass(self, value: SecretStr | None) -> str | None:
@@ -96,7 +96,7 @@ class TemplateSourceModel(CreatedModifiedMixin, IDMixin):
     repo_url: PathLike | None = Field(default=None, title='Git repository URL')
     repo_user: str | None = Field(default=None, title='Git user (basic auth)')
     repo_pass: SecretStr | None = Field(default=None, title='Git password (basic auth)')
-    branch: str = Field(default='master', max_length=100, title='Git branch')
+    branch: str | None = Field(default=None, max_length=100, title='Git branch')
     local_path: str = Field(default='', max_length=32, pattern=r'^[a-z0-9_\-]*$', title='Local storage path')
     root: str = Field(default='', title='Path in repository to serve for masters')
     state: SourceState = Field(title='State of the template source')
@@ -117,7 +117,7 @@ class TemplateSourcePublicSchema(CreatedModifiedMixin, IDMixin):
     repo_url: PathLike | None = None
     repo_user: str | None = None
     repo_pass: SecretStr | None = None
-    branch: str
+    branch: str | None = None
     local_path: str
     state: SourceState
     current_operation: SourceOperation | None

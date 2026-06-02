@@ -1,9 +1,10 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, status
+from fastapi import APIRouter, Body, Depends, File, Form, UploadFile, status
 
 from saltbox_core.config import logger
 from saltbox_core.task_templates.schemas.source import (
+    SourceType,
     TemplateSourceActions,
     TemplateSourceCreateSchema,
     TemplateSourceListBody,
@@ -17,11 +18,47 @@ from saltbox_core.task_templates.tiq_tasks import (
     source_remove_task,
     source_sync_task,
 )
+from saltbox_core.task_templates.utils.orchestrator import SyncOrchestrator, get_sync_orchestrator
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 
 router = APIRouter(prefix='/task-tpl-sources', tags=['Task Template Sources'])
+
+
+@router.post(
+    '/create-from-archive',
+    operation_id='template_source_create_from_archive',
+    openapi_extra=GatewayEndpointConfig(
+        policy='public',
+        action=TemplateSourceActions.CREATE,
+    ).model_dump(by_alias=True),
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=TemplateSourcePublicSchema,
+)
+async def source_create_from_archive(
+    name: Annotated[str, Form(description='Name of the template source')],
+    description: Annotated[str, Form(description='Description of the template source')],
+    file: Annotated[UploadFile, File(description='Archive to upload')],
+    service: Annotated[TemplateSourceService, Depends(get_tpl_source_service)],
+    orchestrator: Annotated[SyncOrchestrator, Depends(get_sync_orchestrator)],
+) -> TemplateSourcePublicSchema:
+    source_in = TemplateSourceCreateSchema(
+        name=name,
+        description=description,
+        source_type=SourceType.ARCHIVE_BUNDLE,
+        branch=None,
+    )
+
+    oid = await service.create(source_in)
+    created = await service.get(oid, projection_model=TemplateSourcePublicSchema)
+
+    await orchestrator.save_and_unpack_archive(file, local_path=created.local_path)
+
+    task = await source_discover_task.kiq(source_id=str(oid))
+    logger.debug('Created task %s to discover source %s', task.task_id, oid)
+
+    return created
 
 
 @router.post(

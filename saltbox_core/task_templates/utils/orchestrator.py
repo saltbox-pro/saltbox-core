@@ -4,11 +4,14 @@ import json
 import os
 import re
 import shutil
+import tempfile
+import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
 
-from fastapi import Depends
+import anyio
+from fastapi import Depends, UploadFile
 from git import Repo
 from ruamel.yaml import YAML
 from ruamel.yaml.scanner import ScannerError
@@ -19,7 +22,13 @@ from saltbox_core.event_bus.redis.app import default_master_broker
 from saltbox_core.event_bus.redis.masters_bus import send_message_and_wait_response_to_master
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_core.pillars.services.pillar import PillarService, get_pillar_service
-from saltbox_core.task_templates.exceptions import RepoURLMissingException
+from saltbox_core.task_templates.exceptions import (
+    FileNameMissingException,
+    FileTooLargeException,
+    FileTypeNotSupportedException,
+    FileUploadException,
+    RepoURLMissingException,
+)
 from saltbox_core.task_templates.schemas.source import SourceOperation, SourceState, SourceType
 from saltbox_core.task_templates.schemas.sshfs_file import (
     ManifestDigest,
@@ -31,6 +40,7 @@ from saltbox_core.task_templates.schemas.template import TaskTemplateCreateSchem
 from saltbox_core.task_templates.services.source import TemplateSourceService, get_tpl_source_service
 from saltbox_core.task_templates.services.sshfs_file import SshfsFileService, get_sshfs_file_service
 from saltbox_core.task_templates.services.template import TaskTemplateService, get_task_tpl_service
+from saltbox_core.task_templates.utils.file_config import file_storage_config
 from saltbox_core.task_templates.utils.manifest import SourceServeUpdater, SshfsSync, get_sshfs_sync
 from saltbox_core.utilities.filesystem import TreePermissionsApplicator
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
@@ -337,6 +347,61 @@ class SyncOrchestrator:
         app = TreePermissionsApplicator(SETTINGS.sshfs_permissions)
         for path in SETTINGS.sshfs_dir.glob('*'):
             app.apply_to(path)
+
+    @staticmethod
+    def _unpack_archive_strip_root(archive_path: Path, dest_path: Path, tmp_base: Path) -> None:
+        """Unpack archive into dest_path, stripping the single top-level root directory if present."""
+        tmp_extract = Path(tempfile.mkdtemp(dir=tmp_base))
+        try:
+            shutil.unpack_archive(str(archive_path), str(tmp_extract))
+            extracted_entries = list(tmp_extract.iterdir())
+            root_dir = (
+                extracted_entries[0] if len(extracted_entries) == 1 and extracted_entries[0].is_dir() else tmp_extract
+            )
+            for item in root_dir.iterdir():
+                shutil.move(str(item), str(dest_path / item.name))
+        except Exception as e:
+            raise FileUploadException(detail=f'Failed to unpack archive: {e}') from e
+        finally:
+            shutil.rmtree(tmp_extract, ignore_errors=True)
+
+    async def save_and_unpack_archive(self, file: UploadFile, local_path: str) -> None:
+        if file.filename is None or file.filename == '':
+            raise FileNameMissingException()
+        if not any(file.filename.endswith(ext) for ext in file_storage_config.allowed_archive_types):
+            raise FileTypeNotSupportedException(ext=Path(file.filename).suffix)
+
+        ext = Path(file.filename).suffix or '.bin'
+        safe_name = f'{uuid.uuid4()}{ext}'
+        tmp_path = SETTINGS.local_repos_dir / file_storage_config.tmp_dir
+        tmp_path.mkdir(parents=True, exist_ok=True)
+        tmp_file_path = tmp_path / safe_name
+
+        dest_path = SETTINGS.local_repos_dir / local_path
+        dest_path.mkdir(parents=True, exist_ok=True)
+
+        logger.debug('Saving uploaded file to temporary path: %s', tmp_path)
+
+        total_size = 0
+        try:
+            async with await anyio.open_file(tmp_file_path, 'wb') as f:
+                while chunk := await file.read(file_storage_config.chunk_size):
+                    total_size += len(chunk)
+                    if total_size > file_storage_config.max_size:
+                        raise FileTooLargeException(size=total_size, max_size=file_storage_config.max_size)
+                    await f.write(chunk)
+        except Exception as exc:
+            if tmp_file_path.exists():
+                await anyio.Path(tmp_file_path).unlink()
+            raise FileUploadException(detail=str(exc)) from exc
+
+        logger.debug('File exists on disk: %s', tmp_file_path.exists())
+
+        await asyncio.to_thread(self._unpack_archive_strip_root, tmp_file_path, dest_path, tmp_path)
+        logger.debug('Archive unpacked successfully')
+        # Remove the uploaded archive file
+        await anyio.Path(tmp_file_path).unlink()
+        logger.debug('Temporary archive file removed')
 
     async def discover(self, source_id: PyObjectId) -> dict[str, Any]:
         source = await self._source_service.get(source_id)
