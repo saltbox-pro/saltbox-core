@@ -22,7 +22,7 @@ router = RabbitRouter(prefix='minions_')
 
 
 @router.subscriber('add_extra_data')
-async def add_extra_data(
+async def add_extra_data(  # noqa: C901
     message: MinionAddOrUpdateExtraDataRequestMessage, msg: RabbitMessage, context: ContextRepo, logger: Logger
 ) -> None:
     if message.target != 'core':
@@ -60,15 +60,18 @@ async def add_extra_data(
             )
         elif category_data.category_type == MinionExtraDataType.AGGREGATED:
             for extra_data_item in category_data.items:
-                await extra_data_service.update(
-                    query={
-                        'source': message.sender,
-                        'name': category_data.category_name,
-                        'data': extra_data_item.category_data,
-                    },
-                    data={'minions': {'minion_id': minion_id}},
-                    operator=MongoUpdateOperator.pull,
-                )
+                try:
+                    await extra_data_service.update(
+                        query={
+                            'source': message.sender,
+                            'name': category_data.category_name,
+                            'data': extra_data_item.category_data,
+                        },
+                        data={'minions': {'minion_id': minion_id}},
+                        operator=MongoUpdateOperator.pull,
+                    )
+                except ObjectNotFoundException:
+                    continue
 
             # TODO (i.moshkov): May use bulk ops?
             for extra_data_item in category_data.items:
