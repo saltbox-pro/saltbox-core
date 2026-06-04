@@ -7,6 +7,13 @@ from pymongo.asynchronous.database import AsyncDatabase
 from pymongo.operations import _IndexKeyHint
 
 from saltbox_core.task_templates.schemas.template import TaskTemplateModel
+from saltbox_sdk.db.mongo.aggregations import (
+    AddFieldsAggregationStage,
+    AggregatedField,
+    AggregationsStore,
+    LookupAggregationStage,
+    UnwindAggregationStage,
+)
 from saltbox_sdk.db.mongo.config import get_mongo
 from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
 
@@ -24,6 +31,23 @@ class TaskTemplateRepository(BaseMongoRepository[TaskTemplateModel]):
         collection_index_options: ClassVar[dict[str, dict[str, Any]]] = {
             'name_unique_index': {'unique': True},
         }
+        aggregations: ClassVar[AggregationsStore] = AggregationsStore(
+            aggregations=[
+                AggregatedField(
+                    field_name='local_path',
+                    stages=[
+                        LookupAggregationStage(
+                            from_collection='task_tpl_sources',
+                            local_field='source_id',
+                            foreign_field='_id',
+                            as_field='_source',
+                        ),
+                        UnwindAggregationStage(path='$_source', preserve_null_and_empty_arrays=True),
+                        AddFieldsAggregationStage(fields={'local_path': '$_source.local_path'}),
+                    ],
+                ),
+            ]
+        )
 
 
 def get_task_template_repository(db: Annotated[AsyncDatabase, Depends(get_mongo)]) -> TaskTemplateRepository:

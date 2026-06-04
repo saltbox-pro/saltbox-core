@@ -197,3 +197,40 @@ async def create_tpl_from_raw_task(
             raise
 
     return {'status': 'created'}
+
+
+@broker.task(queue_name=queue_default.name)
+async def update_tpl_from_raw_task(
+    source_id: str,
+    template_id: str,
+    content: str,
+    progress: ProgressTracker[Any] = TaskiqDepends(),
+    orchestrator: SyncOrchestrator = TaskiqDepends(get_sync_orchestrator),
+    redis: Redis = TaskiqDepends(get_redis),
+) -> dict[str, Any]:
+    lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=60, prefix='template_source')
+    lock = lock_factory.create(source_id)
+    logger.info('is_locked: %s', await lock.locked())
+
+    if await lock.locked():
+        msg = f'Source {source_id} is already being fetched by another task.'
+        logger.warning(msg)
+        raise TaskTemplateSourceLockException(source_id=source_id)
+
+    async with lock:
+        await progress.set_progress(TaskState.STARTED, 'Update template from raw started')
+        try:
+            await orchestrator.update_template_from_raw(PyObjectId(template_id), content)
+            await progress.set_progress(TaskState.SUCCESS, 'Update template from raw successful')
+        except Exception:
+            await progress.set_progress(TaskState.FAILURE, 'Update template from raw failed')
+            raise
+
+        try:
+            await orchestrator.discover(PyObjectId(source_id))
+            await progress.set_progress(TaskState.SUCCESS, 'Fetch successful')
+        except Exception:
+            await progress.set_progress(TaskState.FAILURE, 'Fetch failed')
+            raise
+
+    return {'status': 'updated'}

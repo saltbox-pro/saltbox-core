@@ -446,7 +446,7 @@ class SyncOrchestrator:
     async def prepare(self, source_id: PyObjectId) -> None:
         # source = await self._source_service.get(source_id)
 
-        await self._source_service.update(source_id, {'current_operation': SourceOperation.PREPARE_SLS})
+        await self._source_service.update(source_id, {'current_operation': SourceOperation.PREPARE_TEMPLATES})
         try:
             logger.info('Syncing templates to serve dir...')
             await self._serve_templates_to_serve_dir()
@@ -565,6 +565,21 @@ class SyncOrchestrator:
             logger.error('Failed to write template file: %s', e)
             raise
         await self._source_service.update(source_id, {'state': SourceState.PENDING})
+
+    async def update_template_from_raw(self, template_id: PyObjectId, content: str) -> None:
+        template = await self._template_service.get(template_id)
+
+        await self._source_service.update(
+            template.source_id,
+            {'state': SourceState.PENDING, 'current_operation': SourceOperation.UPDATE_TEMPLATE_CONTENT},
+        )
+        local_path = Path(SETTINGS.local_repos_dir) / template.local_path / template.sls_rel_path
+
+        try:
+            local_path.write_text(content, encoding='utf-8')
+        except OSError as e:
+            logger.error('Failed to write template file: %s', e)
+            raise
 
 
 async def get_sync_orchestrator(

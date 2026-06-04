@@ -42,7 +42,9 @@ class SourceOperation(StrEnum):
     """Operation in progress for the template source. None means no operation in progress."""
 
     DISCOVER = 'discover'
-    PREPARE_SLS = 'prepare_sls'
+    PREPARE_TEMPLATES = 'prepare_templates'
+    UPDATE_TEMPLATE_CONTENT = 'update_template_content'
+    DELETE_TEMPLATE = 'delete_template'
     PREPARE_FILES = 'prepare_files'
     ADD_USER_FILE = 'add_user_file'
     SYNC = 'sync'

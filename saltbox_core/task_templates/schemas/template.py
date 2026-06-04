@@ -36,6 +36,10 @@ class TaskTemplateFromRawCreateSchema(BaseModel):
     content: str
 
 
+class TaskTemplateFromRawUpdateSchema(BaseModel):
+    content: str
+
+
 class TaskTemplateUpdateSchema(BaseModel):
     pass
 
@@ -55,6 +59,7 @@ class TaskTemplateModel(CreatedModifiedMixin, IDMixin):
     secret_pillars: list[str] | None = Field(title='Secret pillar names', default=None)
     json_schema: dict = Field(title='JSON schema', default_factory=dict)
     ui_schema: dict = Field(title='UI schema', default_factory=dict)
+    local_path: str = Field(title='Source local path')
 
 
 class TaskTemplateSyncSchema(BaseModel):
@@ -84,3 +89,5 @@ class TaskTemplateActions(StrEnum):
     LIST = 'list'
     READ = 'read'
     CREATE = 'create'
+    UPDATE = 'update'
+    DELETE = 'delete'
