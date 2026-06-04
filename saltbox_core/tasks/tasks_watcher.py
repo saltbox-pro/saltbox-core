@@ -12,6 +12,8 @@ from saltbox_core.jobs.services.job_services import JobService
 from saltbox_core.masters.repositories.master_repository import MasterRepository
 from saltbox_core.masters.services.master_service import MasterService
 from saltbox_core.minion_collections.repositories.collection import CollectionRepository
+from saltbox_core.minion_collections.repositories.extra_data import ExtraDataRepository
+from saltbox_core.minion_collections.repositories.extra_data_category import ExtraDataCategoryRepository
 from saltbox_core.minion_collections.repositories.minion import MinionRepository
 from saltbox_core.minion_collections.services.collection import CollectionService
 from saltbox_core.minion_collections.services.minion import MinionService
@@ -40,7 +42,11 @@ class TasksWatcher:
         self.job_schema_repository = JobSchemaRepository(self.db)
         self.master_repository = MasterRepository(self.db)
         self.collections_repository = CollectionRepository(self.db)
-        self.minions_repository = MinionRepository(self.db)
+        self.extra_data_category_repository = ExtraDataCategoryRepository(self.db)
+        self.extra_data_repository = ExtraDataRepository(
+            self.db, extra_data_category_repository=self.extra_data_category_repository
+        )
+        self.minions_repository = MinionRepository(self.db, extra_data_repository=self.extra_data_repository)
         self.task_repository = TaskRepository(self.db)
         self.task_status_repository = TaskStatusRepository(self.db)
         self.task_minion_repository = TaskMinionRepository(self.db)

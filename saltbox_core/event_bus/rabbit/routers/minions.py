@@ -4,7 +4,9 @@ from faststream import Logger
 from faststream.rabbit import RabbitRouter
 from faststream.rabbit.annotations import ContextRepo, RabbitMessage
 
+from saltbox_core.minion_collections.schemas.extra_data import ExtraDataForMinion
 from saltbox_core.minion_collections.services.extra_data import ExtraDataService
+from saltbox_core.minion_collections.services.extra_data_category import ExtraDataCategoryService
 from saltbox_core.minion_collections.services.minion import MinionService
 from saltbox_sdk.db.mongo.repository_base import MongoUpdateOperator
 from saltbox_sdk.db.mongo.schemas_base import EmptyModel
@@ -20,7 +22,7 @@ router = RabbitRouter(prefix='minions_')
 
 
 @router.subscriber('add_extra_data')
-async def add_extra_data(
+async def add_extra_data(  # noqa: C901
     message: MinionAddOrUpdateExtraDataRequestMessage, msg: RabbitMessage, context: ContextRepo, logger: Logger
 ) -> None:
     if message.target != 'core':
@@ -29,6 +31,7 @@ async def add_extra_data(
     await msg.ack()
 
     minion_service: MinionService = context.get('minion_service')
+    extra_data_category_service: ExtraDataCategoryService = context.get('extra_data_category_service')
     extra_data_service: ExtraDataService = context.get('extra_data_service')
 
     try:
@@ -40,11 +43,13 @@ async def add_extra_data(
         return None
 
     static_items: dict[str, list[Any]] = {}
-    updated_categories: list[str] = []
     updated_at = utc_now()
 
     for category_data in message.data_list:
-        updated_categories.append(category_data.category_name)
+        await extra_data_category_service.update_or_create(
+            query={'source': message.sender, 'name': category_data.category_name},
+            data={'category_fields': category_data.category_fields, 'minion_fields': category_data.minion_fields},
+        )
 
         if category_data.category_type == MinionExtraDataType.STATIC:
             static_items.setdefault(f'extra_static.{message.sender}.{category_data.category_name}', []).extend(
@@ -54,7 +59,19 @@ async def add_extra_data(
                 ]
             )
         elif category_data.category_type == MinionExtraDataType.AGGREGATED:
-            # TODO (i.moshkov): Remove old category extra data for this minion!!!
+            for extra_data_item in category_data.items:
+                try:
+                    await extra_data_service.update(
+                        query={
+                            'source': message.sender,
+                            'name': category_data.category_name,
+                            'data': extra_data_item.category_data,
+                        },
+                        data={'minions': {'minion_id': minion_id}},
+                        operator=MongoUpdateOperator.pull,
+                    )
+                except ObjectNotFoundException:
+                    continue
 
             # TODO (i.moshkov): May use bulk ops?
             for extra_data_item in category_data.items:
@@ -64,7 +81,12 @@ async def add_extra_data(
                         'name': category_data.category_name,
                         'data': extra_data_item.category_data,
                     },
-                    data={f'minions.{minion_id!s}': {**extra_data_item.minion_data, 'updated_at': updated_at}},
+                    data={
+                        'minions': ExtraDataForMinion(
+                            minion_id=minion_id, data={**extra_data_item.minion_data, 'updated_at': updated_at}
+                        ).model_dump()
+                    },
+                    operator=MongoUpdateOperator.push,
                 )
 
     try:

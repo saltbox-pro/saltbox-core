@@ -23,6 +23,8 @@ from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.masters.repositories.master_repository import MasterRepository, get_master_repository
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_core.minion_collections.repositories.collection import CollectionRepository, get_collection_repository
+from saltbox_core.minion_collections.repositories.extra_data import get_extra_data_repository
+from saltbox_core.minion_collections.repositories.extra_data_category import get_extra_data_category_repository
 from saltbox_core.minion_collections.repositories.minion import MinionRepository, get_minion_repository
 from saltbox_core.minion_collections.services.collection import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion import MinionService, get_minion_service
@@ -73,7 +75,13 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
     redis_db = await aioredis.from_url(REDIS_SETTINGS.redis_url, **REDIS_SETTINGS.redis_connection_kwargs)
     master_repository: MasterRepository = get_master_repository(db=mongo_db)
     master_service: MasterService = get_master_service(repo=master_repository)
-    minion_repository: MinionRepository = get_minion_repository(db=mongo_db)
+    extra_data_category_repository = get_extra_data_category_repository(db=mongo_db)
+    extra_data_repository = get_extra_data_repository(
+        db=mongo_db, extra_data_category_repository=extra_data_category_repository
+    )
+    minion_repository: MinionRepository = get_minion_repository(
+        db=mongo_db, extra_data_repository=extra_data_repository
+    )
     minion_service: MinionService = get_minion_service(repo=minion_repository)
     job_return_repository: JobReturnRepository = get_job_return_repository(db=mongo_db, rdb=redis_db)
     job_return_service: JobReturnService = get_job_return_service(rdb=redis_db, repo=job_return_repository)

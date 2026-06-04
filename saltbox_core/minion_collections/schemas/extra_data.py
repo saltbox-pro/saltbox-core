@@ -6,14 +6,19 @@ from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin
 
 
+class ExtraDataForMinion(BaseModel):
+    minion_id: PyObjectId = Field(title='Minion MongoDB id')
+    data: dict = Field(title='Minion data')
+
+
 class ExtraDataReadOnlyFieldsMixin(BaseModel):
     source: str = Field(title='Source')
     name: str = Field(title='Name')
     data: Any = Field(title='Data')
-    minions: dict[PyObjectId, Any] = Field(title='Minions data', default_factory=dict)
 
 
-class ExtraDataEditableFieldsMixin(BaseModel): ...
+class ExtraDataEditableFieldsMixin(BaseModel):
+    minions: list[ExtraDataForMinion] = Field(title='Minions data', default_factory=list)
 
 
 class ExtraDataCreateSchema(ExtraDataEditableFieldsMixin, ExtraDataReadOnlyFieldsMixin):

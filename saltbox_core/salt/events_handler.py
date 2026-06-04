@@ -12,6 +12,8 @@ from saltbox_core.jobs.services.job_services import get_job_service
 from saltbox_core.masters.repositories.master_repository import get_master_repository
 from saltbox_core.masters.services.master_service import get_master_service
 from saltbox_core.minion_collections.repositories.collection import get_collection_repository
+from saltbox_core.minion_collections.repositories.extra_data import get_extra_data_repository
+from saltbox_core.minion_collections.repositories.extra_data_category import get_extra_data_category_repository
 from saltbox_core.minion_collections.repositories.minion import get_minion_repository
 from saltbox_core.minion_collections.services.collection import get_collection_service
 from saltbox_core.minion_collections.services.minion import get_minion_service
@@ -44,7 +46,13 @@ class SaltEventsHandler:
         self.mongo_db = get_mongo_db()
         self.master_repository = get_master_repository(db=self.mongo_db)
         self.master_service = get_master_service(repo=self.master_repository)
-        self.minion_repository = get_minion_repository(db=self.mongo_db)
+        self.extra_data_category_repository = get_extra_data_category_repository(db=self.mongo_db)
+        self.extra_data_repository = get_extra_data_repository(
+            db=self.mongo_db, extra_data_category_repository=self.extra_data_category_repository
+        )
+        self.minion_repository = get_minion_repository(
+            db=self.mongo_db, extra_data_repository=self.extra_data_repository
+        )
         self.minion_service = get_minion_service(repo=self.minion_repository)
         self.collection_repository = get_collection_repository(db=self.mongo_db)
         self.collection_service = get_collection_service(repo=self.collection_repository)

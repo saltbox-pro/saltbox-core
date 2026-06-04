@@ -27,6 +27,8 @@ class _NotifyServicesStoreSingleton:
         from saltbox_core.masters.repositories.master_repository import MasterRepository
         from saltbox_core.masters.services.master_service import MasterService
         from saltbox_core.minion_collections.repositories.collection import CollectionRepository
+        from saltbox_core.minion_collections.repositories.extra_data import ExtraDataRepository
+        from saltbox_core.minion_collections.repositories.extra_data_category import ExtraDataCategoryRepository
         from saltbox_core.minion_collections.repositories.minion import MinionRepository
         from saltbox_core.minion_collections.services.collection import CollectionService
         from saltbox_core.minion_collections.services.minion import MinionService
@@ -61,7 +63,11 @@ class _NotifyServicesStoreSingleton:
 
         collection_repository = CollectionRepository(database=mongo_db)
         collection_service = CollectionService(repo=collection_repository)
-        minion_repository = MinionRepository(database=mongo_db)
+        extra_data_category_repository = ExtraDataCategoryRepository(database=mongo_db)
+        extra_data_repository = ExtraDataRepository(
+            database=mongo_db, extra_data_category_repository=extra_data_category_repository
+        )
+        minion_repository = MinionRepository(database=mongo_db, extra_data_repository=extra_data_repository)
         minion_service = MinionService(repo=minion_repository)
 
         task_status_repository = TaskStatusRepository(database=mongo_db)
