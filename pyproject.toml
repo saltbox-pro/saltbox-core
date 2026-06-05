@@ -140,7 +140,7 @@ quote-style = "single"
 docstring-code-format = true
 
 [tool.ruff.lint]
-preview = true
+preview = false
 logger-objects = ["saltbox_core.config.logger"]
 select = [
   "B",  # flake8-bugbear
