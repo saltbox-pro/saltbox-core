@@ -4,6 +4,7 @@ from fastapi import APIRouter, Body, Depends, File, Form, UploadFile, status
 
 from saltbox_core.config import logger
 from saltbox_core.task_templates.schemas.source import (
+    SourceListWithExtrasSchema,
     SourceType,
     TemplateSourceActions,
     TemplateSourceCreateSchema,
@@ -89,17 +90,17 @@ async def source_create(
         policy='public',
         action=TemplateSourceActions.LIST,
     ).model_dump(by_alias=True),
-    response_model=PaginatedResponse[TemplateSourcePublicSchema],
+    response_model=PaginatedResponse[SourceListWithExtrasSchema],
 )
 async def source_list(
     body: Annotated[TemplateSourceListBody, Body()],
     service: Annotated[TemplateSourceService, Depends(get_tpl_source_service)],
-) -> PaginatedResponse[TemplateSourcePublicSchema]:
+) -> PaginatedResponse[SourceListWithExtrasSchema]:
     sources = await service.get_list_paginated(
         query=body.query,
         skip=body.skip,
         limit=body.limit,
-        projection_model=TemplateSourcePublicSchema,
+        projection_model=SourceListWithExtrasSchema,
         sort=body.sort,
     )
     return sources

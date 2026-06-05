@@ -4,6 +4,8 @@ from enum import StrEnum
 from git.types import PathLike
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_serializer
 
+from saltbox_core.task_templates.schemas.sshfs_file import SshfsFilePublicSchema
+from saltbox_core.task_templates.schemas.template import TaskTemplatePublicSchema
 from saltbox_sdk.db.mongo.schemas_base import IDMixin, QueryParams, SortParams
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime
@@ -135,6 +137,33 @@ class TemplateSourcePublicSchema(CreatedModifiedMixin, IDMixin):
 
 class TemplateSourceListBody(SkipLimitParams, QueryParams, SortParams):
     model_config = ConfigDict(extra='ignore')
+
+
+class SourceListWithExtrasSchema(TemplateSourcePublicSchema):
+    templates: list[TaskTemplatePublicSchema] = Field(default_factory=list)
+    files: list[SshfsFilePublicSchema] = Field(default_factory=list)
+
+
+class GitlabProjectSchema(BaseModel):
+    id: int
+    name: str
+    description: str | None = None
+    name_with_namespace: str
+    path: str
+    path_with_namespace: str
+    created_at: str
+    default_branch: str
+    ssh_url_to_repo: str
+    http_url_to_repo: str
+    web_url: str
+    readme_url: str | None = None
+    star_count: int
+    forks_count: int
+    tag_list: list[str]
+    topics: list[str]
+    visibility: str
+    last_activity_at: str
+    updated_at: str
 
 
 class TemplateSourceActions(StrEnum):
