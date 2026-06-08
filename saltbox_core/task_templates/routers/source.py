@@ -171,13 +171,13 @@ async def source_sync(source_id: PyObjectId) -> str:
         policy='public',
         action=TemplateSourceActions.READ,
     ).model_dump(by_alias=True),
-    response_model=TemplateSourcePublicSchema,
+    response_model=SourceListWithExtrasSchema,
 )
 async def source_get(
     source_id: PyObjectId,
     service: Annotated[TemplateSourceService, Depends(get_tpl_source_service)],
-) -> TemplateSourcePublicSchema:
-    source = await service.get(source_id, projection_model=TemplateSourcePublicSchema)
+) -> SourceListWithExtrasSchema:
+    source = await service.get(source_id, projection_model=SourceListWithExtrasSchema)
     return source
 
 
