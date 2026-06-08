@@ -157,8 +157,58 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
                     stages=[
                         AddFieldsAggregationStage(
                             fields={
-                                'extra.aggregated': '$extra_aggregated',
-                                'extra.static': {'$ifNull': ['$extra_static', {}]},
+                                'extra': {
+                                    '$arrayToObject': {
+                                        '$reduce': {
+                                            'input': {
+                                                '$concatArrays': [
+                                                    {'$objectToArray': {'$ifNull': ['$extra_static', {}]}},
+                                                    {'$objectToArray': '$extra_aggregated'},
+                                                ]
+                                            },
+                                            'initialValue': [],
+                                            'in': {
+                                                '$let': {
+                                                    'vars': {'idx': {'$indexOfArray': ['$$value.k', '$$this.k']}},
+                                                    'in': {
+                                                        '$cond': [
+                                                            {'$eq': ['$$idx', -1]},
+                                                            {'$concatArrays': ['$$value', ['$$this']]},
+                                                            {
+                                                                '$concatArrays': [
+                                                                    {'$slice': ['$$value', '$$idx']},
+                                                                    [
+                                                                        {
+                                                                            'k': '$$this.k',
+                                                                            'v': {
+                                                                                '$mergeObjects': [
+                                                                                    {
+                                                                                        '$arrayElemAt': [
+                                                                                            '$$value.v',
+                                                                                            '$$idx',
+                                                                                        ]
+                                                                                    },
+                                                                                    '$$this.v',
+                                                                                ]
+                                                                            },
+                                                                        }
+                                                                    ],
+                                                                    {
+                                                                        '$slice': [
+                                                                            '$$value',
+                                                                            {'$add': ['$$idx', 1]},
+                                                                            {'$size': '$$value'},
+                                                                        ]
+                                                                    },
+                                                                ]
+                                                            },
+                                                        ]
+                                                    },
+                                                }
+                                            },
+                                        }
+                                    }
+                                }
                             }
                         )
                     ],
