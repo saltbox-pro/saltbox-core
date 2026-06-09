@@ -55,6 +55,7 @@ dev = [
   "pytest>=8.3.4",
   "pytest-asyncio>=0.25.3",
   "pytest-cov>=6.0.0",
+  "pytest-dotenv>=0.5.2",
   "pytest-mock>=3.14.0",
   "pytest-sugar>=1.0.0",
   "python-lsp-server[all]",
@@ -122,10 +123,10 @@ addopts = [
   # "--maxfail=1",
   # "--disable-warnings -q",
 ]
-minversion = "8.0"
+minversion = "9.0"
 testpaths = ["tests"]
 asyncio_default_fixture_loop_scope = "function"
-# env_files = [".env.example"]
+env_files = ["tests/test.env"]
 
 [tool.ruff]
 target-version = "py312"
