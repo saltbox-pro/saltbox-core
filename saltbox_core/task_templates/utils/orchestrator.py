@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 import anyio
+import httpx
 from fastapi import Depends, UploadFile
 from git import Repo
 from ruamel.yaml import YAML
@@ -27,9 +28,17 @@ from saltbox_core.task_templates.exceptions import (
     FileTooLargeException,
     FileTypeNotSupportedException,
     FileUploadException,
+    GitlabApiException,
+    MissingGroupIdException,
     RepoURLMissingException,
 )
-from saltbox_core.task_templates.schemas.source import SourceOperation, SourceState, SourceType
+from saltbox_core.task_templates.schemas.source import (
+    GitlabProjectSchema,
+    SourceOperation,
+    SourceState,
+    SourceType,
+    TemplateSourceCreateSchema,
+)
 from saltbox_core.task_templates.schemas.sshfs_file import (
     ManifestDigest,
     ManifestSchema,
@@ -43,6 +52,7 @@ from saltbox_core.task_templates.services.template import TaskTemplateService, g
 from saltbox_core.task_templates.utils.file_config import file_storage_config
 from saltbox_core.task_templates.utils.manifest import SourceServeUpdater, SshfsSync, get_sshfs_sync
 from saltbox_core.utilities.filesystem import TreePermissionsApplicator
+from saltbox_core.utilities.httpx_client import HttpxClientSingletoneFactory
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.exceptions import ObjectNotFoundException
 
@@ -58,14 +68,14 @@ class SyncOrchestrator:
         pillar_service: PillarService,
         master_service: MasterService,
         sshfs_sync_service: SshfsSync,
-        # httpx_client: httpx.AsyncClient | None = None,
+        httpx_client: httpx.AsyncClient | None = None,
     ) -> None:
         self._source_service = source_service
         self._template_service = template_service
         self._sshfs_file_service = sshfs_file_service
         self._pillar_service = pillar_service
         self._master_service = master_service
-        # self._httpx_client = httpx_client or httpx.AsyncClient()
+        self._httpx_client = httpx_client or httpx.AsyncClient()
         self._sshfs_sync_service = sshfs_sync_service
         self._manifest: ManifestSchema | None = None
         self._local_path: Path | None = None
@@ -264,12 +274,14 @@ class SyncOrchestrator:
         manifest_path = await self._get_manifest_path(self._local_path)
         if not manifest_path:
             logger.debug('No manifest file found in the repo.')
+            self._manifest = None
             return None
         logger.debug('Manifest file found: %s', manifest_path)
         try:
             manifest_data: dict[str, Any] = yaml.load(manifest_path)
         except ScannerError as err:
             logger.error('Failed to parse manifest file: %s', err)
+            self._manifest = None
             return None
         self._manifest = ManifestSchema(**manifest_data)
 
@@ -283,12 +295,12 @@ class SyncOrchestrator:
             query={'source_id': source_id, 'file_type': SshfsFileType.MANIFEST}, skip=0, limit=0
         )
         existing_files_map = {file.rel_path: file for file in existing_files}
-        manifest_keys = set(self._manifest.sshfs_files.keys())
+        manifest_keys = set(self._manifest.sshfs_files.keys()) if self._manifest.sshfs_files else set()
 
         for rel_path in set(existing_files_map.keys()) - manifest_keys:
             await self._sshfs_file_service.delete(existing_files_map[rel_path].id)
 
-        for rel_path, file_schema in self._manifest.sshfs_files.items():
+        for rel_path, file_schema in (self._manifest.sshfs_files or {}).items():
             existing_file = existing_files_map.get(rel_path)
             if existing_file is None:
                 await self._sshfs_file_service.create(
@@ -581,6 +593,87 @@ class SyncOrchestrator:
             logger.error('Failed to write template file: %s', e)
             raise
 
+    async def _get_gitpab_projects_list(self) -> list[GitlabProjectSchema]:
+        if not SETTINGS.gitlab_group_id:
+            raise MissingGroupIdException()
+
+        url = f'{SETTINGS.gitlab_base_url}/api/v4/groups/{SETTINGS.gitlab_group_id}/projects'
+        headers = {}
+        if SETTINGS.gitlab_token:
+            headers['Authorization'] = f'Bearer {SETTINGS.gitlab_token}'
+
+        query_params = {
+            'archived': 'false',
+            'per_page': '200',
+            'page': '0',
+            'order_by': 'id',
+            'sort': 'asc',
+        }
+
+        response = await self._httpx_client.get(url, headers=headers, params=query_params)
+
+        if not response.is_success:
+            raise GitlabApiException(
+                status_code=response.status_code, detail=f'GitLab API request failed: {response.text}'
+            )
+
+        projects_data = response.json()
+
+        return [
+            GitlabProjectSchema(**item)
+            for item in projects_data
+            if item.get('marked_for_deletion_on') is None and item.get('marked_for_deletion_at') is None
+        ]
+
+    async def create_sources_from_gitlab(self) -> None:
+        projects = await self._get_gitpab_projects_list()
+        logger.info(
+            f'Fetched projects from GitLab: {len(projects)}\n\n{"\n".join([p.http_url_to_repo for p in projects])}'
+        )
+        source_ids_to_discover = []
+        for project in projects:
+            try:
+                existing_source = await self._source_service.get(query={'repo_url': project.http_url_to_repo})
+            except ObjectNotFoundException:
+                existing_source = None
+            if existing_source:
+                if existing_source.state in [SourceState.DISCOVERED]:
+                    await self._source_service.update(
+                        existing_source.id,
+                        {
+                            'name': project.name,
+                            'description': project.description or '',
+                            'repo_user': 'user' if SETTINGS.gitlab_token else None,
+                            'repo_pass': SETTINGS.gitlab_token if SETTINGS.gitlab_token else None,
+                            'state': SourceState.PENDING,
+                        },
+                    )
+                    source_ids_to_discover.append(existing_source.id)
+                else:
+                    logger.debug(
+                        f'Source for repo {project.http_url_to_repo} already exists with '
+                        f'state {existing_source.state}, skipping update'
+                    )
+                continue
+
+            source_in = TemplateSourceCreateSchema(
+                name=project.name,
+                description=project.description or '',
+                source_type=SourceType.GIT_REPO,
+                repo_url=project.http_url_to_repo,
+                repo_user='user' if SETTINGS.gitlab_token else None,
+                repo_pass=SETTINGS.gitlab_token if SETTINGS.gitlab_token else None,
+            )
+
+            created_source_id = await self._source_service.create(data=source_in)
+            source_ids_to_discover.append(created_source_id)
+
+        for source_id in source_ids_to_discover:
+            try:
+                await self.discover(source_id)
+            except Exception as e:
+                logger.error(f'Failed to discover source {source_id} created from GitLab project: {e}')
+
 
 async def get_sync_orchestrator(
     source_service: Annotated[TemplateSourceService, Depends(get_tpl_source_service)],
@@ -590,6 +683,7 @@ async def get_sync_orchestrator(
     master_service: Annotated[MasterService, Depends(get_master_service)],
     sshfs_sync_service: Annotated[SshfsSync, Depends(get_sshfs_sync)],
 ) -> SyncOrchestrator:
+    httpx_client = HttpxClientSingletoneFactory.get_instance()
     return SyncOrchestrator(
         source_service=source_service,
         template_service=template_service,
@@ -597,4 +691,5 @@ async def get_sync_orchestrator(
         pillar_service=pillar_service,
         master_service=master_service,
         sshfs_sync_service=sshfs_sync_service,
+        httpx_client=httpx_client,
     )

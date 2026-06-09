@@ -15,6 +15,7 @@ from saltbox_core.minion_collections.routers.collections import router as collec
 from saltbox_core.minion_collections.routers.filters import router as filters_router
 from saltbox_core.minion_collections.routers.minion import router as minions_router
 from saltbox_core.pillars.routers import router as pillars_router
+from saltbox_core.routers import router as utils_router
 from saltbox_core.salt.routers.salt_keys import router as salt_keys_router
 from saltbox_core.settings.routers.gitlab_router import router as gitlab_router
 from saltbox_core.settings.routers.sls_repos_router import router as settings_sls_router
@@ -26,10 +27,8 @@ from saltbox_core.tasks.routers.tasks_template import router as template_router
 from saltbox_core.tkq import broker, shutdown_broker, startup_broker
 from saltbox_core.utilities.httpx_client import HttpxClientSingletoneFactory
 from saltbox_core.utilities.redis_cache import CustomRedisCache
-from saltbox_sdk.config.discovery_config import DISCOVERY_SETTINGS
 from saltbox_sdk.db.redis.config import POOL, get_redis_now
 from saltbox_sdk.discovery_client.client import DiscoveryClient
-from saltbox_sdk.discovery_client.schemas import HealthCheckResponse
 from saltbox_sdk.exceptions import SaltBoxBaseException
 from saltbox_sdk.fastapi_utils.custom_openapi import custom_openapi, patch_swagger_config
 from saltbox_sdk.fastapi_utils.exception_handlers import custom_http_handler
@@ -99,15 +98,6 @@ app.add_exception_handler(SaltBoxBaseException, custom_http_handler)
 PrometheusExporter(app).expose_metrics()
 
 
-@app.get('/discovery/health')
-async def health_check() -> HealthCheckResponse:
-    """Health check endpoint"""
-    return HealthCheckResponse(
-        status='ok',
-        message=f'Instance of {DISCOVERY_SETTINGS.service_name} is running',
-    )
-
-
 app.include_router(router=task_tpl_source_router)
 app.include_router(router=new_template_router)
 app.include_router(router=task_tpl_file_router)
@@ -124,3 +114,4 @@ app.include_router(pillars_router)
 app.include_router(salt_keys_router)
 app.include_router(router=settings_sls_router, prefix='/settings', tags=['Settings'])
 app.include_router(router=gitlab_router, prefix='/settings')
+app.include_router(router=utils_router)

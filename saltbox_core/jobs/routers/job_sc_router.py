@@ -76,6 +76,7 @@ async def sync_schemas(
     return TaskiqTaskIdResponse(task_id=res)
 
 
+# TODO: Deprecated
 @router.get(
     '/sync-status/{task_id}',
     operation_id='jobs_schemas_sync_status',
@@ -83,6 +84,7 @@ async def sync_schemas(
         policy='core.jobs.schemas.base',
         action=JobSchemasActions.SYNC,
     ).model_dump(by_alias=True),
+    deprecated=True,
 )
 async def get_sync_status(task_id: str) -> TaskiqTaskResult:
     """

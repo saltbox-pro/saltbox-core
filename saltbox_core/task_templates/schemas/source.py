@@ -55,7 +55,7 @@ class SourceOperation(StrEnum):
 class TemplateSourceCreateSchema(BaseModel):
     source_type: SourceType = Field(title='Source type')
     name: str = Field(min_length=1, max_length=100, title='Display name')
-    description: str = Field(default='', max_length=500, title='Description')
+    description: str | None = Field(default='', max_length=500, title='Description')
     # is_active: bool = Field(default=False, title='Is active (publish to serve_dir)')
     # Ненулевой namespace даёт: serve_dir/<namespace>/... и name (mods) = "<namespace>.<dot_path>"
     namespace: str = Field(
@@ -67,12 +67,12 @@ class TemplateSourceCreateSchema(BaseModel):
     )
     repo_url: PathLike | None = Field(default=None, title='Git repository URL')
     repo_user: str | None = Field(default=None, title='Git user (basic auth)')
-    repo_pass: SecretStr | None = Field(default=None, title='Git password (basic auth)')
+    repo_pass: str | None = Field(default=None, title='Git password (basic auth)')
     branch: str | None = Field(default=None, max_length=100, title='Git branch')
 
-    @field_serializer('repo_pass')
-    def serialize_repo_pass(self, value: SecretStr | None) -> str | None:
-        return value.get_secret_value() if value else None
+    # @field_serializer('repo_pass')
+    # def serialize_repo_pass(self, value: SecretStr | None) -> str | None:
+    #     return value.get_secret_value() if value else None
 
     @field_serializer('repo_url')
     def serialize_url(self, url: PathLike | None) -> str | None:
@@ -87,7 +87,7 @@ class TemplateSourceUpdateSchema(BaseModel):
 
 class TemplateSourceModel(CreatedModifiedMixin, IDMixin):
     name: str = Field(min_length=1, max_length=100, title='Display name')
-    description: str = Field(default='', max_length=500, title='Description')
+    description: str | None = Field(default='', max_length=500, title='Description')
     # is_active: bool = Field(default=False, title='Is active (publish to serve_dir)')
     namespace: str = Field(
         default='',
@@ -115,8 +115,8 @@ class TemplateSourceModel(CreatedModifiedMixin, IDMixin):
 
 class TemplateSourcePublicSchema(CreatedModifiedMixin, IDMixin):
     name: str
-    description: str
-    namespace: str
+    description: str | None = Field(default='', max_length=1000)
+    namespace: str = Field(default='')
     source_type: SourceType
     repo_url: PathLike | None = None
     repo_user: str | None = None
@@ -178,3 +178,4 @@ class TemplateSourceActions(StrEnum):
     DELETE_USER_FILE = 'delete_user_file'
     ADD_USER_FILE = 'add_user_file'
     FILES_LIST = 'files_list'
+    CHECK_EXTERNAL_LIST = 'check_external_list'

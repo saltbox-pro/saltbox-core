@@ -14,6 +14,7 @@ from saltbox_core.utilities.filesystem import TreePermissionsApplicator, recursi
 from saltbox_core.utilities.httpx_client import HttpxClientSingletoneFactory
 
 
+# TODO: Remove this class and move its logic to service/orchestrator level
 class SshfsSync:
     def __init__(self, httpx_client: httpx.AsyncClient | None = None) -> None:
         self._tmp_filename_digest_size = 16

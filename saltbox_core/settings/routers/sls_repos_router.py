@@ -57,6 +57,7 @@ async def sls_repo_settings_sync_all(
     return await service.sync_all()
 
 
+# TODO: Deprecated, use /bg-task-result/{task_id} instead
 @router.get(
     '/sync-status/{task_id}',
     operation_id='repo_sync_status',
@@ -64,6 +65,7 @@ async def sls_repo_settings_sync_all(
         policy='core.git_repos.base',
         action=SettingsSlsActions.SYNC_STATUS,
     ).model_dump(by_alias=True),
+    deprecated=True,
 )
 async def get_sync_status(task_id: str) -> TaskiqTaskResult:
     """

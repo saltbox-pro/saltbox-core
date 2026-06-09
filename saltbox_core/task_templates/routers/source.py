@@ -14,6 +14,7 @@ from saltbox_core.task_templates.schemas.source import (
 )
 from saltbox_core.task_templates.services.source import TemplateSourceService, get_tpl_source_service
 from saltbox_core.task_templates.tiq_tasks import (
+    source_check_external_list_task,
     source_discover_task,
     source_prepare_task,
     source_remove_task,
@@ -25,6 +26,19 @@ from saltbox_sdk.db.schemas_base import PaginatedResponse
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 
 router = APIRouter(prefix='/task-tpl-sources', tags=['Task Template Sources'])
+
+
+@router.get(
+    '/check-external-list',
+    operation_id='template_source_check_external_list',
+    openapi_extra=GatewayEndpointConfig(
+        policy='public',
+        action=TemplateSourceActions.CHECK_EXTERNAL_LIST,
+    ).model_dump(by_alias=True),
+)
+async def source_check_external_list() -> str:
+    task = await source_check_external_list_task.kiq()
+    return task.task_id
 
 
 @router.post(

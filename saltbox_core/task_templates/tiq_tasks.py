@@ -234,3 +234,18 @@ async def update_tpl_from_raw_task(
             raise
 
     return {'status': 'updated'}
+
+
+@broker.task(queue_name=queue_default.name)
+async def source_check_external_list_task(
+    progress: ProgressTracker[Any] = TaskiqDepends(),
+    orchestrator: SyncOrchestrator = TaskiqDepends(get_sync_orchestrator),
+) -> dict[str, Any]:
+    await progress.set_progress(TaskState.STARTED, 'Check external list started')
+    try:
+        await orchestrator.create_sources_from_gitlab()
+        await progress.set_progress(TaskState.SUCCESS, 'Check external list successful')
+        return {'status': 'checked'}
+    except Exception:
+        await progress.set_progress(TaskState.FAILURE, 'Check external list failed')
+        raise

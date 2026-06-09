@@ -101,7 +101,10 @@ class FileInManifestSchema(BaseModel):
 
 class ManifestSchema(BaseModel):
     root: str = Field(default='', title='Path in repository to serve for masters')
-    sshfs_files: dict[str, FileInManifestSchema]
+    sshfs_files: dict[str, FileInManifestSchema] | None = Field(
+        default=None,
+        title='Mapping of file paths (relative to manifest root) to file info',
+    )
     sshfs_files_checksum_type: ManifestDigest = ManifestDigest.SHA256
     sshfs_files_token: SecretStr | None = None
 
@@ -109,11 +112,12 @@ class ManifestSchema(BaseModel):
 
     @model_validator(mode='after')
     def _set_global_values(self) -> 'ManifestSchema':
-        for path, file_entry in self.sshfs_files.items():
-            file_entry.checksum_type = file_entry.checksum_type or self.sshfs_files_checksum_type
-            if not file_entry.token:
-                file_entry.token = self.sshfs_files_token
-            file_entry.rel_path = path
+        if self.sshfs_files:
+            for path, file_entry in self.sshfs_files.items():
+                file_entry.checksum_type = file_entry.checksum_type or self.sshfs_files_checksum_type
+                if not file_entry.token:
+                    file_entry.token = self.sshfs_files_token
+                file_entry.rel_path = path
         return self
 
 
