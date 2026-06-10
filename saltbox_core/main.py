@@ -12,6 +12,8 @@ from saltbox_core.jobs.routers.jobs_router import router as jobs_router
 from saltbox_core.masters.routers.master_route import router as masters_router
 from saltbox_core.masters.routers.system_route import router as system_router
 from saltbox_core.minion_collections.routers.collections import router as collections_router
+from saltbox_core.minion_collections.routers.extra_data_category import router as minions_extra_data_category_router
+from saltbox_core.minion_collections.routers.extra_data_collector import router as minions_extra_data_collector_router
 from saltbox_core.minion_collections.routers.filters import router as filters_router
 from saltbox_core.minion_collections.routers.minion import router as minions_router
 from saltbox_core.pillars.routers import router as pillars_router
@@ -107,6 +109,8 @@ app.include_router(job_schemas_router)
 app.include_router(template_router)
 app.include_router(task_router)
 app.include_router(collections_router)
+app.include_router(minions_extra_data_category_router)
+app.include_router(minions_extra_data_collector_router)
 app.include_router(minions_router)
 app.include_router(masters_router)
 app.include_router(system_router)

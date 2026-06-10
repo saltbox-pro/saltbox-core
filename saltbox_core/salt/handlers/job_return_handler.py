@@ -13,6 +13,7 @@ from saltbox_core.jobs.schemas.job_schemas import JobForJobReturnSaltHandlerSche
 from saltbox_core.jobs.services.job_return_service import JobReturnService
 from saltbox_core.jobs.services.job_services import JobService
 from saltbox_core.minion_collections.services.minion import MinionService
+from saltbox_core.minion_collections.tiq_tasks import process_extra_collector_by_tgt
 from saltbox_core.salt.exceptions import StopProcessing
 from saltbox_core.salt.handlers.base_handler import MessageDataType
 from saltbox_core.salt.handlers.base_job_handler import BaseJobMessageHandler
@@ -112,6 +113,10 @@ class JobReturnMessageHandler(BaseJobMessageHandler[JobForJobReturnSaltHandlerSc
 
         if tid:
             await process_task_job_return.kiq(jid=jid, minion_id=mid)  # type: ignore
+        if job.source and job.source.type == 'extra_collector' and job.source.id:
+            await process_extra_collector_by_tgt.kiq(
+                minion_id=mid, salt_master=master_id, extra_collector_id=job.source.id, data=return_data
+            )  # type: ignore
 
         process_return_coro = self._process_return(job_return=job_return, is_new_return=is_new_return)
         send_presence_coro = self._send_presence(master_id=master_id, mid=mid, data=data)
@@ -150,12 +155,12 @@ class JobReturnMessageHandler(BaseJobMessageHandler[JobForJobReturnSaltHandlerSc
 
         if job_return.fun == 'grains.items':
             await self._process_grains(job_return=job_return)
-        elif job_return.fun == 'inventory.get':
-            logger.debug('Got inventory.get return for %s', job_return.minion_id)
-            await self._notify_on_inventory_fun(job_return=job_return)
-        elif self._inventory_state_predicate(job_return=job_return):
-            logger.debug('Got inventory state return for %s', job_return.minion_id)
-            await self._notify_on_inventory_state(job_return=job_return)
+        # elif job_return.fun == 'inventory.get':
+        #     logger.debug('Got inventory.get return for %s', job_return.minion_id)
+        #     await self._notify_on_inventory_fun(job_return=job_return)
+        # elif self._inventory_state_predicate(job_return=job_return):
+        #     logger.debug('Got inventory state return for %s', job_return.minion_id)
+        #     await self._notify_on_inventory_state(job_return=job_return)
 
     async def _save_job_return_data(self, master_id: str, jid: str, mid: str, return_data: Any) -> None:
         hash_name = f'master:{master_id}:job:{jid}:return-data'
