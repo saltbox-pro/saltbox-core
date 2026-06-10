@@ -2,7 +2,7 @@ from pathlib import Path
 from typing import Any
 
 from redis.asyncio import Redis
-from taskiq import TaskiqDepends
+from taskiq import Context, TaskiqDepends
 from taskiq.depends.progress_tracker import ProgressTracker, TaskState
 
 from saltbox_core.config import Settings, logger
@@ -48,6 +48,7 @@ async def source_discover_task(
 @broker.task(queue_name=queue_default.name)
 async def source_prepare_task(
     source_id: str,
+    context: Context = TaskiqDepends(),
     progress: ProgressTracker[Any] = TaskiqDepends(),
     orchestrator: SyncOrchestrator = TaskiqDepends(get_sync_orchestrator),
     redis: Redis = TaskiqDepends(get_redis),
@@ -64,7 +65,7 @@ async def source_prepare_task(
     async with lock:
         await progress.set_progress(TaskState.STARTED, 'Prepare started')
         try:
-            await orchestrator.prepare(PyObjectId(source_id))
+            await orchestrator.prepare(PyObjectId(source_id), context.message.task_id)
             await progress.set_progress(TaskState.SUCCESS, 'Prepare successful')
             return {'status': 'prepared'}
         except Exception:
@@ -75,6 +76,7 @@ async def source_prepare_task(
 @broker.task(queue_name=queue_default.name)
 async def source_sync_task(
     source_id: str,
+    context: Context = TaskiqDepends(),
     progress: ProgressTracker[Any] = TaskiqDepends(),
     orchestrator: SyncOrchestrator = TaskiqDepends(get_sync_orchestrator),
     redis: Redis = TaskiqDepends(get_redis),
@@ -91,14 +93,14 @@ async def source_sync_task(
     async with lock:
         await progress.set_progress(TaskState.STARTED, 'Sync started')
         try:
-            await orchestrator.prepare(PyObjectId(source_id))
+            await orchestrator.prepare(PyObjectId(source_id), context.message.task_id)
             await progress.set_progress(TaskState.SUCCESS, 'Prepare successful')
         except Exception:
             await progress.set_progress(TaskState.FAILURE, 'Prepare failed')
             raise
 
         try:
-            await orchestrator.sync(PyObjectId(source_id))
+            await orchestrator.sync(PyObjectId(source_id), context.message.task_id)
             await progress.set_progress(TaskState.SUCCESS, 'Sync successful')
             return {'status': 'synced'}
         except Exception:

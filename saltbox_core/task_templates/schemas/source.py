@@ -50,6 +50,7 @@ class SourceOperation(StrEnum):
     PREPARE_FILES = 'prepare_files'
     ADD_USER_FILE = 'add_user_file'
     SYNC = 'sync'
+    REMOVE = 'remove'
 
 
 class TemplateSourceCreateSchema(BaseModel):
@@ -105,6 +106,7 @@ class TemplateSourceModel(CreatedModifiedMixin, IDMixin):
     root: str = Field(default='', title='Path in repository to serve for masters')
     state: SourceState = Field(title='State of the template source')
     current_operation: SourceOperation | None = Field(default=None, title='Current operation in progress')
+    current_task_id: str | None = Field(default=None, title='Current task ID for the operation in progress')
     last_error: str | None = Field(default=None, title='Last error message if state is BROKEN')
     synced_at: Iso8601ZDatetime | None = Field(default=None, title='Last sync time')
 
@@ -125,6 +127,7 @@ class TemplateSourcePublicSchema(CreatedModifiedMixin, IDMixin):
     local_path: str
     state: SourceState
     current_operation: SourceOperation | None
+    current_task_id: str | None = Field(default=None)
     last_error: str | None
     synced_at: Iso8601ZDatetime | None
 

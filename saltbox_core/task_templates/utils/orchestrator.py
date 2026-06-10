@@ -455,10 +455,12 @@ class SyncOrchestrator:
         await self._source_service.update(source_id, {'state': SourceState.DISCOVERED, 'current_operation': None})
         return {'status': 'discovered'}
 
-    async def prepare(self, source_id: PyObjectId) -> None:
+    async def prepare(self, source_id: PyObjectId, task_id: str) -> None:
         # source = await self._source_service.get(source_id)
 
-        await self._source_service.update(source_id, {'current_operation': SourceOperation.PREPARE_TEMPLATES})
+        await self._source_service.update(
+            source_id, {'current_operation': SourceOperation.PREPARE_TEMPLATES, 'current_task_id': task_id}
+        )
         try:
             logger.info('Syncing templates to serve dir...')
             await self._serve_templates_to_serve_dir()
@@ -481,20 +483,27 @@ class SyncOrchestrator:
             raise
         if sync_file_errors:
             error_msg = '; '.join(f'{err["file"]}: {err["error"]}' for err in sync_file_errors)
-            await self._source_service.update(source_id, {'state': SourceState.BROKEN, 'last_error': error_msg})
+            await self._source_service.update(
+                source_id, {'state': SourceState.BROKEN, 'last_error': error_msg, 'current_task_id': None}
+            )
         else:
             await self._source_service.update(
-                source_id, {'state': SourceState.PLUGGED, 'current_operation': None, 'last_error': None}
+                source_id,
+                {'state': SourceState.PLUGGED, 'current_operation': None, 'last_error': None, 'current_task_id': None},
             )
 
-    async def sync(self, source_id: PyObjectId) -> None:
+    async def sync(self, source_id: PyObjectId, task_id: str) -> None:
         # Get list of accepted masters and send them rpc notification in parallel
-        await self._source_service.update(source_id, {'current_operation': SourceOperation.SYNC})
+        await self._source_service.update(
+            source_id, {'current_operation': SourceOperation.SYNC, 'current_task_id': task_id}
+        )
         accepted_masters = await self._master_service.get_list(query={'status': MasterStatus.ACCEPTED}, skip=0, limit=0)
         if not accepted_masters:
             msg = f'No accepted masters found for source {source_id}. Skipping notification.'
             logger.warning(msg)
-            await self._source_service.update(source_id, {'state': SourceState.PLUGGED, 'last_error': msg})
+            await self._source_service.update(
+                source_id, {'state': SourceState.PLUGGED, 'last_error': msg, 'current_task_id': None}
+            )
             return
 
         async with default_master_broker as broker:
@@ -516,7 +525,7 @@ class SyncOrchestrator:
             error_msg = '; '.join(str(e) for e in errors)
             await self._source_service.update(
                 source_id,
-                {'state': SourceState.BROKEN, 'last_error': error_msg},
+                {'state': SourceState.BROKEN, 'last_error': error_msg, 'current_task_id': None},
             )
             raise errors[0]
 
@@ -527,6 +536,7 @@ class SyncOrchestrator:
                 'current_operation': None,
                 'last_error': None,
                 'synced_at': datetime.now(UTC),
+                'current_task_id': None,
             },
         )
 
@@ -563,7 +573,13 @@ class SyncOrchestrator:
             raise
 
     async def remove(self, source_id: PyObjectId) -> None:
-        await self._source_service.delete(source_id)
+        await self._source_service.update(source_id, {'current_operation': SourceOperation.REMOVE})
+        try:
+            await self._source_service.delete(source_id)
+        except Exception as e:
+            logger.error('Failed to remove source: %s', e)
+            await self._source_service.update(source_id, {'state': SourceState.BROKEN, 'last_error': str(e)})
+            raise
 
     async def create_template_from_raw(self, source_id: PyObjectId, file_name: str, content: str) -> None:
         source = await self._source_service.get(source_id)
