@@ -21,6 +21,7 @@ SETTINGS = Settings()
 @broker.task(queue_name=queue_default.name)
 async def source_discover_task(
     source_id: str,
+    context: Context = TaskiqDepends(),
     progress: ProgressTracker[Any] = TaskiqDepends(),
     orchestrator: SyncOrchestrator = TaskiqDepends(get_sync_orchestrator),
     redis: Redis = TaskiqDepends(get_redis),
@@ -37,7 +38,7 @@ async def source_discover_task(
     async with lock:
         await progress.set_progress(TaskState.STARTED, 'Fetch started')
         try:
-            await orchestrator.discover(PyObjectId(source_id))
+            await orchestrator.discover(PyObjectId(source_id), context.message.task_id)
             await progress.set_progress(TaskState.SUCCESS, 'Fetch successful')
             return {'status': 'discovered'}
         except Exception:
@@ -111,6 +112,7 @@ async def source_sync_task(
 @broker.task(queue_name=queue_default.name)
 async def source_remove_task(
     source_id: str,
+    context: Context = TaskiqDepends(),
     progress: ProgressTracker[Any] = TaskiqDepends(),
     orchestrator: SyncOrchestrator = TaskiqDepends(get_sync_orchestrator),
     redis: Redis = TaskiqDepends(get_redis),
@@ -127,7 +129,7 @@ async def source_remove_task(
     async with lock:
         await progress.set_progress(TaskState.STARTED, 'Remove started')
         try:
-            await orchestrator.remove(PyObjectId(source_id))
+            await orchestrator.remove(PyObjectId(source_id), context.message.task_id)
             await progress.set_progress(TaskState.SUCCESS, 'Remove successful')
             return {'status': 'removed'}
         except Exception:
@@ -140,6 +142,7 @@ async def add_user_file_to_source_task(
     source_id: str,
     file_id: str,
     tmp_path: Path | None = None,
+    context: Context = TaskiqDepends(),
     progress: ProgressTracker[Any] = TaskiqDepends(),
     orchestrator: SyncOrchestrator = TaskiqDepends(get_sync_orchestrator),
     redis: Redis = TaskiqDepends(get_redis),
@@ -156,7 +159,9 @@ async def add_user_file_to_source_task(
     async with lock:
         await progress.set_progress(TaskState.STARTED, 'Adding user file started')
         try:
-            await orchestrator.add_user_file(PyObjectId(source_id), PyObjectId(file_id), tmp_path=tmp_path)
+            await orchestrator.add_user_file(
+                PyObjectId(source_id), PyObjectId(file_id), tmp_path=tmp_path, task_id=context.message.task_id
+            )
             await progress.set_progress(TaskState.SUCCESS, 'User file added')
             return {'status': 'added', 'file_id': str(file_id)}
         except Exception:
@@ -169,6 +174,7 @@ async def create_tpl_from_raw_task(
     source_id: str,
     file_name: str,
     content: str,
+    context: Context = TaskiqDepends(),
     progress: ProgressTracker[Any] = TaskiqDepends(),
     orchestrator: SyncOrchestrator = TaskiqDepends(get_sync_orchestrator),
     redis: Redis = TaskiqDepends(get_redis),
@@ -185,14 +191,16 @@ async def create_tpl_from_raw_task(
     async with lock:
         await progress.set_progress(TaskState.STARTED, 'Create template from raw started')
         try:
-            await orchestrator.create_template_from_raw(PyObjectId(source_id), file_name, content)
+            await orchestrator.create_template_from_raw(
+                PyObjectId(source_id), file_name, content, task_id=context.message.task_id
+            )
             await progress.set_progress(TaskState.SUCCESS, 'Create template from raw successful')
         except Exception:
             await progress.set_progress(TaskState.FAILURE, 'Create template from raw failed')
             raise
 
         try:
-            await orchestrator.discover(PyObjectId(source_id))
+            await orchestrator.discover(PyObjectId(source_id), task_id=context.message.task_id)
             await progress.set_progress(TaskState.SUCCESS, 'Fetch successful')
         except Exception:
             await progress.set_progress(TaskState.FAILURE, 'Fetch failed')
@@ -206,6 +214,7 @@ async def update_tpl_from_raw_task(
     source_id: str,
     template_id: str,
     content: str,
+    context: Context = TaskiqDepends(),
     progress: ProgressTracker[Any] = TaskiqDepends(),
     orchestrator: SyncOrchestrator = TaskiqDepends(get_sync_orchestrator),
     redis: Redis = TaskiqDepends(get_redis),
@@ -222,14 +231,16 @@ async def update_tpl_from_raw_task(
     async with lock:
         await progress.set_progress(TaskState.STARTED, 'Update template from raw started')
         try:
-            await orchestrator.update_template_from_raw(PyObjectId(template_id), content)
+            await orchestrator.update_template_from_raw(
+                PyObjectId(template_id), content, task_id=context.message.task_id
+            )
             await progress.set_progress(TaskState.SUCCESS, 'Update template from raw successful')
         except Exception:
             await progress.set_progress(TaskState.FAILURE, 'Update template from raw failed')
             raise
 
         try:
-            await orchestrator.discover(PyObjectId(source_id))
+            await orchestrator.discover(PyObjectId(source_id), task_id=context.message.task_id)
             await progress.set_progress(TaskState.SUCCESS, 'Fetch successful')
         except Exception:
             await progress.set_progress(TaskState.FAILURE, 'Fetch failed')

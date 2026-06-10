@@ -415,14 +415,16 @@ class SyncOrchestrator:
         await anyio.Path(tmp_file_path).unlink()
         logger.debug('Temporary archive file removed')
 
-    async def discover(self, source_id: PyObjectId) -> dict[str, Any]:
+    async def discover(self, source_id: PyObjectId, task_id: str | None = None) -> dict[str, Any]:
         source = await self._source_service.get(source_id)
 
         if source.state == SourceState.DISCOVERED:
             logger.debug('Source is already discovered, skipping fetch and parse.')
             return {'status': 'already_discovered'}
 
-        await self._source_service.update(source_id, {'current_operation': SourceOperation.DISCOVER})
+        await self._source_service.update(
+            source_id, {'current_operation': SourceOperation.DISCOVER, 'current_task_id': task_id}
+        )
 
         logger.info('Source type: %s', source.source_type)
 
@@ -433,7 +435,9 @@ class SyncOrchestrator:
                 await self._create_local_source_dir(source_id)
         except Exception as e:
             logger.error('Fetch failed: %s', e)
-            await self._source_service.update(source_id, {'state': SourceState.BROKEN, 'last_error': str(e)})
+            await self._source_service.update(
+                source_id, {'state': SourceState.BROKEN, 'last_error': str(e), 'current_task_id': None}
+            )
             raise
 
         # 2. parse and save templates to db
@@ -441,7 +445,9 @@ class SyncOrchestrator:
             await self._parse_and_save_templates(source_id)
         except Exception as e:
             logger.error('Parse failed: %s', e)
-            await self._source_service.update(source_id, {'state': SourceState.BROKEN, 'last_error': str(e)})
+            await self._source_service.update(
+                source_id, {'state': SourceState.BROKEN, 'last_error': str(e), 'current_task_id': None}
+            )
             raise
 
         # 3. parse manifest and save file instances to db
@@ -449,13 +455,17 @@ class SyncOrchestrator:
             await self._save_sshfs_files_from_manifest(source_id)
         except Exception as e:
             logger.error('Manifest parsing failed: %s', e)
-            await self._source_service.update(source_id, {'state': SourceState.BROKEN, 'last_error': str(e)})
+            await self._source_service.update(
+                source_id, {'state': SourceState.BROKEN, 'last_error': str(e), 'current_task_id': None}
+            )
             raise
 
-        await self._source_service.update(source_id, {'state': SourceState.DISCOVERED, 'current_operation': None})
+        await self._source_service.update(
+            source_id, {'state': SourceState.DISCOVERED, 'current_operation': None, 'current_task_id': None}
+        )
         return {'status': 'discovered'}
 
-    async def prepare(self, source_id: PyObjectId, task_id: str) -> None:
+    async def prepare(self, source_id: PyObjectId, task_id: str | None = None) -> None:
         # source = await self._source_service.get(source_id)
 
         await self._source_service.update(
@@ -466,10 +476,14 @@ class SyncOrchestrator:
             await self._serve_templates_to_serve_dir()
         except Exception as e:
             logger.error('Failed to serve templates to serve dir: %s', e)
-            await self._source_service.update(source_id, {'state': SourceState.BROKEN, 'last_error': str(e)})
+            await self._source_service.update(
+                source_id, {'state': SourceState.BROKEN, 'last_error': str(e), 'current_task_id': None}
+            )
             raise
 
-        await self._source_service.update(source_id, {'current_operation': SourceOperation.PREPARE_FILES})
+        await self._source_service.update(
+            source_id, {'current_operation': SourceOperation.PREPARE_FILES, 'current_task_id': task_id}
+        )
         try:
             logger.info('Syncing files to serve dir...')
             sync_file_errors = await self._sync_manifest_files_to_sshfs(source_id)
@@ -479,7 +493,9 @@ class SyncOrchestrator:
 
         except Exception as e:
             logger.error('Failed to sync files to serve dir: %s', e)
-            await self._source_service.update(source_id, {'state': SourceState.BROKEN, 'last_error': str(e)})
+            await self._source_service.update(
+                source_id, {'state': SourceState.BROKEN, 'last_error': str(e), 'current_task_id': None}
+            )
             raise
         if sync_file_errors:
             error_msg = '; '.join(f'{err["file"]}: {err["error"]}' for err in sync_file_errors)
@@ -492,7 +508,7 @@ class SyncOrchestrator:
                 {'state': SourceState.PLUGGED, 'current_operation': None, 'last_error': None, 'current_task_id': None},
             )
 
-    async def sync(self, source_id: PyObjectId, task_id: str) -> None:
+    async def sync(self, source_id: PyObjectId, task_id: str | None = None) -> None:
         # Get list of accepted masters and send them rpc notification in parallel
         await self._source_service.update(
             source_id, {'current_operation': SourceOperation.SYNC, 'current_task_id': task_id}
@@ -552,9 +568,12 @@ class SyncOrchestrator:
         source_id: PyObjectId,
         file_id: PyObjectId,
         tmp_path: Path | None = None,
+        task_id: str | None = None,
     ) -> None:
         file_instance = await self._sshfs_file_service.get(file_id)
-        await self._source_service.update(source_id, {'current_operation': SourceOperation.ADD_USER_FILE})
+        await self._source_service.update(
+            source_id, {'current_operation': SourceOperation.ADD_USER_FILE, 'current_task_id': task_id}
+        )
 
         try:
             update_data: dict[str, Any] = {'synced_on_sshfs': True, 'last_sync_error': None}
@@ -564,25 +583,38 @@ class SyncOrchestrator:
             await self._sshfs_sync_service.save_to_sshfs(file_instance, tmp_path)
             await self._sshfs_file_service.update(query=file_id, data=update_data)
             await self._source_service.update(
-                source_id, {'state': SourceState.PLUGGED, 'current_operation': None, 'last_error': None}
+                source_id,
+                {'state': SourceState.PLUGGED, 'current_operation': None, 'last_error': None, 'current_task_id': None},
             )
         except Exception as e:
             logger.error('Failed to save file to SSHFS: %s', e)
             await self._sshfs_file_service.delete(file_id)
-            await self._source_service.update(source_id, {'state': SourceState.BROKEN, 'last_error': str(e)})
+            await self._source_service.update(
+                source_id, {'state': SourceState.BROKEN, 'last_error': str(e), 'current_task_id': None}
+            )
             raise
 
-    async def remove(self, source_id: PyObjectId) -> None:
-        await self._source_service.update(source_id, {'current_operation': SourceOperation.REMOVE})
+    async def remove(self, source_id: PyObjectId, task_id: str | None = None) -> None:
+        await self._source_service.update(
+            source_id, {'current_operation': SourceOperation.REMOVE, 'current_task_id': task_id}
+        )
         try:
             await self._source_service.delete(source_id)
         except Exception as e:
             logger.error('Failed to remove source: %s', e)
-            await self._source_service.update(source_id, {'state': SourceState.BROKEN, 'last_error': str(e)})
+            await self._source_service.update(
+                source_id, {'state': SourceState.BROKEN, 'last_error': str(e), 'current_task_id': None}
+            )
             raise
 
-    async def create_template_from_raw(self, source_id: PyObjectId, file_name: str, content: str) -> None:
+    async def create_template_from_raw(
+        self, source_id: PyObjectId, file_name: str, content: str, task_id: str | None = None
+    ) -> None:
         source = await self._source_service.get(source_id)
+
+        await self._source_service.update(
+            source_id, {'current_operation': SourceOperation.ADD_TEMPLATE_FROM_RAW, 'current_task_id': task_id}
+        )
 
         local_path = Path(SETTINGS.local_repos_dir) / source.local_path / f'{file_name}.sls'
 
@@ -592,14 +624,20 @@ class SyncOrchestrator:
         except OSError as e:
             logger.error('Failed to write template file: %s', e)
             raise
-        await self._source_service.update(source_id, {'state': SourceState.PENDING})
+        await self._source_service.update(
+            source_id, {'state': SourceState.PENDING, 'current_operation': None, 'current_task_id': None}
+        )
 
-    async def update_template_from_raw(self, template_id: PyObjectId, content: str) -> None:
+    async def update_template_from_raw(self, template_id: PyObjectId, content: str, task_id: str | None = None) -> None:
         template = await self._template_service.get(template_id)
 
         await self._source_service.update(
             template.source_id,
-            {'state': SourceState.PENDING, 'current_operation': SourceOperation.UPDATE_TEMPLATE_CONTENT},
+            {
+                'state': SourceState.PENDING,
+                'current_operation': SourceOperation.UPDATE_TEMPLATE_CONTENT,
+                'current_task_id': task_id,
+            },
         )
         local_path = Path(SETTINGS.local_repos_dir) / template.local_path / template.sls_rel_path
 
@@ -608,6 +646,7 @@ class SyncOrchestrator:
         except OSError as e:
             logger.error('Failed to write template file: %s', e)
             raise
+        await self._source_service.update(template.source_id, {'current_operation': None, 'current_task_id': None})
 
     async def _get_gitpab_projects_list(self) -> list[GitlabProjectSchema]:
         if not SETTINGS.gitlab_group_id:

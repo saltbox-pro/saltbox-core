@@ -46,6 +46,7 @@ class SourceOperation(StrEnum):
     DISCOVER = 'discover'
     PREPARE_TEMPLATES = 'prepare_templates'
     UPDATE_TEMPLATE_CONTENT = 'update_template_content'
+    ADD_TEMPLATE_FROM_RAW = 'add_template_from_raw'
     DELETE_TEMPLATE = 'delete_template'
     PREPARE_FILES = 'prepare_files'
     ADD_USER_FILE = 'add_user_file'
