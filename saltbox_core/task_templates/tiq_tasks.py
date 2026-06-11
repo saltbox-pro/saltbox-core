@@ -31,8 +31,9 @@ async def source_discover_task(
     logger.info('is_locked: %s', await lock.locked())
 
     if await lock.locked():
-        msg = f'Source {source_id} is already being fetched by another task.'
+        msg = f'Source {source_id} is locked by another task.'
         logger.warning(msg)
+        await progress.set_progress(TaskState.FAILURE, msg)
         raise TaskTemplateSourceLockException(source_id=source_id)
 
     async with lock:
@@ -59,8 +60,9 @@ async def source_prepare_task(
     logger.info('is_locked: %s', await lock.locked())
 
     if await lock.locked():
-        msg = f'Source {source_id} is already being fetched by another task.'
+        msg = f'Source {source_id} is locked by another task.'
         logger.warning(msg)
+        await progress.set_progress(TaskState.FAILURE, msg)
         raise TaskTemplateSourceLockException(source_id=source_id)
 
     async with lock:
@@ -87,8 +89,9 @@ async def source_sync_task(
     logger.info('is_locked: %s', await lock.locked())
 
     if await lock.locked():
-        msg = f'Source {source_id} is already being fetched by another task.'
+        msg = f'Source {source_id} is locked by another task.'
         logger.warning(msg)
+        await progress.set_progress(TaskState.FAILURE, msg)
         raise TaskTemplateSourceLockException(source_id=source_id)
 
     async with lock:
@@ -122,8 +125,9 @@ async def source_remove_task(
     logger.info('is_locked: %s', await lock.locked())
 
     if await lock.locked():
-        msg = f'Source {source_id} is already being fetched by another task.'
+        msg = f'Source {source_id} is locked by another task.'
         logger.warning(msg)
+        await progress.set_progress(TaskState.FAILURE, msg)
         raise TaskTemplateSourceLockException(source_id=source_id)
 
     async with lock:
@@ -152,8 +156,9 @@ async def add_user_file_to_source_task(
     logger.info('is_locked: %s', await lock.locked())
 
     if await lock.locked():
-        msg = f'Source {source_id} is already being fetched by another task.'
+        msg = f'Source {source_id} is locked by another task.'
         logger.warning(msg)
+        await progress.set_progress(TaskState.FAILURE, msg)
         raise TaskTemplateSourceLockException(source_id=source_id)
 
     async with lock:
@@ -184,8 +189,9 @@ async def create_tpl_from_raw_task(
     logger.info('is_locked: %s', await lock.locked())
 
     if await lock.locked():
-        msg = f'Source {source_id} is already being fetched by another task.'
+        msg = f'Source {source_id} is locked by another task.'
         logger.warning(msg)
+        await progress.set_progress(TaskState.FAILURE, msg)
         raise TaskTemplateSourceLockException(source_id=source_id)
 
     async with lock:
@@ -224,8 +230,9 @@ async def update_tpl_from_raw_task(
     logger.info('is_locked: %s', await lock.locked())
 
     if await lock.locked():
-        msg = f'Source {source_id} is already being fetched by another task.'
+        msg = f'Source {source_id} is locked by another task.'
         logger.warning(msg)
+        await progress.set_progress(TaskState.FAILURE, msg)
         raise TaskTemplateSourceLockException(source_id=source_id)
 
     async with lock:
