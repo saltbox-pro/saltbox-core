@@ -66,12 +66,12 @@ async def source_create_from_archive(
     )
 
     oid = await service.create(source_in)
-    created = await service.get(oid, projection_model=TemplateSourcePublicSchema)
 
+    created = await service.get(oid, projection_model=TemplateSourcePublicSchema)
     await orchestrator.save_and_unpack_archive(file, local_path=created.local_path)
 
     task = await source_discover_task.kiq(source_id=str(oid))
-    logger.debug('Created task %s to discover source %s', task.task_id, oid)
+    created.current_task_id = task.task_id
 
     return created
 
@@ -94,6 +94,7 @@ async def source_create(
     task = await source_discover_task.kiq(source_id=str(oid))
     logger.debug('Created task %s to discover source %s', task.task_id, oid)
     created = await service.get(oid, projection_model=TemplateSourcePublicSchema)
+    created.current_task_id = task.task_id
     return created
 
 

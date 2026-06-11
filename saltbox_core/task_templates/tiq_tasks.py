@@ -95,7 +95,7 @@ async def source_sync_task(
         await progress.set_progress(TaskState.STARTED, 'Sync started')
         try:
             await orchestrator.prepare(PyObjectId(source_id), context.message.task_id)
-            await progress.set_progress(TaskState.SUCCESS, 'Prepare successful')
+            await progress.set_progress(TaskState.STARTED, 'Prepare successful')
         except Exception:
             await progress.set_progress(TaskState.FAILURE, 'Prepare failed')
             raise
@@ -194,7 +194,7 @@ async def create_tpl_from_raw_task(
             await orchestrator.create_template_from_raw(
                 PyObjectId(source_id), file_name, content, task_id=context.message.task_id
             )
-            await progress.set_progress(TaskState.SUCCESS, 'Create template from raw successful')
+            await progress.set_progress(TaskState.STARTED, 'Create template from raw successful')
         except Exception:
             await progress.set_progress(TaskState.FAILURE, 'Create template from raw failed')
             raise
@@ -234,7 +234,7 @@ async def update_tpl_from_raw_task(
             await orchestrator.update_template_from_raw(
                 PyObjectId(template_id), content, task_id=context.message.task_id
             )
-            await progress.set_progress(TaskState.SUCCESS, 'Update template from raw successful')
+            await progress.set_progress(TaskState.STARTED, 'Update template from raw successful')
         except Exception:
             await progress.set_progress(TaskState.FAILURE, 'Update template from raw failed')
             raise
