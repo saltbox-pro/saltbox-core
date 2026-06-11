@@ -181,49 +181,48 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
         if query:
             pipeline.append({'$match': query})
 
-        lookup_pipeline: list[dict[str, Any]] = [
-            {
-                '$addFields': {
-                    '_entry': {
-                        '$first': {
-                            '$filter': {
-                                'input': '$minions',
-                                'as': 'm',
-                                'cond': {'$eq': ['$$m.minion_id', '$$mid']},
-                            }
-                        }
-                    }
-                }
-            },
-            {
-                '$replaceRoot': {
-                    'newRoot': {'$mergeObjects': ['$data', '$_entry.data', {'_source': '$source', '_name': '$name'}]}
-                }
-            },
-        ]
-
         if category_source:
             category_query['source'] = category_source
-
             source_input = {
-                '$filter': {
-                    'input': source_input,
-                    'as': 'src_pair',
-                    'cond': {'$eq': ['$$src_pair.k', category_source]},
-                }
+                '$filter': {'input': source_input, 'as': 'src_pair', 'cond': {'$eq': ['$$src_pair.k', category_source]}}
             }
         if category_name:
             category_query['name'] = category_name
-
             name_input = {
-                '$filter': {
-                    'input': name_input,
-                    'as': 'cat_pair',
-                    'cond': {'$eq': ['$$cat_pair.k', category_name]},
-                }
+                '$filter': {'input': name_input, 'as': 'cat_pair', 'cond': {'$eq': ['$$cat_pair.k', category_name]}}
             }
+
+        entry_filter = {'$filter': {'input': '$minions', 'as': 'm', 'cond': {'$eq': ['$$m.minion_id', '$$mid']}}}
+        merge_with_meta = {'$mergeObjects': ['$data', '$_entry.data', {'_source': '$source', '_name': '$name'}]}
+        lookup_pipeline: list[dict[str, Any]] = [
+            {'$addFields': {'_entry': {'$first': entry_filter}}},
+            {'$replaceRoot': {'newRoot': merge_with_meta}},
+        ]
         if category_query:
             lookup_pipeline.insert(0, {'$match': category_query})
+
+        static_map = {
+            '$map': {
+                'input': '$$this.v',
+                'as': 'it',
+                'in': {'$mergeObjects': ['$$it', {'_source': '$$src_name', '_name': '$$this.k'}]},
+            }
+        }
+        inner_reduce = {
+            '$reduce': {'input': name_input, 'initialValue': [], 'in': {'$concatArrays': ['$$value', static_map]}}
+        }
+        outer_reduce = {
+            '$reduce': {
+                'input': source_input,
+                'initialValue': [],
+                'in': {
+                    '$let': {
+                        'vars': {'src_name': '$$this.k', 'categories': '$$this.v'},
+                        'in': {'$concatArrays': ['$$value', inner_reduce]},
+                    }
+                },
+            }
+        }
 
         pipeline.extend(
             [
@@ -237,52 +236,7 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
                         'as': '_aggregated_items',
                     }
                 },
-                {
-                    '$addFields': {
-                        '_static_items': {
-                            '$reduce': {
-                                'input': source_input,
-                                'initialValue': [],
-                                'in': {
-                                    '$let': {
-                                        'vars': {'src_name': '$$this.k', 'categories': '$$this.v'},
-                                        'in': {
-                                            '$concatArrays': [
-                                                '$$value',
-                                                {
-                                                    '$reduce': {
-                                                        'input': name_input,
-                                                        'initialValue': [],
-                                                        'in': {
-                                                            '$concatArrays': [
-                                                                '$$value',
-                                                                {
-                                                                    '$map': {
-                                                                        'input': '$$this.v',
-                                                                        'as': 'it',
-                                                                        'in': {
-                                                                            '$mergeObjects': [
-                                                                                '$$it',
-                                                                                {
-                                                                                    '_source': '$$src_name',
-                                                                                    '_name': '$$this.k',
-                                                                                },
-                                                                            ]
-                                                                        },
-                                                                    }
-                                                                },
-                                                            ]
-                                                        },
-                                                    }
-                                                },
-                                            ]
-                                        },
-                                    }
-                                },
-                            }
-                        }
-                    }
-                },
+                {'$addFields': {'_static_items': outer_reduce}},
                 {'$project': {'_id': 0, 'items': {'$concatArrays': ['$_static_items', '$_aggregated_items']}}},
                 {'$unwind': '$items'},
                 {'$replaceRoot': {'newRoot': '$items'}},
@@ -292,41 +246,25 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
         )
 
         if search_str:
+            kv_value = {'$convert': {'input': '$$kv.v', 'to': 'string', 'onError': '', 'onNull': ''}}
+            regex = re.escape(search_str) if escape_search_str else search_str
+            search_match = {'$regexMatch': {'input': kv_value, 'regex': regex, 'options': 'i'}}
             pipeline.append(
                 {
                     '$match': {
                         '$expr': {
                             '$anyElementTrue': {
-                                '$map': {
-                                    'input': {'$objectToArray': '$$ROOT'},
-                                    'as': 'kv',
-                                    'in': {
-                                        '$regexMatch': {
-                                            'input': {
-                                                '$convert': {
-                                                    'input': '$$kv.v',
-                                                    'to': 'string',
-                                                    'onError': '',
-                                                    'onNull': '',
-                                                }
-                                            },
-                                            'regex': re.escape(search_str) if escape_search_str else search_str,
-                                            'options': 'i',
-                                        }
-                                    },
-                                }
+                                '$map': {'input': {'$objectToArray': '$$ROOT'}, 'as': 'kv', 'in': search_match}
                             }
                         }
                     }
-                },
+                }
             )
 
         if count_only:
             pipeline.append({'$count': 'total'})
         else:
-            sort = {'_source': SortOrder.ASC, '_name': SortOrder.ASC, **(sort or {})}
-            pipeline.append({'$sort': sort})
-
+            pipeline.append({'$sort': {'_source': SortOrder.ASC, '_name': SortOrder.ASC, **(sort or {})}})
             if skip:
                 pipeline.append({'$skip': skip})
             if limit:
