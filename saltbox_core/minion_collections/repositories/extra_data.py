@@ -34,6 +34,11 @@ class ExtraDataRepository(BaseMongoRepository[ExtraDataModel]):
                 ('source', pymongo.ASCENDING),
                 ('name', pymongo.ASCENDING),
             ],
+            'category_by_minions_index_asc': [
+                ('source', pymongo.ASCENDING),
+                ('name', pymongo.ASCENDING),
+                ('minions.minion_id', pymongo.ASCENDING),
+            ],
             'data_index_wildecart': [('data.$**', pymongo.ASCENDING)],
             'minions_index_wildecart': [('minions.$**', pymongo.ASCENDING)],
             'minions_ids_index': [('minions.minion_id', pymongo.ASCENDING)],

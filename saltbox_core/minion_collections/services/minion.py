@@ -1,6 +1,7 @@
 import csv
+import re
 from datetime import UTC, datetime
-from typing import Annotated, Any, overload
+from typing import Annotated, Any, Literal, overload
 
 from anyio import Path
 from fastapi import Depends
@@ -18,7 +19,8 @@ from saltbox_core.minion_collections.schemas.minion import (
     MinionUpdateSchema,
 )
 from saltbox_core.minion_collections.services.pipeline_builder import MongoPipelineBuilder
-from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
+from saltbox_sdk.db.schemas_base import PaginatedResponse
 from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService, ProjectionModel
 
@@ -130,6 +132,211 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
                 await writer.writerow(row)
 
         return file_path
+
+    @overload
+    @staticmethod
+    def build_extra_data_mongo_pipeline(
+        *,
+        query: dict[str, Any] | None = ...,
+        category_source: str | None = ...,
+        category_name: str | None = ...,
+        search_str: str | None = ...,
+        escape_search_str: bool = ...,
+        count_only: Literal[True],
+    ) -> list[dict[str, Any]]: ...
+
+    @overload
+    @staticmethod
+    def build_extra_data_mongo_pipeline(
+        *,
+        query: dict[str, Any] | None = ...,
+        category_source: str | None = ...,
+        category_name: str | None = ...,
+        search_str: str | None = ...,
+        escape_search_str: bool = ...,
+        count_only: Literal[False] = False,
+        limit: int = ...,
+        skip: int = ...,
+        sort: dict[str, SortOrder] | None = ...,
+    ) -> list[dict[str, Any]]: ...
+
+    @staticmethod
+    def build_extra_data_mongo_pipeline(
+        *,
+        query: dict[str, Any] | None = None,
+        category_source: str | None = None,
+        category_name: str | None = None,
+        search_str: str | None = None,
+        escape_search_str: bool = True,
+        count_only: bool = False,
+        limit: int = 0,
+        skip: int = 0,
+        sort: dict[str, SortOrder] | None = None,
+    ) -> list[dict[str, Any]]:
+        pipeline: list[dict[str, Any]] = []
+        source_input: dict[str, Any] = {'$objectToArray': {'$ifNull': ['$extra_static', {}]}}
+        name_input: dict[str, Any] = {'$objectToArray': '$$categories'}
+        category_query: dict[str, Any] = {}
+
+        if query:
+            pipeline.append({'$match': query})
+
+        if category_source:
+            category_query['source'] = category_source
+            source_input = {
+                '$filter': {'input': source_input, 'as': 'src_pair', 'cond': {'$eq': ['$$src_pair.k', category_source]}}
+            }
+        if category_name:
+            category_query['name'] = category_name
+            name_input = {
+                '$filter': {'input': name_input, 'as': 'cat_pair', 'cond': {'$eq': ['$$cat_pair.k', category_name]}}
+            }
+
+        entry_filter = {'$filter': {'input': '$minions', 'as': 'm', 'cond': {'$eq': ['$$m.minion_id', '$$mid']}}}
+        merge_with_meta = {'$mergeObjects': ['$data', '$_entry.data', {'_source': '$source', '_name': '$name'}]}
+        lookup_pipeline: list[dict[str, Any]] = [
+            {'$addFields': {'_entry': {'$first': entry_filter}}},
+            {'$replaceRoot': {'newRoot': merge_with_meta}},
+        ]
+        if category_query:
+            lookup_pipeline.insert(0, {'$match': category_query})
+
+        static_map = {
+            '$map': {
+                'input': '$$this.v',
+                'as': 'it',
+                'in': {'$mergeObjects': ['$$it', {'_source': '$$src_name', '_name': '$$this.k'}]},
+            }
+        }
+        inner_reduce = {
+            '$reduce': {'input': name_input, 'initialValue': [], 'in': {'$concatArrays': ['$$value', static_map]}}
+        }
+        outer_reduce = {
+            '$reduce': {
+                'input': source_input,
+                'initialValue': [],
+                'in': {
+                    '$let': {
+                        'vars': {'src_name': '$$this.k', 'categories': '$$this.v'},
+                        'in': {'$concatArrays': ['$$value', inner_reduce]},
+                    }
+                },
+            }
+        }
+
+        pipeline.extend(
+            [
+                {
+                    '$lookup': {
+                        'from': 'minion_extra_data',
+                        'localField': '_id',
+                        'foreignField': 'minions.minion_id',
+                        'let': {'mid': '$_id'},
+                        'pipeline': lookup_pipeline,
+                        'as': '_aggregated_items',
+                    }
+                },
+                {'$addFields': {'_static_items': outer_reduce}},
+                {'$project': {'_id': 0, 'items': {'$concatArrays': ['$_static_items', '$_aggregated_items']}}},
+                {'$unwind': '$items'},
+                {'$replaceRoot': {'newRoot': '$items'}},
+                {'$group': {'_id': '$$ROOT'}},
+                {'$replaceRoot': {'newRoot': '$_id'}},
+            ]
+        )
+
+        if search_str:
+            kv_value = {'$convert': {'input': '$$kv.v', 'to': 'string', 'onError': '', 'onNull': ''}}
+            regex = re.escape(search_str) if escape_search_str else search_str
+            search_match = {'$regexMatch': {'input': kv_value, 'regex': regex, 'options': 'i'}}
+            pipeline.append(
+                {
+                    '$match': {
+                        '$expr': {
+                            '$anyElementTrue': {
+                                '$map': {'input': {'$objectToArray': '$$ROOT'}, 'as': 'kv', 'in': search_match}
+                            }
+                        }
+                    }
+                }
+            )
+
+        if count_only:
+            pipeline.append({'$count': 'total'})
+        else:
+            pipeline.append({'$sort': {'_source': SortOrder.ASC, '_name': SortOrder.ASC, **(sort or {})}})
+            if skip:
+                pipeline.append({'$skip': skip})
+            if limit:
+                pipeline.append({'$limit': limit})
+
+        return pipeline
+
+    async def get_extra_data_list(
+        self,
+        query: dict[str, Any] | None = None,
+        category_source: str | None = None,
+        category_name: str | None = None,
+        search_str: str | None = None,
+        escape_search_str: bool = True,
+        limit: int = 0,
+        skip: int = 0,
+        sort: dict[str, SortOrder] | None = None,
+        session: MongoAsyncClientSession | None = None,
+    ) -> list[dict[str, Any]]:
+        pipeline = self.build_extra_data_mongo_pipeline(
+            query=query,
+            category_source=category_source,
+            category_name=category_name,
+            search_str=search_str,
+            escape_search_str=escape_search_str,
+            limit=limit,
+            skip=skip,
+            sort=sort,
+        )
+
+        cursor = await self.repo.collection.aggregate(pipeline=pipeline, session=session)
+
+        return await cursor.to_list()
+
+    async def get_paginated_extra_data_list(
+        self,
+        query: dict[str, Any] | None = None,
+        category_source: str | None = None,
+        category_name: str | None = None,
+        search_str: str | None = None,
+        escape_search_str: bool = True,
+        limit: int = 0,
+        skip: int = 0,
+        sort: dict[str, SortOrder] | None = None,
+        session: MongoAsyncClientSession | None = None,
+    ) -> PaginatedResponse[dict]:
+        total_pipeline = self.build_extra_data_mongo_pipeline(
+            query=query,
+            category_source=category_source,
+            category_name=category_name,
+            search_str=search_str,
+            escape_search_str=escape_search_str,
+            count_only=True,
+        )
+
+        total_cursor = await self.repo.collection.aggregate(pipeline=total_pipeline, session=session)
+        total_cursor_result = await total_cursor.to_list()
+        total = total_cursor_result[0]['total'] if total_cursor_result else 0
+
+        data = await self.get_extra_data_list(
+            query=query,
+            category_source=category_source,
+            category_name=category_name,
+            search_str=search_str,
+            escape_search_str=escape_search_str,
+            limit=limit,
+            skip=skip,
+            sort=sort,
+            session=session,
+        )
+
+        return PaginatedResponse[dict](total=total, data=data)
 
 
 def get_minion_service(
