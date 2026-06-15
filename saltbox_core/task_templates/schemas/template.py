@@ -63,7 +63,7 @@ class TaskTemplateModel(CreatedModifiedMixin, IDMixin):
 
 class TaskTemplateAggregatedModel(TaskTemplateModel):
     local_path: str = Field(title='Source local path')
-    source_root: str = Field(title='Source root in the repository')
+    source_root: str = Field(default='', title='Source root in the repository')
 
 
 class TaskTemplateSyncSchema(BaseModel):
