@@ -45,7 +45,7 @@ from saltbox_core.task_templates.schemas.sshfs_file import (
     SshfsFileCreateSchema,
     SshfsFileType,
 )
-from saltbox_core.task_templates.schemas.template import TaskTemplateCreateSchema
+from saltbox_core.task_templates.schemas.template import TaskTemplateAggregatedModel, TaskTemplateCreateSchema
 from saltbox_core.task_templates.services.source import TemplateSourceService, get_tpl_source_service
 from saltbox_core.task_templates.services.sshfs_file import SshfsFileService, get_sshfs_file_service
 from saltbox_core.task_templates.services.template import TaskTemplateService, get_task_tpl_service
@@ -629,7 +629,7 @@ class SyncOrchestrator:
         )
 
     async def update_template_from_raw(self, template_id: PyObjectId, content: str, task_id: str | None = None) -> None:
-        template = await self._template_service.get(template_id)
+        template = await self._template_service.get(template_id, projection_model=TaskTemplateAggregatedModel)
 
         await self._source_service.update(
             template.source_id,
@@ -639,7 +639,12 @@ class SyncOrchestrator:
                 'current_task_id': task_id,
             },
         )
-        local_path = Path(SETTINGS.local_repos_dir) / template.local_path / template.sls_rel_path
+        if template.source_root:
+            local_path = (
+                Path(SETTINGS.local_repos_dir) / template.local_path / template.source_root / template.sls_rel_path
+            )
+        else:
+            local_path = Path(SETTINGS.local_repos_dir) / template.local_path / template.sls_rel_path
 
         try:
             local_path.write_text(content, encoding='utf-8')

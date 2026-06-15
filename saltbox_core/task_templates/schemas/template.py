@@ -59,7 +59,11 @@ class TaskTemplateModel(CreatedModifiedMixin, IDMixin):
     secret_pillars: list[str] | None = Field(title='Secret pillar names', default=None)
     json_schema: dict = Field(title='JSON schema', default_factory=dict)
     ui_schema: dict = Field(title='UI schema', default_factory=dict)
+
+
+class TaskTemplateAggregatedModel(TaskTemplateModel):
     local_path: str = Field(title='Source local path')
+    source_root: str = Field(title='Source root in the repository')
 
 
 class TaskTemplateSyncSchema(BaseModel):

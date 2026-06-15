@@ -8,6 +8,7 @@ from saltbox_core.pillars.repository import PillarRepository, get_pillar_reposit
 from saltbox_core.pillars.schemas import PillarTgtType
 from saltbox_core.task_templates.repositories.template import TaskTemplateRepository, get_task_template_repository
 from saltbox_core.task_templates.schemas.template import (
+    TaskTemplateAggregatedModel,
     TaskTemplateCreateSchema,
     TaskTemplateModel,
     TaskTemplatePublicWithContentSchema,
@@ -41,7 +42,7 @@ class TaskTemplateService(
     ) -> int:
         async with get_mongo_session_with_transaction(session) as s:
             # Remove all related pillars
-            tpl = await self.get(query=query, session=s)
+            tpl = await self.get(query=query, session=s, projection_model=TaskTemplateAggregatedModel)
             pillar_query = {
                 'tgt_type': PillarTgtType.TASK_TPL,
                 'pillarenv': {
@@ -94,9 +95,12 @@ class TaskTemplateService(
         *,
         session: AsyncClientSession | None = None,
     ) -> TaskTemplatePublicWithContentSchema:
-        tpl = await self.get(query={'_id': tpl_id}, session=session)
+        tpl = await self.get(query={'_id': tpl_id}, session=session, projection_model=TaskTemplateAggregatedModel)
 
-        sls_file = SETTINGS.local_repos_dir / tpl.local_path / tpl.sls_rel_path
+        if tpl.source_root:
+            sls_file = SETTINGS.local_repos_dir / tpl.local_path / tpl.source_root / tpl.sls_rel_path
+        else:
+            sls_file = SETTINGS.local_repos_dir / tpl.local_path / tpl.sls_rel_path
         logger.debug('Attempting to read SLS file: %s', sls_file)
         try:
             sls_content = sls_file.read_text()

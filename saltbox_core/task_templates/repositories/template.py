@@ -46,6 +46,19 @@ class TaskTemplateRepository(BaseMongoRepository[TaskTemplateModel]):
                         AddFieldsAggregationStage(fields={'local_path': '$_source.local_path'}),
                     ],
                 ),
+                AggregatedField(
+                    field_name='source_root',
+                    stages=[
+                        LookupAggregationStage(
+                            from_collection='task_tpl_sources',
+                            local_field='source_id',
+                            foreign_field='_id',
+                            as_field='_source',
+                        ),
+                        UnwindAggregationStage(path='$_source', preserve_null_and_empty_arrays=True),
+                        AddFieldsAggregationStage(fields={'source_root': '$_source.root'}),
+                    ],
+                ),
             ]
         )
 
