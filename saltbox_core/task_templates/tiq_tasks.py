@@ -77,6 +77,35 @@ async def source_prepare_task(
 
 
 @broker.task(queue_name=queue_default.name)
+async def source_unplug_task(
+    source_id: str,
+    context: Context = TaskiqDepends(),
+    progress: ProgressTracker[Any] = TaskiqDepends(),
+    orchestrator: SyncOrchestrator = TaskiqDepends(get_sync_orchestrator),
+    redis: Redis = TaskiqDepends(get_redis),
+) -> dict[str, Any]:
+    lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=60, prefix='template_source')
+    lock = lock_factory.create(source_id)
+    logger.info('is_locked: %s', await lock.locked())
+
+    if await lock.locked():
+        msg = f'Source {source_id} is locked by another task.'
+        logger.warning(msg)
+        await progress.set_progress(TaskState.FAILURE, msg)
+        raise TaskTemplateSourceLockException(source_id=source_id)
+
+    async with lock:
+        await progress.set_progress(TaskState.STARTED, 'Unplug started')
+        try:
+            await orchestrator.unplug(PyObjectId(source_id), context.message.task_id)
+            await progress.set_progress(TaskState.SUCCESS, 'Unplug successful')
+            return {'status': 'unplugged'}
+        except Exception:
+            await progress.set_progress(TaskState.FAILURE, 'Unplug failed')
+            raise
+
+
+@broker.task(queue_name=queue_default.name)
 async def source_sync_task(
     source_id: str,
     context: Context = TaskiqDepends(),
@@ -133,7 +162,7 @@ async def source_remove_task(
     async with lock:
         await progress.set_progress(TaskState.STARTED, 'Remove started')
         try:
-            await orchestrator.remove(PyObjectId(source_id), context.message.task_id)
+            await orchestrator.remove_source(PyObjectId(source_id), context.message.task_id)
             await progress.set_progress(TaskState.SUCCESS, 'Remove successful')
             return {'status': 'removed'}
         except Exception:
@@ -269,3 +298,41 @@ async def source_check_external_list_task(
     except Exception:
         await progress.set_progress(TaskState.FAILURE, 'Check external list failed')
         raise
+
+
+@broker.task(queue_name=queue_default.name)
+async def delete_local_template_task(
+    source_id: str,
+    template_id: str,
+    context: Context = TaskiqDepends(),
+    progress: ProgressTracker[Any] = TaskiqDepends(),
+    orchestrator: SyncOrchestrator = TaskiqDepends(get_sync_orchestrator),
+    redis: Redis = TaskiqDepends(get_redis),
+) -> dict[str, Any]:
+    lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=60, prefix='template_source')
+    lock = lock_factory.create(source_id)
+    logger.info('is_locked: %s', await lock.locked())
+
+    if await lock.locked():
+        msg = f'Source {source_id} is locked by another task.'
+        logger.warning(msg)
+        await progress.set_progress(TaskState.FAILURE, msg)
+        raise TaskTemplateSourceLockException(source_id=source_id)
+
+    async with lock:
+        await progress.set_progress(TaskState.STARTED, 'Delete local template started')
+        try:
+            await orchestrator.delete_local_template(PyObjectId(template_id), task_id=context.message.task_id)
+            await progress.set_progress(TaskState.STARTED, 'Delete local template successful')
+        except Exception:
+            await progress.set_progress(TaskState.FAILURE, 'Delete local template failed')
+            raise
+
+        try:
+            await orchestrator.discover(PyObjectId(source_id), task_id=context.message.task_id)
+            await progress.set_progress(TaskState.SUCCESS, 'Fetch successful')
+        except Exception:
+            await progress.set_progress(TaskState.FAILURE, 'Fetch failed')
+            raise
+
+    return {'status': 'deleted'}

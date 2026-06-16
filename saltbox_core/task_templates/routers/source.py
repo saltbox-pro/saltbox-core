@@ -19,6 +19,7 @@ from saltbox_core.task_templates.tiq_tasks import (
     source_prepare_task,
     source_remove_task,
     source_sync_task,
+    source_unplug_task,
 )
 from saltbox_core.task_templates.utils.orchestrator import SyncOrchestrator, get_sync_orchestrator
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
@@ -163,6 +164,19 @@ async def source_discover(source_id: PyObjectId) -> str:
 )
 async def source_plug(source_id: PyObjectId) -> str:
     task = await source_prepare_task.kiq(source_id=str(source_id))
+    return task.task_id
+
+
+@router.get(
+    '/{source_id}/unplug',
+    operation_id='template_source_unplug',
+    openapi_extra=GatewayEndpointConfig(
+        policy='public',
+        action=TemplateSourceActions.UNPLUG,
+    ).model_dump(by_alias=True),
+)
+async def source_unplug(source_id: PyObjectId) -> str:
+    task = await source_unplug_task.kiq(source_id=str(source_id))
     return task.task_id
 
 

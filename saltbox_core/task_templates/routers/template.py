@@ -11,7 +11,11 @@ from saltbox_core.task_templates.schemas.template import (
     TaskTemplatePublicWithContentSchema,
 )
 from saltbox_core.task_templates.services.template import TaskTemplateService, get_task_tpl_service
-from saltbox_core.task_templates.tiq_tasks import create_tpl_from_raw_task, update_tpl_from_raw_task
+from saltbox_core.task_templates.tiq_tasks import (
+    create_tpl_from_raw_task,
+    delete_local_template_task,
+    update_tpl_from_raw_task,
+)
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
@@ -93,4 +97,21 @@ async def template_update(
 ) -> str:
     template = await service.get(template_id)
     task = await update_tpl_from_raw_task.kiq(str(template.source_id), str(template_id), body.content)
+    return task.task_id
+
+
+@router.delete(
+    '/{template_id}',
+    operation_id='new_template_delete',
+    openapi_extra=GatewayEndpointConfig(
+        policy='public',
+        action=TaskTemplateActions.DELETE,
+    ).model_dump(by_alias=True),
+)
+async def template_delete(
+    template_id: PyObjectId,
+    service: Annotated[TaskTemplateService, Depends(get_task_tpl_service)],
+) -> str:
+    template = await service.get(template_id)
+    task = await delete_local_template_task.kiq(str(template.source_id), str(template_id))
     return task.task_id

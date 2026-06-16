@@ -47,11 +47,12 @@ class SourceOperation(StrEnum):
     PREPARE_TEMPLATES = 'prepare_templates'
     UPDATE_TEMPLATE_CONTENT = 'update_template_content'
     ADD_TEMPLATE_FROM_RAW = 'add_template_from_raw'
-    DELETE_TEMPLATE = 'delete_template'
+    DELETE_LOCAL_TEMPLATE = 'delete_local_template'
     PREPARE_FILES = 'prepare_files'
     ADD_USER_FILE = 'add_user_file'
     SYNC = 'sync'
     REMOVE = 'remove'
+    UNPLUG = 'unplug'
 
 
 class TemplateSourceCreateSchema(BaseModel):
@@ -177,6 +178,7 @@ class TemplateSourceActions(StrEnum):
     UPDATE = 'update'
     DELETE = 'delete'
     PLUG = 'plug'
+    UNPLUG = 'unplug'
     SYNC = 'sync'
     DISCOVER = 'discover'
     DELETE_USER_FILE = 'delete_user_file'

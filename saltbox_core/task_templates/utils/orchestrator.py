@@ -508,6 +508,33 @@ class SyncOrchestrator:
                 {'state': SourceState.PLUGGED, 'current_operation': None, 'last_error': None, 'current_task_id': None},
             )
 
+    async def unplug(self, source_id: PyObjectId, task_id: str | None = None) -> None:
+        await self._source_service.update(
+            source_id, {'current_operation': SourceOperation.UNPLUG, 'current_task_id': task_id}
+        )
+        try:
+            # Remove templates from serve dir
+            tpls = await self._template_service.get_list(query={'source_id': source_id}, skip=0, limit=0)
+            for tpl in tpls:
+                sls_file = SETTINGS.salt_modules_serve_dir / tpl.sls_rel_path
+                logger.debug('Attempting to remove SLS file: %s', sls_file)
+                sls_file.unlink(missing_ok=True)
+            # Remove files from SSHFS
+            sshfs_files = await self._sshfs_file_service.get_list(query={'source_id': source_id}, skip=0, limit=0)
+            for file in sshfs_files:
+                await self._sshfs_sync_service.remove(file)
+        except Exception as e:
+            logger.error('Failed to unplug source: %s', e)
+            await self._source_service.update(
+                source_id, {'state': SourceState.BROKEN, 'last_error': str(e), 'current_task_id': None}
+            )
+            raise
+
+        await self._source_service.update(
+            source_id,
+            {'state': SourceState.DISCOVERED, 'current_operation': None, 'last_error': None, 'current_task_id': None},
+        )
+
     async def sync(self, source_id: PyObjectId, task_id: str | None = None) -> None:
         # Get list of accepted masters and send them rpc notification in parallel
         await self._source_service.update(
@@ -594,7 +621,7 @@ class SyncOrchestrator:
             )
             raise
 
-    async def remove(self, source_id: PyObjectId, task_id: str | None = None) -> None:
+    async def remove_source(self, source_id: PyObjectId, task_id: str | None = None) -> None:
         await self._source_service.update(
             source_id, {'current_operation': SourceOperation.REMOVE, 'current_task_id': task_id}
         )
@@ -650,6 +677,36 @@ class SyncOrchestrator:
             local_path.write_text(content, encoding='utf-8')
         except OSError as e:
             logger.error('Failed to write template file: %s', e)
+            raise
+        await self._source_service.update(template.source_id, {'current_operation': None, 'current_task_id': None})
+
+    async def delete_local_template(self, template_id: PyObjectId, task_id: str | None = None) -> None:
+        template = await self._template_service.get(template_id, projection_model=TaskTemplateAggregatedModel)
+        source = await self._source_service.get(template.source_id)
+        if source.source_type not in [SourceType.LOCAL_BUNDLE, SourceType.ARCHIVE_BUNDLE]:
+            msg = 'Deleting template is only supported for local sources.'
+            logger.error(msg)
+            raise ValueError(msg)
+
+        await self._source_service.update(
+            template.source_id,
+            {
+                'state': SourceState.PENDING,
+                'current_operation': SourceOperation.DELETE_LOCAL_TEMPLATE,
+                'current_task_id': task_id,
+            },
+        )
+        if template.source_root:
+            local_path = (
+                Path(SETTINGS.local_repos_dir) / template.local_path / template.source_root / template.sls_rel_path
+            )
+        else:
+            local_path = Path(SETTINGS.local_repos_dir) / template.local_path / template.sls_rel_path
+
+        try:
+            local_path.unlink()
+        except OSError as e:
+            logger.error('Failed to delete template file: %s', e)
             raise
         await self._source_service.update(template.source_id, {'current_operation': None, 'current_task_id': None})
 
