@@ -1,12 +1,16 @@
+import csv
+import io
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends
+from fastapi.responses import Response
 from pydantic import Field
 
 from saltbox_core.jobs.schemas.job_return_schemas import (
     JobReturnDataListPaginatedResponse,
     JobReturnDataOnlyScheme,
     JobReturnListResponse,
+    JobReturnsDataCSVBody,
     JobReturnsListBody,
     JobReturnStatus,
 )
@@ -176,7 +180,7 @@ async def job_returns_table(
         query = {'$and': [query, opa_query]}
 
     if not sort:
-        sort = {'minion_is': SortOrder.ASC}
+        sort = {'minion_id': SortOrder.ASC}
 
     data_table = await job_return_service.get_data_list_paginated(
         query=query,
@@ -186,6 +190,52 @@ async def job_returns_table(
     )
 
     return data_table
+
+
+@router.post(
+    '/returns/csv',
+    operation_id='job_returns_csv',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.jobs.base',
+        action=JobsActions.READ,
+    ).model_dump(by_alias=True),
+)
+async def job_returns_csv(
+    opa_query: Annotated[dict, Depends(get_opa_query)],
+    body: Annotated[JobReturnsDataCSVBody, Body()],
+    job_return_service: Annotated[JobReturnService, Depends(get_job_return_service)],
+) -> Response:
+    base_query = {'status': JobReturnStatus.success}
+    sort = body.sort
+
+    query: dict[str, Any]
+    if body.query:
+        query = {'$and': [base_query, body.query]}
+    else:
+        query = base_query
+
+    if opa_query:
+        query = {'$and': [query, opa_query]}
+
+    if not sort:
+        sort = {'minion_id': SortOrder.ASC}
+
+    data = await job_return_service.get_data_list(
+        query=query,
+        sort=sort,
+    )
+
+    buffer = io.StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(data.columns)
+    for item in data.data:
+        writer.writerow([item.get(column_name) for column_name in data.columns])
+
+    return Response(
+        content=buffer.getvalue(),
+        media_type='text/csv; charset=utf-8',
+        headers={'Content-Disposition': 'attachment; filename="job_returns_data.csv"'},
+    )
 
 
 @router.get(

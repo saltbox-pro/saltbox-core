@@ -130,4 +130,8 @@ class JobReturnListResponse(
 ): ...
 
 
+class JobReturnsDataCSVBody(QueryParams, SortParams):
+    model_config = ConfigDict(extra='ignore')
+
+
 class JobReturnDataListPaginatedResponse(PaginatedResponse[dict], JobReturnDataListSchema): ...
