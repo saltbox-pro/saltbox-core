@@ -4,9 +4,11 @@ from fastapi import APIRouter, Body, Depends
 from pydantic import Field
 
 from saltbox_core.jobs.schemas.job_return_schemas import (
+    JobReturnDataListPaginatedResponse,
     JobReturnDataOnlyScheme,
     JobReturnListResponse,
     JobReturnsListBody,
+    JobReturnStatus,
 )
 from saltbox_core.jobs.schemas.job_schemas import (
     CreateJobRequest,
@@ -19,7 +21,7 @@ from saltbox_core.jobs.schemas.job_schemas import (
 )
 from saltbox_core.jobs.services.job_return_service import JobReturnService, get_job_return_service
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
-from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
 from saltbox_sdk.db.schemas_base import PaginatedResponse, Source, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 from saltbox_sdk.fastapi_utils.dependencies import get_current_user, get_opa_query
@@ -137,7 +139,7 @@ async def job_returns_list(
     if opa_query:
         query = {'$and': [query, opa_query]}
 
-    jobs = await job_return_service.get_list_paginated(
+    job_returns = await job_return_service.get_list_paginated(
         query=query,
         skip=body.skip,
         limit=body.limit,
@@ -145,7 +147,45 @@ async def job_returns_list(
         sort=body.sort,
     )
 
-    return jobs
+    return job_returns
+
+
+@router.post(
+    '/returns/table',
+    operation_id='job_returns_table',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.jobs.base',
+        action=JobsActions.READ,
+    ).model_dump(by_alias=True),
+)
+async def job_returns_table(
+    opa_query: Annotated[dict, Depends(get_opa_query)],
+    body: Annotated[JobReturnsListBody, Body()],
+    job_return_service: Annotated[JobReturnService, Depends(get_job_return_service)],
+) -> JobReturnDataListPaginatedResponse:
+    base_query = {'status': JobReturnStatus.success}
+    sort = body.sort
+
+    query: dict[str, Any]
+    if body.query:
+        query = {'$and': [base_query, body.query]}
+    else:
+        query = base_query
+
+    if opa_query:
+        query = {'$and': [query, opa_query]}
+
+    if not sort:
+        sort = {'minion_is': SortOrder.ASC}
+
+    data_table = await job_return_service.get_data_list_paginated(
+        query=query,
+        skip=body.skip,
+        limit=body.limit,
+        sort=sort,
+    )
+
+    return data_table
 
 
 @router.get(

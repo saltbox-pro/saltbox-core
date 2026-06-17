@@ -1,8 +1,11 @@
 from collections.abc import Callable
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends
 from pydantic import BaseModel
+from pymongo.asynchronous.client_session import (
+    AsyncClientSession as MongoAsyncClientSession,
+)
 from redis import exceptions as redis_exceptions
 from redis.asyncio import Redis
 
@@ -11,11 +14,14 @@ from saltbox_core.db.tiq_tasks import send_notify_by_mongo_service
 from saltbox_core.jobs.repositories.job_return_repository import JobReturnRepository, get_job_return_repository
 from saltbox_core.jobs.schemas.job_return_schemas import (
     JobReturnCreateSchema,
+    JobReturnDataListPaginatedResponse,
+    JobReturnDataListSchema,
+    JobReturnForDataList,
     JobReturnModel,
     JobReturnNotifySchema,
     JobReturnUpdateSchema,
 )
-from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
 from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_with_notify_service import MongoBaseWithNotifyService
@@ -24,6 +30,52 @@ from saltbox_sdk.serivces.mongo_base_with_notify_service import MongoBaseWithNot
 class JobReturnService(
     MongoBaseWithNotifyService[JobReturnRepository, JobReturnModel, JobReturnCreateSchema, JobReturnUpdateSchema]
 ):
+    async def get_data_list(
+        self,
+        query: Any,
+        limit: int = 0,
+        skip: int = 0,
+        *,
+        session: MongoAsyncClientSession | None = None,
+        sort: dict[str, SortOrder] | None = None,
+    ) -> JobReturnDataListSchema:
+        data: list[dict[str, Any]] = []
+        columns: list[str] = ['minion_id']
+        job_reruns = await self.get_list(
+            query=query,
+            limit=limit,
+            skip=skip,
+            session=session,
+            sort=sort,
+            projection_model=JobReturnForDataList,
+        )
+
+        for job_rerun in job_reruns:
+            list_of_job_return_formated_data = self.repo.format_data(job_rerun.data)
+
+            for job_return_formated_data in list_of_job_return_formated_data:
+                data.append({**job_return_formated_data, 'minion_id': job_rerun.minion_id})
+
+                for column_name in job_return_formated_data.keys():
+                    if column_name not in columns:
+                        columns.append(column_name)
+
+        return JobReturnDataListSchema(columns=list(columns), data=data)
+
+    async def get_data_list_paginated(
+        self,
+        query: dict[str, Any] | None,
+        limit: int,
+        skip: int,
+        *,
+        session: MongoAsyncClientSession | None = None,
+        sort: dict[str, SortOrder] | None = None,
+    ) -> JobReturnDataListPaginatedResponse:
+        total = await self.count(query=query, session=session)
+        data = await self.get_data_list(query=query, limit=limit, skip=skip, session=session, sort=sort)
+
+        return JobReturnDataListPaginatedResponse.model_validate({'total': total, **data.model_dump()})
+
     @property
     def notify_taskiq_task(self) -> Callable:
         return send_notify_by_mongo_service

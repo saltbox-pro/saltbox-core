@@ -5,7 +5,14 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from saltbox_core.jobs.schemas.job_schemas import StrJid
 from saltbox_sdk.db.mongo.schemas_base import IDMixin, QueryParams, SortParams
-from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER, CreatedModifiedMixin, SkipLimitParams, SourceMixin, UserShort
+from saltbox_sdk.db.schemas_base import (
+    SYSTEM_SHORT_USER,
+    CreatedModifiedMixin,
+    PaginatedResponse,
+    SkipLimitParams,
+    SourceMixin,
+    UserShort,
+)
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
 
 # Job returns
@@ -89,6 +96,18 @@ class JobReturnForTaskStatusUpdate(SourceMixin, IDMixin):
     retcode: int | None = None
 
 
+class JobReturnForDataList(BaseModel):
+    jid: StrJid
+    minion_id: str
+    salt_master: str
+    data: Any = Field(default=None)
+
+
+class JobReturnDataListSchema(BaseModel):
+    columns: list[str]
+    data: list[dict[str, Any]] = Field(default_factory=list)
+
+
 # REST
 
 
@@ -109,3 +128,6 @@ class JobReturnListResponse(
     JobReturnEditableFieldsMixin,
     IDMixin,
 ): ...
+
+
+class JobReturnDataListPaginatedResponse(PaginatedResponse[dict], JobReturnDataListSchema): ...

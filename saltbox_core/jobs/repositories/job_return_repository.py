@@ -1,4 +1,5 @@
 import json
+from collections.abc import Callable
 from typing import Annotated, Any, ClassVar
 
 import pymongo
@@ -89,6 +90,41 @@ class JobReturnRepository(BaseMongoRepository[JobReturnModel]):
             data['data'] = return_data
 
         return data
+
+    @staticmethod
+    def format_data(data: Any) -> list[dict]:
+        def _format_dict(_data: dict) -> list[dict]:
+            res: list[dict] = []
+
+            try:
+                for key, value in _data.items():
+                    res.append({'key': key, **value})
+            except TypeError:
+                for key, value in _data.items():
+                    res.append({'key': key, 'value': value})
+
+            return res
+
+        def _format_list(_data: list[Any]) -> list[dict]:
+            res: list[dict] = []
+
+            for item in _data:
+                if isinstance(item, dict):
+                    res.append(item)
+                else:
+                    res.append({'value': item})
+
+            return res
+
+        def _format_default(_data: Any) -> list[dict]:
+            return [{'value': _data}]
+
+        format_callbacks_map: dict[type, Callable[[Any], list[dict]]] = {
+            dict: _format_dict,
+            list: _format_list,
+        }
+
+        return format_callbacks_map.get(type(data), _format_default)(data)
 
 
 def get_job_return_repository(
