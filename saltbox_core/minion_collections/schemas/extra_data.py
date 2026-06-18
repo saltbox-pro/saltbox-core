@@ -37,3 +37,15 @@ class ExtraDataModel(
     ExtraDataEditableFieldsMixin,
     ExtraDataReadOnlyFieldsMixin,
 ): ...
+
+
+# REST
+
+
+class ExtraDataListItemSchema(BaseModel):
+    source: str = Field(title='Source', alias='_source', exclude=True)
+    name: str = Field(title='Name', alias='_name', exclude=True)
+
+    model_config = ConfigDict(
+        extra='allow',
+    )

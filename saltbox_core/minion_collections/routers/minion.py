@@ -8,6 +8,7 @@ from saltbox_core.config import logger
 from saltbox_core.event_bus.redis.masters_bus import send_message_and_wait_response_to_master
 from saltbox_core.masters.schemas.master_schemas import MasterModel
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
+from saltbox_core.minion_collections.schemas.extra_data import ExtraDataListItemSchema
 from saltbox_core.minion_collections.schemas.extra_data_category import (
     ExtraDataCategoryListBody,
     ExtraDataCategoryModel,
@@ -252,7 +253,7 @@ async def extra_category_list(
 async def extra_data_list(
     body: Annotated[ExtraDataListBody, Body()],
     minion_service: Annotated[MinionService, Depends(get_minion_service)],
-) -> PaginatedResponse[dict]:
+) -> PaginatedResponse[ExtraDataListItemSchema]:
     minion = await minion_service.get(query=body.minion_id, projection_model=MinionTgtOnlySchema)
 
     return await minion_service.get_paginated_extra_data_list(

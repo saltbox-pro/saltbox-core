@@ -9,6 +9,7 @@ from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsync
 
 from saltbox_core.config import logger
 from saltbox_core.minion_collections.repositories.minion import MinionRepository, get_minion_repository
+from saltbox_core.minion_collections.schemas.extra_data import ExtraDataListItemSchema
 from saltbox_core.minion_collections.schemas.filter import UniqueGrainValuesResponse
 from saltbox_core.minion_collections.schemas.minion import (
     GrainsSchema,
@@ -310,7 +311,7 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
         skip: int = 0,
         sort: dict[str, SortOrder] | None = None,
         session: MongoAsyncClientSession | None = None,
-    ) -> PaginatedResponse[dict]:
+    ) -> PaginatedResponse[ExtraDataListItemSchema]:
         total_pipeline = self.build_extra_data_mongo_pipeline(
             query=query,
             category_source=category_source,
@@ -336,7 +337,7 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
             session=session,
         )
 
-        return PaginatedResponse[dict](total=total, data=data)
+        return PaginatedResponse[ExtraDataListItemSchema](total=total, data=data)
 
 
 def get_minion_service(
