@@ -1,8 +1,6 @@
-import os
 from enum import StrEnum
 
-from git.types import PathLike
-from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, SecretStr, field_serializer
 
 from saltbox_core.task_templates.schemas.sshfs_file import SshfsFilePublicSchema
 from saltbox_core.task_templates.schemas.template import TaskTemplatePublicSchema
@@ -55,6 +53,34 @@ class SourceOperation(StrEnum):
     UNPLUG = 'unplug'
 
 
+class TemplateSourceCreateFromURLSchema(BaseModel):
+    name: str = Field(min_length=1, max_length=100, title='Display name')
+    description: str | None = Field(default='', max_length=500, title='Description')
+    namespace: str = Field(
+        default='',
+        max_length=64,
+        pattern=r'^[a-z0-9_]*$',
+        title='Namespace',
+        description='Prefix for template names and serve_dir subdirectory. Empty means no prefix.',
+    )
+    repo_url: HttpUrl = Field(title='Git repository URL')
+    repo_user: str | None = Field(default=None, title='Git user (basic auth)')
+    repo_pass: str | None = Field(default=None, title='Git password (basic auth)')
+    branch: str = Field(max_length=100, title='Git branch')
+
+
+class TemplateSourceCreateLocalSchema(BaseModel):
+    name: str = Field(min_length=1, max_length=100, title='Display name')
+    description: str | None = Field(default='', max_length=500, title='Description')
+    namespace: str = Field(
+        default='',
+        max_length=64,
+        pattern=r'^[a-z0-9_]*$',
+        title='Namespace',
+        description='Prefix for template names and serve_dir subdirectory. Empty means no prefix.',
+    )
+
+
 class TemplateSourceCreateSchema(BaseModel):
     source_type: SourceType = Field(title='Source type')
     name: str = Field(min_length=1, max_length=100, title='Display name')
@@ -68,18 +94,14 @@ class TemplateSourceCreateSchema(BaseModel):
         title='Namespace',
         description='Prefix for template names and serve_dir subdirectory. Empty means no prefix.',
     )
-    repo_url: PathLike | None = Field(default=None, title='Git repository URL')
+    repo_url: HttpUrl | None = Field(default=None, title='Git repository URL')
     repo_user: str | None = Field(default=None, title='Git user (basic auth)')
     repo_pass: str | None = Field(default=None, title='Git password (basic auth)')
     branch: str | None = Field(default=None, max_length=100, title='Git branch')
 
-    # @field_serializer('repo_pass')
-    # def serialize_repo_pass(self, value: SecretStr | None) -> str | None:
-    #     return value.get_secret_value() if value else None
-
     @field_serializer('repo_url')
-    def serialize_url(self, url: PathLike | None) -> str | None:
-        return os.fspath(url) if url else None
+    def serialize_url(self, url: HttpUrl | None) -> str | None:
+        return str(url) if url else None
 
 
 class TemplateSourceUpdateSchema(BaseModel):
@@ -100,7 +122,7 @@ class TemplateSourceModel(CreatedModifiedMixin, IDMixin):
         description='Prefix for template names and serve_dir subdirectory. Empty means no prefix.',
     )
     source_type: SourceType = Field(title='Source type')
-    repo_url: PathLike | None = Field(default=None, title='Git repository URL')
+    repo_url: HttpUrl | None = Field(default=None, title='Git repository URL')
     repo_user: str | None = Field(default=None, title='Git user (basic auth)')
     repo_pass: SecretStr | None = Field(default=None, title='Git password (basic auth)')
     branch: str | None = Field(default=None, max_length=100, title='Git branch')
@@ -113,8 +135,8 @@ class TemplateSourceModel(CreatedModifiedMixin, IDMixin):
     synced_at: Iso8601ZDatetime | None = Field(default=None, title='Last sync time')
 
     @field_serializer('repo_url')
-    def serialize_url(self, url: PathLike | None) -> str | None:
-        return os.fspath(url) if url else None
+    def serialize_url(self, url: HttpUrl | None) -> str | None:
+        return str(url) if url else None
 
 
 class TemplateSourcePublicSchema(CreatedModifiedMixin, IDMixin):
@@ -122,7 +144,7 @@ class TemplateSourcePublicSchema(CreatedModifiedMixin, IDMixin):
     description: str | None = Field(default='', max_length=1000)
     namespace: str = Field(default='')
     source_type: SourceType
-    repo_url: PathLike | None = None
+    repo_url: HttpUrl | None = None
     repo_user: str | None = None
     repo_pass: SecretStr | None = None
     branch: str | None = None
@@ -136,8 +158,8 @@ class TemplateSourcePublicSchema(CreatedModifiedMixin, IDMixin):
     model_config = ConfigDict(from_attributes=True)
 
     @field_serializer('repo_url')
-    def serialize_url(self, url: PathLike | None) -> str | None:
-        return os.fspath(url) if url else None
+    def serialize_url(self, url: HttpUrl | None) -> str | None:
+        return str(url) if url else None
 
 
 class TemplateSourceListBody(SkipLimitParams, QueryParams, SortParams):

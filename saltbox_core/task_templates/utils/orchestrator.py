@@ -1,7 +1,6 @@
 import asyncio
 import hashlib
 import json
-import os
 import re
 import shutil
 import tempfile
@@ -14,6 +13,7 @@ import anyio
 import httpx
 from fastapi import Depends, UploadFile
 from git import Repo
+from pydantic import HttpUrl
 from ruamel.yaml import YAML
 from ruamel.yaml.scanner import ScannerError
 
@@ -37,7 +37,7 @@ from saltbox_core.task_templates.schemas.source import (
     SourceOperation,
     SourceState,
     SourceType,
-    TemplateSourceCreateSchema,
+    TemplateSourceCreateFromURLSchema,
 )
 from saltbox_core.task_templates.schemas.sshfs_file import (
     ManifestDigest,
@@ -124,9 +124,10 @@ class SyncOrchestrator:
 
             try:
                 origin = repo.remote(name='origin')
+                repo.git.update_environment(GIT_TERMINAL_PROMPT='0')
                 await asyncio.wait_for(
                     asyncio.to_thread(origin.pull),
-                    timeout=60,
+                    timeout=SETTINGS.local_repo_sync_timeout_sec,
                 )
                 # return {'status': 'pulled'}
             except Exception as e:
@@ -142,19 +143,24 @@ class SyncOrchestrator:
 
             logger.debug('Local path does not exist, cloning repo')
             raw_url = await self._inject_credentials(
-                os.fspath(source.repo_url),
+                str(source.repo_url),
                 source.repo_user,
                 source.repo_pass.get_secret_value() if source.repo_pass else None,
             )
             try:
                 await asyncio.wait_for(
-                    asyncio.to_thread(Repo.clone_from, raw_url, self._local_path, **git_kwargs),
+                    asyncio.to_thread(
+                        Repo.clone_from,
+                        raw_url,
+                        self._local_path,
+                        env={'GIT_TERMINAL_PROMPT': '0'},
+                        **git_kwargs,
+                    ),
                     timeout=SETTINGS.local_repo_sync_timeout_sec,
                 )
-                # return {'status': 'cloned'}
             except Exception as e:
                 logger.error('Failed to clone repo: %s', e)
-                shutil.rmtree(self._local_path)
+                shutil.rmtree(self._local_path, ignore_errors=True)
                 raise
 
         await self._parse_manifest_if_exists()
@@ -440,7 +446,6 @@ class SyncOrchestrator:
             )
             raise
 
-        # 2. parse and save templates to db
         try:
             await self._parse_and_save_templates(source_id)
         except Exception as e:
@@ -450,7 +455,6 @@ class SyncOrchestrator:
             )
             raise
 
-        # 3. parse manifest and save file instances to db
         try:
             await self._save_sshfs_files_from_manifest(source_id)
         except Exception as e:
@@ -773,16 +777,16 @@ class SyncOrchestrator:
                     )
                 continue
 
-            source_in = TemplateSourceCreateSchema(
+            source_in = TemplateSourceCreateFromURLSchema(
                 name=project.name,
                 description=project.description or '',
-                source_type=SourceType.GIT_REPO,
-                repo_url=project.http_url_to_repo,
+                repo_url=HttpUrl(project.http_url_to_repo),
                 repo_user='user' if SETTINGS.gitlab_token else None,
                 repo_pass=SETTINGS.gitlab_token if SETTINGS.gitlab_token else None,
+                branch=project.default_branch,
             )
 
-            created_source_id = await self._source_service.create(data=source_in)
+            created_source_id = await self._source_service.create_from_url(data=source_in)
             source_ids_to_discover.append(created_source_id)
 
         for source_id in source_ids_to_discover:

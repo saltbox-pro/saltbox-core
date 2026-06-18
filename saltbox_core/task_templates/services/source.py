@@ -12,6 +12,8 @@ from saltbox_core.task_templates.schemas.source import (
     SourceOperation,
     SourceState,
     SourceType,
+    TemplateSourceCreateFromURLSchema,
+    TemplateSourceCreateLocalSchema,
     TemplateSourceCreateSchema,
     TemplateSourceModel,
     TemplateSourceUpdateSchema,
@@ -46,30 +48,72 @@ class TemplateSourceService(
         self._file_service = file_service
         self._task_service = task_service
 
-    @override
-    async def create(
+    async def create_from_url(
         self,
-        data: TemplateSourceCreateSchema | dict[str, Any],
+        data: TemplateSourceCreateFromURLSchema,
         *,
         session: AsyncClientSession | None = None,
     ) -> PyObjectId:
-        if isinstance(data, TemplateSourceCreateSchema):
-            data = data.model_dump()
-        if data['source_type'] == SourceType.GIT_REPO and not data.get('repo_url'):
-            msg = 'repo_url is required for git_repo source type.'
-            raise ValueError(msg)
-        if data['source_type'] != SourceType.GIT_REPO and (
-            data.get('repo_url') or data.get('repo_user') or data.get('repo_pass')
-        ):
-            msg = 'repo_url, repo_user and repo_pass are only valid for git_repo source type.'
-            raise ValueError(msg)
-        data['local_path'] = uuid.uuid4().hex
-        data['state'] = SourceState.PENDING
-        data['current_operation'] = SourceOperation.DISCOVER
-        data['last_error'] = None
-        data['synced_at'] = None
+        clean_url = f'{data.repo_url.scheme}://{data.repo_url.host}{data.repo_url.path}'
+        user = data.repo_user or data.repo_url.username
+        password = data.repo_pass or data.repo_url.password
 
-        return await self.repo.create(data=data, session=session)
+        obj_in = {
+            'name': data.name,
+            'description': data.description,
+            'source_type': SourceType.GIT_REPO,
+            'namespace': data.namespace,
+            'repo_url': clean_url,
+            'repo_user': user,
+            'repo_pass': password,
+            'branch': data.branch,
+            'local_path': uuid.uuid4().hex,
+            'state': SourceState.PENDING,
+            'current_operation': SourceOperation.DISCOVER,
+            'last_error': None,
+            'synced_at': None,
+        }
+        return await self.create(data=obj_in, session=session)
+
+    async def create_local(
+        self,
+        data: TemplateSourceCreateLocalSchema,
+        *,
+        session: AsyncClientSession | None = None,
+    ) -> PyObjectId:
+        obj_in = {
+            'name': data.name,
+            'description': data.description,
+            'source_type': SourceType.LOCAL_BUNDLE,
+            'namespace': data.namespace,
+            'local_path': uuid.uuid4().hex,
+            'state': SourceState.PENDING,
+            'current_operation': SourceOperation.DISCOVER,
+            'last_error': None,
+            'synced_at': None,
+        }
+        return await self.create(data=obj_in, session=session)
+
+    async def create_from_archive(
+        self,
+        name: str,
+        description: str,
+        namespace: str,
+        *,
+        session: AsyncClientSession | None = None,
+    ) -> PyObjectId:
+        obj_in = {
+            'name': name,
+            'description': description,
+            'source_type': SourceType.ARCHIVE_BUNDLE,
+            'namespace': namespace,
+            'local_path': uuid.uuid4().hex,
+            'state': SourceState.PENDING,
+            'current_operation': None,
+            'last_error': None,
+            'synced_at': None,
+        }
+        return await self.create(data=obj_in, session=session)
 
     @override
     async def delete(
