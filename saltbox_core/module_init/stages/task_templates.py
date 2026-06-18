@@ -15,7 +15,7 @@ from saltbox_core.pillars.services.pillar_crypto import get_pillar_crypto_servic
 from saltbox_core.task_templates.repositories.source import get_template_source_repository
 from saltbox_core.task_templates.repositories.sshfs_file import get_sshfs_file_repository
 from saltbox_core.task_templates.repositories.template import get_task_template_repository
-from saltbox_core.task_templates.schemas.source import SourceType, TemplateSourceCreateSchema
+from saltbox_core.task_templates.schemas.source import SourceType, TemplateSourceCreateLocalSchema
 from saltbox_core.task_templates.services.source import get_tpl_source_service
 from saltbox_core.task_templates.services.sshfs_file import get_sshfs_file_service
 from saltbox_core.task_templates.services.template import get_task_tpl_service
@@ -32,7 +32,9 @@ from saltbox_core.tasks.services.tasks_minion import get_task_minion_service
 from saltbox_core.tasks.services.tasks_status import get_task_status_service
 from saltbox_core.tasks.services.tasks_template import get_task_template_service
 from saltbox_sdk.db.mongo.config import get_mongo_db
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.redis.config import get_redis_now
+from saltbox_sdk.exceptions import ObjectNotFoundException
 
 
 async def run_stage() -> None:
@@ -89,21 +91,29 @@ async def run_stage() -> None:
     )
 
     is_base_local_exists = await tpl_source_service.exists({'source_type': SourceType.LOCAL_BUNDLE})
+    created_id: PyObjectId | None = None
     if not is_base_local_exists:
         logger.info('Creating base local template source...')
-        source_in = TemplateSourceCreateSchema(
+        source_in = TemplateSourceCreateLocalSchema(
             name='Default Local Source',
             description='Automatically created local source.',
-            source_type=SourceType.LOCAL_BUNDLE,
-            repo_url=None,
-            repo_user=None,
-            repo_pass=None,
-            branch=None,
+            namespace='',
         )
 
-        created_id = await tpl_source_service.create(source_in)
+        created_id = await tpl_source_service.create_local(source_in)
 
         logger.info('Base local template source created with id %s. Discovering...', created_id)
+    else:
+        logger.info('Base local template source already exists. Skipping creation.')
+
+    try:
+        default_local = await tpl_source_service.get(
+            {'source_type': SourceType.LOCAL_BUNDLE, 'name': 'Default Local Source'}
+        )
+        created_id = default_local.id
+    except ObjectNotFoundException:
+        created_id = None
+    if created_id:
         orchestrator = await get_sync_orchestrator(
             source_service=tpl_source_service,
             template_service=template_service,
@@ -113,6 +123,3 @@ async def run_stage() -> None:
             sshfs_sync_service=sshfs_sync_service,
         )
         await orchestrator.discover(created_id)
-        logger.info('Base local template source discovered successfully.')
-    else:
-        logger.info('Base local template source already exists. Skipping creation.')
