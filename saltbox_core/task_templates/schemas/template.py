@@ -89,6 +89,21 @@ class TaskTemplatePublicWithContentSchema(TaskTemplatePublicSchema):
     sls_content: str
 
 
+class TaskTemplateSchemasProjection(BaseModel):
+    name: str
+    json_schema: dict
+    ui_schema: dict
+
+
+class TaskTemplateSchemasListRequest(BaseModel):
+    names: list[str] = Field(title='Template names')
+
+
+class TaskTemplateSchemaResponse(BaseModel):
+    json_schema: dict = Field(title='JSON schema')
+    ui_schema: dict = Field(title='UI schema', default_factory=dict)
+
+
 class TaskTemplateActions(StrEnum):
     LIST = 'list'
     READ = 'read'

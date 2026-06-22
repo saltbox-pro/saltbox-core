@@ -2,13 +2,19 @@ from typing import Annotated
 
 from fastapi import APIRouter, Body, Depends
 
+from saltbox_core.pillars.schemas import PillarTgtType
+from saltbox_core.pillars.services.pillar import PillarService, get_pillar_service
+from saltbox_core.pillars.utils import PillarSchemaUpdater
 from saltbox_core.task_templates.schemas.template import (
     TaskTemplateActions,
     TaskTemplateFromRawCreateSchema,
     TaskTemplateFromRawUpdateSchema,
     TaskTemplateListBody,
+    TaskTemplateModel,
     TaskTemplatePublicSchema,
     TaskTemplatePublicWithContentSchema,
+    TaskTemplateSchemaResponse,
+    TaskTemplateSchemasListRequest,
 )
 from saltbox_core.task_templates.services.template import TaskTemplateService, get_task_tpl_service
 from saltbox_core.task_templates.tiq_tasks import (
@@ -17,8 +23,9 @@ from saltbox_core.task_templates.tiq_tasks import (
     update_tpl_from_raw_task,
 )
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
-from saltbox_sdk.db.schemas_base import PaginatedResponse
+from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
+from saltbox_sdk.fastapi_utils.dependencies import get_current_user
 
 router = APIRouter(prefix='/task-tpls', tags=['NEW Task Templates'])
 
@@ -62,6 +69,30 @@ async def template_create(
         source_id=str(body.source_id), file_name=body.file_name, content=body.content
     )
     return task.task_id
+
+
+@router.get(
+    '/{template_id}/with-defaults',
+    operation_id='new_template_read_with_defaults',
+    openapi_extra=GatewayEndpointConfig(
+        policy='public',
+        action=TaskTemplateActions.READ,
+    ).model_dump(by_alias=True),
+    response_model=TaskTemplateModel,
+)
+async def template_read_with_defaults(
+    template_id: PyObjectId,
+    service: Annotated[TaskTemplateService, Depends(get_task_tpl_service)],
+    pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
+    user: Annotated[UserShort, Depends(get_current_user)],
+) -> TaskTemplateModel:
+    task_tpl = await service.get(template_id)
+    default_pillars = await pillar_service.get_for_target(
+        tgt_type=PillarTgtType.TASK_TPL, tgt_id=template_id, user_sub=user.sub if user else None
+    )
+    default_setter = PillarSchemaUpdater(schema=task_tpl.json_schema)
+    task_tpl.json_schema = default_setter.set_defaults(default_pillars)
+    return task_tpl
 
 
 @router.get(
@@ -115,3 +146,33 @@ async def template_delete(
     template = await service.get(template_id)
     task = await delete_local_template_task.kiq(str(template.source_id), str(template_id))
     return task.task_id
+
+
+@router.get(
+    '/schema-by-name/{tpl_name}',
+    operation_id='task_template_schema_by_name',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.templates.read',
+        action=TaskTemplateActions.READ,
+    ).model_dump(by_alias=True),
+)
+async def task_template_schema_by_name(
+    tpl_name: str,
+    service: Annotated[TaskTemplateService, Depends(get_task_tpl_service)],
+) -> TaskTemplateSchemaResponse:
+    return await service.get(query={'name': tpl_name}, projection_model=TaskTemplateSchemaResponse)
+
+
+@router.post(
+    '/schemas-list',
+    operation_id='task_template_schemas_list',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.templates.read',
+        action=TaskTemplateActions.READ,
+    ).model_dump(by_alias=True),
+)
+async def task_template_schemas_list(
+    body: Annotated[TaskTemplateSchemasListRequest, Body()],
+    service: Annotated[TaskTemplateService, Depends(get_task_tpl_service)],
+) -> dict[str, dict[str, dict]]:
+    return await service.get_schemas_by_names(body.names)

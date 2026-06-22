@@ -17,6 +17,7 @@ from saltbox_core.minion_collections.repositories.extra_data_category import get
 from saltbox_core.minion_collections.repositories.minion import get_minion_repository
 from saltbox_core.minion_collections.services.collection import get_collection_service
 from saltbox_core.minion_collections.services.minion import get_minion_service
+from saltbox_core.pillars.repository import get_pillar_repository
 from saltbox_core.salt.exceptions import StopProcessing
 from saltbox_core.salt.handlers.base_handler import BaseMessageHandler
 from saltbox_core.salt.handlers.job_error import JobErrorHandler
@@ -25,14 +26,14 @@ from saltbox_core.salt.handlers.metrics_handler import SaltMessageMetricMessageH
 from saltbox_core.salt.handlers.minion_started_handler import MinionStartedMessageHandler
 from saltbox_core.salt.handlers.new_job_handler import JobNewMessageHandler
 from saltbox_core.salt.handlers.presence_handler import PresenceMessageHandler
+from saltbox_core.task_templates.repositories.template import get_task_template_repository
+from saltbox_core.task_templates.services.template import get_task_tpl_service
 from saltbox_core.tasks.repositories.task import get_task_repository
 from saltbox_core.tasks.repositories.tasks_minion import get_task_minion_repository
 from saltbox_core.tasks.repositories.tasks_status import get_task_status_repository
-from saltbox_core.tasks.repositories.tasks_template import get_task_template_repository
 from saltbox_core.tasks.services.task import get_task_service
 from saltbox_core.tasks.services.tasks_minion import get_task_minion_service
 from saltbox_core.tasks.services.tasks_status import get_task_status_service
-from saltbox_core.tasks.services.tasks_template import get_task_template_service
 from saltbox_sdk.db.mongo.config import get_mongo_db
 from saltbox_sdk.db.redis.config import get_redis_now
 from saltbox_sdk.event_bus.faststream_app import get_faststream_broker
@@ -68,8 +69,11 @@ class SaltEventsHandler:
             job_return_service=self.job_return_service,
             master_service=self.master_service,
         )
+        self.pillar_repository = get_pillar_repository(db=self.mongo_db)
         self.task_template_repository = get_task_template_repository(db=self.mongo_db)
-        self.task_template_service = get_task_template_service(repo=self.task_template_repository)
+        self.task_template_service = get_task_tpl_service(
+            repo=self.task_template_repository, pillar_repo=self.pillar_repository
+        )
         self.task_minion_repository = get_task_minion_repository(db=self.mongo_db)
         self.task_minion_service = get_task_minion_service(repo=self.task_minion_repository, rdb=self.redis)
         self.task_repository = get_task_repository(db=self.mongo_db)

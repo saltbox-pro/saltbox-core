@@ -24,13 +24,9 @@ from saltbox_core.task_templates.utils.orchestrator import get_sync_orchestrator
 from saltbox_core.tasks.repositories.task import get_task_repository
 from saltbox_core.tasks.repositories.tasks_minion import get_task_minion_repository
 from saltbox_core.tasks.repositories.tasks_status import get_task_status_repository
-from saltbox_core.tasks.repositories.tasks_template import (
-    get_task_template_repository as get_task_template_repository_old,
-)
 from saltbox_core.tasks.services.task import get_task_service
 from saltbox_core.tasks.services.tasks_minion import get_task_minion_service
 from saltbox_core.tasks.services.tasks_status import get_task_status_service
-from saltbox_core.tasks.services.tasks_template import get_task_template_service
 from saltbox_sdk.db.mongo.config import get_mongo_db
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.redis.config import get_redis_now
@@ -54,7 +50,6 @@ async def run_stage() -> None:
     extra_data_category_repo = get_extra_data_category_repository(db)
     minion_extra_data_repo = get_extra_data_repository(db, extra_data_category_repo)
     minion_repo = get_minion_repository(db, minion_extra_data_repo)
-    old_task_template_repo = get_task_template_repository_old(db)
     master_repo = get_master_repository(db)
 
     sshfs_sync_service = await get_sshfs_sync()
@@ -72,14 +67,14 @@ async def run_stage() -> None:
         collection_service=collections_service,
         crypto_service=crypto_service,
     )
-    old_task_template_service = get_task_template_service(repo=old_task_template_repo)
+    task_template_service = get_task_tpl_service(repo=tpl_repo, pillar_repo=pillar_repo)
     master_service = get_master_service(repo=master_repo)
 
     task_service = get_task_service(
         repo=task_repo,
         rdb=rdb,
         task_status_service=task_status_service,
-        task_template_service=old_task_template_service,
+        task_template_service=task_template_service,
         task_minion_service=task_minion_service,
         job_schema_service=job_schema_service,
         collections_service=collections_service,

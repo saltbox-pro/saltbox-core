@@ -20,16 +20,17 @@ from saltbox_core.minion_collections.repositories.extra_data_category import Ext
 from saltbox_core.minion_collections.repositories.minion import MinionRepository
 from saltbox_core.minion_collections.services.collection import CollectionService
 from saltbox_core.minion_collections.services.minion import MinionService
+from saltbox_core.pillars.repository import get_pillar_repository
+from saltbox_core.task_templates.repositories.template import TaskTemplateRepository
+from saltbox_core.task_templates.services.template import TaskTemplateService
 from saltbox_core.tasks.repositories.task import TaskRepository
 from saltbox_core.tasks.repositories.tasks_minion import TaskMinionRepository
 from saltbox_core.tasks.repositories.tasks_status import TaskStatusRepository
-from saltbox_core.tasks.repositories.tasks_template import TaskTemplateRepository
 from saltbox_core.tasks.schemas.task import TaskForStatusUpdateSchema
 from saltbox_core.tasks.schemas.tasks_minion import TaskMinionForTaskStatusUpdateSchema, TaskMinionStatus
 from saltbox_core.tasks.services.task import TaskService
 from saltbox_core.tasks.services.tasks_minion import TaskMinionService
 from saltbox_core.tasks.services.tasks_status import TaskStatusService
-from saltbox_core.tasks.services.tasks_template import TaskTemplateService
 from saltbox_core.tkq import shutdown_broker, startup_broker
 from saltbox_sdk.config.redis_config import REDIS_SETTINGS
 from saltbox_sdk.db.mongo.config import get_mongo_db
@@ -72,7 +73,8 @@ class JobsWatcher:
         job_schema_service = JobSchemaService(repo=self.job_schema_repository)
         task_minion_service = TaskMinionService(repo=self.task_minion_repository, rdb=redis)
         task_status_service = TaskStatusService(repo=self.task_status_repository)
-        task_template_service = TaskTemplateService(repo=self.task_template_repository)
+        pillar_repository = get_pillar_repository(db=self.db)
+        task_template_service = TaskTemplateService(repo=self.task_template_repository, pillar_repo=pillar_repository)
         collections_service = CollectionService(repo=self.collection_repository)
         minion_service = MinionService(repo=self.minion_repository)
         task_service = TaskService(

@@ -14,6 +14,8 @@ from saltbox_core.minion_collections.schemas.collection import CollectionModel
 from saltbox_core.minion_collections.services.collection import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion import MinionService, get_minion_service
 from saltbox_core.pillars.services.pillar import PillarService, get_pillar_service
+from saltbox_core.task_templates.schemas.template import TaskTemplateModel
+from saltbox_core.task_templates.services.template import TaskTemplateService, get_task_tpl_service
 from saltbox_core.tasks.repositories.task import TaskRepository, get_task_repository
 from saltbox_core.tasks.schemas.task import (
     TaskCreateInputSchema,
@@ -25,10 +27,8 @@ from saltbox_core.tasks.schemas.task import (
 )
 from saltbox_core.tasks.schemas.tasks_minion import TaskMinionCreateSchema, TaskMinionInnerIdOnly
 from saltbox_core.tasks.schemas.tasks_status import TaskStatus, TaskStatusCreateSchema
-from saltbox_core.tasks.schemas.tasks_template import TaskTemplateModel
 from saltbox_core.tasks.services.tasks_minion import TaskMinionService, get_task_minion_service
 from saltbox_core.tasks.services.tasks_status import TaskStatusService, get_task_status_service
-from saltbox_core.tasks.services.tasks_template import TaskTemplateService, get_task_template_service
 from saltbox_sdk.db.mongo.config import get_mongo_session_with_transaction
 from saltbox_sdk.db.mongo.repository_base import MongoUpdateOperator
 from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
@@ -100,7 +100,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
 
             try:
                 validated_data = await self.task_template_service.get_validated_data(
-                    name=task_template.name, sid=task_template.repo_id, data=task_data
+                    name=task_template.name, sid=task_template.source_id, data=task_data
                 )
             except JsonSchemaValidationError as err:
                 raise SaltBoxValidationException(str(err)) from err
@@ -365,7 +365,7 @@ def get_task_service(
     repo: Annotated[TaskRepository, Depends(get_task_repository)],
     rdb: Annotated[Redis, Depends(get_redis)],
     task_status_service: Annotated[TaskStatusService, Depends(get_task_status_service)],
-    task_template_service: Annotated[TaskTemplateService, Depends(get_task_template_service)],
+    task_template_service: Annotated[TaskTemplateService, Depends(get_task_tpl_service)],
     task_minion_service: Annotated[TaskMinionService, Depends(get_task_minion_service)],
     job_schema_service: Annotated[JobSchemaService, Depends(get_job_schema_service)],
     collections_service: Annotated[CollectionService, Depends(get_collection_service)],

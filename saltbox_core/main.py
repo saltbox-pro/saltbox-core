@@ -17,13 +17,10 @@ from saltbox_core.minion_collections.routers.minion import router as minions_rou
 from saltbox_core.pillars.routers import router as pillars_router
 from saltbox_core.routers import router as utils_router
 from saltbox_core.salt.routers.salt_keys import router as salt_keys_router
-from saltbox_core.settings.routers.gitlab_router import router as gitlab_router
-from saltbox_core.settings.routers.sls_repos_router import router as settings_sls_router
 from saltbox_core.task_templates.routers.source import router as task_tpl_source_router
 from saltbox_core.task_templates.routers.sshfs_file import router as task_tpl_file_router
 from saltbox_core.task_templates.routers.template import router as new_template_router
 from saltbox_core.tasks.routers.task import router as task_router
-from saltbox_core.tasks.routers.tasks_template import router as template_router
 from saltbox_core.tkq import broker, shutdown_broker, startup_broker
 from saltbox_core.utilities.httpx_client import HttpxClientSingletoneFactory
 from saltbox_core.utilities.redis_cache import CustomRedisCache
@@ -104,7 +101,6 @@ app.include_router(router=task_tpl_file_router)
 app.include_router(filters_router)
 app.include_router(jobs_router)
 app.include_router(job_schemas_router)
-app.include_router(template_router)
 app.include_router(task_router)
 app.include_router(collections_router)
 app.include_router(minions_router)
@@ -112,6 +108,4 @@ app.include_router(masters_router)
 app.include_router(system_router)
 app.include_router(pillars_router)
 app.include_router(salt_keys_router)
-app.include_router(router=settings_sls_router, prefix='/settings', tags=['Settings'])
-app.include_router(router=gitlab_router, prefix='/settings')
 app.include_router(router=utils_router)

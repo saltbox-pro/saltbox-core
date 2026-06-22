@@ -24,14 +24,15 @@ from saltbox_core.minion_collections.services.collection import get_collection_s
 from saltbox_core.minion_collections.services.extra_data import get_extra_data_service
 from saltbox_core.minion_collections.services.extra_data_category import get_extra_data_category_service
 from saltbox_core.minion_collections.services.minion import get_minion_service
+from saltbox_core.pillars.repository import get_pillar_repository
+from saltbox_core.task_templates.repositories.template import get_task_template_repository
+from saltbox_core.task_templates.services.template import get_task_tpl_service
 from saltbox_core.tasks.repositories.task import get_task_repository
 from saltbox_core.tasks.repositories.tasks_minion import get_task_minion_repository
 from saltbox_core.tasks.repositories.tasks_status import get_task_status_repository
-from saltbox_core.tasks.repositories.tasks_template import get_task_template_repository
 from saltbox_core.tasks.services.task import get_task_service
 from saltbox_core.tasks.services.tasks_minion import get_task_minion_service
 from saltbox_core.tasks.services.tasks_status import get_task_status_service
-from saltbox_core.tasks.services.tasks_template import get_task_template_service
 from saltbox_core.tkq import shutdown_broker, startup_broker
 from saltbox_sdk.config.logger_config import logger
 from saltbox_sdk.db.mongo.config import get_mongo_db
@@ -69,7 +70,8 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
         master_service=master_service,
     )
     task_template_repository = get_task_template_repository(db=mongo_db)
-    task_template_service = get_task_template_service(repo=task_template_repository)
+    pillar_repository = get_pillar_repository(db=mongo_db)
+    task_template_service = get_task_tpl_service(repo=task_template_repository, pillar_repo=pillar_repository)
     task_minion_repository = get_task_minion_repository(db=mongo_db)
     task_minion_service = get_task_minion_service(repo=task_minion_repository, rdb=redis_db)
     task_status_repository = get_task_status_repository(db=mongo_db)

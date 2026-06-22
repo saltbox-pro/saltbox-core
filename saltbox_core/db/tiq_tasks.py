@@ -1,5 +1,6 @@
 from typing import ClassVar
 
+from saltbox_core.pillars.repository import get_pillar_repository
 from saltbox_core.tkq import broker, queue_notify
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.serivces.mongo_base_with_notify_service import MongoBaseWithNotifyService
@@ -32,14 +33,14 @@ class _NotifyServicesStoreSingleton:
         from saltbox_core.minion_collections.repositories.minion import MinionRepository
         from saltbox_core.minion_collections.services.collection import CollectionService
         from saltbox_core.minion_collections.services.minion import MinionService
+        from saltbox_core.task_templates.repositories.template import TaskTemplateRepository
+        from saltbox_core.task_templates.services.template import TaskTemplateService
         from saltbox_core.tasks.repositories.task import TaskRepository
         from saltbox_core.tasks.repositories.tasks_minion import TaskMinionRepository
         from saltbox_core.tasks.repositories.tasks_status import TaskStatusRepository
-        from saltbox_core.tasks.repositories.tasks_template import TaskTemplateRepository
         from saltbox_core.tasks.services.task import TaskService
         from saltbox_core.tasks.services.tasks_minion import TaskMinionService
         from saltbox_core.tasks.services.tasks_status import TaskStatusService
-        from saltbox_core.tasks.services.tasks_template import TaskTemplateService
         from saltbox_sdk.db.mongo.config import get_mongo_db
         from saltbox_sdk.db.redis.config import get_redis_now
 
@@ -73,7 +74,8 @@ class _NotifyServicesStoreSingleton:
         task_status_repository = TaskStatusRepository(database=mongo_db)
         task_status_service = TaskStatusService(repo=task_status_repository)
         task_template_repository = TaskTemplateRepository(database=mongo_db)
-        task_template_service = TaskTemplateService(repo=task_template_repository)
+        pillar_repository = get_pillar_repository(db=mongo_db)
+        task_template_service = TaskTemplateService(repo=task_template_repository, pillar_repo=pillar_repository)
         task_minion_repository = TaskMinionRepository(database=mongo_db)
         task_minion_service = TaskMinionService(repo=task_minion_repository, rdb=rdb)
         task_repository = TaskRepository(database=mongo_db)
