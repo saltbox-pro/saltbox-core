@@ -11,7 +11,6 @@ from saltbox_core.task_templates.repositories.source import TemplateSourceReposi
 from saltbox_core.tasks.repositories.task import TaskRepository
 from saltbox_core.tasks.repositories.tasks_minion import TaskMinionRepository
 from saltbox_core.tasks.repositories.tasks_status import TaskStatusRepository
-from saltbox_core.tasks.repositories.tasks_template import TaskTemplateRepository
 from saltbox_sdk.db.mongo.config import get_mongo_db
 from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
 from saltbox_sdk.db.redis.config import get_redis_now
@@ -38,7 +37,6 @@ async def init_mongo_db() -> None:
         TaskRepository(database),
         TaskMinionRepository(database),
         TaskStatusRepository(database),
-        TaskTemplateRepository(database),
         PillarRepository(database),
         TemplateSourceRepository(database),
     ]
