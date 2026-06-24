@@ -1,0 +1,39 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "file.truncate",
+    "description": "Seek to a position on a file and delete everything after that point",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "path",
+          "length"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]+$"
+          },
+          "length": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "path": {
+        "ui:title": "Path",
+        "ui:description": "Path to file"
+      },
+      "length": {
+        "ui:title": "Length",
+        "ui:description": "Offset into file to truncate"
+      }
+    }
+  }
+}

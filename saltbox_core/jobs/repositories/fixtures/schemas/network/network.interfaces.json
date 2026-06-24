@@ -1,0 +1,8 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "network.interfaces",
+    "description": "Return a dictionary of information about all the interfaces on the minion"
+  },
+  "ui_schema": {}
+}

@@ -1,0 +1,30 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "file.uid_to_user",
+    "description": "Convert a uid to a user name",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "uid"
+        ],
+        "properties": {
+          "uid": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "uid": {
+        "ui:title": "UID",
+        "ui:description": "UID to convert to a username"
+      }
+    }
+  }
+}

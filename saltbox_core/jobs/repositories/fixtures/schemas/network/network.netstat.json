@@ -1,0 +1,9 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "network.netstat",
+    "description": "Return information on open ports and states",
+    "properties": {}
+  },
+  "ui_schema": {}
+}

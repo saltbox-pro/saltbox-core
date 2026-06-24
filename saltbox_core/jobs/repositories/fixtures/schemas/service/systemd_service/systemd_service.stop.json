@@ -1,0 +1,39 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "service.stop",
+    "description": "Stop the specified service with systemd",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "description": "",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "no_block": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "name": {
+        "ui:title": "Name",
+        "ui:description": "Systemd Service Name"
+      },
+      "no_block": {
+        "ui:title": "No block",
+        "ui:description": "Set to True to start the service using --no-block.",
+        "ui:widget": "select"
+      }
+    }
+  }
+}

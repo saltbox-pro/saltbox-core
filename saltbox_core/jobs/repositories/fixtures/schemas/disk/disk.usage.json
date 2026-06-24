@@ -1,0 +1,31 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "disk.usage",
+    "description": "Return usage information for volumes mounted on this minion",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "properties": {
+          "args": {
+            "type": "array",
+            "default": [],
+            "items": {
+              "type": "string",
+              "title": "df argument"
+            }
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "args": {
+        "ui:title": "Arguments",
+        "ui:description": "Sequence of flags to pass to the `df` command (e.g.: T,P)"
+      }
+    }
+  }
+}

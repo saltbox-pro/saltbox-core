@@ -1,0 +1,30 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "file.file_exists",
+    "description": "Tests to see if path is a valid file. Returns True/False",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]+$"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "path": {
+        "ui:title": "Path",
+        "ui:description": "Path to the file"
+      }
+    }
+  }
+}

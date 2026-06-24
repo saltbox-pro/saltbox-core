@@ -1,0 +1,70 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "ssh.auth_keys",
+    "description": "Return the authorized keys for users",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "properties": {
+          "user": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][\\w\\.-]+$"
+          },
+          "config": {
+            "type": "string",
+            "default": ".ssh/authorized_keys"
+          },
+          "fingerprint_hash_type": {
+            "type": "string",
+            "default": "sha256",
+            "oneOf": [
+              {
+                "title": "MD5",
+                "const": "md5"
+              },
+              {
+                "title": "SHA1",
+                "const": "sha1"
+              },
+              {
+                "title": "SHA224",
+                "const": "sha224"
+              },
+              {
+                "title": "SHA256",
+                "const": "sha256"
+              },
+              {
+                "title": "SHA384",
+                "const": "sha384"
+              },
+              {
+                "title": "SHA512",
+                "const": "sha512"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "user": {
+        "ui:title": "User",
+        "ui:description": ""
+      },
+      "config": {
+        "ui:title": "Path to the config file",
+        "ui:description": ""
+      },
+      "fingerprint_hash_type": {
+        "ui:title": "Fingerprint hash type",
+        "ui:description": "The fingerprint hash type that the public key fingerprints were originally hashed with. This defaults to sha256 if not specified",
+        "ui:widget": "select"
+      }
+    }
+  }
+}

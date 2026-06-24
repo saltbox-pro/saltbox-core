@@ -1,0 +1,9 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "network.active_tcp",
+    "description": "Return a dict containing information on all of the running TCP connections (currently linux and solaris only)",
+    "properties": {}
+  },
+  "ui_schema": {}
+}

@@ -1,0 +1,38 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "file.set_mode",
+    "description": "Set the mode (numeric representation of access mode) of a file",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "path",
+          "mode"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]+$"
+          },
+          "mode": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "path": {
+        "ui:title": "Path",
+        "ui:description": "File or directory of which to set the mode"
+      },
+      "mode": {
+        "ui:title": "Mode",
+        "ui:description": "Mode to set the path to. Example: 0644"
+      }
+    }
+  }
+}

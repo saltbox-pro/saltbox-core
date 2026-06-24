@@ -1,0 +1,61 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "network.ip_addrs",
+    "description": "Returns a list of IPv4 addresses assigned to the host. 127.0.0.1 is ignored, unless 'include_loopback=True' is indicated. If 'interface' is provided, then only IP addresses from that interface will be returned. Providing a CIDR via 'cidr=\"10.0.0.0/8\"' will return only the addresses which are within that subnet. If 'type' is 'public', then only public addresses will be returned. Ditto for 'type'='private'",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "properties": {
+          "interface": {
+            "type": "string"
+          },
+          "include_loopback": {
+            "type": "boolean",
+            "default": false
+          },
+          "cidr": {
+            "type": "string",
+            "pattern": "^(?:\\/(?:[0-9]|[1-2][0-9]|3[0-2])|(?:\\d{1,3}\\.){3}\\d{1,3}\\/(?:[0-9]|[1-2][0-9]|3[0-2]))$"
+          },
+          "type": {
+            "type": "string",
+            "oneOf": [
+              {
+                "title": "Public",
+                "const": "public"
+              },
+              {
+                "title": "Private",
+                "const": "private"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "interface": {
+        "ui:title": "Interface",
+        "ui:description": ""
+      },
+      "include_loopback": {
+        "ui:title": "Include Loopback",
+        "ui:description": "Toggle to include loopback addresses such as 127.0.0.1 in the output",
+        "ui:widget": "select"
+      },
+      "cidr": {
+        "ui:title": "CIDR",
+        "ui:description": "Filter returned addresses to this network (e.g. 10.0.0.0/24 or /24 for mask-only)"
+      },
+      "type": {
+        "ui:title": "Type",
+        "ui:description": "",
+        "ui:widget": "select"
+      }
+    }
+  }
+}

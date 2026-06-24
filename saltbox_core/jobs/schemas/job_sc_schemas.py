@@ -15,7 +15,6 @@ class JobSchemaEditableFieldsMixin(BaseModel):
     default_ttl: int | None = Field(ge=0, le=SETTINGS.jobs_max_ttl, default=None)
     json_schema: dict = Field(title='JSON schema')
     ui_schema: dict = Field(title='UI schema', default_factory=dict)
-    commit_hash: str = Field(title='Commit hash')
 
 
 class JobSchemaCreateSchema(JobSchemaReadOnlyFieldsMixin, JobSchemaEditableFieldsMixin):
@@ -28,7 +27,6 @@ class JobSchemaUpdateSchema(JobSchemaEditableFieldsMixin):
 
 class JobSchemaShortSchema(CreatedModifiedMixin, IDMixin):
     name: str = Field(title='Schema name')
-    commit_hash: str = Field(title='Commit hash')
 
 
 class JobSchemaBaseSchema(JobSchemaReadOnlyFieldsMixin, JobSchemaEditableFieldsMixin): ...

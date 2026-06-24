@@ -1,0 +1,62 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "pillar.fetch",
+    "description": "Use the given path and search relative to the pillar environments to see if a file exists at that path",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "key"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^(?:_+[a-zA-Z0-9]|[a-zA-Z])[\\w-]*$"
+          },
+          "default": {
+            "type": "string"
+          },
+          "merge": {
+            "type": "boolean",
+            "default": false
+          },
+          "merge_nested_lists": {
+            "type": "boolean"
+          },
+          "delimiter": {
+            "type": "string",
+            "default": ":"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "key": {
+        "ui:title": "Key",
+        "ui:description": "The pillar key to get value from"
+      },
+      "default": {
+        "ui:title": "Default value",
+        "ui:description": "The value specified by this option will be returned if the desired pillar key does not exist. If a default value is not specified, then it will be an empty string, unless pillar_raise_on_missing is set to True, in which case an error will be raised"
+      },
+      "merge": {
+        "ui:title": "Merge",
+        "ui:description": "If True, the retrieved values will be merged into the passed default. When the default and the retrieved value are both dictionaries, the dictionaries will be recursively merged",
+        "ui:widget": "select"
+      },
+      "merge_nested_lists": {
+        "ui:title": "Merge the nested lists",
+        "ui:description": "If set to False, lists nested within the retrieved pillar dictionary will overwrite lists in default. If set to True, nested lists will be merged into lists in default. If unspecified (the default), this option is inherited from the pillar_merge_lists minion config option",
+        "ui:widget": "select"
+      },
+      "delimiter": {
+        "ui:title": "Delimiter",
+        "ui:description": "Specify an alternate delimiter to use when traversing a nested dict. This is useful for when the desired key contains a colon"
+      }
+    }
+  }
+}

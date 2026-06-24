@@ -1,0 +1,101 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "file.sed",
+    "description": "Make a simple edit to a file",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "path",
+          "before",
+          "after"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]+$"
+          },
+          "before": {
+            "type": "string"
+          },
+          "after": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "string"
+          },
+          "backup": {
+            "type": "string",
+            "default": ".bak"
+          },
+          "options": {
+            "type": "array",
+            "default": [
+              "-r",
+              "-e"
+            ],
+            "items": {
+              "type": "string",
+              "title": "sed option"
+            }
+          },
+          "flags": {
+            "type": "string",
+            "default": "g"
+          },
+          "escape_all": {
+            "type": "boolean",
+            "default": false
+          },
+          "negate_match": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "path": {
+        "ui:title": "Path",
+        "ui:description": "The full path to the file to be edited"
+      },
+      "before": {
+        "ui:title": "Before",
+        "ui:description": "A pattern to find in order to replace with after"
+      },
+      "after": {
+        "ui:title": "After",
+        "ui:description": "Text that will replace before"
+      },
+      "limit": {
+        "ui:title": "Limit",
+        "ui:description": "An initial pattern to search for before searching for before"
+      },
+      "backup": {
+        "ui:title": "Backup",
+        "ui:description": "The file will be backed up before edit with this file extension"
+      },
+      "options": {
+        "ui:title": "Options",
+        "ui:description": "Options to pass to sed"
+      },
+      "flags": {
+        "ui:title": "Flags",
+        "ui:description": "Flags to modify the sed search; e.g., i for case-insensitive pattern matching"
+      },
+      "escape_all": {
+        "ui:title": "Escape all",
+        "ui:widget": "select"
+      },
+      "negate_match": {
+        "ui:title": "Negate match",
+        "ui:description": "Negate the search command",
+        "ui:widget": "select"
+      }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "test.ping",
+    "description": "Used to make sure the minion is up and responding. Not an ICMP ping",
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "ui_schema": {}
+}

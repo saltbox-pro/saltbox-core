@@ -1,0 +1,39 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "file.readlink",
+    "description": "Return the path that a symlink points to",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]+$"
+          },
+          "canonicalize": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "path": {
+        "ui:title": "Path",
+        "ui:description": "The path to the symlink"
+      },
+      "canonicalize": {
+        "ui:title": "Canonicalize",
+        "ui:description": "A canonical path eliminating any symbolic links encountered in the path",
+        "ui:widget": "select"
+      }
+    }
+  }
+}

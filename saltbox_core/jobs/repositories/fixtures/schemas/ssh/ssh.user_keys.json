@@ -1,0 +1,43 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "ssh.user_keys",
+    "description": "Return the user's ssh keys on the minion",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "properties": {
+          "user": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][\\w\\.-]+$"
+          },
+          "pubfile": {
+            "type": "string",
+            "pattern": "^(?:/(?:[^/\\n\\x00]+(?:/[^/\\n\\x00]+)*)?/?|[A-Za-z]:[\\\\/](?:[^\\\\/\\n\\x00]+(?:[\\\\/][^\\\\/\\n\\x00]+)*)?(?:[\\\\/])?|[^\\n\\x00]+)$"
+          },
+          "prvfile": {
+            "type": "string",
+            "pattern": "^(?:/(?:[^/\\n\\x00]+(?:/[^/\\n\\x00]+)*)?/?|[A-Za-z]:[\\\\/](?:[^\\\\/\\n\\x00]+(?:[\\\\/][^\\\\/\\n\\x00]+)*)?(?:[\\\\/])?|[^\\n\\x00]+)$"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "user": {
+        "ui:title": "User",
+        "ui:description": ""
+      },
+      "pubfile": {
+        "ui:title": "Public key path or name",
+        "ui:description": "Absolute path (/home/user/.ssh/id_rsa.pub), Windows path (C:\\Users\\user\\.ssh\\id_rsa.pub)"
+      },
+      "prvfile": {
+        "ui:title": "Private key path or name",
+        "ui:description": "Same rules as public key. Provide an absolute/Windows path or key filename relative to ~/.ssh"
+      }
+    }
+  }
+}

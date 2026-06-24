@@ -1,0 +1,38 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "service.restart",
+    "description": "Restart the named service. This issues a stop command followed by a start",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "timeout": {
+            "type": "integer",
+            "default": 90,
+            "minimum": 1
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "name": {
+        "ui:title": "Name",
+        "ui:description": "The name of the service to restart"
+      },
+      "timeout": {
+        "ui:title": "Timeout",
+        "ui:description": "The time in seconds to wait for the service to stop and start before returning. Default is 90 seconds"
+      }
+    }
+  }
+}

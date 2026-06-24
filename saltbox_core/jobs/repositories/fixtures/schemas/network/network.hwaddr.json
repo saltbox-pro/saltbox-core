@@ -1,0 +1,29 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "network.hw_addr",
+    "description": "Return the hardware address (a.k.a. MAC address) for a given interface",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "iface"
+        ],
+        "properties": {
+          "iface": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "iface": {
+        "ui:title": "Interface name",
+        "ui:description": "e.g. eth0"
+      }
+    }
+  }
+}

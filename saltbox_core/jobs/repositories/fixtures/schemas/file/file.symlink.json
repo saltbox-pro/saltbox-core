@@ -1,0 +1,56 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "file.symlink",
+    "description": "Create a symbolic link (symlink, soft link) to a file",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "src",
+          "path"
+        ],
+        "properties": {
+          "src": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string",
+            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]+$"
+          },
+          "force": {
+            "type": "boolean",
+            "default": false
+          },
+          "atomic": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "src": {
+        "ui:title": "Source",
+        "ui:description": "The path to a file or directory"
+      },
+      "path": {
+        "ui:title": "Path",
+        "ui:description": "The path to the link. Must be an absolute path"
+      },
+      "force": {
+        "ui:title": "Force",
+        "ui:description": "Overwrite an existing symlink with the same name",
+        "ui:widget": "select"
+      },
+      "atomic": {
+        "ui:title": "Atomic",
+        "ui:description": "Use atomic file operations to create the symlink",
+        "ui:widget": "select"
+      }
+    }
+  }
+}

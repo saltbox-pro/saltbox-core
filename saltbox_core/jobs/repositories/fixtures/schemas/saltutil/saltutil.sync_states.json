@@ -1,0 +1,52 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "saltutil.sync_states",
+    "description": "Sync state modules from salt://_states to the minion",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "properties": {
+          "saltenv": {
+            "type": "string",
+            "pattern": "^(?:_+[a-zA-Z0-9]|[a-zA-Z])[\\w-]*(?:,(?:_+[a-zA-Z0-9]|[a-zA-Z])[\\w-]*)*$"
+          },
+          "refresh": {
+            "type": "boolean",
+            "default": true
+          },
+          "extmod_whitelist": {
+            "type": "string",
+            "pattern": "^(?:_+[a-zA-Z0-9]|[a-zA-Z])[\\w-]*(?:,(?:_+[a-zA-Z0-9]|[a-zA-Z])[\\w-]*)*$"
+          },
+          "extmod_blacklist": {
+            "type": "string",
+            "pattern": "^(?:_+[a-zA-Z0-9]|[a-zA-Z])[\\w-]*(?:,(?:_+[a-zA-Z0-9]|[a-zA-Z])[\\w-]*)*$"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "saltenv": {
+        "ui:title": "SaltStack environment",
+        "ui:description": "The fileserver environment from which to sync. To sync from more than one environment, pass a comma-separated list.  If not passed, then all environments configured in the :ref:`top files <states-top>` will be checked for state modules to sync. If no top files are found, then the base environment will be synced (e.g. saltenv=base,dev)"
+      },
+      "refresh": {
+        "ui:title": "Refresh",
+        "ui:description": "If True, refresh the available states on the minion. This refresh will be performed even if no new state modules are synced. Set to False to prevent this refresh",
+        "ui:widget": "select"
+      },
+      "extmod_whitelist": {
+        "ui:title": "Extension modules whitelist",
+        "ui:description": "Comma-separated list of modules to sync"
+      },
+      "extmod_blacklist": {
+        "ui:title": "Extension modules blacklist",
+        "ui:description": "Comma-separated list of modules to blacklist based on type"
+      }
+    }
+  }
+}

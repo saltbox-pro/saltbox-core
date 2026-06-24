@@ -1,0 +1,47 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "file.seek_read",
+    "description": "Seek to a position on a file and read it",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "path",
+          "size",
+          "offset"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]+$"
+          },
+          "size": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "path": {
+        "ui:title": "Path",
+        "ui:description": "Path to file"
+      },
+      "size": {
+        "ui:title": "Size",
+        "ui:description": "Amount to read at once"
+      },
+      "offset": {
+        "ui:title": "Offset",
+        "ui:description": "Offset to start into the file"
+      }
+    }
+  }
+}

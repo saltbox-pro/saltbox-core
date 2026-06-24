@@ -1,0 +1,72 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "pillar.filter_by",
+    "description": "Look up the given pillar in a given dictionary and return the result",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "lookup_dict",
+          "pillar"
+        ],
+        "properties": {
+          "lookup_dict": {
+            "type": "object",
+            "title": "Lookup_dict",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+            }
+          },
+          "pillar": {
+            "type": "string"
+          },
+          "merge": {
+            "type": "object",
+            "title": "Merge params",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+            }
+          },
+          "default": {
+            "type": "string",
+            "default": "default"
+          },
+          "base": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "lookup_dict": {
+        "ui:title": "Lookup dictionary",
+        "ui:description": "A dictionary, keyed by a pillar, containing a value or values relevant to systems matching that pillar. For example, a key could be a pillar for a role and the value could the name of a package on that particular OS. The dictionary key can be a globbing pattern. The function will return the corresponding lookup_dict value where the pillar value matches the pattern"
+      },
+      "pillar": {
+        "ui:title": "Pillar",
+        "ui:description": "The name of a pillar to match with the system's pillar. For example, the value of the \"role\" pillar could be used to pull values from the lookup_dict dictionary"
+      },
+      "merge": {
+        "ui:description": "A dictionary to merge with the results of the pillar selection from lookup_dict. This allows another dictionary to override the values in the lookup_dict"
+      },
+      "default": {
+        "ui:title": "Default key",
+        "ui:description": "Default lookup_dict's key used if the pillar does not exist or if the pillar value has no match on lookup_dict. If unspecified the value is \"default"
+      },
+      "base": {
+        "ui:title": "Base key",
+        "ui:description": "A lookup_dict key to use for a base dictionary. The pillar-selected lookup_dict is merged over this and then finally the merge dictionary is merged. This allows common values for each case to be collected in the base and overridden by the pillar selection dictionary and the merge dictionary. Default is unset"
+      }
+    }
+  }
+}

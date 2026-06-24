@@ -1,0 +1,73 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "saltutil.sync_all",
+    "description": "Sync down all of the dynamic modules from the file server for a specific environment. This function synchronizes custom modules, states, beacons, grains, returners, output modules, renderers, and utils",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "properties": {
+          "saltenv": {
+            "type": "string",
+            "pattern": "^(?:_+[a-zA-Z0-9]|[a-zA-Z])[\\w-]*(?:,(?:_+[a-zA-Z0-9]|[a-zA-Z])[\\w-]*)*$"
+          },
+          "refresh": {
+            "type": "boolean",
+            "default": true
+          },
+          "extmod_whitelist": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "extmod_blacklist": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "array",
+              "default": [],
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "clean_pillar_cache": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "saltenv": {
+        "ui:title": "SaltStack environment",
+        "ui:description": "The fileserver environment from which to sync. To sync from more than one environment, pass a comma-separated list.  If not passed, then all environments configured in the :ref:`top files <states-top>` will be checked for execution modules to sync. If no top files are found, then the base environment will be synced (e.g. saltenv=base,dev)"
+      },
+      "refresh": {
+        "ui:title": "Refresh",
+        "ui:description": "Also refresh the execution modules and recompile pillar data available to the minion. If this is a masterless minion, also refresh the environments from which extension modules are synced after syncing master tops. This refresh will be performed even if no new dynamic modules are synced. Set to False to prevent this refresh",
+        "ui:widget": "select"
+      },
+      "extmod_whitelist": {
+        "ui:title": "Extension modules whitelist",
+        "ui:description": "Dictionary of modules to sync based on type (e.g. extmod_whitelist={'modules': ['custom_module']})"
+      },
+      "extmod_blacklist": {
+        "ui:title": "Extension modules blacklist",
+        "ui:description": "Dictionary of modules to blacklist based on type"
+      },
+      "clean_pillar_cache": {
+        "ui:title": "Clean pillar cache",
+        "ui:description": "Set to True to refresh pillar cache",
+        "ui:widget": "select"
+      }
+    }
+  }
+}

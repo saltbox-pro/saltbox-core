@@ -1,0 +1,10 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "test.versions_report",
+    "description": "Returns versions of components used by salt",
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "ui_schema": {}
+}

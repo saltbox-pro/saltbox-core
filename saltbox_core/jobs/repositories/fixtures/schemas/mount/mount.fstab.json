@@ -1,0 +1,28 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "mount.fstab",
+    "description": "List the contents of the fstab",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "properties": {
+          "config": {
+            "type": "string",
+            "default": "/etc/fstab",
+            "pattern": "^(?!.*?\\/\\/)(?!.*\\\\)\\/[^<>:,\"|?*\\0\\r\\n]+[^\\/]$"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "config": {
+        "ui:title": "Config",
+        "ui:description": "Path to fstab file"
+      }
+    }
+  }
+}

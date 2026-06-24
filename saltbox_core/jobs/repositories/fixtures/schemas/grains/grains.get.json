@@ -1,0 +1,54 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "grains.get",
+    "description": "Attempt to retrieve the named value from grains, if the named value is not available return the passed default. The default return is an empty string",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "key"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^(?:_+[a-zA-Z0-9]|[a-zA-Z])[\\w-]*$"
+          },
+          "default": {
+            "type": "string"
+          },
+          "delimiter": {
+            "type": "string",
+            "default": ":"
+          },
+          "ordered": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "key": {
+        "ui:title": "Key",
+        "ui:description": ""
+      },
+      "default": {
+        "ui:title": "Default value",
+        "ui:description": "Value to return when the grain is missing"
+      },
+      "delimiter": {
+        "ui:title": "Delimiter",
+        "ui:description": "Specify an alternate delimiter to use when traversing a nested dict. This is useful for when the desired key contains a colon"
+      },
+      "ordered": {
+        "ui:title": "Ordered",
+        "ui:description": "Outputs an ordered dict if applicable (default: True)",
+        "ui:widget": "select"
+      }
+    }
+  }
+}

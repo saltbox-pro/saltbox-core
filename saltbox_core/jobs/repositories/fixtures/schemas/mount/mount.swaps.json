@@ -1,0 +1,15 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "mount.swaps",
+    "description": "Return a dict containing information on active swap",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "properties": {}
+      }
+    }
+  },
+  "ui_schema": {}
+}

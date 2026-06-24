@@ -1,0 +1,39 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "grains.delkey",
+    "description": "Remove a grain key and it's value from the minion grains file. Wrapper around grains.delval that performs destructive removal and optionally forces deletion of mapped values",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "key"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^(?:_+[a-zA-Z0-9]|[a-zA-Z])[\\w-]*$"
+          },
+          "force": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "key": {
+        "ui:title": "Key",
+        "ui:description": "The grain key from which to delete the value"
+      },
+      "force": {
+        "ui:title": "Force",
+        "ui:description": "Force remove the grain even when it is a mapped value. Defaults to False",
+        "ui:widget": "select"
+      }
+    }
+  }
+}

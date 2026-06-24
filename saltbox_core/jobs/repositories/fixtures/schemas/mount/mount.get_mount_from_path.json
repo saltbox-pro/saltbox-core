@@ -1,0 +1,30 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "mount.get_mount_from_path",
+    "description": "Return the mount providing a specified path",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?!.*?\\/\\/)(?!.*\\\\)\\/[^<>:,\"|?*\\0\\r\\n]+[^\\/]$"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "path": {
+        "ui:title": "Path",
+        "ui:description": "The path for the function to evaluate"
+      }
+    }
+  }
+}

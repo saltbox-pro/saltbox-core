@@ -1,0 +1,69 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "mount.remount",
+    "description": "Attempt to remount a device, if the device is not already mounted, mount is called",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "name",
+          "device"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^(?!.*?\\/\\/)(?!.*\\\\)\\/[^<>:,\"|?*\\0\\r\\n]+$"
+          },
+          "device": {
+            "type": "string"
+          },
+          "mkmnt": {
+            "type": "boolean",
+            "default": false
+          },
+          "fstype": {
+            "type": "string"
+          },
+          "opts": {
+            "type": "string",
+            "default": "defaults"
+          },
+          "user": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "name": {
+        "ui:title": "Mount Point",
+        "ui:description": "Path where the filesystem should be mounted (e.g. /mnt/foo)"
+      },
+      "device": {
+        "ui:title": "Device",
+        "ui:description": "Device or image to mount (e.g. /dev/sdz1)"
+      },
+      "mkmnt": {
+        "ui:title": "Create Mount Point",
+        "ui:description": "Create the mount point directory if it does not exist",
+        "ui:widget": "select"
+      },
+      "fstype": {
+        "ui:title": "Filesystem Type",
+        "ui:description": "Force a filesystem type when mounting (e.g. ext4, xfs)"
+      },
+      "opts": {
+        "ui:title": "Mount Options",
+        "ui:description": "Comma-separated mount options passed to the mount command"
+      },
+      "user": {
+        "ui:title": "Run As User",
+        "ui:description": "Run the mount command as this user"
+      }
+    }
+  }
+}

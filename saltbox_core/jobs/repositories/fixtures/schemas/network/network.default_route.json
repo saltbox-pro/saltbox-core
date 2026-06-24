@@ -1,0 +1,40 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "network.default_route",
+    "description": "Return default route(s) from routing table",
+    "additionalProperties": false,
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "Keyword arguments",
+        "additionalProperties": false,
+        "properties": {
+          "family": {
+            "type": "string",
+            "default": "inet",
+            "oneOf": [
+              {
+                "const": "inet",
+                "title": "IPv4 routes"
+              },
+              {
+                "const": "inet6",
+                "title": "IPv6 routes"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "family": {
+        "ui:title": "Family",
+        "ui:description": "Optional address family filter, e.g. inet for IPv4 or inet6 for IPv6.",
+        "ui:widget": "select"
+      }
+    }
+  }
+}

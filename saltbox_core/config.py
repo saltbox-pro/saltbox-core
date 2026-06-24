@@ -72,8 +72,6 @@ class Settings(BaseSettings):
     opa_url: str = ''
 
     # SLS and jobs repos
-    salt_func_repo_url: str = 'https://dev.saltbox.pro/saltbox/salt-func-schemas.git'
-    salt_func_local_repo_name: str = 'salt-func-schemas'
     gitlab_token: str | None = None
     gitlab_base_url: str = 'https://dev.saltbox.pro'
     gitlab_group_id: int | None = None
@@ -102,10 +100,6 @@ class Settings(BaseSettings):
         default=None, description='Optional specification to force owner and permissions of Manifest.sshfs_files'
     )
     local_repo_sync_timeout_sec: int = 3600
-    orphan_aux_files_cleanup_dry_run: bool = Field(
-        default=False,
-        description='Do not delete files in SSHFS_DIR on cleanup, only write to log',
-    )
 
     # GPG
     gpg_key_length: int = 4096

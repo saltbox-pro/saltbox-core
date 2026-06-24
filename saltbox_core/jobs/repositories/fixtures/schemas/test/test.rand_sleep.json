@@ -1,0 +1,31 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "test.rand_sleep",
+    "description": "Sleep for a random number of seconds, used to test long-running commands and minions returning at differing intervals",
+    "additionalProperties": false,
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "description": "",
+        "additionalProperties": false,
+        "properties": {
+          "max": {
+            "type": "integer",
+            "default": 60,
+            "minimum": 1
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "max": {
+        "ui:title": "Max",
+        "ui:description": "Max seconds to sleep"
+      }
+    }
+  }
+}

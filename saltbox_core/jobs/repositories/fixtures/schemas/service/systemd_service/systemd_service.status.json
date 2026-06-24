@@ -1,0 +1,29 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "service.status",
+    "description": "Return the status for a service via systemd. If the name contains globbing, a dict mapping service name to True/False values is returned",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "name": {
+        "ui:title": "Name",
+        "ui:description": "Systemd Service Name"
+      }
+    }
+  }
+}

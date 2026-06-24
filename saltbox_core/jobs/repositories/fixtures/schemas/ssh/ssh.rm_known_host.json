@@ -1,0 +1,55 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "ssh.rm_known_host",
+    "description": "Remove all keys belonging to hostname from a known_hosts file",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "user",
+          "hostname"
+        ],
+        "properties": {
+          "user": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][\\w\\.-]+$"
+          },
+          "hostname": {
+            "type": "string"
+          },
+          "config": {
+            "type": "string"
+          },
+          "port": {
+            "type": "integer",
+            "default": 22,
+            "minimum": 0,
+            "maximum": 65535
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "user": {
+        "ui:title": "User",
+        "ui:description": ""
+      },
+      "hostname": {
+        "ui:title": "Hostname",
+        "ui:description": ""
+      },
+      "config": {
+        "ui:title": "Path to the config file",
+        "ui:description": ""
+      },
+      "port": {
+        "ui:title": "SSH port",
+        "ui:description": ""
+      }
+    }
+  }
+}

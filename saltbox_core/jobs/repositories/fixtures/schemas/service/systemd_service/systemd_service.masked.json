@@ -1,0 +1,45 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "service.masked",
+    "description": "Check whether or not a service is masked",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "runtime": {
+            "type": "boolean",
+            "default": false
+          },
+          "root": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "name": {
+        "ui:title": "Name",
+        "ui:description": ""
+      },
+      "runtime": {
+        "ui:title": "Runtime",
+        "ui:description": "Set to True to check for a runtime mask",
+        "ui:widget": "select"
+      },
+      "root": {
+        "ui:title": "Root",
+        "ui:description": "Enable/disable/mask unit files in the specified root directory"
+      }
+    }
+  }
+}

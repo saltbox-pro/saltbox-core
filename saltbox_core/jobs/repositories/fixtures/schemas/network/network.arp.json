@@ -1,0 +1,9 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "network.arp",
+    "description": "Return the arp table from the minion",
+    "properties": {}
+  },
+  "ui_schema": {}
+}

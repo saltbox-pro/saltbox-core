@@ -1,0 +1,91 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "parted_partition.list",
+    "description": "Prints partition information of given <device>. (NOTE: feature may not be available depending on your versions of parted on minions)",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "device"
+        ],
+        "properties": {
+          "device": {
+            "type": "string"
+          },
+          "unit": {
+            "type": "string",
+            "oneOf": [
+              {
+                "title": "s",
+                "const": "s"
+              },
+              {
+                "title": "B",
+                "const": "B"
+              },
+              {
+                "title": "kB",
+                "const": "kB"
+              },
+              {
+                "title": "MB",
+                "const": "MB"
+              },
+              {
+                "title": "MiB",
+                "const": "MiB"
+              },
+              {
+                "title": "GB",
+                "const": "GB"
+              },
+              {
+                "title": "GiB",
+                "const": "GiB"
+              },
+              {
+                "title": "TB",
+                "const": "TB"
+              },
+              {
+                "title": "TiB",
+                "const": "TiB"
+              },
+              {
+                "title": "%",
+                "const": "%"
+              },
+              {
+                "title": "cyl",
+                "const": "cyl"
+              },
+              {
+                "title": "chs",
+                "const": "chs"
+              },
+              {
+                "title": "compact",
+                "const": "compact"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "device": {
+        "ui:title": "Device",
+        "ui:description": "The full path to the block device (e.g., /dev/sda)"
+      },
+      "unit": {
+        "ui:title": "Unit",
+        "ui:description": "",
+        "ui:widget": "select"
+      }
+    }
+  }
+}

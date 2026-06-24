@@ -1,0 +1,15 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "service.get_enabled",
+    "description": "Return a list of enabled services. Enabled is defined as a service that is marked to Auto Start",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "properties": {}
+      }
+    }
+  },
+  "ui_schema": {}
+}

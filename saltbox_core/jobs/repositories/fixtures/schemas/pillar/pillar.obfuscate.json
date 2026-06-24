@@ -1,0 +1,45 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "pillar.obfuscate",
+    "properties": {
+      "args": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "title": "Pillar key"
+        }
+      },
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "properties": {
+          "pillar": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+            }
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "args": {
+      "ui:title": "List of pillar keys",
+      "ui:description": "Return one or more pillars with values replaced by type indicators, e.g., 'secret password' → '<str>', ['secret', 1] → ['<str>', '<int>'], {'login': 'somelogin', 'pwd': 'secret'} → {'login': '<str>', 'pwd': '<str>'}",
+      "items": {
+        "ui:title": "pillar key"
+      }
+    },
+    "kwargs": {
+      "pillar": {
+        "ui:title": "Pillar",
+        "ui:description": "If specified, allows for a dictionary of pillar data to be made available to pillar and ext_pillar rendering. These pillar variables will also override any variables of the same name in pillar or ext_pillar"
+      }
+    }
+  }
+}

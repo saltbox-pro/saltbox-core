@@ -1,0 +1,28 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "file.open_files",
+    "description": "Return a list of all physical open files on the system",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "properties": {
+          "by_pid": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "by_pid": {
+        "ui:title": "Group by PID",
+        "ui:description": "Return open files grouped by process ID when enabled",
+        "ui:widget": "select"
+      }
+    }
+  }
+}

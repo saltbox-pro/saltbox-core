@@ -1,0 +1,38 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "parted_partition.get_id",
+    "description": "Returns the system ID of a specific partition, such as Linux, NTFS, LVM, etc. (NOTE: feature may not be available depending on your versions of parted on minions)",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "device",
+          "minor"
+        ],
+        "properties": {
+          "device": {
+            "type": "string"
+          },
+          "minor": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "device": {
+        "ui:title": "Device",
+        "ui:description": "The full path to the block device (e.g., /dev/sda)"
+      },
+      "minor": {
+        "ui:title": "Minor",
+        "ui:description": "The partition number (minor number), such as 1 for /dev/sda1"
+      }
+    }
+  }
+}

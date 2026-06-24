@@ -1,0 +1,53 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "file.mkdir",
+    "description": "Ensure that a directory is available",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "additionalProperties": false,
+        "required": [
+          "dir_path"
+        ],
+        "properties": {
+          "dir_path": {
+            "type": "string",
+            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]+$"
+          },
+          "user": {
+            "type": "string"
+          },
+          "group": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "pattern": "\\d"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "dir_path": {
+        "ui:title": "Path to directory",
+        "ui:description": ""
+      },
+      "user": {
+        "ui:title": "User",
+        "ui:description": ""
+      },
+      "group": {
+        "ui:title": "Group",
+        "ui:description": ""
+      },
+      "mode": {
+        "ui:title": "Mode",
+        "ui:description": ""
+      }
+    }
+  }
+}

@@ -1,0 +1,89 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "mount.mount",
+    "description": "Mount a device",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^(?!.*?\\/\\/)(?!.*\\\\)\\/[^<>:,\"|?*\\0\\r\\n]+$"
+          },
+          "device": {
+            "default": false,
+            "oneOf": [
+              {
+                "title": "Use device from fstab",
+                "type": "boolean",
+                "const": false
+              },
+              {
+                "title": "Provide device path",
+                "type": "string",
+                "minLength": 1
+              }
+            ]
+          },
+          "mkmnt": {
+            "type": "boolean",
+            "default": false
+          },
+          "fstype": {
+            "type": "string"
+          },
+          "opts": {
+            "type": "string",
+            "default": "defaults",
+            "pattern": "^(?:\\s*[A-Za-z0-9._-]+(?:=[^,\\s][^,]*)?\\s*)(?:,\\s*[A-Za-z0-9._-]+(?:=[^,\\s][^,]*)?\\s*)*$|^$"
+          },
+          "user": {
+            "type": "string"
+          },
+          "util": {
+            "type": "string",
+            "default": "mount"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "name": {
+        "ui:title": "Mount Point",
+        "ui:description": "Path where the filesystem should be mounted (e.g. /mnt/foo)"
+      },
+      "device": {
+        "ui:title": "Device",
+        "ui:description": "Device or image to mount (e.g. /dev/sdz1)"
+      },
+      "mkmnt": {
+        "ui:title": "Create Mount Point",
+        "ui:description": "Create the mount point directory if it does not exist",
+        "ui:widget": "select"
+      },
+      "fstype": {
+        "ui:title": "Filesystem Type",
+        "ui:description": "Force a filesystem type when mounting (e.g. ext4, xfs)"
+      },
+      "opts": {
+        "ui:title": "Mount Options",
+        "ui:description": "Comma-separated mount options passed to the mount command"
+      },
+      "user": {
+        "ui:title": "Run As User",
+        "ui:description": "Run the mount command as this user"
+      },
+      "util": {
+        "ui:title": "Utility",
+        "ui:description": "Select the helper to perform the mount (mount, guestfs, qemu_nbd)"
+      }
+    }
+  }
+}

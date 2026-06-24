@@ -1,8 +1,8 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, status
+from fastapi import APIRouter, Body, Depends
 
-from saltbox_core.db.schemas_base import TaskiqTaskIdResponse, TaskiqTaskResult
+from saltbox_core.db.schemas_base import TaskiqTaskResult
 from saltbox_core.jobs.schemas.job_sc_schemas import (
     JobSchemaListBody,
     JobSchemaModel,
@@ -43,37 +43,6 @@ async def get_json_schemas_list(
         projection_model=JobSchemaShortSchema,
         sort=body.sort,
     )
-
-
-@router.get(
-    '/clean',
-    operation_id='jobs_schemas_clean',
-    openapi_extra=GatewayEndpointConfig(
-        policy='core.jobs.schemas.base',
-        action=JobSchemasActions.CLEAN,
-    ).model_dump(by_alias=True),
-    status_code=status.HTTP_204_NO_CONTENT,
-)
-async def clean_schemas(
-    service: Annotated[JobSchemaService, Depends(get_job_schema_service)],
-) -> None:
-    await service.remove_repo_data()
-    await service.delete_many({})
-
-
-@router.post(
-    '/sync',
-    operation_id='jobs_schemas_sync',
-    openapi_extra=GatewayEndpointConfig(
-        policy='core.jobs.schemas.base',
-        action=JobSchemasActions.SYNC,
-    ).model_dump(by_alias=True),
-)
-async def sync_schemas(
-    service: Annotated[JobSchemaService, Depends(get_job_schema_service)],
-) -> TaskiqTaskIdResponse:
-    res = await service.sync()
-    return TaskiqTaskIdResponse(task_id=res)
 
 
 # TODO: Deprecated

@@ -1,0 +1,47 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "network.wol",
+    "description": "Send Wake On Lan packet to a host",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "mac"
+        ],
+        "properties": {
+          "mac": {
+            "type": "string",
+            "pattern": "^(?:[0-9A-Fa-f]{2}([:-]))(?:[0-9A-Fa-f]{2}\\1){4}[0-9A-Fa-f]{2}$"
+          },
+          "bcast": {
+            "type": "string",
+            "default": "255.255.255.255",
+            "pattern": "^(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)){3}$"
+          },
+          "destport": {
+            "type": "integer",
+            "default": 9
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "mac": {
+        "ui:title": "Mac",
+        "ui:description": "Target MAC address, for example 00:11:22:33:44:55."
+      },
+      "bcast": {
+        "ui:title": "Broadcast Address",
+        "ui:description": "IPv4 broadcast address to send eth packet to (e.g. 192.168.1.255)"
+      },
+      "destport": {
+        "ui:title": "Destination port",
+        "ui:description": ""
+      }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "test.version",
+    "description": "Return the version of salt on the minion",
+    "additionalProperties": false,
+    "properties": {}
+  },
+  "ui_schema": {}
+}

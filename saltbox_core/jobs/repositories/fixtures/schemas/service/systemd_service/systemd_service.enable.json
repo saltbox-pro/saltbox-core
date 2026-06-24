@@ -1,0 +1,63 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "service.enable",
+    "description": "Enable the named service to start when the system boots",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "no_block": {
+            "type": "boolean",
+            "default": false
+          },
+          "unmask": {
+            "type": "boolean",
+            "default": false
+          },
+          "unmask_runtime": {
+            "type": "boolean",
+            "default": false
+          },
+          "root": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "name": {
+        "ui:title": "Name",
+        "ui:description": ""
+      },
+      "no_block": {
+        "ui:title": "No block",
+        "ui:description": "Set to True to start the service using --no-block",
+        "ui:widget": "select"
+      },
+      "unmask": {
+        "ui:title": "Unmask",
+        "ui:description": "Set to True to remove an indefinite mask before attempting to enable the service",
+        "ui:widget": "select"
+      },
+      "unmask_runtime": {
+        "ui:title": "Unmask runtime",
+        "ui:description": "Set to True to remove a runtime mask before attempting to enable the service",
+        "ui:widget": "select"
+      },
+      "root": {
+        "ui:title": "Root",
+        "ui:description": "Enable/disable/mask unit files in the specified root directory"
+      }
+    }
+  }
+}

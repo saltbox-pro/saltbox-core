@@ -1,0 +1,39 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "file.read",
+    "description": "Return the content of the file",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]+$"
+          },
+          "binary": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "path": {
+        "ui:title": "Path",
+        "ui:description": "Path to file"
+      },
+      "binary": {
+        "ui:title": "Binary",
+        "ui:description": "Whether to read and return binary data",
+        "ui:widget": "select"
+      }
+    }
+  }
+}

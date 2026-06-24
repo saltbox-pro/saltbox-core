@@ -1,0 +1,267 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "cmd.retcode",
+    "description": "Execute a shell command and return the command's return code",
+    "additionalProperties": false,
+    "required": [
+      "kwargs"
+    ],
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "additionalProperties": false,
+        "required": [
+          "cmd"
+        ],
+        "properties": {
+          "cmd": {
+            "type": "string"
+          },
+          "cwd": {
+            "type": "string",
+            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]+$"
+          },
+          "stdin": {
+            "type": "string"
+          },
+          "runas": {
+            "type": "string"
+          },
+          "group": {
+            "type": "string"
+          },
+          "shell": {
+            "type": "string",
+            "default": "/bin/sh",
+            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]+[^\\/\\\\]$"
+          },
+          "python_shell": {
+            "type": "boolean",
+            "default": false
+          },
+          "env": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "propertyNames": {
+              "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+            }
+          },
+          "clean_env": {
+            "type": "boolean",
+            "default": false
+          },
+          "template": {
+            "type": "string"
+          },
+          "umask": {
+            "type": "string"
+          },
+          "output_encoding": {
+            "type": "string"
+          },
+          "output_loglevel": {
+            "type": "string",
+            "default": "debug",
+            "oneOf": [
+              {
+                "title": "All",
+                "const": "all"
+              },
+              {
+                "title": "Debug",
+                "const": "debug"
+              },
+              {
+                "title": "Error",
+                "const": "error"
+              },
+              {
+                "title": "Critical",
+                "const": "critical"
+              },
+              {
+                "title": "Garbage",
+                "const": "garbage"
+              },
+              {
+                "title": "Info",
+                "const": "info"
+              },
+              {
+                "title": "Profile",
+                "const": "profile"
+              },
+              {
+                "title": "Quiet",
+                "const": "quiet"
+              },
+              {
+                "title": "Trace",
+                "const": "trace"
+              },
+              {
+                "title": "Warning",
+                "const": "warning"
+              }
+            ]
+          },
+          "log_callback": {
+            "type": "string"
+          },
+          "timeout": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "reset_system_locale": {
+            "type": "boolean",
+            "default": true
+          },
+          "ignore_retcode": {
+            "type": "boolean",
+            "default": false
+          },
+          "saltenv": {
+            "type": "string",
+            "pattern": "^(?:_+[a-zA-Z0-9]|[a-zA-Z])[\\w-]*(?:,(?:_+[a-zA-Z0-9]|[a-zA-Z])[\\w-]*)*$"
+          },
+          "use_vt": {
+            "type": "boolean",
+            "default": false
+          },
+          "password": {
+            "type": "string"
+          },
+          "success_retcodes": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "title": "value"
+            }
+          },
+          "success_stdout": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "title": "value"
+            }
+          },
+          "success_stderr": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "title": "value"
+            }
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "cmd": {
+        "ui:title": "Cmd",
+        "ui:description": "The command to run. ex: ls -lart /home"
+      },
+      "cwd": {
+        "ui:title": "Cwd",
+        "ui:description": "The directory from which to execute the command. Defaults to the home directory of the user specified by runas (or the user under which Salt is running if runas is not specified)"
+      },
+      "stdin": {
+        "ui:title": "Standard input",
+        "ui:description": "A string of standard input can be specified for the command to be run using the stdin parameter. This can be useful in cases where sensitive information must be read from standard input"
+      },
+      "runas": {
+        "ui:title": "Run as",
+        "ui:description": "Specify an alternate user to run the command. The default behavior is to run as the user under which Salt is running. If running on a Windows minion you must also use the password argument, and the target user account must be in the Administrators group"
+      },
+      "group": {
+        "ui:title": "Group",
+        "ui:description": "Group to run command as. Not currently supported on Windows"
+      },
+      "shell": {
+        "ui:title": "Shell",
+        "ui:description": "Specify an alternate shell. Defaults to the system's default shell"
+      },
+      "python_shell": {
+        "ui:title": "Python shell",
+        "ui:description": "If False, let python handle the positional arguments. Set to True to use shell features, such as pipes or redirection",
+        "ui:widget": "select"
+      },
+      "env": {
+        "ui:title": "Environment",
+        "ui:description": "Environment variables to be set prior to execution",
+        "ui:widget": "select"
+      },
+      "clean_env": {
+        "ui:title": "Clean environment",
+        "ui:description": "Attempt to clean out all other shell environment variables and set only those provided in the 'env' argument to this function",
+        "ui:widget": "select"
+      },
+      "template": {
+        "ui:title": "Template",
+        "ui:description": "If this setting is applied then the named templating engine will be used to render the downloaded file. Currently jinja, mako, and wempy are supported"
+      },
+      "umask": {
+        "ui:title": "Umask",
+        "ui:description": "The umask (in octal) to use when running the command"
+      },
+      "output_encoding": {
+        "ui:title": "Output encoding",
+        "ui:description": "Control the encoding used to decode the command's output"
+      },
+      "output_loglevel": {
+        "ui:title": "Output loglevel",
+        "ui:description": "Control the loglevel at which the output from the command is logged to the minion log",
+        "ui:widget": "select"
+      },
+      "log_callback": {
+        "ui:title": "Log callback",
+        "ui:description": ""
+      },
+      "timeout": {
+        "ui:title": "Timeout",
+        "ui:description": "A timeout in seconds for the executed process to return"
+      },
+      "reset_system_locale": {
+        "ui:title": "Reset system locale",
+        "ui:description": "",
+        "ui:widget": "select"
+      },
+      "ignore_retcode": {
+        "ui:title": "Ignore retcode",
+        "ui:description": "If the exit code of the command is nonzero, this is treated as an error condition, and the output from the command will be logged to the minion log. However, there are some cases where programs use the return code for signaling and a nonzero exit code doesn't necessarily mean failure. Pass this argument as True to skip logging the output if the command has a nonzero exit code",
+        "ui:widget": "select"
+      },
+      "saltenv": {
+        "ui:title": "Salt environment",
+        "ui:description": ""
+      },
+      "use_vt": {
+        "ui:title": "VT utils",
+        "ui:description": "Use VT utils (saltstack) to stream the command output more interactively to the console and the logs. This is experimental",
+        "ui:widget": "select"
+      },
+      "password": {
+        "ui:title": "Password",
+        "ui:description": "Windows only. Required when specifying runas. This parameter will be ignored on non-Windows platforms",
+        "ui:widget": "password"
+      },
+      "success_retcodes": {
+        "ui:title": "Success return codes",
+        "ui:description": "This parameter will allow a list of non-zero return codes that should be considered a success.  If the return code returned from the run matches any in the provided list, the return code will be overridden with zero"
+      },
+      "success_stdout": {
+        "ui:title": "Success standard output",
+        "ui:description": "This parameter will allow a list of strings that when found in standard out should be considered a success. If stdout returned from the run matches any in the provided list, the return code will be overridden with zero"
+      },
+      "success_stderr": {
+        "ui:title": "Success standard error",
+        "ui:description": "This parameter will allow a list of strings that when found in standard error should be considered a success. If stderr returned from the run matches any in the provided list, the return code will be overridden with zero"
+      }
+    }
+  }
+}

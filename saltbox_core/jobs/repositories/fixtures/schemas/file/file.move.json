@@ -1,0 +1,50 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "file.move",
+    "description": "Move a file or directory",
+    "additionalProperties": false,
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "additionalProperties": false,
+        "required": [
+          "src",
+          "dst"
+        ],
+        "properties": {
+          "src": {
+            "type": "string",
+            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]+$"
+          },
+          "dst": {
+            "type": "string",
+            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]+$"
+          },
+          "disallow_copy_and_unlink": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "src": {
+        "ui:title": "Source",
+        "ui:description": "File path musth be absolute!"
+      },
+      "dst": {
+        "ui:title": "Destination",
+        "ui:description": "File path musth be absolute!"
+      },
+      "disallow_copy_and_unlink": {
+        "ui:title": "Disallow copy and unlink",
+        "ui:description": "If True, the operation is offloaded to the file.rename execution module function. This will use os.rename underneath, which will fail in the event that src and dst are on different filesystems. If False (the default), shutil.move will be used in order to fall back on a \"copy then unlink\" approach, which is required for moving across filesystems.",
+        "ui:widget": "select"
+      }
+    }
+  }
+}

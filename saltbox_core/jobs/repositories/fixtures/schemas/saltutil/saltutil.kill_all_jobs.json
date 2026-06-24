@@ -1,0 +1,9 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "saltutil.kill_all_jobs",
+    "description": "Sends a kill signal (SIGKILL 9) to all currently running jobs",
+    "properties": {}
+  },
+  "ui_schema": {}
+}

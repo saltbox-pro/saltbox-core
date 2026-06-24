@@ -1,0 +1,51 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "file.sed_contains",
+    "description": "Return True if the file at path contains text. Utilizes sed to perform the search (line-wise search). Note: the p flag will be added to any flags you pass in",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "path",
+          "text"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]+$"
+          },
+          "text": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "string"
+          },
+          "flags": {
+            "type": "string",
+            "default": "g"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "path": {
+        "ui:title": "Path",
+        "ui:description": "Path to file"
+      },
+      "text": {
+        "ui:title": "Text",
+        "ui:description": "Required text"
+      },
+      "limit": {
+        "ui:title": "Limit"
+      },
+      "flags": {
+        "ui:title": "Flags"
+      }
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "environ.get",
+    "description": "Get a single salt process environment variable",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "key"
+        ],
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+          },
+          "default": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "key": {
+        "ui:title": "Key",
+        "ui:description": "String used as the key for environment lookup"
+      },
+      "default": {
+        "ui:title": "Default value",
+        "ui:description": "If the key is not found in the environment, return this value"
+      }
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "pillar.item",
+    "required": [
+      "args"
+    ],
+    "properties": {
+      "args": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "string",
+          "title": "Pillar key",
+          "pattern": "^(?:_+[a-zA-Z0-9]|[a-zA-Z])[\\w-]*$"
+        }
+      },
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "properties": {
+          "default": {
+            "type": "string"
+          },
+          "delimiter": {
+            "type": "string",
+            "default": ":"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "args": {
+      "ui:title": "List of pillar keys",
+      "ui:description": "Return one or more pillar entries from the in-memory pillar data",
+      "items": {
+        "ui:title": "Pillar key"
+      }
+    },
+    "kwargs": {
+      "default": {
+        "ui:title": "Default value",
+        "ui:description": "Value to return if the specified pillar key is not found"
+      },
+      "delimiter": {
+        "ui:title": "Delimiter",
+        "ui:description": "Delimiter used to traverse nested dictionaries"
+      }
+    }
+  }
+}

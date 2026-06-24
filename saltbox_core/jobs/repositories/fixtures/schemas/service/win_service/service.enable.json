@@ -1,0 +1,64 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "service.enable",
+    "description": "Enable the named service to start at boot",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "start_type": {
+            "type": "string",
+            "default": "auto",
+            "oneOf": [
+              {
+                "title": "Automatic",
+                "const": "auto"
+              },
+              {
+                "title": "Automatic (boot driver)",
+                "const": "boot"
+              },
+              {
+                "title": "Manual",
+                "const": "manual"
+              },
+              {
+                "title": "Disabled",
+                "const": "disabled"
+              }
+            ]
+          },
+          "start_delayed": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "name": {
+        "ui:title": "Name",
+        "ui:description": "The name of the service to enable"
+      },
+      "start_type": {
+        "ui:title": "Service start type",
+        "ui:description": "Specifies the service start type. Valid options are as follows: 'boot':Device driver that is loaded by the boot loader; 'system':Device driver that is started during kernel initialization; 'auto':Service that automatically starts; 'manual':Service must be started manually; 'disabled':Service cannot be started"
+      },
+      "start_delayed": {
+        "ui:title": "Delayed Start",
+        "ui:description": "Set the service to Auto(Delayed Start). Only valid if the start_type is set to Auto. If service_type is not passed, but the service is already set to Auto, then the flag will be set",
+        "ui:widget": "select"
+      }
+    }
+  }
+}

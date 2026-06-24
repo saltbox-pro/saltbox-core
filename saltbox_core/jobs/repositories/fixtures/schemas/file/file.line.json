@@ -1,0 +1,139 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "file.line",
+    "description": "Line-focused editing of a file",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]+$"
+          },
+          "content": {
+            "type": "string"
+          },
+          "match": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "oneOf": [
+              {
+                "title": "Ensure",
+                "const": "ensure"
+              },
+              {
+                "title": "Replace",
+                "const": "replace"
+              },
+              {
+                "title": "Delete",
+                "const": "delete"
+              },
+              {
+                "title": "Insert",
+                "const": "insert"
+              }
+            ]
+          },
+          "location": {
+            "type": "string",
+            "oneOf": [
+              {
+                "title": "Start",
+                "const": "start"
+              },
+              {
+                "title": "End",
+                "const": "end"
+              }
+            ]
+          },
+          "before": {
+            "type": "string"
+          },
+          "after": {
+            "type": "string"
+          },
+          "show_changes": {
+            "type": "boolean",
+            "default": true
+          },
+          "backup": {
+            "type": "boolean",
+            "default": false
+          },
+          "quiet": {
+            "type": "boolean",
+            "default": false
+          },
+          "indent": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "path": {
+        "ui:title": "Path",
+        "ui:description": "Filesystem path to the file to be edited"
+      },
+      "content": {
+        "ui:title": "Content",
+        "ui:description": "Content of the line. Allowed to be empty if mode='delete'",
+        "ui:widget": "textarea"
+      },
+      "match": {
+        "ui:title": "Match",
+        "ui:description": "Match the target line for an action by a fragment of a string or regular expression.  If neither before nor after are provided, and match is also None, match falls back to the content value"
+      },
+      "mode": {
+        "ui:title": "Mode",
+        "ui:description": "Defines how to edit a line. One of the following options is required:  ENSURE  If line does not exist, it will be added. If before and after are specified either zero lines, or lines that contain the content line are allowed to be in between before and after. If there are lines, and none of them match then it will produce an error.  REPLACE  If line already exists, the entire line will be replaced.  DELETE  Delete the line, if found.  INSERT  Nearly identical to ensure. If a line does not exist, it will be added.  The differences are that multiple (and non-matching) lines are alloweed between before and after, if they are specified. The line will always be inserted right before before. insert also allows the use of location to specify that the line should be added at the beginning or end of the file.  If mode='insert' is used, at least one of location, before, or after is required.  If location is used, before and after are ignored",
+        "ui:widget": "select"
+      },
+      "location": {
+        "ui:title": "Location",
+        "ui:description": "In mode='insert' only, whether to place the content at the beginning or end of a the file. If location is provided, before and after are ignored. Valid locations:  start  Place the content at the beginning of the file.  end  Place the content at the end of the file",
+        "ui:widget": "select"
+      },
+      "before": {
+        "ui:title": "Before",
+        "ui:description": "Regular expression or an exact case-sensitive fragment of the string. Will be tried as both a regex and a part of the line.  Must match exactly one line in the file.  This value is only used in ensure and insert modes. The content will be inserted just before this line, with matching indentation unless indent=False"
+      },
+      "after": {
+        "ui:title": "After",
+        "ui:description": "Regular expression or an exact case-sensitive fragment of the string. Will be tried as both a regex and a part of the line.  Must match exactly one line in the file.  This value is only used in ensure and insert modes. The content will be inserted directly after this line, unless before is also provided. If before is not provided, indentation will match this line, unless indent=False"
+      },
+      "show_changes": {
+        "ui:title": "Show changes",
+        "ui:description": "Output a unified diff of the old file and the new file. If False return a boolean if any changes were made. Default is True  Using this option will store two copies of the file in-memory (the original version and the edited version) in order to generate the diff",
+        "ui:widget": "select"
+      },
+      "backup": {
+        "ui:title": "Backup",
+        "ui:description": "Create a backup of the original file with the extension: \"Year-Month-Day-Hour-Minutes-Seconds\"",
+        "ui:widget": "select"
+      },
+      "quiet": {
+        "ui:title": "Quiet",
+        "ui:description": "Do not raise any exceptions. E.g. ignore the fact that the file that is tried to be edited does not exist and nothing really happened",
+        "ui:widget": "select"
+      },
+      "indent": {
+        "ui:title": "Indent",
+        "ui:description": "Keep indentation with the previous line. This option is not considered when the delete mode is specified. Default is True",
+        "ui:widget": "select"
+      }
+    }
+  }
+}

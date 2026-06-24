@@ -1,0 +1,56 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "file.ucomment",
+    "description": "Uncomment specified commented lines in a file",
+    "additionalProperties": false,
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "regex"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]+$"
+          },
+          "regex": {
+            "type": "string"
+          },
+          "char": {
+            "type": "string",
+            "default": "#"
+          },
+          "backup": {
+            "type": "string",
+            "default": ".bak"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "path": {
+        "ui:title": "Path",
+        "ui:description": "The full path to the file to be edited"
+      },
+      "regex": {
+        "ui:title": "Regex",
+        "ui:description": "A regular expression used to find the lines that are to be uncommented. This regex should not include the comment character"
+      },
+      "char": {
+        "ui:title": "Char",
+        "ui:description": "The character to remove in order to uncomment a line"
+      },
+      "backup": {
+        "ui:title": "Backup file extension",
+        "ui:description": "The file will be backed up before edit with this file extension"
+      }
+    }
+  }
+}

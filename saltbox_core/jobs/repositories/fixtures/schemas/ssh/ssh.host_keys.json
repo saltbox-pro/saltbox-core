@@ -1,0 +1,45 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "ssh.host_keys",
+    "description": "Return the minion's host keys",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "properties": {
+          "keydir": {
+            "type": "string",
+            "pattern": "^(?:/(?:[^/\\n\\x00]+(?:/[^/\\n\\x00]+)*)?/?|[A-Za-z]:[\\\\/](?:[^\\\\/\\n\\x00]+(?:[\\\\/][^\\\\/\\n\\x00]+)*)?(?:[\\\\/])?)$"
+          },
+          "private": {
+            "type": "boolean",
+            "default": true
+          },
+          "certs": {
+            "type": "boolean",
+            "default": true
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "keydir": {
+        "ui:title": "Key directory",
+        "ui:description": "e.g /etc/ssh or C:\\Users\\<user_name>\\.ssh"
+      },
+      "private": {
+        "ui:title": "Private key file",
+        "ui:description": "",
+        "ui:widget": "select"
+      },
+      "certs": {
+        "ui:title": "Certs",
+        "ui:description": "",
+        "ui:widget": "select"
+      }
+    }
+  }
+}

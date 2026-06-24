@@ -1,0 +1,34 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "ssh.hash_known_hosts",
+    "description": "Hash all the hostnames in the known hosts file",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "properties": {
+          "user": {
+            "type": "string",
+            "pattern": "^[a-zA-Z][\\w\\.-]+$"
+          },
+          "config": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "user": {
+        "ui:title": "User",
+        "ui:description": "Hash known hosts of this user"
+      },
+      "config": {
+        "ui:title": "Config",
+        "ui:description": "Path to known hosts file: can be absolute or relative to user's home directory"
+      }
+    }
+  }
+}

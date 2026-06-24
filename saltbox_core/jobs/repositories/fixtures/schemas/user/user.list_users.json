@@ -1,0 +1,28 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "user.list_users",
+    "description": "Return a list of all users",
+    "additionalProperties": false,
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "properties": {
+          "root": {
+            "type": "string",
+            "pattern": "^\\/[\\w-]+(?:\\/[\\w-]+)*$"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "root": {
+        "ui:title": "Path to root directory",
+        "ui:description": "Directory to chroot into"
+      }
+    }
+  }
+}

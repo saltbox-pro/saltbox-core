@@ -1,0 +1,37 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "service.disabled",
+    "description": "Return if the named service is disabled from starting on boot",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "description": "",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "root": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "name": {
+        "ui:title": "Name",
+        "ui:description": "Systemd Service Name"
+      },
+      "root": {
+        "ui:title": "Root",
+        "ui:description": "Enable/disable/mask unit files in the specified root directory"
+      }
+    }
+  }
+}

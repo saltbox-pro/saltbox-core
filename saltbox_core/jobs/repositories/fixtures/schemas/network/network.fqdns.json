@@ -1,0 +1,15 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "network.fqdns",
+    "description": "Return all known FQDNs for the system by enumerating all interfaces and then trying to reverse resolve them (excluding 'lo' interface)",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "properties": {}
+      }
+    }
+  },
+  "ui_schema": {}
+}

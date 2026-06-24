@@ -1,0 +1,154 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "file.set_selinux_context",
+    "description": "Set a specific SELinux label on a given path",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "path"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]+$"
+          },
+          "user": {
+            "type": "string",
+            "oneOf": [
+              {
+                "title": "Guest",
+                "const": "guest_u"
+              },
+              {
+                "title": "Root",
+                "const": "root"
+              },
+              {
+                "title": "Staff",
+                "const": "staff_u"
+              },
+              {
+                "title": "Sysadm",
+                "const": "sysadm_u"
+              },
+              {
+                "title": "System",
+                "const": "system_u"
+              },
+              {
+                "title": "Unconfined",
+                "const": "unconfined_u"
+              },
+              {
+                "title": "User",
+                "const": "user_u"
+              },
+              {
+                "title": "Xguest",
+                "const": "xquest_u"
+              }
+            ]
+          },
+          "role": {
+            "type": "string",
+            "oneOf": [
+              {
+                "title": "Staff",
+                "const": "staff_r"
+              },
+              {
+                "title": "User",
+                "const": "user_r"
+              },
+              {
+                "title": "Guest",
+                "const": "guest_r"
+              },
+              {
+                "title": "Xguest",
+                "const": "xguest_r"
+              },
+              {
+                "title": "Object",
+                "const": "object_r"
+              },
+              {
+                "title": "Auditadm",
+                "const": "auditadm_r"
+              },
+              {
+                "title": "Dbadm",
+                "const": "dbadm_r"
+              },
+              {
+                "title": "Logadm",
+                "const": "logadm_r"
+              },
+              {
+                "title": "Sysadm",
+                "const": "sysadm_r"
+              },
+              {
+                "title": "Secadm",
+                "const": "secadm_r"
+              },
+              {
+                "title": "System",
+                "const": "system_r"
+              },
+              {
+                "title": "Webadm",
+                "const": "webadm_r"
+              },
+              {
+                "title": "Nx_server",
+                "const": "nx_server_r"
+              },
+              {
+                "title": "Unconfined",
+                "const": "unconfined_r"
+              }
+            ]
+          },
+          "type": {
+            "type": "string"
+          },
+          "range": {
+            "type": "string"
+          },
+          "persist": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "path": {
+        "ui:title": "Path",
+        "ui:description": "Path to set the SELinux context"
+      },
+      "user": {
+        "ui:title": "User"
+      },
+      "role": {
+        "ui:title": "Role"
+      },
+      "type": {
+        "ui:title": "Type"
+      },
+      "range": {
+        "ui:title": "Range"
+      },
+      "persist": {
+        "ui:title": "Persist",
+        "ui:widget": "select"
+      }
+    }
+  }
+}

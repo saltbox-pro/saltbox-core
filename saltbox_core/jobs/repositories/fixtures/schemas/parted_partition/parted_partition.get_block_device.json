@@ -1,0 +1,8 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "parted_partition.get_block_device",
+    "description": "Retrieve a list of disk devices. (NOTE: feature may not be available depending on your versions of parted on minions)"
+  },
+  "ui_schema": {}
+}

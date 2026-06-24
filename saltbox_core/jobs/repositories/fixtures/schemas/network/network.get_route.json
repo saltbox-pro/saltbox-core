@@ -1,0 +1,30 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "network.get_route",
+    "description": "Return routing information for given destination ip",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "ip"
+        ],
+        "properties": {
+          "ip": {
+            "type": "string",
+            "pattern": "^(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)(?:\\.(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)){3}$"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "ip": {
+        "ui:title": "IP-address",
+        "ui:description": "Destination IPv4 address to look up (e.g. 10.10.10.10)"
+      }
+    }
+  }
+}

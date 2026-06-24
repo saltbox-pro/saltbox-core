@@ -1,0 +1,29 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "service.disabled",
+    "description": "Check to see if the named service is disabled to start on boot",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "name": {
+        "ui:title": "Name",
+        "ui:description": "The name of the service to check"
+      }
+    }
+  }
+}
