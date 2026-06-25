@@ -223,11 +223,13 @@ class PillarService(MongoBaseService[PillarRepository, PillarModel, PillarCreate
             logger.debug(f'Deleted {deleted_count} existing default pillars for task template {task_template_id}')
             created_for_tpl_count = 0
             for pillar_data in new_pillars_data:
-                pillar_create = PillarCreateSchema(
-                    tgt_type=PillarTgtType.TASK_TPL,
-                    tgt_id=task_template_id,
-                    pillarenv=f'task_tpl:{task_template_id};user:{user.sub}',
-                    **pillar_data,
+                pillar_create = PillarCreateSchema.model_validate(
+                    {
+                        'tgt_type': PillarTgtType.TASK_TPL,
+                        'tgt_id': task_template_id,
+                        'pillarenv': f'task_tpl:{task_template_id};user:{user.sub}',
+                        **pillar_data,
+                    }
                 )
                 await self.create(data=pillar_create, session=session)
                 created_for_tpl_count += 1

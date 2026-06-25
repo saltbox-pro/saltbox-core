@@ -90,8 +90,8 @@ async def run_stage() -> None:
     if not is_base_local_exists:
         logger.info('Creating base local template source...')
         source_in = TemplateSourceCreateLocalSchema(
-            name='Default Local Source',
-            description='Automatically created local source.',
+            name='Локальные шаблоны',
+            description='Встроенный источник для хранения пользовательских шаблонов конфигураций.',
             namespace='',
         )
 
@@ -103,7 +103,7 @@ async def run_stage() -> None:
 
     try:
         default_local = await tpl_source_service.get(
-            {'source_type': SourceType.LOCAL_BUNDLE, 'name': 'Default Local Source'}
+            {'source_type': SourceType.LOCAL_BUNDLE, 'name': 'Локальные шаблоны'}
         )
         created_id = default_local.id
     except ObjectNotFoundException:
