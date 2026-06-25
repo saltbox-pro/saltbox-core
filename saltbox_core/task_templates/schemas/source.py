@@ -1,6 +1,6 @@
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field, HttpUrl, SecretStr, field_serializer
+from pydantic import BaseModel, ConfigDict, Field, HttpUrl, SecretStr, field_serializer, field_validator
 
 from saltbox_core.task_templates.schemas.sshfs_file import SshfsFilePublicSchema
 from saltbox_core.task_templates.schemas.template import TaskTemplatePublicSchema
@@ -79,6 +79,14 @@ class TemplateSourceCreateLocalSchema(BaseModel):
         title='Namespace',
         description='Prefix for template names and serve_dir subdirectory. Empty means no prefix.',
     )
+
+    @field_validator('name')
+    @classmethod
+    def name_must_not_be_blank(cls, v: str) -> str:
+        if not v.strip():
+            msg = 'name must not be blank'
+            raise ValueError(msg)
+        return v
 
 
 class TemplateSourceCreateSchema(BaseModel):

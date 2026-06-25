@@ -32,7 +32,10 @@ class TaskTemplateCreateSchema(BaseModel):
 
 class TaskTemplateFromRawCreateSchema(BaseModel):
     source_id: PyObjectId
-    file_name: str = Field(title='File name (without path and extension)')
+    file_name: str = Field(
+        title='File name (without path and extension)',
+        pattern=r'^\w[\w-]*(?:\.[\w-]+)*(?:,\w[\w-]*(?:\.[\w-]+)*)*$',
+    )
     content: str
 
 
