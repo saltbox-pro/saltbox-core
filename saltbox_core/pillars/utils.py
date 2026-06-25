@@ -9,12 +9,14 @@ from saltbox_core.config import logger
 class PillarSchemaUpdater:
     def __init__(self, schema: dict[str, Any]) -> None:
         self._original_schema = copy.deepcopy(schema)
+        self._working_schema: dict[str, Any] = {}
 
     def set_defaults(self, pillar_defaults: dict[str, Any]) -> dict[str, Any]:
         schema = copy.deepcopy(self._original_schema)
         pillar_schema = self._get_pillar_schema(schema)
 
         if pillar_schema is not None:
+            self._working_schema = schema
             self._update_node(pillar_schema, pillar_defaults)
 
         try:
@@ -32,7 +34,19 @@ class PillarSchemaUpdater:
         except KeyError:
             return None
 
+    def _resolve_ref(self, ref: str) -> dict[str, Any] | None:
+        if not ref.startswith('#/definitions/'):
+            return None
+        def_name = ref[len('#/definitions/') :]
+        definition = self._working_schema.get('definitions', {}).get(def_name)
+        return definition if isinstance(definition, dict) else None
+
     def _update_node(self, node: dict[str, Any], defaults_map: dict[str, Any]) -> None:
+        if ref := node.get('$ref'):
+            resolved = self._resolve_ref(ref)
+            if resolved is not None:
+                self._update_node(resolved, defaults_map)
+
         self._process_properties(node, defaults_map)
         self._process_recursive_keywords(node, defaults_map)
         self._process_compositions(node, defaults_map)
@@ -47,6 +61,8 @@ class PillarSchemaUpdater:
                     self._update_node(prop, val)
                 else:
                     prop['default'] = val
+                    if isinstance(val, dict):
+                        self._update_node(prop, val)
             self._update_node(prop, defaults_map)
 
     def _process_recursive_keywords(self, node: dict[str, Any], defaults_map: dict[str, Any]) -> None:
