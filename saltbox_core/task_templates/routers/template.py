@@ -152,7 +152,7 @@ async def template_delete(
     '/schema-by-name/{tpl_name}',
     operation_id='task_template_schema_by_name',
     openapi_extra=GatewayEndpointConfig(
-        policy='core.tasks.templates.read',
+        policy='public',
         action=TaskTemplateActions.READ,
     ).model_dump(by_alias=True),
 )
@@ -167,7 +167,7 @@ async def task_template_schema_by_name(
     '/schemas-list',
     operation_id='task_template_schemas_list',
     openapi_extra=GatewayEndpointConfig(
-        policy='core.tasks.templates.read',
+        policy='public',
         action=TaskTemplateActions.READ,
     ).model_dump(by_alias=True),
 )
