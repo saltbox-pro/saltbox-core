@@ -626,24 +626,27 @@ class SyncOrchestrator:
             raise
 
     async def remove_source(self, source_id: PyObjectId, task_id: str | None = None) -> None:
+        source = await self._source_service.get(source_id)
         await self._source_service.update(
             source_id, {'current_operation': SourceOperation.REMOVE, 'current_task_id': task_id}
         )
-        is_last_local_source = await self._source_service.count(query={'source_type': SourceType.LOCAL_BUNDLE}) == 1
 
-        if is_last_local_source:
-            msg = 'Cannot remove the last local source. At least one local source must be present.'
-            logger.error(msg)
-            await self._source_service.update(
-                source_id,
-                {
-                    'state': SourceState.DISCOVERED,
-                    'current_operation': None,
-                    'last_error': msg,
-                    'current_task_id': None,
-                },
-            )
-            raise ValueError(msg)
+        if source.source_type == SourceType.LOCAL_BUNDLE:
+            is_last_local_source = await self._source_service.count(query={'source_type': SourceType.LOCAL_BUNDLE}) == 1
+
+            if is_last_local_source:
+                msg = 'Cannot remove the last local source. At least one local source must be present.'
+                logger.error(msg)
+                await self._source_service.update(
+                    source_id,
+                    {
+                        'state': SourceState.DISCOVERED,
+                        'current_operation': None,
+                        'last_error': msg,
+                        'current_task_id': None,
+                    },
+                )
+                raise ValueError(msg)
         try:
             await self._source_service.delete(source_id)
         except Exception as e:
