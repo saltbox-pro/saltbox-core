@@ -31,13 +31,6 @@ class SourceState(StrEnum):
     BROKEN = 'broken'
 
 
-class SourceStateNew(StrEnum):
-    DISCOVERED = 'discovered'
-    SYNC_NEEDED = 'sync_needed'
-    SYNCED = 'synced'
-    BROKEN = 'broken'
-
-
 class SourceOperation(StrEnum):
     """Operation in progress for the template source. None means no operation in progress."""
 
@@ -53,7 +46,7 @@ class SourceOperation(StrEnum):
     UNPLUG = 'unplug'
 
 
-class TemplateSourceCreateFromURLSchema(BaseModel):
+class TemplateSourceImportFromGitSchema(BaseModel):
     name: str = Field(min_length=1, max_length=100, title='Display name')
     description: str | None = Field(default='', max_length=500, title='Description')
     namespace: str = Field(
@@ -66,7 +59,7 @@ class TemplateSourceCreateFromURLSchema(BaseModel):
     repo_url: HttpUrl = Field(title='Git repository URL')
     repo_user: str | None = Field(default=None, title='Git user (basic auth)')
     repo_pass: str | None = Field(default=None, title='Git password (basic auth)')
-    branch: str = Field(max_length=100, title='Git branch')
+    branch: str | None = Field(default=None, max_length=100, title='Git branch')
 
 
 class TemplateSourceCreateLocalSchema(BaseModel):
@@ -93,7 +86,6 @@ class TemplateSourceCreateSchema(BaseModel):
     source_type: SourceType = Field(title='Source type')
     name: str = Field(min_length=1, max_length=100, title='Display name')
     description: str | None = Field(default='', max_length=500, title='Description')
-    # is_active: bool = Field(default=False, title='Is active (publish to serve_dir)')
     # Ненулевой namespace даёт: serve_dir/<namespace>/... и name (mods) = "<namespace>.<dot_path>"
     namespace: str = Field(
         default='',
@@ -115,7 +107,6 @@ class TemplateSourceCreateSchema(BaseModel):
 class TemplateSourceUpdateSchema(BaseModel):
     name: str | None = None
     description: str | None = None
-    # is_active: bool | None = None
 
 
 class TemplateSourceModel(CreatedModifiedMixin, IDMixin):

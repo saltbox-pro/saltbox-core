@@ -20,7 +20,7 @@ ModelType = TypeVar('ModelType', bound=BaseModel)
 
 class TemplateSourceRepository(BaseMongoRepository[TemplateSourceModel]):
     class Meta:
-        collection_name = 'task_tpl_sources'
+        collection_name = 'task_template_sources'
         auto_now_add_fields: ClassVar[list[str]] = ['created']
         auto_now_fields: ClassVar[list[str]] = ['modified']
         collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
@@ -42,7 +42,7 @@ class TemplateSourceRepository(BaseMongoRepository[TemplateSourceModel]):
                     field_name='templates',
                     stages=[
                         LookupAggregationStage(
-                            from_collection='task_tpls',
+                            from_collection='task_templates',
                             let={'source_id': '$_id'},
                             pipeline=[
                                 {'$match': {'$expr': {'$eq': ['$source_id', '$$source_id']}}},
@@ -67,7 +67,7 @@ class TemplateSourceRepository(BaseMongoRepository[TemplateSourceModel]):
                     field_name='files',
                     stages=[
                         LookupAggregationStage(
-                            from_collection='sshfs_files',
+                            from_collection='task_template_files',
                             let={'source_id': '$_id'},
                             pipeline=[
                                 {'$match': {'$expr': {'$eq': ['$source_id', '$$source_id']}}},

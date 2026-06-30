@@ -45,7 +45,7 @@ class TaskRepository(BaseMongoRepository[TaskModel]):
                     field_name='task_template',
                     stages=[
                         LookupAggregationStage(
-                            from_collection='task_tpls',
+                            from_collection='task_templates',
                             local_field='task_template_id',
                             foreign_field='_id',
                             as_field='task_template',

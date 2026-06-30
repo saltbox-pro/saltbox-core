@@ -17,9 +17,10 @@ from saltbox_core.minion_collections.routers.minion import router as minions_rou
 from saltbox_core.pillars.routers import router as pillars_router
 from saltbox_core.routers import router as utils_router
 from saltbox_core.salt.routers.salt_keys import router as salt_keys_router
-from saltbox_core.task_templates.routers.source import router as task_tpl_source_router
-from saltbox_core.task_templates.routers.sshfs_file import router as task_tpl_file_router
-from saltbox_core.task_templates.routers.template import router as new_template_router
+from saltbox_core.task_templates.routers.schema import router as task_template_schema_router
+from saltbox_core.task_templates.routers.source import router as task_template_source_router
+from saltbox_core.task_templates.routers.sshfs_file import router as task_template_file_router
+from saltbox_core.task_templates.routers.template import router as task_template_router
 from saltbox_core.tasks.routers.task import router as task_router
 from saltbox_core.tkq import broker, shutdown_broker, startup_broker
 from saltbox_core.utilities.httpx_client import HttpxClientSingletoneFactory
@@ -95,9 +96,10 @@ app.add_exception_handler(SaltBoxBaseException, custom_http_handler)
 PrometheusExporter(app).expose_metrics()
 
 
-app.include_router(router=task_tpl_source_router)
-app.include_router(router=new_template_router)
-app.include_router(router=task_tpl_file_router)
+app.include_router(router=task_template_source_router)
+app.include_router(router=task_template_router)
+app.include_router(router=task_template_file_router)
+app.include_router(router=task_template_schema_router)
 app.include_router(filters_router)
 app.include_router(jobs_router)
 app.include_router(job_schemas_router)

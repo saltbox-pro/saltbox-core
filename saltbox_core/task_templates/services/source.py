@@ -12,9 +12,9 @@ from saltbox_core.task_templates.schemas.source import (
     SourceOperation,
     SourceState,
     SourceType,
-    TemplateSourceCreateFromURLSchema,
     TemplateSourceCreateLocalSchema,
     TemplateSourceCreateSchema,
+    TemplateSourceImportFromGitSchema,
     TemplateSourceModel,
     TemplateSourceUpdateSchema,
 )
@@ -50,7 +50,7 @@ class TemplateSourceService(
 
     async def create_from_url(
         self,
-        data: TemplateSourceCreateFromURLSchema,
+        data: TemplateSourceImportFromGitSchema,
         *,
         session: AsyncClientSession | None = None,
     ) -> PyObjectId:

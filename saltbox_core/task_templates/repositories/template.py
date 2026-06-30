@@ -22,7 +22,7 @@ ModelType = TypeVar('ModelType', bound=BaseModel)
 
 class TaskTemplateRepository(BaseMongoRepository[TaskTemplateModel]):
     class Meta:
-        collection_name = 'task_tpls'
+        collection_name = 'task_templates'
         auto_now_add_fields: ClassVar[list[str]] = ['created']
         auto_now_fields: ClassVar[list[str]] = ['modified']
         collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
@@ -37,7 +37,7 @@ class TaskTemplateRepository(BaseMongoRepository[TaskTemplateModel]):
                     field_name='local_path',
                     stages=[
                         LookupAggregationStage(
-                            from_collection='task_tpl_sources',
+                            from_collection='task_template_sources',
                             local_field='source_id',
                             foreign_field='_id',
                             as_field='_source',
@@ -50,7 +50,7 @@ class TaskTemplateRepository(BaseMongoRepository[TaskTemplateModel]):
                     field_name='source_root',
                     stages=[
                         LookupAggregationStage(
-                            from_collection='task_tpl_sources',
+                            from_collection='task_template_sources',
                             local_field='source_id',
                             foreign_field='_id',
                             as_field='_source',

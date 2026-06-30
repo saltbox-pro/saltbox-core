@@ -15,7 +15,7 @@ ModelType = TypeVar('ModelType', bound=BaseModel)
 
 class SshfsFileRepository(BaseMongoRepository[SshfsFileModel]):
     class Meta:
-        collection_name = 'sshfs_files'
+        collection_name = 'task_template_files'
         auto_now_add_fields: ClassVar[list[str]] = ['created']
         auto_now_fields: ClassVar[list[str]] = ['modified']
         collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {

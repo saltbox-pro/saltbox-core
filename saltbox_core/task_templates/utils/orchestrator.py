@@ -37,7 +37,7 @@ from saltbox_core.task_templates.schemas.source import (
     SourceOperation,
     SourceState,
     SourceType,
-    TemplateSourceCreateFromURLSchema,
+    TemplateSourceImportFromGitSchema,
 )
 from saltbox_core.task_templates.schemas.sshfs_file import (
     ManifestDigest,
@@ -105,7 +105,7 @@ class SyncOrchestrator:
             logger.error('Failed to create local path: %s', e)
             raise
 
-    async def _fetch(self, source_id: PyObjectId, shallow: bool = False) -> dict[str, Any]:
+    async def _fetch(self, source_id: PyObjectId, shallow: bool = False) -> dict[str, Any]:  # noqa: C901
         source = await self._source_service.get(source_id)
         if source.source_type != SourceType.GIT_REPO:
             msg = f'Fetch is only supported for git_repo source type. Source {source_id} has type {source.source_type}.'
@@ -125,21 +125,26 @@ class SyncOrchestrator:
             try:
                 origin = repo.remote(name='origin')
                 repo.git.update_environment(GIT_TERMINAL_PROMPT='0')
-                await asyncio.wait_for(
-                    asyncio.to_thread(origin.pull),
-                    timeout=SETTINGS.local_repo_sync_timeout_sec,
-                )
-                # return {'status': 'pulled'}
+                if source.branch:
+                    await asyncio.wait_for(
+                        asyncio.to_thread(repo.git.pull, 'origin', source.branch),
+                        timeout=SETTINGS.local_repo_sync_timeout_sec,
+                    )
+                else:
+                    await asyncio.wait_for(
+                        asyncio.to_thread(origin.pull),
+                        timeout=SETTINGS.local_repo_sync_timeout_sec,
+                    )
             except Exception as e:
                 logger.error('Failed to pull repo: %s', e)
-                shutil.rmtree(self._local_path)
                 raise
         else:
-            # clone
             git_kwargs: dict[str, Any] = {}
             if shallow:
                 git_kwargs['depth'] = 1
                 git_kwargs['single_branch'] = True
+            if source.branch:
+                git_kwargs['branch'] = source.branch
 
             logger.debug('Local path does not exist, cloning repo')
             raw_url = await self._inject_credentials(
@@ -795,7 +800,7 @@ class SyncOrchestrator:
                     )
                 continue
 
-            source_in = TemplateSourceCreateFromURLSchema(
+            source_in = TemplateSourceImportFromGitSchema(
                 name=project.name,
                 description=project.description or '',
                 repo_url=HttpUrl(project.http_url_to_repo),

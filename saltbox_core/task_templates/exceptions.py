@@ -58,6 +58,7 @@ class TaskTemplateSourceServeUpdateException(TaskTemplateException):
     detail: str = 'Task template source failed to update'
 
 
+# Files
 class ManifestFileSyncHttpException(TaskTemplateException):
     """Exception raised when syncing manifest file from HTTP source fails."""
 
@@ -121,6 +122,13 @@ class FileTooLargeException(TaskTemplateException):
         if size and max_size:
             self.detail = f'Uploaded file is too large (size: {size} bytes, max size: {max_size} bytes)'
         super().__init__(detail=self.detail)
+
+
+class OnlyUserFilesCanBeDeletedException(TaskTemplateException):
+    """Exception raised when trying to delete a non-user file."""
+
+    status_code: int = status.HTTP_400_BAD_REQUEST
+    detail: str = 'Only user files can be deleted'
 
 
 class GitlabApiException(CoreException):

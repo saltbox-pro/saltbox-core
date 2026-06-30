@@ -1,7 +1,8 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends
+from fastapi import APIRouter, Body, Depends, status
 
+from saltbox_core.db.schemas_base import TaskiqTaskIdResponse
 from saltbox_core.pillars.schemas import PillarTgtType
 from saltbox_core.pillars.services.pillar import PillarService, get_pillar_service
 from saltbox_core.pillars.utils import PillarSchemaUpdater
@@ -13,8 +14,6 @@ from saltbox_core.task_templates.schemas.template import (
     TaskTemplateModel,
     TaskTemplatePublicSchema,
     TaskTemplatePublicWithContentSchema,
-    TaskTemplateSchemaResponse,
-    TaskTemplateSchemasListRequest,
 )
 from saltbox_core.task_templates.services.template import TaskTemplateService, get_task_tpl_service
 from saltbox_core.task_templates.tiq_tasks import (
@@ -27,12 +26,12 @@ from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 from saltbox_sdk.fastapi_utils.dependencies import get_current_user
 
-router = APIRouter(prefix='/task-tpls', tags=['NEW Task Templates'])
+router = APIRouter(prefix='/task-template-sources', tags=['Task Templates / Templates'])
 
 
 @router.post(
-    '/list',
-    operation_id='new_template_list',
+    '/{source_id}/templates/list',
+    operation_id='task_template_list',
     openapi_extra=GatewayEndpointConfig(
         policy='public',
         action=TaskTemplateActions.LIST,
@@ -40,11 +39,13 @@ router = APIRouter(prefix='/task-tpls', tags=['NEW Task Templates'])
     response_model=PaginatedResponse[TaskTemplatePublicSchema],
 )
 async def template_list(
+    source_id: PyObjectId,
     body: Annotated[TaskTemplateListBody, Body()],
     service: Annotated[TaskTemplateService, Depends(get_task_tpl_service)],
 ) -> PaginatedResponse[TaskTemplatePublicSchema]:
+    query = {'$and': [{'source_id': source_id}, body.query]}
     sources = await service.get_list_paginated(
-        query=body.query,
+        query=query,
         skip=body.skip,
         limit=body.limit,
         projection_model=TaskTemplatePublicSchema,
@@ -54,33 +55,33 @@ async def template_list(
 
 
 @router.post(
-    '',
-    operation_id='new_template_create',
+    '/{source_id}/templates',
+    operation_id='task_template_create',
     openapi_extra=GatewayEndpointConfig(
         policy='public',
         action=TaskTemplateActions.CREATE,
     ).model_dump(by_alias=True),
-    status_code=202,
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=TaskiqTaskIdResponse,
 )
 async def template_create(
+    source_id: PyObjectId,
     body: Annotated[TaskTemplateFromRawCreateSchema, Body()],
-) -> str:
-    task = await create_tpl_from_raw_task.kiq(
-        source_id=str(body.source_id), file_name=body.file_name, content=body.content
-    )
-    return task.task_id
+) -> TaskiqTaskIdResponse:
+    task = await create_tpl_from_raw_task.kiq(source_id=str(source_id), file_name=body.file_name, content=body.content)
+    return TaskiqTaskIdResponse(task_id=task.task_id)
 
 
 @router.get(
-    '/{template_id}/with-defaults',
-    operation_id='new_template_read_with_defaults',
+    '/{source_id}/templates/{template_id}/schema-with-defaults',
+    operation_id='task_template_schema_with_defaults',
     openapi_extra=GatewayEndpointConfig(
         policy='public',
         action=TaskTemplateActions.READ,
     ).model_dump(by_alias=True),
     response_model=TaskTemplateModel,
 )
-async def template_read_with_defaults(
+async def template_schema_with_defaults(
     template_id: PyObjectId,
     service: Annotated[TaskTemplateService, Depends(get_task_tpl_service)],
     pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
@@ -96,8 +97,8 @@ async def template_read_with_defaults(
 
 
 @router.get(
-    '/{template_id}',
-    operation_id='new_template_read',
+    '/{source_id}/templates/{template_id}',
+    operation_id='task_template_read',
     openapi_extra=GatewayEndpointConfig(
         policy='public',
         action=TaskTemplateActions.READ,
@@ -114,65 +115,39 @@ async def template_read(
 
 
 @router.put(
-    '/{template_id}',
-    operation_id='new_template_update',
+    '/{source_id}/templates/{template_id}',
+    operation_id='task_template_update',
     openapi_extra=GatewayEndpointConfig(
         policy='public',
         action=TaskTemplateActions.UPDATE,
     ).model_dump(by_alias=True),
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=TaskiqTaskIdResponse,
 )
 async def template_update(
+    source_id: PyObjectId,
     template_id: PyObjectId,
     body: Annotated[TaskTemplateFromRawUpdateSchema, Body()],
     service: Annotated[TaskTemplateService, Depends(get_task_tpl_service)],
-) -> str:
-    template = await service.get(template_id)
-    task = await update_tpl_from_raw_task.kiq(str(template.source_id), str(template_id), body.content)
-    return task.task_id
+) -> TaskiqTaskIdResponse:
+    task = await update_tpl_from_raw_task.kiq(str(source_id), str(template_id), body.content)
+    return TaskiqTaskIdResponse(task_id=task.task_id)
 
 
 @router.delete(
-    '/{template_id}',
-    operation_id='new_template_delete',
+    '/{source_id}/templates/{template_id}',
+    operation_id='task_template_delete',
     openapi_extra=GatewayEndpointConfig(
         policy='public',
         action=TaskTemplateActions.DELETE,
     ).model_dump(by_alias=True),
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=TaskiqTaskIdResponse,
 )
 async def template_delete(
+    source_id: PyObjectId,
     template_id: PyObjectId,
     service: Annotated[TaskTemplateService, Depends(get_task_tpl_service)],
-) -> str:
-    template = await service.get(template_id)
-    task = await delete_local_template_task.kiq(str(template.source_id), str(template_id))
-    return task.task_id
-
-
-@router.get(
-    '/schema-by-name/{tpl_name}',
-    operation_id='task_template_schema_by_name',
-    openapi_extra=GatewayEndpointConfig(
-        policy='public',
-        action=TaskTemplateActions.READ,
-    ).model_dump(by_alias=True),
-)
-async def task_template_schema_by_name(
-    tpl_name: str,
-    service: Annotated[TaskTemplateService, Depends(get_task_tpl_service)],
-) -> TaskTemplateSchemaResponse:
-    return await service.get(query={'name': tpl_name}, projection_model=TaskTemplateSchemaResponse)
-
-
-@router.post(
-    '/schemas-list',
-    operation_id='task_template_schemas_list',
-    openapi_extra=GatewayEndpointConfig(
-        policy='public',
-        action=TaskTemplateActions.READ,
-    ).model_dump(by_alias=True),
-)
-async def task_template_schemas_list(
-    body: Annotated[TaskTemplateSchemasListRequest, Body()],
-    service: Annotated[TaskTemplateService, Depends(get_task_tpl_service)],
-) -> dict[str, dict[str, dict]]:
-    return await service.get_schemas_by_names(body.names)
+) -> TaskiqTaskIdResponse:
+    task = await delete_local_template_task.kiq(str(source_id), str(template_id))
+    return TaskiqTaskIdResponse(task_id=task.task_id)
