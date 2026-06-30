@@ -83,7 +83,6 @@ async def add_file_to_source(
 async def add_file_to_source_from_url(
     source_id: PyObjectId,
     rel_path: Annotated[str, Form(description='Destination path relative to sshfs root')],
-    orchestrator: Annotated[SyncOrchestrator, Depends(get_sync_orchestrator)],
     file_service: Annotated[SshfsFileService, Depends(get_sshfs_file_service)],
     url: Annotated[str, Form(description='URL to download the file from')],
     unpack_as: Annotated[

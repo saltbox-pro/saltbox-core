@@ -82,6 +82,7 @@ async def template_create(
     response_model=TaskTemplateModel,
 )
 async def template_schema_with_defaults(
+    source_id: PyObjectId,
     template_id: PyObjectId,
     service: Annotated[TaskTemplateService, Depends(get_task_tpl_service)],
     pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
@@ -106,6 +107,7 @@ async def template_schema_with_defaults(
     response_model=TaskTemplatePublicWithContentSchema,
 )
 async def template_read(
+    source_id: PyObjectId,
     template_id: PyObjectId,
     service: Annotated[TaskTemplateService, Depends(get_task_tpl_service)],
 ) -> TaskTemplatePublicWithContentSchema:
@@ -128,7 +130,6 @@ async def template_update(
     source_id: PyObjectId,
     template_id: PyObjectId,
     body: Annotated[TaskTemplateFromRawUpdateSchema, Body()],
-    service: Annotated[TaskTemplateService, Depends(get_task_tpl_service)],
 ) -> TaskiqTaskIdResponse:
     task = await update_tpl_from_raw_task.kiq(str(source_id), str(template_id), body.content)
     return TaskiqTaskIdResponse(task_id=task.task_id)
@@ -147,7 +148,6 @@ async def template_update(
 async def template_delete(
     source_id: PyObjectId,
     template_id: PyObjectId,
-    service: Annotated[TaskTemplateService, Depends(get_task_tpl_service)],
 ) -> TaskiqTaskIdResponse:
     task = await delete_local_template_task.kiq(str(source_id), str(template_id))
     return TaskiqTaskIdResponse(task_id=task.task_id)
