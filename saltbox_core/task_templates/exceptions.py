@@ -105,6 +105,18 @@ class FileTypeNotSupportedException(TaskTemplateException):
         super().__init__(detail=self.detail)
 
 
+class ArchiveUnpackException(TaskTemplateException):
+    """Exception raised when an error occurs during archive unpacking."""
+
+    status_code: int = status.HTTP_400_BAD_REQUEST
+    detail: str = 'An error occurred during archive unpacking'
+
+    def __init__(self, detail: str | None = None):
+        if detail:
+            self.detail = f'An error occurred during archive unpacking: {detail}'
+        super().__init__(detail=self.detail)
+
+
 class FileNameMissingException(TaskTemplateException):
     """Exception raised when an uploaded file is missing a filename."""
 

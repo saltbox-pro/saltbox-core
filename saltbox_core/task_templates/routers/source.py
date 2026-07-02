@@ -3,6 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Depends, File, Form, UploadFile, status
 
 from saltbox_core.db.schemas_base import TaskiqTaskIdResponse
+from saltbox_core.task_templates.exceptions import ArchiveUnpackException
 from saltbox_core.task_templates.schemas.source import (
     SourceListWithExtrasSchema,
     TemplateSourceActions,
@@ -147,7 +148,11 @@ async def source_import_from_archive(
     oid = await service.create_from_archive(name=name, description=description, namespace=namespace)
 
     created = await service.get(oid, projection_model=TemplateSourcePublicSchema)
-    await orchestrator.save_and_unpack_archive(file, local_path=created.local_path)
+    try:
+        await orchestrator.save_and_unpack_archive(file, local_path=created.local_path)
+    except Exception as e:
+        await service.delete(oid)
+        raise ArchiveUnpackException(detail=str(e)) from None
 
     task = await source_discover_task.kiq(source_id=str(oid))
 
