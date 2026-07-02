@@ -11,35 +11,48 @@ from saltbox_sdk.db.mongo.config import get_mongo_db
 
 
 async def send_message_to_master(message: CoreMessageBase, message_tag: str, broker: RedisBroker | None = None) -> None:
-    if not broker:
+    if broker is None:
         from saltbox_core.event_bus.redis.app import default_master_broker
 
         broker = default_master_broker
+        async with broker as br:
+            br_channel = f'master_{message.master}_{message_tag}'
+            await br.publish(message=message, channel=br_channel)
+        return
 
-    async with broker as br:
-        br_channel = f'master_{message.master}_{message_tag}'
-        await br.publish(message=message, channel=br_channel)
+    br_channel = f'master_{message.master}_{message_tag}'
+    await broker.publish(message=message, channel=br_channel)
 
 
 async def send_message_and_wait_response_to_master(
     message: CoreMessageBase, message_tag: str, response_timeout: float = 3.0, broker: RedisBroker | None = None
 ) -> Any:
-    if not broker:
+    if broker is None:
         from saltbox_core.event_bus.redis.app import default_master_broker
 
         broker = default_master_broker
+        async with broker as br:
+            try:
+                br_channel = f'master_{message.master}_{message_tag}'
+                response: RedisMessage = await br.request(  # type: ignore
+                    message,
+                    channel=br_channel,
+                    timeout=response_timeout,
+                )
+            except TimeoutError:
+                raise TimeoutResponseToMasterException() from None
+            return await response.decode()
 
-    async with broker as br:
-        try:
-            br_channel = f'master_{message.master}_{message_tag}'
-            response: RedisMessage = await br.request(  # type: ignore
-                message,
-                channel=br_channel,
-                timeout=response_timeout,
-            )
-        except TimeoutError:
-            raise TimeoutResponseToMasterException() from None
-        return await response.decode()
+    try:
+        br_channel = f'master_{message.master}_{message_tag}'
+        response = await broker.request(  # type: ignore[assignment]
+            message,
+            channel=br_channel,
+            timeout=response_timeout,
+        )
+    except TimeoutError:
+        raise TimeoutResponseToMasterException() from None
+    return await response.decode()
 
 
 async def send_message_to_every_master(
