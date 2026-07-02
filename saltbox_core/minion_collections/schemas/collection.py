@@ -26,6 +26,7 @@ class CollectionReadOnlyFieldsMixin(BaseModel):
 
 class CollectionEditableFieldsMixin(BaseModel):
     title: str = Field(title='Title', min_length=3, max_length=50)
+    description: str = Field(title='Description', default='', max_length=500)
     query: MongoQuery = MongoQueryField
 
 
@@ -73,6 +74,7 @@ class CollectionBaseTreeModel(BaseTreeModel):
 
 class CollectionTreeNodeSchema(IDMixin):
     title: str = Field(title='Title', min_length=3, max_length=50)
+    description: str = Field(title='Description', default='', max_length=500)
     slug: str = Field(title='Slug', pattern=r'^[a-z0-9-]+$', min_length=3, max_length=30)
 
     parent_id: PyObjectId | None = Field(title='Parent ID', default=None)
