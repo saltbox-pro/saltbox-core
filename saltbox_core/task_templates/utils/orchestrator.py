@@ -81,6 +81,17 @@ class SyncOrchestrator:
         self._local_path: Path | None = None
         self._tmp_filename_digest_size = 16
 
+    @staticmethod
+    def _detect_archive_ext(file_name: str) -> str | None:
+        normalized_name = file_name.lower()
+        normalized_types = sorted(
+            (ext.lower() for ext in file_storage_config.allowed_archive_types), key=len, reverse=True
+        )
+        for ext in normalized_types:
+            if normalized_name.endswith(ext):
+                return ext
+        return None
+
     async def _inject_credentials(self, repo_url: str, login: str | None, password: str | None) -> str:
         if not login or not password:
             return repo_url
@@ -391,10 +402,12 @@ class SyncOrchestrator:
     async def save_and_unpack_archive(self, file: UploadFile, local_path: str) -> None:
         if file.filename is None or file.filename == '':
             raise FileNameMissingException()
-        if not any(file.filename.endswith(ext) for ext in file_storage_config.allowed_archive_types):
-            raise FileTypeNotSupportedException(ext=Path(file.filename).suffix)
 
-        ext = Path(file.filename).suffix or '.bin'
+        ext = self._detect_archive_ext(file.filename)
+        if ext is None:
+            detected_ext = ''.join(Path(file.filename).suffixes) or Path(file.filename).suffix or '.bin'
+            raise FileTypeNotSupportedException(ext=detected_ext)
+
         safe_name = f'{uuid.uuid4()}{ext}'
         tmp_path = SETTINGS.local_repos_dir / file_storage_config.tmp_dir
         tmp_path.mkdir(parents=True, exist_ok=True)
