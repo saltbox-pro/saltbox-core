@@ -20,7 +20,7 @@ from ruamel.yaml.scanner import ScannerError
 from saltbox_bridge_messages import CoreEmptyMessage, MasterStatus
 from saltbox_core.config import SETTINGS, logger
 from saltbox_core.event_bus.redis.app import default_master_broker
-from saltbox_core.event_bus.redis.masters_bus import send_message_and_wait_response_to_master
+from saltbox_core.event_bus.redis.masters_bus import send_sync_message_and_wait_response_to_master
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_core.pillars.services.pillar import PillarService, get_pillar_service
 from saltbox_core.task_templates.exceptions import (
@@ -574,7 +574,7 @@ class SyncOrchestrator:
         async with default_master_broker as broker:
             results = await asyncio.gather(
                 *[
-                    send_message_and_wait_response_to_master(
+                    send_sync_message_and_wait_response_to_master(
                         message=CoreEmptyMessage(master=master.master_id),
                         message_tag='sync_templates',
                         broker=broker,
