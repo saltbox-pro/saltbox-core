@@ -24,7 +24,7 @@ from saltbox_core.task_templates.tiq_tasks import (
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
-from saltbox_sdk.fastapi_utils.dependencies import get_current_user
+from saltbox_sdk.fastapi_utils.dependencies import get_current_user, get_opa_query
 
 router = APIRouter(prefix='/task-template-sources', tags=['Task Templates / Templates'])
 
@@ -33,7 +33,7 @@ router = APIRouter(prefix='/task-template-sources', tags=['Task Templates / Temp
     '/{source_id}/templates/list',
     operation_id='task_template_list',
     openapi_extra=GatewayEndpointConfig(
-        policy='public',
+        policy='core.task_templates.list',
         action=TaskTemplateActions.LIST,
     ).model_dump(by_alias=True),
     response_model=PaginatedResponse[TaskTemplatePublicSchema],
@@ -41,9 +41,12 @@ router = APIRouter(prefix='/task-template-sources', tags=['Task Templates / Temp
 async def template_list(
     source_id: PyObjectId,
     body: Annotated[TaskTemplateListBody, Body()],
+    opa_query: Annotated[dict, Depends(get_opa_query)],
     service: Annotated[TaskTemplateService, Depends(get_task_tpl_service)],
 ) -> PaginatedResponse[TaskTemplatePublicSchema]:
     query = {'$and': [{'source_id': source_id}, body.query]}
+    if opa_query:
+        query = {'$and': [query, opa_query]}
     sources = await service.get_list_paginated(
         query=query,
         skip=body.skip,
@@ -76,7 +79,7 @@ async def template_create(
     '/{source_id}/templates/{template_id}/schema-with-defaults',
     operation_id='task_template_schema_with_defaults',
     openapi_extra=GatewayEndpointConfig(
-        policy='public',
+        policy='core.task_templates.read',
         action=TaskTemplateActions.READ,
     ).model_dump(by_alias=True),
     response_model=TaskTemplateModel,
@@ -101,7 +104,7 @@ async def template_schema_with_defaults(
     '/{source_id}/templates/{template_id}',
     operation_id='task_template_read',
     openapi_extra=GatewayEndpointConfig(
-        policy='public',
+        policy='core.task_templates.read',
         action=TaskTemplateActions.READ,
     ).model_dump(by_alias=True),
     response_model=TaskTemplatePublicWithContentSchema,
