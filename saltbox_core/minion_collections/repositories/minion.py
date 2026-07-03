@@ -22,6 +22,7 @@ from saltbox_sdk.db.mongo.aggregations import (
 )
 from saltbox_sdk.db.mongo.config import get_mongo
 from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository, ProjectionModel
+from saltbox_sdk.event_bus.schemas import ExtraDataCategoryType
 
 
 class MinionRepository(BaseMongoRepository[MinionModel]):
@@ -55,18 +56,43 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
     async def extra_static_query_override(
         self, field_name: str, field_match: re.Match, field_value: Any, full_raw_query: dict
     ) -> dict[str, Any]:
-        return {f'extra_static.{field_match.group("sub_field")}': field_value}
+        source: str = field_match.group('source')
+        name: str = field_match.group('name')
+        sub_field: str = field_match.group('sub_field')
+
+        return {f'extra_static.{source}.{name}.{sub_field}': field_value}
 
     async def extra_aggregated_query_override(
         self, field_name: str, field_match: re.Match, field_value: Any, full_raw_query: dict
     ) -> dict[str, Any]:
+        source: str = field_match.group('source')
+        name: str = field_match.group('name')
+        sub_field: str = field_match.group('sub_field')
+
         minion_ids = await self.extra_data_repository.get_minion_ids_by_filter(
-            source=field_match.group('source'),
-            name=field_match.group('name'),
-            query={field_match.group('sub_field'): field_value},
+            source=source, name=name, query={sub_field: field_value}
         )
 
         return {'_id': {'$in': minion_ids}}
+
+    async def extra_query_override(
+        self, field_name: str, field_match: re.Match, field_value: Any, full_raw_query: dict
+    ) -> dict[str, Any]:
+        source: str = field_match.group('source')
+        name: str = field_match.group('name')
+
+        category = await self.extra_data_repository.extra_data_category_repository.get({'source': source, 'name': name})
+
+        if category.type == ExtraDataCategoryType.STATIC:
+            return await self.extra_static_query_override(
+                field_name=field_name, field_match=field_match, field_value=field_value, full_raw_query=full_raw_query
+            )
+        elif category.type == ExtraDataCategoryType.AGGREGATED:
+            return await self.extra_aggregated_query_override(
+                field_name=field_name, field_match=field_match, field_value=field_value, full_raw_query=full_raw_query
+            )
+
+        raise KeyError
 
     @overload
     async def get_by_master_and_id(self, master: str, minion_id: str) -> MinionModel: ...
@@ -92,10 +118,13 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
         auto_now_fields: ClassVar[list[str]] = ['modified']
         query_overrides: ClassVar[dict[re.Pattern, str]] = {
             re.compile(r'^last_activity_seconds$'): 'last_activity_seconds_query_override',
-            re.compile(r'^extra\.static\.(?P<sub_field>.+)$'): 'extra_static_query_override',
+            re.compile(
+                r'^extra\.static\.(?P<source>[^.]+)\.(?P<name>[^.]+)\.(?P<sub_field>.+)'
+            ): 'extra_static_query_override',
             re.compile(
                 r'^extra\.aggregated\.(?P<source>[^.]+)\.(?P<name>[^.]+)\.(?P<sub_field>.+)$'
             ): 'extra_aggregated_query_override',
+            re.compile(r'^extra\.(?P<source>[^.]+)\.(?P<name>[^.]+)\.(?P<sub_field>.+)$'): 'extra_query_override',
         }
         collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
             'minion_id_master_unique_index_asc': [('minion_id', pymongo.ASCENDING), ('master', pymongo.ASCENDING)],

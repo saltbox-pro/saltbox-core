@@ -1,17 +1,28 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId, QueryParams, SortParams
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
+from saltbox_sdk.event_bus.schemas import (
+    ExtraDataCategoryType,
+    MinionExtraDataCategoryField,
+    MinionExtraDataExtraFieldsPolicy,
+)
 
 
 class ExtraDataCategoryReadOnlyFieldsMixin(BaseModel):
     source: str = Field(title='Source')
     name: str = Field(title='Name')
+    type: ExtraDataCategoryType = Field(title='Type')
+    extra_fields_policy: MinionExtraDataExtraFieldsPolicy = Field(default=MinionExtraDataExtraFieldsPolicy.IGNORE)
 
 
 class ExtraDataCategoryEditableFieldsMixin(BaseModel):
-    category_fields: list[str] = Field(title='Category Fields', default_factory=list)
-    minion_fields: list[str] = Field(title='Minion Fields', default_factory=list)
+    fields: list[MinionExtraDataCategoryField] = Field(default_factory=list)
+    minion_fields: list[str] = Field(default_factory=list)
+
+    @computed_field
+    def category_fields(self) -> list[str]:
+        return [field.name for field in self.fields if field.name not in self.minion_fields]
 
 
 class ExtraDataCategoryCreateSchema(ExtraDataCategoryEditableFieldsMixin, ExtraDataCategoryReadOnlyFieldsMixin):

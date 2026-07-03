@@ -11,14 +11,39 @@ from saltbox_core.minion_collections.services.minion import MinionService
 from saltbox_sdk.db.mongo.repository_base import MongoUpdateOperator
 from saltbox_sdk.db.mongo.schemas_base import EmptyModel
 from saltbox_sdk.event_bus.schemas import (
+    ExtraDataCategoryType,
     MinionAddOrUpdateExtraDataRequestMessage,
-    MinionExtraDataType,
+    MinionExtraCategoriesSyncMessage,
+    MinionExtraDataExtraFieldsPolicy,
     MinionRemoveExtraDataRequestMessage,
 )
 from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.utilities.helpers import utc_now
 
 router = RabbitRouter(prefix='minions_')
+
+
+@router.subscriber('extra_categories_sync')
+async def extra_categories_sync(
+    message: MinionExtraCategoriesSyncMessage, msg: RabbitMessage, context: ContextRepo, logger: Logger
+) -> None:
+    if message.target != 'core':
+        return None
+
+    extra_data_category_service: ExtraDataCategoryService = context.get('extra_data_category_service')
+
+    for category in message.categories:
+        await extra_data_category_service.update_or_create(
+            query={'source': category.source, 'name': category.name},
+            data={
+                'type': category.type,
+                'extra_fields_policy': category.extra_fields_policy,
+                'fields': [field.model_dump() for field in category.fields],
+                'minion_fields': category.minion_fields,
+            },
+        )
+
+    return None
 
 
 @router.subscriber('add_extra_data')
@@ -45,27 +70,48 @@ async def add_extra_data(  # noqa: C901
     static_items: dict[str, list[Any]] = {}
     updated_at = utc_now()
 
-    for category_data in message.data_list:
-        await extra_data_category_service.update_or_create(
-            query={'source': message.sender, 'name': category_data.category_name},
-            data={'category_fields': category_data.category_fields, 'minion_fields': category_data.minion_fields},
+    for extra_data in message.data_list:
+        category = await extra_data_category_service.get(
+            query={'source': extra_data.category_source, 'name': extra_data.category_name}
         )
+        category_data_items: list[dict[str, dict[str, Any]]] = []
 
-        if category_data.category_type == MinionExtraDataType.STATIC:
-            static_items.setdefault(f'extra_static.{message.sender}.{category_data.category_name}', []).extend(
+        for data_item in extra_data.items:
+            category_data_item: dict[str, Any] = {}
+            minion_data_item: dict[str, Any] = {}
+
+            for data_key, data_value in data_item.items():
+                if data_key in category.minion_fields:
+                    minion_data_item[data_key] = data_value
+                elif data_key in category.category_fields:  # type: ignore
+                    category_data_item[data_key] = data_value
+                else:
+                    if category.extra_fields_policy == MinionExtraDataExtraFieldsPolicy.SAVE_TO_CATEGORY:
+                        category_data_item[data_key] = data_value
+                    elif category.extra_fields_policy == MinionExtraDataExtraFieldsPolicy.SAVE_TO_MINION:
+                        minion_data_item[data_key] = data_value
+                    elif category.extra_fields_policy == MinionExtraDataExtraFieldsPolicy.IGNORE:
+                        continue
+                    else:
+                        raise KeyError
+
+            category_data_items.append({'category_data': category_data_item, 'minion_data': minion_data_item})
+
+        if category.type == ExtraDataCategoryType.STATIC:
+            static_items.setdefault(f'extra_static.{category.source}.{category.name}', []).extend(
                 [
-                    {**value.category_data, **value.minion_data, 'updated_at': updated_at}
-                    for value in category_data.items
+                    {**item['category_data'], **item['minion_data'], 'updated_at': updated_at}
+                    for item in category_data_items
                 ]
             )
-        elif category_data.category_type == MinionExtraDataType.AGGREGATED:
-            for extra_data_item in category_data.items:
+        elif category.type == ExtraDataCategoryType.AGGREGATED:
+            for extra_data_item in category_data_items:
                 try:
                     await extra_data_service.update(
                         query={
-                            'source': message.sender,
-                            'name': category_data.category_name,
-                            'data': extra_data_item.category_data,
+                            'source': category.source,
+                            'name': category.name,
+                            'data': extra_data_item['category_data'],
                         },
                         data={'minions': {'minion_id': minion_id}},
                         operator=MongoUpdateOperator.pull,
@@ -74,16 +120,16 @@ async def add_extra_data(  # noqa: C901
                     continue
 
             # TODO (i.moshkov): May use bulk ops?
-            for extra_data_item in category_data.items:
+            for extra_data_item in category_data_items:
                 await extra_data_service.update_or_create(
                     query={
-                        'source': message.sender,
-                        'name': category_data.category_name,
-                        'data': extra_data_item.category_data,
+                        'source': category.source,
+                        'name': category.name,
+                        'data': extra_data_item['category_data'],
                     },
                     data={
                         'minions': ExtraDataForMinion(
-                            minion_id=minion_id, data={**extra_data_item.minion_data, 'updated_at': updated_at}
+                            minion_id=minion_id, data={**extra_data_item['minion_data'], 'updated_at': updated_at}
                         ).model_dump()
                     },
                     operator=MongoUpdateOperator.push,

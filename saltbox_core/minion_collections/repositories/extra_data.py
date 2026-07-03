@@ -78,7 +78,7 @@ class ExtraDataRepository(BaseMongoRepository[ExtraDataModel]):
                             if isinstance(item, dict):
                                 parse_query(item)
                 else:
-                    for category_field_name in category.category_fields:
+                    for category_field_name in category.category_fields:  # type: ignore
                         if key.startswith(category_field_name):
                             category_sub_queries.append({f'data.{key}': value})
                             break
