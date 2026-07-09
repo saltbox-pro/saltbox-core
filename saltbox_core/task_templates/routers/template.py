@@ -33,7 +33,7 @@ router = APIRouter(prefix='/task-template-sources', tags=['Task Templates / Temp
     '/{source_id}/templates/list',
     operation_id='task_template_list',
     openapi_extra=GatewayEndpointConfig(
-        policy='core.task_templates.list',
+        policy='core.task_templates.templates.list',
         action=TaskTemplateActions.LIST,
     ).model_dump(by_alias=True),
     response_model=PaginatedResponse[TaskTemplatePublicSchema],
@@ -61,7 +61,7 @@ async def template_list(
     '/{source_id}/templates',
     operation_id='task_template_create',
     openapi_extra=GatewayEndpointConfig(
-        policy='public',
+        policy='core.task_templates.templates.create',
         action=TaskTemplateActions.CREATE,
     ).model_dump(by_alias=True),
     status_code=status.HTTP_202_ACCEPTED,
@@ -79,7 +79,7 @@ async def template_create(
     '/{source_id}/templates/{template_id}/schema-with-defaults',
     operation_id='task_template_schema_with_defaults',
     openapi_extra=GatewayEndpointConfig(
-        policy='core.task_templates.read',
+        policy='core.task_templates.templates.read',
         action=TaskTemplateActions.READ,
     ).model_dump(by_alias=True),
     response_model=TaskTemplateModel,
@@ -104,7 +104,7 @@ async def template_schema_with_defaults(
     '/{source_id}/templates/{template_id}',
     operation_id='task_template_read',
     openapi_extra=GatewayEndpointConfig(
-        policy='core.task_templates.read',
+        policy='core.task_templates.templates.read',
         action=TaskTemplateActions.READ,
     ).model_dump(by_alias=True),
     response_model=TaskTemplatePublicWithContentSchema,

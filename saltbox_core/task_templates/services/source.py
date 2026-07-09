@@ -15,6 +15,7 @@ from saltbox_core.task_templates.schemas.source import (
     TemplateSourceCreateLocalSchema,
     TemplateSourceCreateSchema,
     TemplateSourceImportFromGitSchema,
+    TemplateSourceImportFromMountedSchema,
     TemplateSourceModel,
     TemplateSourceUpdateSchema,
 )
@@ -54,7 +55,10 @@ class TemplateSourceService(
         *,
         session: AsyncClientSession | None = None,
     ) -> PyObjectId:
-        clean_url = f'{data.repo_url.scheme}://{data.repo_url.host}{data.repo_url.path}'
+        if data.repo_url.port and data.repo_url.port not in (80, 443):
+            clean_url = f'{data.repo_url.scheme}://{data.repo_url.host}:{data.repo_url.port}{data.repo_url.path}'
+        else:
+            clean_url = f'{data.repo_url.scheme}://{data.repo_url.host}{data.repo_url.path}'
         user = data.repo_user or data.repo_url.username
         password = data.repo_pass or data.repo_url.password
 
@@ -62,11 +66,31 @@ class TemplateSourceService(
             'name': data.name,
             'description': data.description,
             'source_type': SourceType.GIT_REPO,
-            'namespace': data.namespace,
+            'namespace': None,
             'repo_url': clean_url,
             'repo_user': user,
             'repo_pass': password,
             'branch': data.branch,
+            'local_path': uuid.uuid4().hex,
+            'state': SourceState.PENDING,
+            'current_operation': SourceOperation.DISCOVER,
+            'last_error': None,
+            'synced_at': None,
+        }
+        return await self.create(data=obj_in, session=session)
+
+    async def create_from_mounted_path(
+        self,
+        data: TemplateSourceImportFromMountedSchema,
+        *,
+        session: AsyncClientSession | None = None,
+    ) -> PyObjectId:
+        obj_in = {
+            'name': data.name,
+            'description': '',
+            'source_type': SourceType.MOUNTED_REPO,
+            'namespace': None,
+            'repo_mounted_path': data.repo_mounted_path,
             'local_path': uuid.uuid4().hex,
             'state': SourceState.PENDING,
             'current_operation': SourceOperation.DISCOVER,
@@ -98,7 +122,6 @@ class TemplateSourceService(
         self,
         name: str,
         description: str,
-        namespace: str,
         *,
         session: AsyncClientSession | None = None,
     ) -> PyObjectId:
@@ -106,7 +129,7 @@ class TemplateSourceService(
             'name': name,
             'description': description,
             'source_type': SourceType.ARCHIVE_BUNDLE,
-            'namespace': namespace,
+            'namespace': None,
             'local_path': uuid.uuid4().hex,
             'state': SourceState.PENDING,
             'current_operation': None,

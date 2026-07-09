@@ -1,13 +1,10 @@
-import pathlib
 from typing import Annotated
 from uuid import uuid4
 
 import anyio
 from fastapi import APIRouter, Depends, File, Form, UploadFile, status
-from pydantic import HttpUrl
 
 from saltbox_core.config import SETTINGS
-from saltbox_core.db.schemas_base import TaskiqTaskIdResponse
 from saltbox_core.task_templates.exceptions import OnlyUserFilesCanBeDeletedException
 from saltbox_core.task_templates.schemas.source import TemplateSourceActions
 from saltbox_core.task_templates.schemas.sshfs_file import (
@@ -17,8 +14,8 @@ from saltbox_core.task_templates.schemas.sshfs_file import (
     SshfsFileType,
     UnpackAs,
 )
+from saltbox_core.task_templates.services.source import TemplateSourceService, get_tpl_source_service
 from saltbox_core.task_templates.services.sshfs_file import SshfsFileService, get_sshfs_file_service
-from saltbox_core.task_templates.tiq_tasks import add_user_file_to_source_task
 from saltbox_core.task_templates.utils.orchestrator import SyncOrchestrator, get_sync_orchestrator
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
@@ -38,15 +35,23 @@ router = APIRouter(prefix='/task-template-sources', tags=['Task Templates / File
 )
 async def add_file_to_source(
     source_id: PyObjectId,
-    rel_path: Annotated[str, Form(description='Destination path relative to sshfs root')],
+    # rel_path: Annotated[str, Form(description='Destination path relative to sshfs root')],
     file: Annotated[UploadFile, File(description='File to upload')],
     orchestrator: Annotated[SyncOrchestrator, Depends(get_sync_orchestrator)],
     file_service: Annotated[SshfsFileService, Depends(get_sshfs_file_service)],
+    source_service: Annotated[TemplateSourceService, Depends(get_tpl_source_service)],
     unpack_as: Annotated[
         UnpackAs | None,
         Form(description='Unpack as archive of specified format rather than place as is'),
     ] = None,
 ) -> SshfsFilePublicSchema:
+    source = await source_service.get(query={'_id': source_id})
+    if not file.filename:
+        msg = 'File must have a filename'
+        raise ValueError(msg)
+    rel_path = file.filename
+    if source.namespace:
+        rel_path = f'{source.namespace}/{rel_path}'
     file_in = SshfsFileCreateSchema.model_validate(
         {
             'source_id': source_id,
@@ -68,46 +73,6 @@ async def add_file_to_source(
     await anyio.Path(tmp_path).write_bytes(content)
     await orchestrator.add_user_file(source_id, file_id, tmp_path=tmp_path)
     return await file_service.get(query={'_id': file_id}, projection_model=SshfsFilePublicSchema)
-
-
-@router.post(
-    '/{source_id}/files/add-from-url',
-    operation_id='sshfs_file_add_from_url',
-    openapi_extra=GatewayEndpointConfig(
-        policy='public',
-        action=TemplateSourceActions.ADD_USER_FILE,
-    ).model_dump(by_alias=True),
-    status_code=status.HTTP_202_ACCEPTED,
-    response_model=TaskiqTaskIdResponse,
-)
-async def add_file_to_source_from_url(
-    source_id: PyObjectId,
-    rel_path: Annotated[str, Form(description='Destination path relative to sshfs root')],
-    file_service: Annotated[SshfsFileService, Depends(get_sshfs_file_service)],
-    url: Annotated[str, Form(description='URL to download the file from')],
-    unpack_as: Annotated[
-        UnpackAs | None,
-        Form(description='Unpack as archive of specified format rather than place as is'),
-    ] = None,
-) -> TaskiqTaskIdResponse:
-    file_in = SshfsFileCreateSchema.model_validate(
-        {
-            'source_id': source_id,
-            'file_type': SshfsFileType.USER,
-            'rel_path': rel_path,
-            'url': HttpUrl(url),
-            'checksum': '',
-            'checksum_type': ManifestDigest.SHA256,
-            'token': None,
-            'unpack_as': unpack_as,
-        }
-    )
-
-    file_id = await file_service.create(file_in)
-    tmp_path: pathlib.Path | None = None
-
-    task = await add_user_file_to_source_task.kiq(source_id=str(source_id), file_id=str(file_id), tmp_path=tmp_path)
-    return TaskiqTaskIdResponse(task_id=task.task_id)
 
 
 @router.get(

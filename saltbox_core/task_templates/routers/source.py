@@ -26,6 +26,7 @@ from saltbox_core.task_templates.utils.orchestrator import SyncOrchestrator, get
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
+from saltbox_sdk.fastapi_utils.dependencies import get_opa_query
 
 router = APIRouter(prefix='/task-template-sources', tags=['Task Templates / Sources'])
 
@@ -71,17 +72,21 @@ async def source_get(
     '/list',
     operation_id='template_source_list',
     openapi_extra=GatewayEndpointConfig(
-        policy='public',
+        policy='core.task_templates.sources.list',
         action=TemplateSourceActions.LIST,
     ).model_dump(by_alias=True),
     response_model=PaginatedResponse[SourceListWithExtrasSchema],
 )
 async def source_list(
     body: Annotated[TemplateSourceListBody, Body()],
+    opa_query: Annotated[dict, Depends(get_opa_query)],
     service: Annotated[TemplateSourceService, Depends(get_tpl_source_service)],
 ) -> PaginatedResponse[SourceListWithExtrasSchema]:
+    query = body.query
+    if opa_query:
+        query = {'$and': [query, opa_query]}
     sources = await service.get_list_paginated(
-        query=body.query,
+        query=query,
         skip=body.skip,
         limit=body.limit,
         projection_model=SourceListWithExtrasSchema,
@@ -143,9 +148,8 @@ async def source_import_from_archive(
     service: Annotated[TemplateSourceService, Depends(get_tpl_source_service)],
     orchestrator: Annotated[SyncOrchestrator, Depends(get_sync_orchestrator)],
     description: Annotated[str, Form(description='Description of the template source')] = '',
-    namespace: Annotated[str, Form(description='Namespace for the template source')] = '',
 ) -> TaskiqTaskIdResponse:
-    oid = await service.create_from_archive(name=name, description=description, namespace=namespace)
+    oid = await service.create_from_archive(name=name, description=description)
 
     created = await service.get(oid, projection_model=TemplateSourcePublicSchema)
     try:
@@ -192,6 +196,19 @@ async def source_import_from_git(
 async def source_check_external_list() -> TaskiqTaskIdResponse:
     task = await source_check_external_list_task.kiq()
     return TaskiqTaskIdResponse(task_id=task.task_id)
+
+
+@router.get(
+    '/actions/check-mounted-list',
+    operation_id='template_source_check_mounted_list',
+    openapi_extra=GatewayEndpointConfig(
+        policy='public',
+        action=TemplateSourceActions.CHECK_MOUNTED_LIST,
+    ).model_dump(by_alias=True),
+)
+async def source_check_mounted_list(orchestrator: Annotated[SyncOrchestrator, Depends(get_sync_orchestrator)]) -> str:
+    await orchestrator.create_sources_from_mounted()
+    return 'ok'
 
 
 @router.get(

@@ -27,6 +27,7 @@ class TemplateSourceRepository(BaseMongoRepository[TemplateSourceModel]):
             'url_unique_index_asc': [('repo_url', pymongo.ASCENDING)],
             'name_unique_index': [('name', pymongo.ASCENDING)],
             'local_path_unique_index_asc': [('local_path', pymongo.ASCENDING)],
+            'namespace_unique_index_asc': [('namespace', pymongo.ASCENDING)],
         }
         collection_index_options: ClassVar[dict[str, dict[str, Any]]] = {
             'url_unique_index_asc': {
@@ -35,6 +36,10 @@ class TemplateSourceRepository(BaseMongoRepository[TemplateSourceModel]):
             },
             'name_unique_index': {'unique': True},
             'local_path_unique_index_asc': {'unique': True},
+            'namespace_unique_index_asc': {
+                'unique': True,
+                'partialFilterExpression': {'namespace': {'$type': 'string'}},
+            },
         }
         aggregations: ClassVar[AggregationsStore] = AggregationsStore(
             aggregations=[

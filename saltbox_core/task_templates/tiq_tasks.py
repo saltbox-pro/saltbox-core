@@ -28,7 +28,7 @@ async def source_discover_task(
 ) -> dict[str, Any]:
     lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=60, prefix='template_source')
     lock = lock_factory.create(source_id)
-    logger.info('is_locked: %s', await lock.locked())
+    logger.debug('is_locked: %s', await lock.locked())
 
     if await lock.locked():
         msg = f'Source {source_id} is locked by another task.'
@@ -57,7 +57,7 @@ async def source_prepare_task(
 ) -> dict[str, Any]:
     lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=60, prefix='template_source')
     lock = lock_factory.create(source_id)
-    logger.info('is_locked: %s', await lock.locked())
+    logger.debug('is_locked: %s', await lock.locked())
 
     if await lock.locked():
         msg = f'Source {source_id} is locked by another task.'
@@ -86,7 +86,7 @@ async def source_unplug_task(
 ) -> dict[str, Any]:
     lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=60, prefix='template_source')
     lock = lock_factory.create(source_id)
-    logger.info('is_locked: %s', await lock.locked())
+    logger.debug('is_locked: %s', await lock.locked())
 
     if await lock.locked():
         msg = f'Source {source_id} is locked by another task.'
@@ -115,7 +115,7 @@ async def source_sync_task(
 ) -> dict[str, Any]:
     lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=600, prefix='template_source')
     lock = lock_factory.create(source_id)
-    logger.info('is_locked: %s', await lock.locked())
+    logger.debug('is_locked: %s', await lock.locked())
 
     if await lock.locked():
         msg = f'Source {source_id} is locked by another task.'
@@ -151,7 +151,7 @@ async def source_remove_task(
 ) -> dict[str, Any]:
     lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=60, prefix='template_source')
     lock = lock_factory.create(source_id)
-    logger.info('is_locked: %s', await lock.locked())
+    logger.debug('is_locked: %s', await lock.locked())
 
     if await lock.locked():
         msg = f'Source {source_id} is locked by another task.'
@@ -182,7 +182,7 @@ async def add_user_file_to_source_task(
 ) -> dict[str, Any]:
     lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=60, prefix='template_source')
     lock = lock_factory.create(source_id)
-    logger.info('is_locked: %s', await lock.locked())
+    logger.debug('is_locked: %s', await lock.locked())
 
     if await lock.locked():
         msg = f'Source {source_id} is locked by another task.'
@@ -215,7 +215,7 @@ async def create_tpl_from_raw_task(
 ) -> dict[str, Any]:
     lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=60, prefix='template_source')
     lock = lock_factory.create(source_id)
-    logger.info('is_locked: %s', await lock.locked())
+    logger.debug('is_locked: %s', await lock.locked())
 
     if await lock.locked():
         msg = f'Source {source_id} is locked by another task.'
@@ -226,22 +226,23 @@ async def create_tpl_from_raw_task(
     async with lock:
         await progress.set_progress(TaskState.STARTED, 'Create template from raw started')
         try:
-            await orchestrator.create_template_from_raw(
+            tpl_id = await orchestrator.create_template_from_raw(
                 PyObjectId(source_id), file_name, content, task_id=context.message.task_id
             )
-            await progress.set_progress(TaskState.STARTED, 'Create template from raw successful')
+            await progress.set_progress(TaskState.SUCCESS, 'Create template from raw successful')
+            return {'status': 'created', 'template_id': str(tpl_id)}
         except Exception:
             await progress.set_progress(TaskState.FAILURE, 'Create template from raw failed')
             raise
 
-        try:
-            await orchestrator.discover(PyObjectId(source_id), task_id=context.message.task_id)
-            await progress.set_progress(TaskState.SUCCESS, 'Fetch successful')
-        except Exception:
-            await progress.set_progress(TaskState.FAILURE, 'Fetch failed')
-            raise
+        # try:
+        #     await orchestrator.discover(PyObjectId(source_id), task_id=context.message.task_id)
+        #     await progress.set_progress(TaskState.SUCCESS, 'Fetch successful')
+        # except Exception:
+        #     await progress.set_progress(TaskState.FAILURE, 'Fetch failed')
+        #     raise
 
-    return {'status': 'created'}
+    # return {'status': 'created'}
 
 
 @broker.task(queue_name=queue_default.name)
@@ -256,7 +257,7 @@ async def update_tpl_from_raw_task(
 ) -> dict[str, Any]:
     lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=60, prefix='template_source')
     lock = lock_factory.create(source_id)
-    logger.info('is_locked: %s', await lock.locked())
+    logger.debug('is_locked: %s', await lock.locked())
 
     if await lock.locked():
         msg = f'Source {source_id} is locked by another task.'
@@ -311,7 +312,7 @@ async def delete_local_template_task(
 ) -> dict[str, Any]:
     lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=60, prefix='template_source')
     lock = lock_factory.create(source_id)
-    logger.info('is_locked: %s', await lock.locked())
+    logger.debug('is_locked: %s', await lock.locked())
 
     if await lock.locked():
         msg = f'Source {source_id} is locked by another task.'

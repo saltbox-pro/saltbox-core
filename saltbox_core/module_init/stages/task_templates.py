@@ -92,7 +92,7 @@ async def run_stage() -> None:
         source_in = TemplateSourceCreateLocalSchema(
             name='Локальные шаблоны',
             description='Встроенный источник для хранения пользовательских шаблонов конфигураций.',
-            namespace='',
+            namespace='baselocal',
         )
 
         created_id = await tpl_source_service.create_local(source_in)

@@ -41,7 +41,7 @@ class SshfsSync:
     def _move(self, src: Path, dst: Path, unpack_as: str | None = None) -> None:
         if unpack_as is not None:
             try:
-                logger.info('Unpacking file %s as %s to %s', src, unpack_as, dst)
+                logger.debug('Unpacking file %s as %s to %s', src, unpack_as, dst)
                 shutil.unpack_archive(src, format=unpack_as, extract_dir=dst)
             except shutil.ReadError as exc:
                 raise ManifestFileSyncHttpException(
@@ -71,7 +71,7 @@ class SshfsSync:
 
         url_str = str(file_entry.url)
         download_path = self._get_download_path(url_str)
-        logger.info('Syncing manifest file to SSHFS: %s', download_path)
+        logger.debug('Syncing manifest file to SSHFS: %s', download_path)
 
         try:
             async with self._httpx_client.stream(method='GET', url=url_str, headers=headers) as response:
@@ -108,12 +108,7 @@ class SshfsSync:
         dest_path = self._get_dest_path(file_entry.rel_path)
         if dest_path.exists():
             if dest_path.is_file():
-                dest_path.unlink()
-                parent = dest_path.parent
-                while parent != SETTINGS.sshfs_dir and not any(parent.iterdir()):
-                    logger.debug('Removing empty directory: %s', parent)
-                    parent.rmdir()
-                    parent = parent.parent
+                dest_path.unlink(missing_ok=True)
             else:
                 recursive_force_remove(dest_path)
 

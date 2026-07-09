@@ -10,6 +10,7 @@ from saltbox_sdk.utilities.helpers import Iso8601ZDatetime
 
 
 class SourceType(StrEnum):
+    MOUNTED_REPO = 'mounted_repo'
     GIT_REPO = 'git_repo'
     ARCHIVE_BUNDLE = 'archive_bundle'
     LOCAL_BUNDLE = 'local_bundle'
@@ -49,28 +50,25 @@ class SourceOperation(StrEnum):
 class TemplateSourceImportFromGitSchema(BaseModel):
     name: str = Field(min_length=1, max_length=100, title='Display name')
     description: str | None = Field(default='', max_length=500, title='Description')
-    namespace: str = Field(
-        default='',
-        max_length=64,
-        pattern=r'^[a-z0-9_]*$',
-        title='Namespace',
-        description='Prefix for template names and serve_dir subdirectory. Empty means no prefix.',
-    )
     repo_url: HttpUrl = Field(title='Git repository URL')
     repo_user: str | None = Field(default=None, title='Git user (basic auth)')
     repo_pass: str | None = Field(default=None, title='Git password (basic auth)')
     branch: str | None = Field(default=None, max_length=100, title='Git branch')
 
 
+class TemplateSourceImportFromMountedSchema(BaseModel):
+    name: str = Field(min_length=1, max_length=100, title='Display name')
+    repo_mounted_path: str = Field(title='Mounted repository path')
+
+
 class TemplateSourceCreateLocalSchema(BaseModel):
     name: str = Field(min_length=1, max_length=100, title='Display name')
     description: str | None = Field(default='', max_length=500, title='Description')
     namespace: str = Field(
-        default='',
         max_length=64,
         pattern=r'^[a-z0-9_]*$',
         title='Namespace',
-        description='Prefix for template names and serve_dir subdirectory. Empty means no prefix.',
+        description='Prefix for template names and serve_dir|sshfs subdirectory. Empty means no prefix.',
     )
 
     @field_validator('name')
@@ -87,14 +85,15 @@ class TemplateSourceCreateSchema(BaseModel):
     name: str = Field(min_length=1, max_length=100, title='Display name')
     description: str | None = Field(default='', max_length=500, title='Description')
     # Ненулевой namespace даёт: serve_dir/<namespace>/... и name (mods) = "<namespace>.<dot_path>"
-    namespace: str = Field(
-        default='',
+    namespace: str | None = Field(
+        default=None,
         max_length=64,
         pattern=r'^[a-z0-9_]*$',
         title='Namespace',
-        description='Prefix for template names and serve_dir subdirectory. Empty means no prefix.',
+        description='Prefix for template names and serve_dir|sshfs subdirectory. Empty means no prefix.',
     )
     repo_url: HttpUrl | None = Field(default=None, title='Git repository URL')
+    repo_mounted_path: str | None = Field(default=None, title='Mounted repository path')
     repo_user: str | None = Field(default=None, title='Git user (basic auth)')
     repo_pass: str | None = Field(default=None, title='Git password (basic auth)')
     branch: str | None = Field(default=None, max_length=100, title='Git branch')
@@ -112,9 +111,8 @@ class TemplateSourceUpdateSchema(BaseModel):
 class TemplateSourceModel(CreatedModifiedMixin, IDMixin):
     name: str = Field(min_length=1, max_length=100, title='Display name')
     description: str | None = Field(default='', max_length=500, title='Description')
-    # is_active: bool = Field(default=False, title='Is active (publish to serve_dir)')
-    namespace: str = Field(
-        default='',
+    namespace: str | None = Field(
+        default=None,
         max_length=64,
         pattern=r'^[a-z0-9_]*$',
         title='Namespace',
@@ -122,6 +120,7 @@ class TemplateSourceModel(CreatedModifiedMixin, IDMixin):
     )
     source_type: SourceType = Field(title='Source type')
     repo_url: HttpUrl | None = Field(default=None, title='Git repository URL')
+    repo_mounted_path: str | None = Field(default=None, title='Mounted repository path')
     repo_user: str | None = Field(default=None, title='Git user (basic auth)')
     repo_pass: SecretStr | None = Field(default=None, title='Git password (basic auth)')
     branch: str | None = Field(default=None, max_length=100, title='Git branch')
@@ -141,9 +140,10 @@ class TemplateSourceModel(CreatedModifiedMixin, IDMixin):
 class TemplateSourcePublicSchema(CreatedModifiedMixin, IDMixin):
     name: str
     description: str | None = Field(default='', max_length=1000)
-    namespace: str = Field(default='')
+    namespace: str | None = Field(default=None)
     source_type: SourceType
     repo_url: HttpUrl | None = None
+    repo_mounted_path: str | None = None
     repo_user: str | None = None
     repo_pass: SecretStr | None = None
     branch: str | None = None
@@ -206,3 +206,4 @@ class TemplateSourceActions(StrEnum):
     ADD_USER_FILE = 'add_user_file'
     FILES_LIST = 'files_list'
     CHECK_EXTERNAL_LIST = 'check_external_list'
+    CHECK_MOUNTED_LIST = 'check_mounted_list'

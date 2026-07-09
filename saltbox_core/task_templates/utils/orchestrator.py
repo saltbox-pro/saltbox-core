@@ -8,6 +8,7 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
+from urllib.parse import quote
 
 import anyio
 import httpx
@@ -38,6 +39,7 @@ from saltbox_core.task_templates.schemas.source import (
     SourceState,
     SourceType,
     TemplateSourceImportFromGitSchema,
+    TemplateSourceImportFromMountedSchema,
 )
 from saltbox_core.task_templates.schemas.sshfs_file import (
     ManifestDigest,
@@ -104,7 +106,7 @@ class SyncOrchestrator:
             raise ValueError(msg)
         protocol = match.group(1)
         rest = match.group(2)
-        return f'{protocol}{login}:{password}@{rest}'
+        return f'{protocol}{quote(login, safe="")}:{quote(password, safe="")}@{rest}'
 
     async def _create_local_source_dir(self, source_id: PyObjectId) -> None:
         source = await self._source_service.get(source_id)
@@ -112,11 +114,28 @@ class SyncOrchestrator:
 
         try:
             local_path.mkdir(parents=True, exist_ok=True)
+            # self._local_path = local_path
         except OSError as e:
             logger.error('Failed to create local path: %s', e)
             raise
 
-    async def _fetch(self, source_id: PyObjectId, shallow: bool = False) -> dict[str, Any]:  # noqa: C901
+    async def _clone_from_path(self, source_id: PyObjectId) -> None:
+        source = await self._source_service.get(source_id)
+        if source.source_type != SourceType.MOUNTED_REPO:
+            msg = 'Clone from path is only supported for mounted_repo source type.'
+            raise ValueError(msg)
+        if not source.repo_mounted_path:
+            msg_0 = f'Mounted path is missing for source {source_id}.'
+            raise ValueError(msg_0)
+
+        self._local_path = Path(SETTINGS.local_repos_dir) / source.local_path
+        try:
+            shutil.copytree(source.repo_mounted_path, self._local_path, dirs_exist_ok=True)
+        except OSError as e:
+            logger.error('Failed to copy from mounted path: %s', e)
+            raise
+
+    async def _fetch(self, source_id: PyObjectId, shallow: bool = False) -> dict[str, Any]:
         source = await self._source_service.get(source_id)
         if source.source_type != SourceType.GIT_REPO:
             msg = f'Fetch is only supported for git_repo source type. Source {source_id} has type {source.source_type}.'
@@ -178,10 +197,6 @@ class SyncOrchestrator:
                 logger.error('Failed to clone repo: %s', e)
                 shutil.rmtree(self._local_path, ignore_errors=True)
                 raise
-
-        await self._parse_manifest_if_exists()
-        if self._manifest and self._manifest.root != source.root:
-            await self._source_service.update(source_id, {'root': self._manifest.root})
 
         return {'status': 'fetched'}
 
@@ -345,10 +360,19 @@ class SyncOrchestrator:
             skip=0,
             limit=0,
         )
+        source = await self._source_service.get(source_id)
         sync_file_errors: list[dict[str, str]] = []
         for file in missing_manifest_files:
             try:
-                await self._sshfs_sync_service.save_to_sshfs(file)
+                # If source_type is MOUNTED - check if the file exists in the sshfs_dir
+                if source.source_type == SourceType.MOUNTED_REPO:
+                    mounted_file_path = Path(SETTINGS.sshfs_dir) / file.rel_path
+                    logger.debug('Checking if mounted file exists: %s', mounted_file_path)
+                    if not mounted_file_path.exists():
+                        msg = f'Mounted file not found: {mounted_file_path}'
+                        raise FileNotFoundError(msg)
+                else:
+                    await self._sshfs_sync_service.save_to_sshfs(file)
                 await self._sshfs_file_service.update(
                     query=file.id,
                     data={'synced_on_sshfs': True, 'last_sync_error': None},
@@ -364,9 +388,11 @@ class SyncOrchestrator:
                 continue
         return sync_file_errors
 
-    async def _serve_templates_to_serve_dir(self) -> None:
+    async def _serve_templates_to_serve_dir(self, source_id: PyObjectId) -> None:
         active_sources = await self._source_service.get_list(
-            query={'state': {'$in': [SourceState.DISCOVERED, SourceState.PLUGGED, SourceState.ACTIVE]}}, skip=0, limit=0
+            query={'$or': [{'_id': source_id}, {'state': {'$in': [SourceState.PLUGGED, SourceState.ACTIVE]}}]},
+            skip=0,
+            limit=0,
         )
         salt_modules_serve_updater = SourceServeUpdater(active_sources)
         logger.info('Updating serve dir with templates from %d active sources...', len(active_sources))
@@ -374,6 +400,7 @@ class SyncOrchestrator:
             salt_modules_serve_updater.update()
         except Exception as e:
             logger.error('Failed to update serve dir: %s', e)
+            raise
 
     async def _update_sshfs_permissions(self) -> None:
         if not SETTINGS.sshfs_permissions:
@@ -455,6 +482,10 @@ class SyncOrchestrator:
         try:
             if source.source_type == SourceType.GIT_REPO:
                 await self._fetch(source_id, shallow=True)
+                await self._parse_manifest_if_exists()
+            elif source.source_type == SourceType.MOUNTED_REPO:
+                await self._clone_from_path(source_id)
+                await self._parse_manifest_if_exists()
             else:
                 await self._create_local_source_dir(source_id)
         except Exception as e:
@@ -483,19 +514,54 @@ class SyncOrchestrator:
             raise
 
         await self._source_service.update(
-            source_id, {'state': SourceState.DISCOVERED, 'current_operation': None, 'current_task_id': None}
+            source_id,
+            {
+                'state': SourceState.DISCOVERED,
+                'current_operation': None,
+                'current_task_id': None,
+                'root': self._manifest.root if self._manifest else source.root,
+            },
         )
         return {'status': 'discovered'}
 
+    async def _check_if_source_local_paths_exists(self, source_id: PyObjectId) -> str:
+        error = ''
+        source = await self._source_service.get(source_id)
+        templates = await self._template_service.get_list(query={'source_id': source_id}, skip=0, limit=0)
+        local_path = Path(SETTINGS.local_repos_dir) / source.local_path
+        if not local_path.exists() or not local_path.is_dir():
+            error = f'Local path does not exist: {source.local_path}'
+            logger.warning(error)
+            return error
+        for tpl in templates:
+            sls_file = Path(SETTINGS.local_repos_dir) / source.local_path / (source.root or '') / tpl.sls_rel_path
+            if not sls_file.exists() or not sls_file.is_file():
+                logger.warning('SLS file does not exist: %s', tpl.sls_rel_path)
+                error += f'SLS file does not exist: {tpl.sls_rel_path}\n'
+        return error
+
     async def prepare(self, source_id: PyObjectId, task_id: str | None = None) -> None:
-        # source = await self._source_service.get(source_id)
+        error = await self._check_if_source_local_paths_exists(source_id)
+        if error:
+            logger.error('Source preparation failed:\n%s', error)
+            await self._source_service.update(
+                source_id,
+                {
+                    'state': SourceState.BROKEN,
+                    'current_operation': SourceOperation.PREPARE_TEMPLATES,
+                    'last_error': error,
+                    'current_task_id': None,
+                },
+            )
+            raise FileNotFoundError(error)
 
         await self._source_service.update(
             source_id, {'current_operation': SourceOperation.PREPARE_TEMPLATES, 'current_task_id': task_id}
         )
         try:
             logger.info('Syncing templates to serve dir...')
-            await self._serve_templates_to_serve_dir()
+            # await self._serve_templates_to_serve_dir()
+            await self._serve_templates_to_serve_dir(source_id)
         except Exception as e:
             logger.error('Failed to serve templates to serve dir: %s', e)
             await self._source_service.update(
@@ -535,16 +601,30 @@ class SyncOrchestrator:
             source_id, {'current_operation': SourceOperation.UNPLUG, 'current_task_id': task_id}
         )
         try:
+            # TODO: If namespace is required and set in manifest.yaml, we can remove all namespace dir from serve dir
             # Remove templates from serve dir
             tpls = await self._template_service.get_list(query={'source_id': source_id}, skip=0, limit=0)
             for tpl in tpls:
                 sls_file = SETTINGS.salt_modules_serve_dir / tpl.sls_rel_path
                 logger.debug('Attempting to remove SLS file: %s', sls_file)
                 sls_file.unlink(missing_ok=True)
+                parent = sls_file.parent
+                while (
+                    parent != SETTINGS.salt_modules_serve_dir
+                    and parent.exists()
+                    and parent.is_dir()
+                    and not any(parent.iterdir())
+                ):
+                    logger.debug('Removing empty directory: %s', parent)
+                    parent.rmdir()
+                    parent = parent.parent
             # Remove files from SSHFS
             sshfs_files = await self._sshfs_file_service.get_list(query={'source_id': source_id}, skip=0, limit=0)
             for file in sshfs_files:
                 await self._sshfs_sync_service.remove(file)
+                await self._sshfs_file_service.update(
+                    query=file.id, data={'synced_on_sshfs': False, 'last_sync_error': None}
+                )
         except Exception as e:
             logger.error('Failed to unplug source: %s', e)
             await self._source_service.update(
@@ -558,6 +638,15 @@ class SyncOrchestrator:
         )
 
     async def sync(self, source_id: PyObjectId, task_id: str | None = None) -> None:
+        local_files_errors = await self._check_if_source_local_paths_exists(source_id)
+        if local_files_errors:
+            error_msg = '\n'.join(local_files_errors)
+            logger.error('Source preparation failed:\n%s', error_msg)
+            await self._source_service.update(
+                source_id, {'state': SourceState.BROKEN, 'last_error': error_msg, 'current_task_id': None}
+            )
+            raise FileNotFoundError(error_msg)
+
         # Get list of accepted masters and send them rpc notification in parallel
         await self._source_service.update(
             source_id, {'current_operation': SourceOperation.SYNC, 'current_task_id': task_id}
@@ -674,26 +763,89 @@ class SyncOrchestrator:
             )
             raise
 
+    async def _create_template_db_instance_from_raw(
+        self, source_id: PyObjectId, full_path: Path, rel_path: Path, content: str
+    ) -> PyObjectId:
+        name = '.'.join((*rel_path.parent.parts, rel_path.stem))
+        pattern = re.compile(r'{#start_schema(.*?)end_schema#}', re.DOTALL)
+        match = pattern.search(content)
+        if not match:
+            msg = f'{rel_path}: Schema block not found. Expected {{#start_schema ... end_schema#}}'
+            raise ValueError(msg)
+
+        schema_json = match.group(1).strip()
+        parsed = json.loads(schema_json)
+        if not isinstance(parsed, dict):
+            msg = f'{rel_path}: Schema is not a dictionary'
+            raise ValueError(msg)
+        if 'json_schema' not in parsed and 'title' in parsed:
+            # For v1 format without ui_schema
+            json_schema = parsed
+        else:
+            json_schema = parsed.get('json_schema', {})
+
+        tpl_data = {
+            'fun': parsed.get('fun', 'state.apply'),
+            'title': json_schema.get('title', rel_path.stem),
+            'description': parsed.get('description'),
+            'defaults': parsed.get('defaults'),
+            'name': name,
+            'json_schema': json_schema,
+            'ui_schema': parsed.get('ui_schema'),
+            'source_hash': self._make_checksum(full_path),
+            'sls_rel_path': str(rel_path),
+            'source_id': source_id,
+        }
+        return await self._template_service.create(data=tpl_data)
+
     async def create_template_from_raw(
         self, source_id: PyObjectId, file_name: str, content: str, task_id: str | None = None
-    ) -> None:
+    ) -> PyObjectId:
         source = await self._source_service.get(source_id)
 
         await self._source_service.update(
             source_id, {'current_operation': SourceOperation.ADD_TEMPLATE_FROM_RAW, 'current_task_id': task_id}
         )
 
-        local_path = Path(SETTINGS.local_repos_dir) / source.local_path / f'{file_name}.sls'
+        source_root = Path(SETTINGS.local_repos_dir) / source.local_path
+        if source.namespace:
+            rel_path = Path(source.namespace.strip()) / f'{file_name}.sls'
+        else:
+            rel_path = Path(f'{file_name}.sls')
 
+        if source.root:
+            local_path = source_root / source.root / rel_path
+        else:
+            local_path = source_root / rel_path
+
+        # check if template already exists
+        if local_path.exists() and local_path.is_file():
+            msg = f'Template file already exists: {local_path}'
+            logger.error(msg)
+            await self._source_service.update(source_id, {'current_operation': None, 'current_task_id': None})
+            raise FileExistsError(msg)
         try:
             local_path.parent.mkdir(parents=True, exist_ok=True)
             local_path.write_text(content, encoding='utf-8')
         except OSError as e:
             logger.error('Failed to write template file: %s', e)
+            await self._source_service.update(
+                source_id, {'state': SourceState.BROKEN, 'last_error': str(e), 'current_task_id': None}
+            )
+            raise
+        try:
+            tpl_id = await self._create_template_db_instance_from_raw(source_id, local_path, rel_path, content)
+        except Exception as e:
+            logger.error('Failed to create template in DB: %s', e)
+            local_path.unlink(missing_ok=True)
+            await self._source_service.update(
+                source_id, {'state': SourceState.BROKEN, 'last_error': str(e), 'current_task_id': None}
+            )
             raise
         await self._source_service.update(
-            source_id, {'state': SourceState.PENDING, 'current_operation': None, 'current_task_id': None}
+            source_id, {'state': SourceState.DISCOVERED, 'current_operation': None, 'current_task_id': None}
         )
+        return tpl_id
 
     async def update_template_from_raw(self, template_id: PyObjectId, content: str, task_id: str | None = None) -> None:
         template = await self._template_service.get(template_id, projection_model=TaskTemplateAggregatedModel)
@@ -744,7 +896,7 @@ class SyncOrchestrator:
             local_path = Path(SETTINGS.local_repos_dir) / template.local_path / template.sls_rel_path
 
         try:
-            local_path.unlink()
+            local_path.unlink(missing_ok=True)
         except OSError as e:
             logger.error('Failed to delete template file: %s', e)
             raise
@@ -784,9 +936,6 @@ class SyncOrchestrator:
 
     async def create_sources_from_gitlab(self) -> None:
         projects = await self._get_gitpab_projects_list()
-        logger.info(
-            f'Fetched projects from GitLab: {len(projects)}\n\n{"\n".join([p.http_url_to_repo for p in projects])}'
-        )
         source_ids_to_discover = []
         for project in projects:
             try:
@@ -830,6 +979,41 @@ class SyncOrchestrator:
                 await self.discover(source_id)
             except Exception as e:
                 logger.error(f'Failed to discover source {source_id} created from GitLab project: {e}')
+
+    async def create_sources_from_mounted(self) -> None:
+        mounted_dir = anyio.Path('/mnt/config-boxes/')
+        if not await mounted_dir.exists() or not await mounted_dir.is_dir():
+            msg = 'Mounted directory /mnt/config-boxes/ does not exist or is not a directory.'
+            logger.warning(msg)
+            raise FileNotFoundError(msg)
+
+        mounted_repos = [
+            d
+            async for d in mounted_dir.iterdir()
+            if await d.is_dir() and await (d / '.git').exists()
+            # and await (d / 'manifest.yaml').exists()
+        ]
+
+        for repo_path in mounted_repos:
+            try:
+                existing_source = await self._source_service.get(
+                    query={'source_type': SourceType.MOUNTED_REPO, 'repo_mounted_path': str(repo_path)}
+                )
+            except ObjectNotFoundException:
+                existing_source = None
+            if existing_source:
+                logger.debug(f'Source for mounted repo {repo_path!s} already exists, skipping creation')
+                continue
+
+            source_in = TemplateSourceImportFromMountedSchema(
+                name=str(repo_path),
+                repo_mounted_path=str(repo_path),
+            )
+            created_source_id = await self._source_service.create_from_mounted_path(data=source_in)
+            try:
+                await self.discover(created_source_id)
+            except Exception as e:
+                logger.error(f'Failed to discover source {created_source_id} created from mounted repo: {e}')
 
 
 async def get_sync_orchestrator(
