@@ -72,7 +72,8 @@ async def source_get(
     '/list',
     operation_id='template_source_list',
     openapi_extra=GatewayEndpointConfig(
-        policy='core.task_templates.sources.list',
+        # policy='core.task_templates.sources.list',
+        policy='public',
         action=TemplateSourceActions.LIST,
     ).model_dump(by_alias=True),
     response_model=PaginatedResponse[SourceListWithExtrasSchema],
