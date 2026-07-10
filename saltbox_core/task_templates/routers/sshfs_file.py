@@ -49,7 +49,11 @@ async def add_file_to_source(
     if not file.filename:
         msg = 'File must have a filename'
         raise ValueError(msg)
+
     rel_path = file.filename
+    if unpack_as:
+        rel_path = rel_path.rsplit(f'.{unpack_as.value}', 1)[0]
+
     if source.namespace:
         rel_path = f'{source.namespace}/{rel_path}'
     file_in = SshfsFileCreateSchema.model_validate(

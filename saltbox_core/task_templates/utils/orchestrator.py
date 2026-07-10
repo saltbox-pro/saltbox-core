@@ -619,12 +619,12 @@ class SyncOrchestrator:
                     parent.rmdir()
                     parent = parent.parent
             # Remove files from SSHFS
-            sshfs_files = await self._sshfs_file_service.get_list(query={'source_id': source_id}, skip=0, limit=0)
-            for file in sshfs_files:
-                await self._sshfs_sync_service.remove(file)
-                await self._sshfs_file_service.update(
-                    query=file.id, data={'synced_on_sshfs': False, 'last_sync_error': None}
-                )
+            # sshfs_files = await self._sshfs_file_service.get_list(query={'source_id': source_id}, skip=0, limit=0)
+            # for file in sshfs_files:
+            #     await self._sshfs_sync_service.remove(file)
+            #     await self._sshfs_file_service.update(
+            #         query=file.id, data={'synced_on_sshfs': False, 'last_sync_error': None}
+            #     )
         except Exception as e:
             logger.error('Failed to unplug source: %s', e)
             await self._source_service.update(
@@ -1006,7 +1006,7 @@ class SyncOrchestrator:
                 continue
 
             source_in = TemplateSourceImportFromMountedSchema(
-                name=str(repo_path),
+                name=str(repo_path.relative_to(mounted_dir)),
                 repo_mounted_path=str(repo_path),
             )
             created_source_id = await self._source_service.create_from_mounted_path(data=source_in)
