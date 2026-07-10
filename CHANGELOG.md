@@ -5,7 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-
 ## [x.x.x] - YYYY-MM-DD
 
 ### Added
@@ -13,6 +12,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 ### Fixed
+
+## [0.3.0] - 2026-07-10
+
+### Added
+
+- New task templates module with end-to-end source and template management (local/URL/archive sources, mounted repos, SSHFS file operations, schema endpoints, bootstrap stage, and TaskIQ background workflows)
+- Minion extra data subsystem: categories, list endpoints, aggregation, filtering, and event bus ingestion
+- POST endpoints for job returns export in table and CSV formats
+- Collection description field
+- Redis masters bus helper for master-scoped pub/sub messaging
+
+### Changed
+
+- Refactored broker/message lifecycle to ensure proper broker initialization before handling and sending messages
+- Refactored minion collections structure with dedicated repositories, services, and schemas
+- Updated SDK dependencies and aligned related contracts
+- Updated template/source policies and pillar working schema handling
+- Updated CI pipeline: reusable Python setup and bump-version stage
+
+### Fixed
+
+- Fixed minion extra data collection from event bus
+- Fixed template field validation and regex constraints
+- Removed unused orchestrator dependency from routes
+- Stabilized tests and linting configuration
 
 
 ## [0.2.1] - 2026-05-21
@@ -131,7 +155,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Downloading AUX files not depends on `content-disposition` header.
-- Manifest `sshfs_files` archive entry requires `unpack_as` field to contain an 
+- Manifest `sshfs_files` archive entry requires `unpack_as` field to contain an
 archive format string. `unpack` field is deprecated.
 
 ### Fixed
