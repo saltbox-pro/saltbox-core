@@ -39,6 +39,18 @@ class RepoURLMissingException(TaskTemplateException):
         super().__init__(detail=self.detail)
 
 
+class SourceRepoCloneException(TaskTemplateException):
+    """Exception raised when a git repo source fails to clone."""
+
+    status_code: int = status.HTTP_400_BAD_REQUEST
+    detail: str = 'Git repo source failed to clone'
+
+    def __init__(self, detail: str | None = None):
+        if detail:
+            self.detail = detail
+        super().__init__(detail=self.detail)
+
+
 class TaskTemplateSourceLockException(TaskTemplateException):
     """Exception raised when a task template source is locked."""
 

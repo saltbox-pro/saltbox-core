@@ -6,7 +6,7 @@ from taskiq import Context, TaskiqDepends
 from taskiq.depends.progress_tracker import ProgressTracker, TaskState
 
 from saltbox_core.config import Settings, logger
-from saltbox_core.task_templates.exceptions import TaskTemplateSourceLockException
+from saltbox_core.task_templates.exceptions import SourceRepoCloneException, TaskTemplateSourceLockException
 from saltbox_core.task_templates.utils.orchestrator import SyncOrchestrator, get_sync_orchestrator
 from saltbox_core.tkq import broker, queue_default
 
@@ -42,6 +42,10 @@ async def source_discover_task(
             await orchestrator.discover(PyObjectId(source_id), context.message.task_id)
             await progress.set_progress(TaskState.SUCCESS, 'Fetch successful')
             return {'status': 'discovered'}
+        except SourceRepoCloneException as e:
+            await progress.set_progress(TaskState.FAILURE, f'Fetch failed: {e}')
+            await orchestrator.remove_source(PyObjectId(source_id), context.message.task_id)
+            raise
         except Exception:
             await progress.set_progress(TaskState.FAILURE, 'Fetch failed')
             raise

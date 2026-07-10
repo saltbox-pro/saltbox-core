@@ -32,6 +32,7 @@ from saltbox_core.task_templates.exceptions import (
     GitlabApiException,
     MissingGroupIdException,
     RepoURLMissingException,
+    SourceRepoCloneException,
 )
 from saltbox_core.task_templates.schemas.source import (
     GitlabProjectSchema,
@@ -194,9 +195,10 @@ class SyncOrchestrator:
                     timeout=SETTINGS.local_repo_sync_timeout_sec,
                 )
             except Exception as e:
-                logger.error('Failed to clone repo: %s', e)
+                msg = f'Failed to clone repo from {raw_url}: {e}'
+                logger.error(msg)
                 shutil.rmtree(self._local_path, ignore_errors=True)
-                raise
+                raise SourceRepoCloneException(detail=msg) from None
 
         return {'status': 'fetched'}
 
