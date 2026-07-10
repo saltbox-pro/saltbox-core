@@ -39,6 +39,18 @@ class RepoURLMissingException(TaskTemplateException):
         super().__init__(detail=self.detail)
 
 
+class SourceMissingFilesException(TaskTemplateException):
+    """Exception raised when a source is missing required files."""
+
+    status_code: int = status.HTTP_400_BAD_REQUEST
+    detail: str = 'Source is missing required files'
+
+    def __init__(self, detail: str | None = None):
+        if detail:
+            self.detail = f'Source is missing required files: {detail}'
+        super().__init__(detail=self.detail)
+
+
 class SourceRepoCloneException(TaskTemplateException):
     """Exception raised when a git repo source fails to clone."""
 

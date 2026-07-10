@@ -32,6 +32,7 @@ from saltbox_core.task_templates.exceptions import (
     GitlabApiException,
     MissingGroupIdException,
     RepoURLMissingException,
+    SourceMissingFilesException,
     SourceRepoCloneException,
 )
 from saltbox_core.task_templates.schemas.source import (
@@ -592,6 +593,7 @@ class SyncOrchestrator:
             await self._source_service.update(
                 source_id, {'state': SourceState.BROKEN, 'last_error': error_msg, 'current_task_id': None}
             )
+            raise SourceMissingFilesException(detail=f'Some files failed to sync to SSHFS: {error_msg}')
         else:
             await self._source_service.update(
                 source_id,
