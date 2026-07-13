@@ -20,22 +20,25 @@ class CollectionComputedFieldsMixin(BaseModel):
 
 
 class CollectionReadOnlyFieldsMixin(BaseModel):
-    slug: str = Field(title='Slug', pattern=r'^[a-z0-9-]+$', min_length=3, max_length=30)
+    slug: str | None = Field(default=None, title='Slug')
     owner_id: str | None = Field(title='Owner', min_length=3, max_length=50, default=None)
+    parent_title: str | None = Field(title='Parent Title', default=None)
 
 
 class CollectionEditableFieldsMixin(BaseModel):
     title: str = Field(title='Title', min_length=3, max_length=50)
     description: str = Field(title='Description', default='', max_length=500)
     query: MongoQuery = MongoQueryField
+    parent_slug: str | None = Field(
+        title='Parent Slug', default=None, description='Slug of the parent collection, if any'
+    )
 
 
 class CollectionCreateSchema(CollectionEditableFieldsMixin, CollectionReadOnlyFieldsMixin, TreeMixin):
     pass
 
 
-class CollectionCreateRequestSchema(CollectionEditableFieldsMixin, CollectionReadOnlyFieldsMixin):
-    parent_slug: str = Field(title='Slug', pattern=r'^[a-z0-9-]+$', min_length=3, max_length=30)
+class CollectionCreateRequestSchema(CollectionEditableFieldsMixin, CollectionReadOnlyFieldsMixin): ...
 
 
 class CollectionUpdateSchema(CollectionEditableFieldsMixin):
@@ -50,16 +53,7 @@ class CollectionModel(
     CollectionEditableFieldsMixin,
     CollectionReadOnlyFieldsMixin,
     CollectionComputedFieldsMixin,
-):
-    parent_title: str | None = Field(title='Title', min_length=3, max_length=50, default=None)
-    parent_slug: str | None = Field(
-        title='Parent Slug',
-        pattern=r'^[a-z0-9-]+$',
-        min_length=3,
-        max_length=30,
-        default=None,
-        description='Slug of the parent collection, if any',
-    )
+): ...
 
 
 class CollectionDetailSchema(CollectionModel): ...
@@ -75,7 +69,7 @@ class CollectionBaseTreeModel(BaseTreeModel):
 class CollectionTreeNodeSchema(IDMixin):
     title: str = Field(title='Title', min_length=3, max_length=50)
     description: str = Field(title='Description', default='', max_length=500)
-    slug: str = Field(title='Slug', pattern=r'^[a-z0-9-]+$', min_length=3, max_length=30)
+    slug: str = Field(title='Slug')
 
     parent_id: PyObjectId | None = Field(title='Parent ID', default=None)
     children: list['CollectionTreeNodeSchema'] = Field(title='Children', default=[])

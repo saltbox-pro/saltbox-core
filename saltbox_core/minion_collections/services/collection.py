@@ -4,7 +4,9 @@ from uuid import uuid4
 from fastapi import Depends
 from pydantic import BaseModel
 from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
+from slugify import slugify
 
+from saltbox_core.minion_collections.exceptions import InvalidParentCollectionException
 from saltbox_core.minion_collections.repositories.collection import CollectionRepository, get_collection_repository
 from saltbox_core.minion_collections.schemas.collection import (
     CollectionCreateSchema,
@@ -55,7 +57,27 @@ class CollectionService(
         *,
         session: MongoAsyncClientSession | None = None,
     ) -> CollectionModel:
-        obj_id = await self.update(query={'slug': slug}, data=data, session=session)
+        collection = await self.get_by_slug(slug=slug, session=session)
+        descendants_ids = await self.repo.get_descendants_ids(target=collection.id, include_self=False, session=session)
+        descendants_collections = await self.get_list(
+            query={'_id': {'$in': descendants_ids}}, session=session, projection_model=CollectionModel
+        )
+        descendants_slugs = [descendant.slug for descendant in descendants_collections]
+
+        if data.parent_slug == slug or data.parent_slug in descendants_slugs:
+            raise InvalidParentCollectionException()
+
+        if data.parent_slug is not None and data.parent_slug != collection.parent_slug:
+            parent_collection = await self.get_by_slug(slug=data.parent_slug, session=session)
+            new_parent_id: PyObjectId | None = parent_collection.id
+        else:
+            new_parent_id = collection.parent_id
+
+        obj_id = await self.update(
+            query={'slug': slug},
+            data={**data.model_dump(exclude={'parent_slug'}), 'parent_id': new_parent_id},
+            session=session,
+        )
 
         return await self.get(query=obj_id, session=session)
 
@@ -88,14 +110,15 @@ class CollectionService(
     ) -> PyObjectId:
         if not isinstance(data, CollectionCreateSchema):
             data = CollectionCreateSchema.model_validate(data)
-
+        slug = slugify(data.title, separator='-', lowercase=True)
         while True:
-            existing = await self.exists(query={'slug': data.slug}, session=session)
+            existing = await self.exists(query={'slug': slug}, session=session)
             if not existing:
                 break
-            data.slug = f'{data.slug.split("-")[0]}-{uuid4().hex[:8]}'
+            cleaned_slug = slugify(data.title, separator='-', lowercase=True)
+            slug = f'{cleaned_slug}-{uuid4().hex[:8]}'
 
-        return await super().create(data=data, session=session)
+        return await super().create(data={**data.model_dump(exclude={'slug'}), 'slug': slug}, session=session)
 
     async def get_root_collection_id(self) -> PyObjectId:
         root_collection = await self.get_by_slug(slug='root')

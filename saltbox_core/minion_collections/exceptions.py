@@ -20,3 +20,10 @@ class UnsupportedFieldTypeException(MinionCollectionException):
 
     status_code: int = status.HTTP_400_BAD_REQUEST
     detail: str = 'The specified field type is not supported for aggregation.'
+
+
+class InvalidParentCollectionException(MinionCollectionException):
+    """Exception raised when attempting to set a collection's parent to itself or one of its children."""
+
+    status_code: int = status.HTTP_400_BAD_REQUEST
+    detail: str = 'Cannot set parent_slug to self or any of its children.'
