@@ -6,7 +6,10 @@ from pydantic import BaseModel
 from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
 from slugify import slugify
 
-from saltbox_core.minion_collections.exceptions import InvalidParentCollectionException
+from saltbox_core.minion_collections.exceptions import (
+    DuplicateChildCollectionTitleException,
+    InvalidParentCollectionException,
+)
 from saltbox_core.minion_collections.repositories.collection import CollectionRepository, get_collection_repository
 from saltbox_core.minion_collections.schemas.collection import (
     CollectionCreateSchema,
@@ -72,6 +75,16 @@ class CollectionService(
             new_parent_id: PyObjectId | None = parent_collection.id
         else:
             new_parent_id = collection.parent_id
+
+        if new_parent_id is not None:
+            siblings = await self.repo.get_children(
+                target=new_parent_id,
+                projection_model=CollectionModel,
+                session=session,
+            )
+            sibling_titles = {child.title for child in siblings if child.id != collection.id}
+            if data.title in sibling_titles:
+                raise DuplicateChildCollectionTitleException()
 
         obj_id = await self.update(
             query={'slug': slug},

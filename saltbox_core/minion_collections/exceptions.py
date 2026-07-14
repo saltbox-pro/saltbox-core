@@ -27,3 +27,10 @@ class InvalidParentCollectionException(MinionCollectionException):
 
     status_code: int = status.HTTP_400_BAD_REQUEST
     detail: str = 'Cannot set parent_slug to self or any of its children.'
+
+
+class DuplicateChildCollectionTitleException(MinionCollectionException):
+    """Exception raised when a collection title duplicates one of the new parent's direct children."""
+
+    status_code: int = status.HTTP_400_BAD_REQUEST
+    detail: str = 'Collection title must be unique among the direct children of the parent collection.'
