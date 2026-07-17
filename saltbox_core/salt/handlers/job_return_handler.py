@@ -78,7 +78,7 @@ class JobReturnMessageHandler(BaseJobMessageHandler[JobForJobReturnSaltHandlerSc
             enriched_data['status'] = JobReturnStatus.failed
 
         raw_stamp = enriched_data.pop('_stamp')
-        iso_stamp = datetime.fromisoformat(raw_stamp)
+        iso_stamp = datetime.fromisoformat(str(raw_stamp))
         enriched_data['stamp'] = make_aware(iso_stamp) if raw_stamp else None
 
         return enriched_data
@@ -241,11 +241,14 @@ class JobReturnMessageHandler(BaseJobMessageHandler[JobForJobReturnSaltHandlerSc
             return
 
         if not job_return.data:
+            logger.warning(
+                'No data found in inventory state return for JID=%s, minion=%s', job_return.jid, job_return.minion_id
+            )
             return
 
         mod_name = None
         for mod, mod_data in job_return.data.items():
-            if mod_data['name'] == 'inventory.get':
+            if mod_data.get('name') == 'inventory.get':
                 if mod_data['result'] is not True:
                     logger.warning(
                         'Calling inventory.get from state seems failed for JID=%s, minion=%s',
