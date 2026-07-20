@@ -1,0 +1,8 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "puppet.plugin_sync",
+    "description": "Runs a plugin sync between the puppet master and agent."
+  },
+  "ui_schema": {}
+}

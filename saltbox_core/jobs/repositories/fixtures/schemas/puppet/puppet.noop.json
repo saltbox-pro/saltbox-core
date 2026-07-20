@@ -1,0 +1,81 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "puppet.noop",
+    "description": "Execute a puppet noop run and return a dict with the stderr, stdout, return code, etc. Usage is the same as for puppet.run.",
+    "properties": {
+      "args": {
+        "type": "array",
+        "uniqueItems": true,
+        "items": {
+          "type": "string",
+          "pattern": "^([a-z0-9_-]+|\\/?([a-z0-9_-]+\\/)*[a-z0-9_-]+\\.pp)$",
+          "examples": [
+            "agent",
+            "onetime",
+            "no-daemonize",
+            "apply",
+            "/a/b/manifest.pp",
+            "debug"
+          ]
+        }
+      },
+      "kwargs": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "string",
+            "title": "Tags",
+            "pattern": "^[a-z0-9][a-z0-9_]*(::[a-z0-9][a-z0-9_]*)*(,[a-z0-9][a-z0-9_]*(::[a-z0-9][a-z0-9_]*)*)*$",
+            "examples": [
+              "basefiles::edit,apache::server"
+            ]
+          },
+          "modulepath": {
+            "type": "string",
+            "title": "Module path",
+            "pattern": "^(\\.?\\/[a-z0-9_-]+(\\/[a-z0-9_-]+)*|\\$[a-z0-9_]+)(:(\\.?\\/[a-z0-9_-]+(\\/[a-z0-9_-]+)*|\\$[a-z0-9_]+))*$",
+            "examples": [
+              "/a/b/modules"
+            ]
+          },
+          "environment": {
+            "type": "string",
+            "title": "Environment",
+            "pattern": "^[a-z0-9_]+$",
+            "examples": [
+              "production"
+            ]
+          },
+          "server": {
+            "type": "string",
+            "title": "Server",
+            "pattern": "^(?:(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)$|^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)*[a-zA-Z]{2,}$",
+            "examples": [
+              "puppet.example.com",
+              "192.168.1.20"
+            ]
+          },
+          "port": {
+            "type": "integer",
+            "title": "Port",
+            "minimum": 0,
+            "maximum": 65535
+          },
+          "certname": {
+            "type": "string",
+            "title": "Certificate name",
+            "pattern": "^(?:(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)$|^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)*[a-zA-Z]{2,}$"
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "args": {
+      "items": {
+        "ui:label": false
+      }
+    }
+  }
+}

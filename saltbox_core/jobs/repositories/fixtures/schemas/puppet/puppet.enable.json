@@ -1,0 +1,8 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "puppet.disable",
+    "description": "Enable the puppet agent."
+  },
+  "ui_schema": {}
+}

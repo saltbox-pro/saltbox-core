@@ -1,0 +1,27 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "puppet.facts",
+    "description": "Run facter and return the results.",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "title": "Keyword arguments",
+        "properties": {
+          "puppet": {
+            "type": "boolean",
+            "title": "Puppet",
+            "default": false
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "puppet": {
+        "ui:widget": "select"
+      }
+    }
+  }
+}
