@@ -8,7 +8,8 @@
         "type": "object",
         "title": "",
         "required": [
-          "key"
+          "key",
+          "val"
         ],
         "properties": {
           "key": {
