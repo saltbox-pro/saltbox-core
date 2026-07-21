@@ -1,0 +1,85 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "ansible.discover_playbooks",
+    "description": "Discover Ansible playbooks stored under the given path or from multiple paths (locations). This will search for files matching with the playbook file extension under the given root path and will also look for files inside the first level of directories in this path.",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to discover playbooks from.",
+            "pattern": "^(\\/|(\\.{1,2}\\/)+|\\.{1,2}$)?([a-zA-Z0-9_-]+\\/)*[a-zA-Z0-9_\\.-]*\\/?$",
+            "examples": [
+              "/srv/ansible/playbooks/",
+              "./ansible-repo",
+              "../../infrastructure",
+              "."
+            ]
+          },
+          "locations": {
+            "type": "array",
+            "title": "Locations",
+            "description": "List of paths to discover playbooks from.",
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^(\\/|(\\.{1,2}\\/)+|\\.{1,2}$)?([a-zA-Z0-9_-]+\\/)*[a-zA-Z0-9_\\.-]*\\/?$",
+              "examples": [
+                "/srv/playbooks/",
+                "/opt/ansible/dev",
+                "./staging",
+                "../shared",
+                "../../teams/qa",
+                "."
+              ]
+            }
+          },
+          "playbook_extension": {
+            "type": "string",
+            "title": "Extention",
+            "description": "File extension of playbooks file to search for.",
+            "pattern": "^[a-zA-Z0-9]+$",
+            "examples": [
+              "yml",
+              "yaml"
+            ]
+          },
+          "hosts_filename": {
+            "type": "string",
+            "title": "Hosts",
+            "description": "Filename of custom playbook inventory to search for.",
+            "pattern": "^[a-zA-Z0-9_\\.-]+$",
+            "examples": [
+              "hosts",
+              "hosts.ini",
+              "production",
+              "inventory.yaml"
+            ]
+          },
+          "syntax_check": {
+            "type": "boolean",
+            "title": "Syntax check",
+            "description": "Skip playbooks that do not pass `ansible-playbook --syntax-check` validation.",
+            "default": false
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "locations": {
+        "items": {
+          "ui:label": false
+        }
+      },
+      "syntax_check": {
+        "ui:widget": "select",
+        "ui:enableMarkdownInDescription": true
+      }
+    }
+  }
+}

@@ -1,0 +1,191 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "ansible.playbooks",
+    "description": "Run Ansible Playbooks.",
+    "properties": {
+      "kwargs": {
+        "type": "object",
+        "required": [
+          "playbook"
+        ],
+        "properties": {
+          "playbook": {
+            "type": "string",
+            "title": "Playbook",
+            "description": "Which playbook to run.",
+            "pattern": "^(\\/|(\\.{1,2}\\/)+|\\.{1,2}$)?([a-zA-Z0-9_-]+\\/)*[a-zA-Z0-9_\\.-]*\\/?$",
+            "examples": [
+              "/srv/playbooks/play.yml",
+              "./site.yaml",
+              "playbooks/infrastructure/setup.yml"
+            ]
+          },
+          "rundir": {
+            "type": "string",
+            "title": "Directory",
+            "description": "Directory to run `ansible-playbook` in.",
+            "pattern": "^(\\/|(\\.{1,2}\\/)+|\\.{1,2}$)?([a-zA-Z0-9_-]+\\/)*[a-zA-Z0-9_\\.-]*\\/?$",
+            "examples": [
+              "/srv/git/infrastructure-repo/",
+              "./ansible_context"
+            ]
+          },
+          "check": {
+            "type": "boolean",
+            "title": "Check",
+            "description": "Don't make any changes; instead, try to predict some of the changes that may occur.",
+            "default": false
+          },
+          "diff": {
+            "type": "boolean",
+            "title": "Diff",
+            "description": "When changing (small) files and templates, show the differences in those files; works great with `--check`.",
+            "default": false
+          },
+          "extra_vars": {
+            "type": "string",
+            "title": "Extra vars",
+            "description": "Set additional variables as `key=value` or YAML/JSON, if filename prepend with `@`.",
+            "examples": [
+              "app_version=2.4.1 environment=production",
+              "{\"http_port\": 80, \"ssl_enabled\": true}",
+              "@/srv/ansible/vars/secrets.json"
+            ]
+          },
+          "flush_cache": {
+            "type": "boolean",
+            "title": "Flush cache",
+            "description": "Clear the fact cache for every host in inventory.",
+            "default": false
+          },
+          "forks": {
+            "type": "integer",
+            "title": "Forks",
+            "description": "Specify number of parallel processes to use. If not specified, 5 is used.",
+            "minimum": 1
+          },
+          "inventory": {
+            "type": "string",
+            "title": "Inventory",
+            "description": "Specify inventory host path or comma separated host list.",
+            "pattern": "^(((\\/|(\\.{1,2}\\/)+|\\.{1,2}$)?([a-zA-Z0-9_-]+\\/)*[a-zA-Z0-9_\\.-]*\\/?)|([a-zA-Z0-9_\\.-]+,([a-zA-Z0-9_\\.-]+,?)*))$",
+            "examples": [
+              "inventories/production/hosts.ini",
+              "/etc/ansible/plugins/aws_ec2.yaml",
+              "192.168.1.10,192.168.1.11,10.0.0.5",
+              "localhost,"
+            ]
+          },
+          "limit": {
+            "type": "string",
+            "title": "Limit",
+            "description": "Further limit selected hosts to an additional pattern.",
+            "pattern": "^[a-zA-Z0-9_\\.-]+([:&!][a-zA-Z0-9_\\.-]+)*$",
+            "examples": [
+              "webservers",
+              "db01.local",
+              "webservers:&!staging",
+              "*.zone_east"
+            ]
+          },
+          "list_hosts": {
+            "type": "boolean",
+            "title": "List hosts",
+            "description": "Outputs a list of matching hosts; does not execute anything else.",
+            "default": false
+          },
+          "list_tags": {
+            "type": "boolean",
+            "title": "List tags",
+            "description": "List all available tags.",
+            "default": false
+          },
+          "list_tasks": {
+            "type": "boolean",
+            "title": "List tasks",
+            "description": "List all tasks that would be executed.",
+            "default": false
+          },
+          "module_path": {
+            "type": "string",
+            "title": "Module path",
+            "description": "Prepend colon-separated path(s) to module library.",
+            "pattern": "^(\\/|(\\.{1,2}\\/)+|\\.{1,2}$)?([a-zA-Z0-9_-]+\\/)*[a-zA-Z0-9_\\.-]*\\/?(:(\\/|(\\.{1,2}\\/)+|\\.{1,2}$)?([a-zA-Z0-9_-]+\\/)*[a-zA-Z0-9_\\.-]*\\/?)*$",
+            "examples":[
+              "/srv/ansible/custom_modules",
+              "../library:/usr/share/my_modules:./plugins/modules"
+            ]
+          },
+          "tags": {
+            "type": "string",
+            "title": "Tags",
+            "description": "Only run plays and tasks tagged with these values.",
+            "pattern": "^[a-zA-Z0-9_-]+(,[a-zA-Z0-9_-]+)*$",
+            "examples": [
+              "nginx,configuration"
+            ]
+          },
+          "skip_tags": {
+            "type": "string",
+            "title": "Skip tags",
+            "description": "Only run plays and tasks whose tags do not match these values.",
+            "pattern": "^[a-zA-Z0-9_-]+(,[a-zA-Z0-9_-]+)*$",
+            "examples": [
+              "packages,docker"
+            ]
+          },
+          "start_at_task": {
+            "type": "string",
+            "title": "Start at task",
+            "description": "Start the playbook at the task matching this name.",
+            "pattern": "^[a-zA-Z0-9_\\s\\s\\.-]+$",
+            "examples": [
+              "Restart php-fpm service",
+              "Ensure config directory exists"
+            ]
+          },
+          "syntax_check": {
+            "type": "boolean",
+            "title": "Syntax check",
+            "description": "Skip playbooks that do not pass `ansible-playbook --syntax-check` validation.",
+            "default": false
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "kwargs": {
+      "rundir": {
+        "ui:enableMarkdownInDescription": true
+      },
+      "check": {
+        "ui:widget": "select"
+      },
+      "diff": {
+        "ui:widget": "select",
+        "ui:enableMarkdownInDescription": true
+      },
+      "extra_vars": {
+        "ui:enableMarkdownInDescription": true
+      },
+      "flush_cache": {
+        "ui:widget": "select"
+      },
+      "list_hosts": {
+        "ui:widget": "select"
+      },
+      "list_tags": {
+        "ui:widget": "select"
+      },
+      "list_tasks": {
+        "ui:widget": "select"
+      },
+      "syntax_check": {
+        "ui:widget": "select",
+        "ui:enableMarkdownInDescription": true
+      }
+    }
+  }
+}

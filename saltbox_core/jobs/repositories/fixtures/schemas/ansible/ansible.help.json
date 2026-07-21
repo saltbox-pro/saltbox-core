@@ -1,0 +1,55 @@
+{
+  "json_schema": {
+    "type": "object",
+    "title": "ansible.help",
+    "description": "Display help on Ansible standard module.",
+    "properties": {
+      "args": {
+        "type": "array",
+        "uniqueItems": true,
+        "items": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_-]+$"
+        }
+      },
+      "kwargs": {
+        "type": "object",
+        "properties": {
+          "module": {
+            "type": "string",
+            "title": "Module",
+            "description": "The module to get the help.",
+            "pattern": "^[a-z0-9_]+(\\.[a-z0-9_]+)*$",
+            "examples": [
+              "ansible.builtin.command",
+              "ansible.builtin.ping",
+              "apt",
+              "copy",
+              "cron",
+              "debug",
+              "file",
+              "group",
+              "lineinfile",
+              "package",
+              "script",
+              "service",
+              "setup",
+              "shell",
+              "systemd",
+              "template",
+              "user",
+              "yum"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "ui_schema": {
+    "args": {
+      "items": {
+        "ui:label": false
+      }
+    }
+  }
+}
