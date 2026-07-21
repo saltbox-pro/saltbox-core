@@ -2,7 +2,7 @@
   "json_schema": {
     "type": "object",
     "title": "ansible.targets",
-    "description": "Return the inventory from an Ansible inventory_file.",
+    "description": "Return the inventory from an Ansible `inventory_file`.",
     "properties": {
       "kwargs": {
         "type": "object",
@@ -37,6 +37,7 @@
     }
   },
   "ui_schema": {
+    "ui:enableMarkdownInDescription": true,
     "kwargs": {
       "inventory": {
         "ui:enableMarkdownInDescription": true
