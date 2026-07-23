@@ -21,7 +21,7 @@
           },
           "cwd": {
             "type": "string",
-            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]+$"
+            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]*$"
           },
           "stdin": {
             "type": "string"
@@ -34,17 +34,16 @@
           },
           "shell": {
             "type": "string",
-            "default": "/bin/sh",
-            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]+[^\\/\\\\]$"
+            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]+[^\\/\\\\]|[a-zA-Z0-9]+)$"
           },
           "python_shell": {
-            "type": "boolean",
-            "default": false
+            "type": "boolean"
           },
           "env": {
             "type": "object",
             "additionalProperties": {
-              "type": "string"
+              "type": "string",
+              "default": ""
             },
             "propertyNames": {
               "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
@@ -138,22 +137,19 @@
           "success_retcodes": {
             "type": "array",
             "items": {
-              "type": "integer",
-              "title": "value"
+              "type": "integer"
             }
           },
           "success_stdout": {
             "type": "array",
             "items": {
-              "type": "string",
-              "title": "value"
+              "type": "string"
             }
           },
           "success_stderr": {
             "type": "array",
             "items": {
-              "type": "string",
-              "title": "value"
+              "type": "string"
             }
           }
         }
@@ -194,7 +190,9 @@
       "env": {
         "ui:title": "Environment",
         "ui:description": "Environment variables to be set prior to execution",
-        "ui:widget": "select"
+        "additionalProperties": {
+          "ui:label": false
+        }
       },
       "clean_env": {
         "ui:title": "Clean environment",
@@ -252,15 +250,24 @@
       },
       "success_retcodes": {
         "ui:title": "Success return codes",
-        "ui:description": "This parameter will allow a list of non-zero return codes that should be considered a success.  If the return code returned from the run matches any in the provided list, the return code will be overridden with zero"
+        "ui:description": "This parameter will allow a list of non-zero return codes that should be considered a success.  If the return code returned from the run matches any in the provided list, the return code will be overridden with zero",
+        "items": {
+          "ui:label": false
+        }
       },
       "success_stdout": {
         "ui:title": "Success standard output",
-        "ui:description": "This parameter will allow a list of strings that when found in standard out should be considered a success. If stdout returned from the run matches any in the provided list, the return code will be overridden with zero"
+        "ui:description": "This parameter will allow a list of strings that when found in standard out should be considered a success. If stdout returned from the run matches any in the provided list, the return code will be overridden with zero",
+        "items": {
+          "ui:label": false
+        }
       },
       "success_stderr": {
         "ui:title": "Success standard error",
-        "ui:description": "This parameter will allow a list of strings that when found in standard error should be considered a success. If stderr returned from the run matches any in the provided list, the return code will be overridden with zero"
+        "ui:description": "This parameter will allow a list of strings that when found in standard error should be considered a success. If stderr returned from the run matches any in the provided list, the return code will be overridden with zero",
+        "items": {
+          "ui:label": false
+        }
       }
     }
   }
