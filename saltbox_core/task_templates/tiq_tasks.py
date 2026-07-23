@@ -9,8 +9,6 @@ from saltbox_core.config import Settings, logger
 from saltbox_core.task_templates.exceptions import SourceRepoCloneException, TaskTemplateSourceLockException
 from saltbox_core.task_templates.utils.orchestrator import SyncOrchestrator, get_sync_orchestrator
 from saltbox_core.tkq import broker, queue_default
-
-# from saltbox_core.tkq import ConcurrencyLocker
 from saltbox_core.utilities.redis_locker import AsyncRedisLockFactory
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.redis.config import get_redis
@@ -26,7 +24,7 @@ async def source_discover_task(
     orchestrator: SyncOrchestrator = TaskiqDepends(get_sync_orchestrator),
     redis: Redis = TaskiqDepends(get_redis),
 ) -> dict[str, Any]:
-    lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=60, prefix='template_source')
+    lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=300, prefix='template_source')
     lock = lock_factory.create(source_id)
     logger.debug('is_locked: %s', await lock.locked())
 
@@ -59,7 +57,7 @@ async def source_prepare_task(
     orchestrator: SyncOrchestrator = TaskiqDepends(get_sync_orchestrator),
     redis: Redis = TaskiqDepends(get_redis),
 ) -> dict[str, Any]:
-    lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=60, prefix='template_source')
+    lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=300, prefix='template_source')
     lock = lock_factory.create(source_id)
     logger.debug('is_locked: %s', await lock.locked())
 
