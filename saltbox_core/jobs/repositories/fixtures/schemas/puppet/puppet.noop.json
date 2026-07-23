@@ -9,7 +9,7 @@
         "uniqueItems": true,
         "items": {
           "type": "string",
-          "pattern": "^([a-z0-9_-]+|\\/?([a-z0-9_-]+\\/)*[a-z0-9_-]+\\.pp)$",
+          "pattern": "^([\\w.:-]+|\\/?([\\w-]+\\/)*[\\w-]+\\.pp)$",
           "examples": [
             "agent",
             "onetime",
@@ -26,31 +26,34 @@
           "tags": {
             "type": "string",
             "title": "Tags",
-            "pattern": "^[a-z0-9][a-z0-9_]*(::[a-z0-9][a-z0-9_]*)*(,[a-z0-9][a-z0-9_]*(::[a-z0-9][a-z0-9_]*)*)*$",
+            "pattern": "^[a-zA-Z0-9]\\w*(::[a-zA-Z0-9]\\w*)*(,[a-zA-Z0-9]\\w*(::[a-zA-Z0-9]\\w*)*)*$",
             "examples": [
-              "basefiles::edit,apache::server"
+              "basefiles::edit,apache::server",
+              "nginx::server"
             ]
           },
           "modulepath": {
             "type": "string",
             "title": "Module path",
-            "pattern": "^(\\.?\\/[a-z0-9_-]+(\\/[a-z0-9_-]+)*|\\$[a-z0-9_]+)(:(\\.?\\/[a-z0-9_-]+(\\/[a-z0-9_-]+)*|\\$[a-z0-9_]+))*$",
+            "pattern": "^(\\.?\\/[\\w-]+(\\/[\\w-]+)*|\\$\\w+)(:(\\.?\\/[\\w-]+(\\/[\\w-]+)*|\\$\\w+))*$",
             "examples": [
-              "/a/b/modules"
+              "/a/b/modules",
+              "/etc/puppet/modules:/opt/Shared_modules"
             ]
           },
           "environment": {
             "type": "string",
             "title": "Environment",
-            "pattern": "^[a-z0-9_]+$",
+            "pattern": "^\\w+$",
             "examples": [
-              "production"
+              "production",
+              "dev"
             ]
           },
           "server": {
             "type": "string",
             "title": "Server",
-            "pattern": "^(?:(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)$|^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)*[a-zA-Z]{2,}$",
+            "pattern": "^(?:(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)$|^(?!\\d+(?:\\.\\d+){3}$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)*[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$",
             "examples": [
               "puppet.example.com",
               "192.168.1.20"
@@ -65,7 +68,12 @@
           "certname": {
             "type": "string",
             "title": "Certificate name",
-            "pattern": "^(?:(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)$|^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)*[a-zA-Z]{2,}$"
+            "pattern": "^(?:(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)$|^(?!\\d+(?:\\.\\d+){3}$)(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)*[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$",
+            "examples": [
+              "k8s-master.Cluster-A.local",
+              "Web-Prod-01",
+              "192.168.20.5"
+            ]
           }
         }
       }
