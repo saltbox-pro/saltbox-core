@@ -1,3 +1,4 @@
+import asyncio
 from datetime import timedelta
 from typing import Annotated
 
@@ -8,11 +9,17 @@ from redis.asyncio import Redis
 from saltbox_bridge_messages import (
     BridgeTestBurstResponse,
     BurstJobsTestReportSchema,
+    CoreEmptyMessage,
     CoreTestBurstJobsRequest,
     CoreTestBurstRequest,
 )
 from saltbox_core.config import SETTINGS
-from saltbox_core.event_bus.redis.masters_bus import send_message_and_wait_response_to_master, send_message_to_master
+from saltbox_core.event_bus.redis.app import default_master_broker
+from saltbox_core.event_bus.redis.masters_bus import (
+    send_message_and_wait_response_to_master,
+    send_message_to_master,
+    send_sync_message_and_wait_response_to_master,
+)
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.masters.exceptions import UnknownUserException
 from saltbox_core.masters.schemas.system_schemas import (
@@ -134,3 +141,32 @@ async def burst_jobs_test_get(
         first_job_time=first_dt,
         last_job_time=last_dt,
     )
+
+
+@router.post('/ping-masters')
+async def ping_master(
+    master_service: Annotated[MasterService, Depends(get_master_service)],
+) -> dict[str, str]:
+    masters = await master_service.get_accepted_list()
+
+    async with default_master_broker as broker:
+        ping_results = await asyncio.gather(
+            *[
+                send_sync_message_and_wait_response_to_master(
+                    message=CoreEmptyMessage(master=master.master_id),
+                    message_tag='ping',
+                    broker=broker,
+                    response_timeout=5,
+                )
+                for master in masters
+            ],
+            return_exceptions=True,
+        )
+    results = {}
+    for master, result in zip(masters, ping_results, strict=True):
+        if isinstance(result, BaseException):
+            results[master.master_id] = str(result)
+        else:
+            results[master.master_id] = result.get('status', 'unknown')
+
+    return results

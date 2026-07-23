@@ -480,8 +480,6 @@ class SyncOrchestrator:
             source_id, {'current_operation': SourceOperation.DISCOVER, 'current_task_id': task_id}
         )
 
-        logger.info('Source type: %s', source.source_type)
-
         try:
             if source.source_type == SourceType.GIT_REPO:
                 await self._fetch(source_id, shallow=True)
@@ -563,7 +561,6 @@ class SyncOrchestrator:
         )
         try:
             logger.info('Syncing templates to serve dir...')
-            # await self._serve_templates_to_serve_dir()
             await self._serve_templates_to_serve_dir(source_id)
         except Exception as e:
             logger.error('Failed to serve templates to serve dir: %s', e)
