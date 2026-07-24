@@ -2,6 +2,7 @@ import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
+from aiormq import AMQPConnectionError
 from faststream import ContextRepo
 
 from saltbox_core.event_bus.rabbit.exchanges import exchanges
@@ -139,10 +140,16 @@ async def async_main() -> None:
         for exchange in exchanges.values():
             await broker.declare_exchange(exchange)
 
-    await startup_broker()
-    logger.info('Starting faststream app')
-    await app.run()
-    await shutdown_broker()
+    try:
+        await startup_broker()
+        logger.info('Starting faststream app')
+        await app.run()
+        await shutdown_broker()
+    except AMQPConnectionError as ex:
+        logger.warning(
+            f'RabbitMQ is unavailable during startup: {ex}. '
+            'The broker will reconnect automatically.'
+        )
 
 
 def main() -> None:

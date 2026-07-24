@@ -5,6 +5,7 @@ from contextlib import suppress
 
 import taskiq_fastapi
 from aio_pika.abc import ExchangeType
+from aiormq import AMQPConnectionError
 from redis.asyncio import Redis
 from taskiq import AsyncBroker, Context, TaskiqDepends
 from taskiq.exceptions import NoResultError
@@ -71,14 +72,26 @@ queue_notify = Queue(
 
 async def startup_broker() -> AsyncBroker:
     if not broker.is_worker_process:
-        broker.with_queues(queue_default, queue_salt, queue_notify)
-        await broker.startup()
+        try:
+            broker.with_queues(queue_default, queue_salt, queue_notify)
+            await broker.startup()
+        except AMQPConnectionError as ex:
+            logger.warning(
+                f'RabbitMQ is unavailable during startup: {ex}. '
+                'The broker will reconnect automatically.'
+            )
     return broker
 
 
 async def shutdown_broker() -> AsyncBroker:
     if not broker.is_worker_process:
-        await broker.shutdown()
+        try:
+            await broker.shutdown()
+        except AMQPConnectionError as ex:
+            logger.warning(
+                f'RabbitMQ is unavailable during startup: {ex}. '
+                'The broker will reconnect automatically.'
+            )
     return broker
 
 
