@@ -17,24 +17,58 @@
         ],
         "properties": {
           "cmd": {
-            "type": "string"
+            "type": "string",
+            "examples": [
+              "ls -la",
+              "grep 'err' /var/log/syslog",
+              "echo 'test' > /tmp/file"
+            ]
           },
           "cwd": {
             "type": "string",
-            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]*$"
+            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]*$",
+            "examples": [
+              "/",
+              "/var/www/html",
+              "C:\\Temp",
+              "/tmp"
+            ]
           },
           "stdin": {
-            "type": "string"
+            "type": "string",
+            "examples": [
+              "input_string",
+              "line1\\nline2",
+              "data"
+            ]
           },
           "runas": {
-            "type": "string"
+            "type": "string",
+            "examples": [
+              "root",
+              "nobody",
+              "www-data",
+              "system"
+            ]
           },
           "group": {
-            "type": "string"
+            "type": "string",
+            "examples": [
+              "users",
+              "lp",
+              "sys"
+            ]
           },
           "shell": {
             "type": "string",
-            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]+[^\\/\\\\]|[a-zA-Z0-9]+)$"
+            "pattern": "^(?!.*?\\\\\\\\)(?!.*?\\/\\/)(?!.*\\\\.*\\/)(?!.*\\/.*\\\\)(?:(?:[a-zA-Z]:\\\\|\\/)[^<>:,\"|?*\\0\\r\\n]+[^\\/\\\\]|[a-zA-Z0-9]+)$",
+            "examples": [
+              "/bin/bash",
+              "/bin/python3",
+              "/bin/sh",
+              "cmd",
+              "powershell"
+            ]
           },
           "python_shell": {
             "type": "boolean"
@@ -54,13 +88,30 @@
             "default": false
           },
           "template": {
-            "type": "string"
+            "type": "string",
+            "enum": [
+              "jinja",
+              "mako",
+              "wempy"
+            ]
           },
           "umask": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^0?[0-7]{1,3}$",
+            "examples": [
+              "022",
+              "077",
+              "0002"
+            ]
           },
           "output_encoding": {
-            "type": "string"
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_-]+$",
+            "examples": [
+              "utf-8",
+              "cp1251",
+              "ascii"
+            ]
           },
           "output_loglevel": {
             "type": "string",
@@ -109,11 +160,20 @@
             ]
           },
           "log_callback": {
-            "type": "string"
+            "type": "string",
+            "examples": [
+              "my_custom_mod.my_log_handler",
+              "logging_utils.stream_processor"
+            ]
           },
           "timeout": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "examples": [
+              10,
+              60,
+              300
+            ]
           },
           "reset_system_locale": {
             "type": "boolean",
@@ -125,7 +185,12 @@
           },
           "saltenv": {
             "type": "string",
-            "pattern": "^(?:_+[a-zA-Z0-9]|[a-zA-Z])[\\w-]*(?:,(?:_+[a-zA-Z0-9]|[a-zA-Z])[\\w-]*)*$"
+            "pattern": "^(?:_+[a-zA-Z0-9]|[a-zA-Z])[\\w-]*(?:,(?:_+[a-zA-Z0-9]|[a-zA-Z])[\\w-]*)*$",
+            "examples": [
+              "base",
+              "production",
+              "dev,staging"
+            ]
           },
           "use_vt": {
             "type": "boolean",
@@ -143,13 +208,27 @@
           "success_stdout": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "examples": [
+                "Success",
+                "Completed successfully",
+                "Everything is up to date",
+                "No changes required",
+                "Nothing to do"
+              ]
             }
           },
           "success_stderr": {
             "type": "array",
             "items": {
-              "type": "string"
+              "type": "string",
+              "examples": [
+                "already exists",
+                "warning:",
+                "update not needed",
+                "File exists",
+                "Directory not empty"
+              ]
             }
           }
         }
