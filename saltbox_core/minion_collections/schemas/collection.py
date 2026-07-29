@@ -1,6 +1,6 @@
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field, PositiveInt
+from pydantic import BaseModel, ConfigDict, Field
 
 from saltbox_sdk.db.mongo.schemas_base import (
     BaseTreeModel,
