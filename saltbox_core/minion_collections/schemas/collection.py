@@ -29,7 +29,7 @@ class CollectionEditableFieldsMixin(BaseModel):
     title: str = Field(title='Title', min_length=3, max_length=50)
     description: str = Field(title='Description', default='', max_length=500)
     query: MongoQuery = MongoQueryField
-    order: PositiveInt = Field(title='Order', default=0)
+    order: int = Field(title='Order', ge=0, default=0)
     parent_slug: str | None = Field(
         title='Parent Slug', default=None, description='Slug of the parent collection, if any'
     )
@@ -58,7 +58,7 @@ class CollectionModel(
 
 
 class CollectionMoveSchema(IDMixin, TreeMixin):
-    order: PositiveInt = Field(title='Order', default=0)
+    order: int = Field(title='Order', ge=0, default=0)
 
 
 # REST
