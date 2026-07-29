@@ -1,6 +1,6 @@
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, PositiveInt
 
 from saltbox_sdk.db.mongo.schemas_base import (
     BaseTreeModel,
@@ -29,6 +29,7 @@ class CollectionEditableFieldsMixin(BaseModel):
     title: str = Field(title='Title', min_length=3, max_length=50)
     description: str = Field(title='Description', default='', max_length=500)
     query: MongoQuery = MongoQueryField
+    order: PositiveInt = Field(title='Order', default=0)
     parent_slug: str | None = Field(
         title='Parent Slug', default=None, description='Slug of the parent collection, if any'
     )
@@ -36,9 +37,6 @@ class CollectionEditableFieldsMixin(BaseModel):
 
 class CollectionCreateSchema(CollectionEditableFieldsMixin, CollectionReadOnlyFieldsMixin, TreeMixin):
     pass
-
-
-class CollectionCreateRequestSchema(CollectionEditableFieldsMixin, CollectionReadOnlyFieldsMixin): ...
 
 
 class CollectionUpdateSchema(CollectionEditableFieldsMixin):
@@ -54,6 +52,31 @@ class CollectionModel(
     CollectionReadOnlyFieldsMixin,
     CollectionComputedFieldsMixin,
 ): ...
+
+
+# System
+
+
+class CollectionMoveSchema(IDMixin, TreeMixin):
+    order: PositiveInt = Field(title='Order', default=0)
+
+
+# REST
+
+
+class CollectionCreateRequestSchema(CollectionEditableFieldsMixin, CollectionReadOnlyFieldsMixin): ...
+
+
+class CollectionUpdateRequestSchema(BaseModel):
+    title: str = Field(title='Title', min_length=3, max_length=50)
+    description: str = Field(title='Description', default='', max_length=500)
+    query: MongoQuery = MongoQueryField
+
+
+class CollectionMoveRequestSchema(BaseModel):
+    target_id: PyObjectId
+    parent_id: PyObjectId
+    insert_before_id: PyObjectId | None = None
 
 
 class CollectionDetailSchema(CollectionModel): ...
@@ -77,6 +100,9 @@ class CollectionTreeNodeSchema(IDMixin):
 
 class CollectionListBody(SkipLimitParams, QueryParams, SortParams):
     model_config = ConfigDict(extra='ignore')
+
+
+# Permissions
 
 
 class CollectionActions(StrEnum):

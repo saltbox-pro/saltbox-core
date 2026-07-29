@@ -9,10 +9,12 @@ from saltbox_core.minion_collections.schemas.collection import (
     CollectionDetailSchema,
     CollectionListBody,
     CollectionModel,
+    CollectionMoveRequestSchema,
     CollectionTreeNodeSchema,
     CollectionUpdateSchema,
 )
 from saltbox_core.minion_collections.services.collection import CollectionService, get_collection_service
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
 from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 from saltbox_sdk.fastapi_utils.dependencies import get_current_user, get_opa_query
@@ -68,7 +70,11 @@ async def collections_tree(
     opa_query: Annotated[dict, Depends(get_opa_query)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
 ) -> list[CollectionTreeNodeSchema]:
-    return await collection_service.get_tree(query=opa_query, projection_model=CollectionTreeNodeSchema)
+    return await collection_service.get_tree(
+        query=opa_query,
+        projection_model=CollectionTreeNodeSchema,
+        sort={'order': SortOrder.ASC, 'created': SortOrder.DESC},
+    )
 
 
 @router.get(
@@ -150,6 +156,26 @@ async def collection_update(
     return CollectionDetailSchema(**response.model_dump(exclude={'id'}), _id=response.id)
 
 
+@router.post(
+    '/move',
+    operation_id='minion_collection_move',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.collections.update',
+        action=CollectionActions.UPDATE,
+    ).model_dump(by_alias=True),
+)
+async def collection_move(
+    collection_move_data: CollectionMoveRequestSchema,
+    collection_service: Annotated[CollectionService, Depends(get_collection_service)],
+) -> PyObjectId:
+    response = await collection_service.move(
+        target_id=collection_move_data.target_id,
+        parent_id=collection_move_data.parent_id,
+        insert_before_id=collection_move_data.insert_before_id,
+    )
+    return response
+
+
 @router.delete(
     '/{slug}',
     operation_id='minion_collection_delete',
@@ -158,6 +184,7 @@ async def collection_update(
         policy='core.collections.delete',
         action=CollectionActions.DELETE,
     ).model_dump(by_alias=True),
+    deprecated=True,
 )
 async def collection_delete(
     slug: str,

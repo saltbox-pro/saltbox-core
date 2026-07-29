@@ -3,6 +3,7 @@ from uuid import uuid4
 
 from fastapi import Depends
 from pydantic import BaseModel
+from pymongo import UpdateOne
 from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
 from slugify import slugify
 
@@ -16,7 +17,7 @@ from saltbox_core.minion_collections.schemas.collection import (
     CollectionModel,
     CollectionUpdateSchema,
 )
-from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId, SortOrder
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 
 ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
@@ -103,6 +104,41 @@ class CollectionService(
         result = await self.delete(query={'slug': slug}, session=session)
         return result
 
+    async def move(
+        self,
+        *,
+        target_id: PyObjectId,
+        parent_id: PyObjectId,
+        insert_before_id: PyObjectId | None = None,
+        session: MongoAsyncClientSession | None = None,
+    ) -> PyObjectId:
+        parent_children = await self.repo.get_children(
+            target=parent_id,
+            session=session,
+            sort={'order': SortOrder.ASC, '_id': SortOrder.ASC},
+            projection_model=EmptyModel,
+        )
+        children_ordered_ids: list[PyObjectId]
+
+        if insert_before_id is None:
+            children_ordered_ids = [child.id for child in parent_children if child.id != target_id]
+            children_ordered_ids.append(target_id)
+        else:
+            children_ordered_ids = []
+            for child in parent_children:
+                if insert_before_id == child.id:
+                    children_ordered_ids.append(target_id)
+
+                if child.id not in children_ordered_ids:
+                    children_ordered_ids.append(child.id)
+
+        operations = [
+            UpdateOne({'_id': doc_id}, {'$set': {'order': idx + 1}}) for idx, doc_id in enumerate(children_ordered_ids)
+        ]
+        await self.repo.collection.bulk_write(operations, session=session)
+
+        return target_id
+
     async def get_tree(
         self,
         query: dict[str, Any] | None = None,
@@ -110,9 +146,14 @@ class CollectionService(
         session: MongoAsyncClientSession | None = None,
         projection_model: type[ProjectionModel],
         children_field_name: str = 'children',
+        sort: dict[str, SortOrder] | None = None,
     ) -> list[ProjectionModel]:
         return await self.repo.get_tree(
-            query=query, projection_model=projection_model, children_field_name=children_field_name, session=session
+            query=query,
+            projection_model=projection_model,
+            children_field_name=children_field_name,
+            session=session,
+            sort=sort,
         )
 
     async def create(
