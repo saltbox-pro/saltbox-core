@@ -117,6 +117,8 @@ class JobForSaltHandlerBaseSchema(SourceMixin, IDMixin): ...
 
 class JobForNewJobSaltHandlerSchema(JobForSaltHandlerBaseSchema):
     user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
+    arg: list | None = None
+    kwarg: dict | None = None
 
 
 class JobForJobReturnSaltHandlerSchema(JobForSaltHandlerBaseSchema):

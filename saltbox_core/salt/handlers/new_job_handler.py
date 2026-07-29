@@ -69,6 +69,8 @@ class JobNewMessageHandler(BaseJobMessageHandler[JobForNewJobSaltHandlerSchema])
                 'salt_master': master_id,
                 'jid': data['jid'],
                 'fun': data['fun'],
+                'fun_args': job.arg,
+                'fun_kwarg': job.kwarg,
                 'source': job.source,
                 'user': job.user,
                 'stamp_job': data['stamp'],
