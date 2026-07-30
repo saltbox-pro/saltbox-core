@@ -3,7 +3,7 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, Field
 
 from saltbox_core.config import SETTINGS
-from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId, QueryParams, SortParams
+from saltbox_sdk.db.mongo.schemas_base import IDMixin, MongoQuery, MongoQueryField, PyObjectId, QueryParams, SortParams
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
 
 
@@ -18,12 +18,12 @@ class TaskTemplateDefaultsSchema(BaseModel):
 class TaskTemplateCreateSchema(BaseModel):
     source_id: PyObjectId
     fun: str
-    title: str
+    title: str | dict[str, str]
     description: str | dict[str, str] | None = None
+    query: MongoQuery = MongoQueryField
     name: str = Field(title='Template name (Salt mods identifier)')
-    sls_rel_path: str = Field(title='SLS file path relative to source root')
-    # Хэш коммита (git) или контента (archive/inline) — для детектирования изменений
-    source_hash: str | None = Field(title='Content hash / commit hash', default=None)
+    sls_rel_path: str | None = Field(title='SLS file path relative to source root', default=None)
+    schema_rel_path: str | None = Field(title='Schema file path relative to source root', default=None)
     defaults: TaskTemplateDefaultsSchema | None = Field(title='Default values', default=None)
     # secret_pillars: list[str] | None = Field(title='Secret pillar names', default=None)
     json_schema: dict = Field(title='JSON schema', default_factory=dict)
@@ -48,15 +48,15 @@ class TaskTemplateUpdateSchema(BaseModel):
 
 class TaskTemplateModel(CreatedModifiedMixin, IDMixin):
     source_id: PyObjectId = Field(title='Source ID')
-    title: str = Field(title='Template title')
+    title: str | dict[str, str] = Field(title='Template title')
     description: str | dict[str, str] | None = Field(title='Template description', default=None)
+    query: MongoQuery = MongoQueryField
     fun: str = Field(title='Salt function', examples=['state.apply'])
     # Имя = dot-path от serve root учётом namespace источника.
     # Используется напрямую как `mods` в `state.apply`.
     name: str = Field(title='Template name (Salt mods identifier)')
-    sls_rel_path: str = Field(title='SLS file path relative to source root')
-    # Хэш коммита (git) или контента (archive/inline) — для детектирования изменений
-    source_hash: str | None = Field(title='Content hash / commit hash', default=None)
+    sls_rel_path: str | None = Field(title='SLS file path relative to source root', default=None)
+    schema_rel_path: str | None = Field(title='Schema file path relative to source root', default=None)
     defaults: TaskTemplateDefaultsSchema | None = Field(title='Default values', default=None)
     secret_pillars: list[str] | None = Field(title='Secret pillar names', default=None)
     json_schema: dict = Field(title='JSON schema', default_factory=dict)
@@ -68,21 +68,15 @@ class TaskTemplateAggregatedModel(TaskTemplateModel):
     source_root: str = Field(default='', title='Source root in the repository')
 
 
-class TaskTemplateSyncSchema(BaseModel):
-    source_id: PyObjectId
-    name: str
-    sls_rel_path: str
-    source_hash: str
-
-
 class TaskTemplateListBody(SkipLimitParams, QueryParams, SortParams):
     model_config = ConfigDict(extra='ignore')
 
 
 class TaskTemplatePublicSchema(CreatedModifiedMixin, IDMixin):
     source_id: PyObjectId
-    title: str
+    title: str | dict[str, str]
     description: str | dict[str, str] | None = None
+    query: MongoQuery
     fun: str
     name: str
 
@@ -95,6 +89,7 @@ class TaskTemplateSchemasProjection(BaseModel):
     name: str
     json_schema: dict
     ui_schema: dict
+    query: MongoQuery
 
 
 class TaskTemplateSchemasListRequest(BaseModel):

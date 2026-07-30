@@ -56,15 +56,25 @@ class TaskTemplateService(
             await self._pillar_repo.delete_many(query=pillar_query, session=s)
 
             result = await super().delete(query=query, session=s)
-
-        serv_sls_file = SETTINGS.salt_modules_serve_dir / tpl.sls_rel_path
-        local_sls_file = SETTINGS.local_repos_dir / tpl.local_path / tpl.sls_rel_path
-        logger.debug('Attempting to remove SLS file: %s', serv_sls_file)
-        serv_sls_file.unlink(missing_ok=True)
-        logger.debug('Attempting to remove SLS file: %s', local_sls_file)
-        local_sls_file.unlink(missing_ok=True)
+        await self._remove_files(tpl)
 
         return result
+
+    async def _remove_files(self, tpl: TaskTemplateAggregatedModel) -> None:
+        if tpl.sls_rel_path:
+            serv_sls_file = SETTINGS.salt_modules_serve_dir / tpl.sls_rel_path
+            local_sls_file = SETTINGS.local_repos_dir / tpl.local_path / tpl.sls_rel_path
+            logger.debug('Attempting to remove SLS file: %s', serv_sls_file)
+            serv_sls_file.unlink(missing_ok=True)
+            logger.debug('Attempting to remove SLS file: %s', local_sls_file)
+            local_sls_file.unlink(missing_ok=True)
+        if tpl.schema_rel_path:
+            serv_schema_file = SETTINGS.salt_modules_serve_dir / tpl.schema_rel_path
+            local_schema_file = SETTINGS.local_repos_dir / tpl.local_path / tpl.schema_rel_path
+            logger.debug('Attempting to remove schema file: %s', serv_schema_file)
+            serv_schema_file.unlink(missing_ok=True)
+            logger.debug('Attempting to remove schema file: %s', local_schema_file)
+            local_schema_file.unlink(missing_ok=True)
 
     @override
     async def delete_many(
@@ -75,7 +85,7 @@ class TaskTemplateService(
     ) -> int:
         async with get_mongo_session_with_transaction(session) as s:
             # Remove all related pillars
-            tpls = await self.get_list(query=query, session=s)
+            tpls = await self.get_list(query=query, session=s, projection_model=TaskTemplateAggregatedModel)
             pillar_query = {
                 'tgt_type': PillarTgtType.TASK_TPL,
                 'pillarenv': {
@@ -87,9 +97,7 @@ class TaskTemplateService(
             result = await super().delete_many(query=query, session=s)
 
         for tpl in tpls:
-            sls_file = SETTINGS.salt_modules_serve_dir / tpl.sls_rel_path
-            logger.debug('Attempting to remove SLS file: %s', sls_file)
-            sls_file.unlink(missing_ok=True)
+            await self._remove_files(tpl)
 
         return result
 
@@ -100,17 +108,22 @@ class TaskTemplateService(
         session: AsyncClientSession | None = None,
     ) -> TaskTemplatePublicWithContentSchema:
         tpl = await self.get(query={'_id': tpl_id}, session=session, projection_model=TaskTemplateAggregatedModel)
-
         if tpl.source_root:
-            sls_file = SETTINGS.local_repos_dir / tpl.local_path / tpl.source_root / tpl.sls_rel_path
+            path = SETTINGS.local_repos_dir / tpl.local_path / tpl.source_root
         else:
-            sls_file = SETTINGS.local_repos_dir / tpl.local_path / tpl.sls_rel_path
-        logger.debug('Attempting to read SLS file: %s', sls_file)
-        try:
-            sls_content = sls_file.read_text()
-        except Exception as e:
-            logger.error('Failed to read SLS file %s: %s', sls_file, e)
+            path = SETTINGS.local_repos_dir / tpl.local_path
+
+        if not tpl.sls_rel_path:
+            logger.warning('Template %s does not have an SLS file path defined.', tpl_id)
             sls_content = ''
+        else:
+            sls_file = path / tpl.sls_rel_path
+            logger.debug('Attempting to read SLS file: %s', sls_file)
+            try:
+                sls_content = sls_file.read_text()
+            except Exception as e:
+                logger.error('Failed to read SLS file %s: %s', sls_file, e)
+                sls_content = ''
 
         return TaskTemplatePublicWithContentSchema.model_validate(
             {

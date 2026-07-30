@@ -178,7 +178,6 @@ class SyncOrchestrator:
             if source.branch:
                 git_kwargs['branch'] = source.branch
 
-            logger.debug('Local path does not exist, cloning repo')
             raw_url = await self._inject_credentials(
                 str(source.repo_url),
                 source.repo_user,
@@ -203,16 +202,154 @@ class SyncOrchestrator:
 
         return {'status': 'fetched'}
 
-    async def _parse_and_save_templates(self, source_id: PyObjectId) -> None:
-        parsed_schemas, _errors = await self._parse_from_local(source_id)
-        # TODO: handle errors
-        await self._save_templates_to_db(source_id, parsed_schemas)
+    @staticmethod
+    def _build_template_name(rel_path: Path) -> str:
+        return '.'.join((*rel_path.parent.parts, rel_path.stem))
 
-    async def _parse_from_local(self, source_id: PyObjectId) -> tuple[dict[str, dict[str, Any]], list[dict[str, str]]]:
+    async def _parse_and_save_templates(self, source_id: PyObjectId) -> None:
+        parsed_schemas = await self._parse_from_local(source_id)
+        parsed_schemas_v2 = await self._parse_from_local_v2(source_id)
+        merged_schemas = {**parsed_schemas, **parsed_schemas_v2}
+        await self._save_templates_to_db(source_id, merged_schemas)
+
+    @staticmethod
+    def _extract_schema_payload(
+        parsed: dict[str, Any],
+        *,
+        file_path: Path,
+        schema_root: Path,
+        name: str,
+    ) -> dict[str, Any]:
+        raw_json_schema: dict[str, Any] = parsed.get('json_schema', {})
+        raw_ui_schema: dict[str, Any] = parsed.get('ui_schema', {})
+        if not isinstance(raw_json_schema, dict):
+            msg = '`json_schema` must be a dictionary'  # type: ignore[unreachable]
+            raise ValueError(msg)
+        if not isinstance(raw_ui_schema, dict):
+            msg = '`ui_schema` must be a dictionary'  # type: ignore[unreachable]
+            raise ValueError(msg)
+
+        if file_path.suffix == '.json':
+            schema_rel_path = str(file_path.relative_to(schema_root))
+            # if file f'{file_path.stem}.sls' exists, then fun is state.apply, else fun is file_path.stem
+            sls_file = file_path.with_suffix('.sls')
+            if sls_file.exists():
+                fun = 'state.apply'
+                sls_rel_path = str(sls_file.relative_to(schema_root))
+            else:
+                fun = file_path.stem
+                sls_rel_path = None
+        else:
+            fun = 'state.apply'
+            sls_rel_path = str(file_path.relative_to(schema_root))
+            schema_rel_path = None
+
+        # Get multilingual title and description if available
+        title_multilangual: dict[str, str] = {}
+        description_multilangual: dict[str, str] = {}
+        title_from_json_schema: str = raw_json_schema.get('title', file_path.stem)
+        old_description: dict[str, str] = raw_json_schema.get('description', {})
+
+        popular_langs = [
+            'en',
+            'es',
+            'fr',
+            'de',
+            'zh',
+            'ja',
+            'ru',
+            'ar',
+            'pt',
+            'hi',
+            'it',
+            'ko',
+            'nl',
+            'sv',
+            'no',
+            'da',
+            'fi',
+            'pl',
+            'tr',
+            'cs',
+            'el',
+        ]
+        for locale in popular_langs:
+            if locale in raw_ui_schema:
+                title_multilangual[locale] = raw_ui_schema[locale].get('ui:title', title_from_json_schema)
+                description_multilangual[locale] = raw_ui_schema[locale].get(
+                    'ui:description', old_description.get(locale, '')
+                )
+
+        if 'ui:title' in raw_ui_schema.keys():
+            title_multilangual['ru'] = title_multilangual.get('ru') or raw_ui_schema.get(
+                'ui:title', title_from_json_schema
+            )
+            title_multilangual['en'] = title_multilangual.get('en') or raw_ui_schema.get(
+                'ui:title', title_from_json_schema
+            )
+        if 'ui:description' in raw_ui_schema.keys():
+            description_multilangual['ru'] = description_multilangual.get('ru') or raw_ui_schema.get(
+                'ui:description', old_description.get('ru', '')
+            )
+            description_multilangual['en'] = description_multilangual.get('en') or raw_ui_schema.get(
+                'ui:description', old_description.get('en', '')
+            )
+
+        return {
+            'fun': parsed.get('fun', fun),
+            'name': name,
+            'title': title_multilangual or title_from_json_schema,
+            'query': parsed.get('query', {}),
+            'description': description_multilangual or old_description,
+            'defaults': parsed.get('defaults'),
+            'json_schema': raw_json_schema,
+            'ui_schema': raw_ui_schema,
+            'sls_rel_path': sls_rel_path,
+            'schema_rel_path': schema_rel_path,
+        }
+
+    async def _parse_from_local_v2(self, source_id: PyObjectId) -> dict[str, dict[str, Any]]:
         source = await self._source_service.get(source_id)
 
         parsed_schemas: dict[str, dict[str, Any]] = {}
-        errors = []
+
+        source_root = Path(SETTINGS.local_repos_dir) / source.local_path
+        schema_root = source_root if not source.root else source_root / source.root
+
+        if not schema_root.exists() or not schema_root.is_dir():
+            msg = f'Local path {schema_root} does not exist or is not a directory.'
+            logger.error(msg)
+            raise FileNotFoundError(msg)
+
+        for schema_file in schema_root.rglob('*.json'):
+            try:
+                parsed = json.loads(schema_file.read_text(encoding='utf-8'))
+            except json.JSONDecodeError as e:
+                msg = f'Failed to parse JSON schema file {schema_file}: {e}'
+                logger.error(msg)
+                raise ValueError(msg) from e
+
+            if not isinstance(parsed, dict):
+                msg = f'{schema_file}: Schema is not a dictionary'
+                raise ValueError(msg)
+
+            if 'json_schema' not in parsed:
+                msg = f'{schema_file}: Missing `json_schema` key. Probably not a schema file.'
+                logger.warning(msg)
+                continue
+
+            name = self._build_template_name(schema_file.relative_to(schema_root))
+            schema_payload = self._extract_schema_payload(
+                parsed, file_path=schema_file, schema_root=schema_root, name=name
+            )
+            parsed_schemas[name] = schema_payload
+
+        return parsed_schemas
+
+    async def _parse_from_local(self, source_id: PyObjectId) -> dict[str, dict[str, Any]]:
+        source = await self._source_service.get(source_id)
+
+        parsed_schemas: dict[str, dict[str, Any]] = {}
 
         source_root = Path(SETTINGS.local_repos_dir) / source.local_path
         sls_root = source_root if not source.root else source_root / source.root
@@ -223,51 +360,34 @@ class SyncOrchestrator:
             raise FileNotFoundError(msg)
 
         pattern = re.compile(r'{#start_schema(.*?)end_schema#}', re.DOTALL)
-        git_repo = Repo(source_root) if source.source_type == SourceType.GIT_REPO else None
 
         for sls_file in sls_root.rglob('*.sls'):
             try:
                 content = sls_file.read_text(encoding='utf-8')
             except OSError as e:
-                errors.append({'file': str(sls_file.relative_to(sls_root)), 'error': str(e)})
+                logger.error(f'Failed to read SLS file {sls_file}: {e}')
                 continue
 
             rel_path = sls_file.relative_to(sls_root)
-            name = '.'.join((*rel_path.parent.parts, rel_path.stem))
-            if git_repo:
-                source_hash = git_repo.git.log('--format=%H', '-1', '--', str(rel_path)) or None
-            else:
-                source_hash = self._make_checksum(sls_file)
+            name = self._build_template_name(rel_path)
             match = pattern.search(content)
 
             if match:
                 try:
                     parsed = json.loads(match.group(1).strip())
-                    if not isinstance(parsed, dict):
-                        msg = f'{sls_file}: Schema is not a dictionary'
-                        raise ValueError(msg)
-                    if 'json_schema' not in parsed and 'title' in parsed:
-                        # For v1 format without ui_schema
-                        json_schema = parsed
-                    else:
-                        json_schema = parsed.get('json_schema', {})
-
-                    parsed_schemas[name] = {
-                        'fun': parsed.get('fun', 'state.apply'),
-                        'title': json_schema.get('title', sls_file.stem),
-                        'description': parsed.get('description'),
-                        'defaults': parsed.get('defaults'),
-                        'name': name,
-                        'json_schema': json_schema,
-                        'ui_schema': parsed.get('ui_schema'),
-                        'source_hash': source_hash,
-                        'sls_rel_path': str(rel_path),
-                    }
                 except json.JSONDecodeError as e:
-                    errors.append({'file': str(sls_file.relative_to(sls_root)), 'error': str(e)})
+                    msg = f'Failed to parse JSON schema in {sls_file}: {e}'
+                    logger.error(msg)
+                    raise ValueError(msg) from e
 
-        return parsed_schemas, errors
+                schema_payload = self._extract_schema_payload(
+                    parsed, file_path=sls_file, schema_root=sls_root, name=name
+                )
+                parsed_schemas[name] = schema_payload
 
+        return parsed_schemas
+
+    # TODO: Temporary deprecated
     def _make_checksum(self, file_path: Path) -> str:
         with file_path.open('rb') as file_stream:
             digest_obj = hashlib.file_digest(file_stream, 'sha256')
@@ -290,11 +410,11 @@ class SyncOrchestrator:
                 existing_tpl = None
 
             if not existing_tpl:
-                logger.debug('Try create: %s', name)
+                logger.debug('Try create: %s, schema: %s', name, schema)
                 await self._template_service.create(
                     data=TaskTemplateCreateSchema(**schema, source_id=source_id),
                 )
-            elif existing_tpl.source_hash != schema['source_hash']:
+            else:
                 logger.debug('Try update: %s', name)
                 await self._template_service.update(query={'name': name, 'source_id': source_id}, data={**schema})
 
@@ -535,6 +655,8 @@ class SyncOrchestrator:
             logger.warning(error)
             return error
         for tpl in templates:
+            if not tpl.sls_rel_path:
+                continue
             sls_file = Path(SETTINGS.local_repos_dir) / source.local_path / (source.root or '') / tpl.sls_rel_path
             if not sls_file.exists() or not sls_file.is_file():
                 logger.warning('SLS file does not exist: %s', tpl.sls_rel_path)
@@ -606,10 +728,16 @@ class SyncOrchestrator:
             # Remove templates from serve dir
             tpls = await self._template_service.get_list(query={'source_id': source_id}, skip=0, limit=0)
             for tpl in tpls:
-                sls_file = SETTINGS.salt_modules_serve_dir / tpl.sls_rel_path
-                logger.debug('Attempting to remove SLS file: %s', sls_file)
-                sls_file.unlink(missing_ok=True)
-                parent = sls_file.parent
+                if tpl.sls_rel_path:
+                    sls_file = SETTINGS.salt_modules_serve_dir / tpl.sls_rel_path
+                    logger.debug('Attempting to remove SLS file: %s', sls_file)
+                    sls_file.unlink(missing_ok=True)
+                    parent = sls_file.parent
+                if tpl.schema_rel_path:
+                    schema_file = SETTINGS.salt_modules_serve_dir / tpl.schema_rel_path
+                    logger.debug('Attempting to remove schema file: %s', schema_file)
+                    schema_file.unlink(missing_ok=True)
+                    parent = schema_file.parent
                 while (
                     parent != SETTINGS.salt_modules_serve_dir
                     and parent.exists()
@@ -793,7 +921,6 @@ class SyncOrchestrator:
             'name': name,
             'json_schema': json_schema,
             'ui_schema': parsed.get('ui_schema'),
-            'source_hash': self._make_checksum(full_path),
             'sls_rel_path': str(rel_path),
             'source_id': source_id,
         }
@@ -859,6 +986,13 @@ class SyncOrchestrator:
                 'current_task_id': task_id,
             },
         )
+
+        if not template.sls_rel_path:
+            msg = f'Template {template.name} does not have a valid SLS relative path.'
+            logger.error(msg)
+            await self._source_service.update(template.source_id, {'current_operation': None, 'current_task_id': None})
+            raise ValueError(msg)
+
         if template.source_root:
             local_path = (
                 Path(SETTINGS.local_repos_dir) / template.local_path / template.source_root / template.sls_rel_path
@@ -890,14 +1024,16 @@ class SyncOrchestrator:
             },
         )
         if template.source_root:
-            local_path = (
-                Path(SETTINGS.local_repos_dir) / template.local_path / template.source_root / template.sls_rel_path
-            )
+            local_path = Path(SETTINGS.local_repos_dir) / template.local_path / template.source_root
         else:
-            local_path = Path(SETTINGS.local_repos_dir) / template.local_path / template.sls_rel_path
-
+            local_path = Path(SETTINGS.local_repos_dir) / template.local_path
         try:
-            local_path.unlink(missing_ok=True)
+            if template.sls_rel_path:
+                sls_local_path = local_path / template.sls_rel_path
+                sls_local_path.unlink(missing_ok=True)
+            if template.schema_rel_path:
+                schema_local_path = local_path / template.schema_rel_path
+                schema_local_path.unlink(missing_ok=True)
         except OSError as e:
             logger.error('Failed to delete template file: %s', e)
             raise
