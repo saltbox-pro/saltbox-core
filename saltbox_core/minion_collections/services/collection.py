@@ -18,6 +18,7 @@ from saltbox_core.minion_collections.schemas.collection import (
     CollectionUpdateSchema,
 )
 from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId, SortOrder
+from saltbox_sdk.exceptions import SaltBoxValidationException
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 
 ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
@@ -112,28 +113,40 @@ class CollectionService(
         insert_before_id: PyObjectId | None = None,
         session: MongoAsyncClientSession | None = None,
     ) -> PyObjectId:
+        if parent_id == target_id:
+            msg = 'Cannot move node into itself'
+            raise SaltBoxValidationException(msg)
+
+        descendants_ids = await self.repo.get_descendants_ids(target_id, session=session)
+        if parent_id in descendants_ids:
+            msg = 'Cannot move node into its own descendant'
+            raise SaltBoxValidationException(msg)
+
         parent_children = await self.repo.get_children(
             target=parent_id,
             session=session,
             sort={'order': SortOrder.ASC, '_id': SortOrder.ASC},
             projection_model=EmptyModel,
         )
-        children_ordered_ids: list[PyObjectId]
+
+        children_ordered_ids = [child.id for child in parent_children if child.id != target_id]
 
         if insert_before_id is None:
-            children_ordered_ids = [child.id for child in parent_children if child.id != target_id]
-            children_ordered_ids.append(target_id)
+            insert_at = len(children_ordered_ids)
         else:
-            children_ordered_ids = []
-            for child in parent_children:
-                if insert_before_id == child.id:
-                    children_ordered_ids.append(target_id)
+            try:
+                insert_at = children_ordered_ids.index(insert_before_id)
+            except ValueError:
+                insert_at = len(children_ordered_ids)
 
-                if child.id not in children_ordered_ids:
-                    children_ordered_ids.append(child.id)
+        children_ordered_ids.insert(insert_at, target_id)
 
         operations = [
-            UpdateOne({'_id': doc_id}, {'$set': {'order': idx + 1}}) for idx, doc_id in enumerate(children_ordered_ids)
+            UpdateOne({'_id': target_id}, {'$set': {'parent_id': parent_id}}),
+            *[
+                UpdateOne({'_id': doc_id}, {'$set': {'order': order}})
+                for order, doc_id in enumerate(children_ordered_ids, start=1)
+            ],
         ]
         await self.repo.collection.bulk_write(operations, session=session)
 
