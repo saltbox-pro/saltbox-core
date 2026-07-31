@@ -62,6 +62,7 @@ class TemplateSourceRepository(BaseMongoRepository[TemplateSourceModel]):
                                         'fun': 1,
                                         'name': 1,
                                         'query': 1,
+                                        'i18n': 1,
                                     }
                                 },
                             ],

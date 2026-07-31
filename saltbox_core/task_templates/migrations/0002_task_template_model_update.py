@@ -18,6 +18,11 @@ class Migration(BaseMigration):
             field_name='query',
             value={},
         ),
+        MongoAddFieldStage(
+            collection_name='task_templates',
+            field_name='i18n',
+            value={},
+        ),
         MongoRemoveFieldStage(
             collection_name='task_templates',
             field_name='source_hash',

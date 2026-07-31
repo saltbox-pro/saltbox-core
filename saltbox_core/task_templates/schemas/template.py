@@ -28,6 +28,7 @@ class TaskTemplateCreateSchema(BaseModel):
     # secret_pillars: list[str] | None = Field(title='Secret pillar names', default=None)
     json_schema: dict = Field(title='JSON schema', default_factory=dict)
     ui_schema: dict = Field(title='UI schema', default_factory=dict)
+    i18n: dict[str, dict[str, str]] = Field(title='I18n dictionary', default_factory=dict)
 
 
 class TaskTemplateFromRawCreateSchema(BaseModel):
@@ -61,6 +62,7 @@ class TaskTemplateModel(CreatedModifiedMixin, IDMixin):
     secret_pillars: list[str] | None = Field(title='Secret pillar names', default=None)
     json_schema: dict = Field(title='JSON schema', default_factory=dict)
     ui_schema: dict = Field(title='UI schema', default_factory=dict)
+    i18n: dict[str, dict[str, str]] = Field(title='I18n dictionary', default_factory=dict)
 
 
 class TaskTemplateAggregatedModel(TaskTemplateModel):
@@ -79,6 +81,7 @@ class TaskTemplatePublicSchema(CreatedModifiedMixin, IDMixin):
     query: MongoQuery
     fun: str
     name: str
+    i18n: dict[str, dict[str, str]] = Field(default_factory=dict)
 
 
 class TaskTemplatePublicWithContentSchema(TaskTemplatePublicSchema):

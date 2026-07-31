@@ -206,104 +206,146 @@ class SyncOrchestrator:
     def _build_template_name(rel_path: Path) -> str:
         return '.'.join((*rel_path.parent.parts, rel_path.stem))
 
+    @staticmethod
+    def _render_i18n_template(template: str, variables: dict[str, str]) -> str:
+        pattern = re.compile(r'\{\{\s*([\w.-]+)\s*\}\}')
+
+        def _replace(match: re.Match[str]) -> str:
+            key = match.group(1)
+            return variables.get(key, '')
+
+        return pattern.sub(_replace, template)
+
+    @staticmethod
+    def _normalize_i18n(i18n_raw: Any) -> dict[str, dict[str, str]]:
+        if i18n_raw is None:
+            return {}
+        if not isinstance(i18n_raw, dict):
+            msg = '`i18n` must be a dictionary'
+            raise ValueError(msg)
+
+        normalized: dict[str, dict[str, str]] = {}
+        for locale, values in i18n_raw.items():
+            if not isinstance(locale, str):
+                continue
+            if not isinstance(values, dict):
+                msg = f'`i18n.{locale}` must be a dictionary'
+                raise ValueError(msg)
+            normalized_values: dict[str, str] = {}
+            for key, value in values.items():
+                if isinstance(key, str) and isinstance(value, str):
+                    normalized_values[key] = value
+            normalized[locale] = normalized_values
+        return normalized
+
+    def _extract_from_i18n_templates(
+        self,
+        *,
+        i18n: dict[str, dict[str, str]],
+        raw_value: str | None,
+    ) -> str | dict[str, str] | None:
+        if not isinstance(raw_value, str):
+            return None
+
+        pattern = re.compile(r'\{\{\s*([\w.-]+)\s*\}\}')
+        if not pattern.search(raw_value):
+            return raw_value
+
+        if not i18n:
+            return raw_value
+
+        rendered_values: dict[str, str] = {}
+        for locale, vars_map in i18n.items():
+            rendered_values[locale] = self._render_i18n_template(raw_value, vars_map).strip()
+
+        return rendered_values
+
+    @staticmethod
+    def _resolve_fun_and_paths(
+        *,
+        file_path: Path,
+        schema_root: Path,
+    ) -> tuple[str, str | None, str | None]:
+        if file_path.suffix != '.json':
+            return 'state.apply', str(file_path.relative_to(schema_root)), None
+
+        schema_rel_path = str(file_path.relative_to(schema_root))
+        sls_file = file_path.with_suffix('.sls')
+        if sls_file.exists():
+            return 'state.apply', str(sls_file.relative_to(schema_root)), schema_rel_path
+        return file_path.stem, None, schema_rel_path
+
     async def _parse_and_save_templates(self, source_id: PyObjectId) -> None:
         parsed_schemas = await self._parse_from_local(source_id)
         parsed_schemas_v2 = await self._parse_from_local_v2(source_id)
         merged_schemas = {**parsed_schemas, **parsed_schemas_v2}
         await self._save_templates_to_db(source_id, merged_schemas)
 
-    @staticmethod
     def _extract_schema_payload(
+        self,
         parsed: dict[str, Any],
         *,
         file_path: Path,
         schema_root: Path,
         name: str,
     ) -> dict[str, Any]:
-        raw_json_schema: dict[str, Any] = parsed.get('json_schema', {})
-        raw_ui_schema: dict[str, Any] = parsed.get('ui_schema', {})
+        raw_json_schema = parsed.get('json_schema', {})
+        raw_ui_schema = parsed.get('ui_schema', {})
+        raw_i18n: Any = parsed.get('i18n', {})
         if not isinstance(raw_json_schema, dict):
-            msg = '`json_schema` must be a dictionary'  # type: ignore[unreachable]
+            msg = '`json_schema` must be a dictionary'
             raise ValueError(msg)
         if not isinstance(raw_ui_schema, dict):
-            msg = '`ui_schema` must be a dictionary'  # type: ignore[unreachable]
+            msg = '`ui_schema` must be a dictionary'
             raise ValueError(msg)
+        normalized_i18n = self._normalize_i18n(raw_i18n)
 
-        if file_path.suffix == '.json':
-            schema_rel_path = str(file_path.relative_to(schema_root))
-            # if file f'{file_path.stem}.sls' exists, then fun is state.apply, else fun is file_path.stem
-            sls_file = file_path.with_suffix('.sls')
-            if sls_file.exists():
-                fun = 'state.apply'
-                sls_rel_path = str(sls_file.relative_to(schema_root))
-            else:
-                fun = file_path.stem
-                sls_rel_path = None
-        else:
-            fun = 'state.apply'
-            sls_rel_path = str(file_path.relative_to(schema_root))
-            schema_rel_path = None
+        fun, sls_rel_path, schema_rel_path = self._resolve_fun_and_paths(
+            file_path=file_path,
+            schema_root=schema_root,
+        )
 
-        # Get multilingual title and description if available
-        title_multilangual: dict[str, str] = {}
-        description_multilangual: dict[str, str] = {}
-        title_from_json_schema: str = raw_json_schema.get('title', file_path.stem)
-        old_description: dict[str, str] = raw_json_schema.get('description', {})
+        title_from_json_schema_raw = raw_json_schema.get('title')
+        title_from_json_schema = title_from_json_schema_raw if isinstance(title_from_json_schema_raw, str) else None
 
-        popular_langs = [
-            'en',
-            'es',
-            'fr',
-            'de',
-            'zh',
-            'ja',
-            'ru',
-            'ar',
-            'pt',
-            'hi',
-            'it',
-            'ko',
-            'nl',
-            'sv',
-            'no',
-            'da',
-            'fi',
-            'pl',
-            'tr',
-            'cs',
-            'el',
-        ]
-        for locale in popular_langs:
-            if locale in raw_ui_schema:
-                title_multilangual[locale] = raw_ui_schema[locale].get('ui:title', title_from_json_schema)
-                description_multilangual[locale] = raw_ui_schema[locale].get(
-                    'ui:description', old_description.get(locale, '')
-                )
+        ui_title_template = raw_ui_schema.get('ui:title')
+        title_value = self._extract_from_i18n_templates(
+            i18n=normalized_i18n,
+            raw_value=ui_title_template if isinstance(ui_title_template, str) else None,
+        )
+        if title_value is None:
+            title_value = title_from_json_schema
+        if title_value is None:
+            title_value = name
 
-        if 'ui:title' in raw_ui_schema.keys():
-            title_multilangual['ru'] = title_multilangual.get('ru') or raw_ui_schema.get(
-                'ui:title', title_from_json_schema
-            )
-            title_multilangual['en'] = title_multilangual.get('en') or raw_ui_schema.get(
-                'ui:title', title_from_json_schema
-            )
-        if 'ui:description' in raw_ui_schema.keys():
-            description_multilangual['ru'] = description_multilangual.get('ru') or raw_ui_schema.get(
-                'ui:description', old_description.get('ru', '')
-            )
-            description_multilangual['en'] = description_multilangual.get('en') or raw_ui_schema.get(
-                'ui:description', old_description.get('en', '')
-            )
+        ui_description_template = raw_ui_schema.get('ui:description')
+        description_value = self._extract_from_i18n_templates(
+            i18n=normalized_i18n,
+            raw_value=ui_description_template if isinstance(ui_description_template, str) else None,
+        )
+        if description_value is None:
+            description_value = parsed.get('description')
+            if isinstance(description_value, dict):
+                description_value = {
+                    locale: value
+                    for locale, value in description_value.items()
+                    if isinstance(locale, str) and isinstance(value, str)
+                } or None
+            elif not isinstance(description_value, str):
+                description_value = None
+        if description_value is None:
+            description_value = ''
 
         return {
             'fun': parsed.get('fun', fun),
             'name': name,
-            'title': title_multilangual or title_from_json_schema,
+            'title': title_value,
             'query': parsed.get('query', {}),
-            'description': description_multilangual or old_description,
+            'description': description_value,
             'defaults': parsed.get('defaults'),
             'json_schema': raw_json_schema,
             'ui_schema': raw_ui_schema,
+            'i18n': normalized_i18n,
             'sls_rel_path': sls_rel_path,
             'schema_rel_path': schema_rel_path,
         }
