@@ -95,7 +95,7 @@ class CollectionTreeNodeSchema(IDMixin):
     slug: str = Field(title='Slug')
 
     parent_id: PyObjectId | None = Field(title='Parent ID', default=None)
-    children: list['CollectionTreeNodeSchema'] = Field(title='Children', default=[])
+    children: list['CollectionTreeNodeSchema'] = Field(title='Children', default_factory=list)
 
 
 class CollectionListBody(SkipLimitParams, QueryParams, SortParams):

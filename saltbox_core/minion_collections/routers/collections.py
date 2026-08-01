@@ -14,7 +14,7 @@ from saltbox_core.minion_collections.schemas.collection import (
     CollectionUpdateSchema,
 )
 from saltbox_core.minion_collections.services.collection import CollectionService, get_collection_service
-from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
+from saltbox_sdk.db.mongo.schemas_base import SortOrder
 from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 from saltbox_sdk.fastapi_utils.dependencies import get_current_user, get_opa_query
@@ -165,15 +165,21 @@ async def collection_update(
     ).model_dump(by_alias=True),
 )
 async def collection_move(
+    opa_query: Annotated[dict, Depends(get_opa_query)],
     collection_move_data: CollectionMoveRequestSchema,
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
-) -> PyObjectId:
-    response = await collection_service.move(
+) -> list[CollectionTreeNodeSchema]:
+    await collection_service.move(
         target_id=collection_move_data.target_id,
         parent_id=collection_move_data.parent_id,
         insert_before_id=collection_move_data.insert_before_id,
     )
-    return response
+
+    return await collection_service.get_tree(
+        query=opa_query,
+        projection_model=CollectionTreeNodeSchema,
+        sort={'order': SortOrder.ASC, 'created': SortOrder.DESC},
+    )
 
 
 @router.delete(
