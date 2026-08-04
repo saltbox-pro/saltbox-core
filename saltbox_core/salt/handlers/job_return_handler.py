@@ -178,7 +178,9 @@ class JobReturnMessageHandler(BaseJobMessageHandler[JobForJobReturnSaltHandlerSc
             )
             return True, job_return_id
         except ObjectNotFoundException as e:
-            if await self.job_return_service.exists(query={'jid': jid, 'salt_master': master_id, 'minion_id': mid}):
+            if await self.job_return_service.exists(
+                query={'jid': jid, 'salt_master': master_id, 'minion_id': mid, 'retcode': {'$ne': None}}
+            ):
                 return False, None
 
             raise e
