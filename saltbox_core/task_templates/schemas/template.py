@@ -25,7 +25,7 @@ class TaskTemplateCreateSchema(BaseModel):
     sls_rel_path: str | None = Field(title='SLS file path relative to source root', default=None)
     schema_rel_path: str | None = Field(title='Schema file path relative to source root', default=None)
     defaults: TaskTemplateDefaultsSchema | None = Field(title='Default values', default=None)
-    # secret_pillars: list[str] | None = Field(title='Secret pillar names', default=None)
+    secret_pillars: list[str] | None = Field(title='Secret pillar names', default=None)
     json_schema: dict = Field(title='JSON schema', default_factory=dict)
     ui_schema: dict = Field(title='UI schema', default_factory=dict)
     i18n: dict[str, dict[str, str]] = Field(title='I18n dictionary', default_factory=dict)

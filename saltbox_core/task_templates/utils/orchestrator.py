@@ -292,6 +292,7 @@ class SyncOrchestrator:
         raw_json_schema = parsed.get('json_schema', {})
         raw_ui_schema = parsed.get('ui_schema', {})
         raw_i18n: Any = parsed.get('i18n', {})
+        secret_pillars = parsed.get('secret_pillars', [])
         if not isinstance(raw_json_schema, dict):
             msg = '`json_schema` must be a dictionary'
             raise ValueError(msg)
@@ -348,6 +349,7 @@ class SyncOrchestrator:
             'i18n': normalized_i18n,
             'sls_rel_path': sls_rel_path,
             'schema_rel_path': schema_rel_path,
+            'secret_pillars': secret_pillars,
         }
 
     async def _parse_from_local_v2(self, source_id: PyObjectId) -> dict[str, dict[str, Any]]:
