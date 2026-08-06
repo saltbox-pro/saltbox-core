@@ -78,7 +78,7 @@ class TaskTemplatePublicSchema(CreatedModifiedMixin, IDMixin):
     source_id: PyObjectId
     title: str | dict[str, str]
     description: str | dict[str, str] | None = None
-    query: MongoQuery
+    query: MongoQuery = MongoQueryField
     fun: str
     name: str
     i18n: dict[str, dict[str, str]] = Field(default_factory=dict)
