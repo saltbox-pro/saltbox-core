@@ -73,7 +73,12 @@ async def template_create(
     source_id: PyObjectId,
     body: Annotated[TaskTemplateFromRawCreateSchema, Body()],
 ) -> TaskiqTaskIdResponse:
-    task = await create_tpl_from_raw_task.kiq(source_id=str(source_id), file_name=body.file_name, content=body.content)
+    task = await create_tpl_from_raw_task.kiq(
+        source_id=str(source_id),
+        file_name=body.file_name,
+        sls_raw=body.sls_raw,
+        meta=body.meta,
+    )
     return TaskiqTaskIdResponse(task_id=task.task_id)
 
 

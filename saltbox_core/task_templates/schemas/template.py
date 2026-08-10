@@ -36,7 +36,8 @@ class TaskTemplateFromRawCreateSchema(BaseModel):
         title='File name (without path and extension)',
         pattern=r'^\w[\w-]*(?:\.[\w-]+)*(?:,\w[\w-]*(?:\.[\w-]+)*)*$',
     )
-    content: str
+    sls_raw: str | None = Field(default=None, title='SLS content')
+    meta: dict = Field(title='Meta content (JSON schema + UI schema + i18n)')
 
 
 class TaskTemplateFromRawUpdateSchema(BaseModel):

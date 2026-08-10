@@ -72,14 +72,14 @@ class SyncOrchestrator:
         pillar_service: PillarService,
         master_service: MasterService,
         sshfs_sync_service: SshfsSync,
-        httpx_client: httpx.AsyncClient | None = None,
+        httpx_client: httpx.AsyncClient,
     ) -> None:
         self._source_service = source_service
         self._template_service = template_service
         self._sshfs_file_service = sshfs_file_service
         self._pillar_service = pillar_service
         self._master_service = master_service
-        self._httpx_client = httpx_client or httpx.AsyncClient()
+        self._httpx_client = httpx_client
         self._sshfs_sync_service = sshfs_sync_service
         self._manifest: ManifestSchema | None = None
         self._local_path: Path | None = None
@@ -357,8 +357,9 @@ class SyncOrchestrator:
 
         parsed_schemas: dict[str, dict[str, Any]] = {}
 
+        custom_root = self._manifest.root if self._manifest and self._manifest.root else source.root
         source_root = Path(SETTINGS.local_repos_dir) / source.local_path
-        schema_root = source_root if not source.root else source_root / source.root
+        schema_root = source_root if not custom_root else source_root / custom_root
 
         if not schema_root.exists() or not schema_root.is_dir():
             msg = f'Local path {schema_root} does not exist or is not a directory.'
@@ -395,8 +396,9 @@ class SyncOrchestrator:
 
         parsed_schemas: dict[str, dict[str, Any]] = {}
 
+        custom_root = self._manifest.root if self._manifest and self._manifest.root else source.root
         source_root = Path(SETTINGS.local_repos_dir) / source.local_path
-        sls_root = source_root if not source.root else source_root / source.root
+        sls_root = source_root if not custom_root else source_root / custom_root
 
         if not sls_root.exists() or not sls_root.is_dir():
             msg = f'Local path {sls_root} does not exist or is not a directory.'
@@ -936,42 +938,8 @@ class SyncOrchestrator:
             )
             raise
 
-    async def _create_template_db_instance_from_raw(
-        self, source_id: PyObjectId, full_path: Path, rel_path: Path, content: str
-    ) -> PyObjectId:
-        name = '.'.join((*rel_path.parent.parts, rel_path.stem))
-        pattern = re.compile(r'{#start_schema(.*?)end_schema#}', re.DOTALL)
-        match = pattern.search(content)
-        if not match:
-            msg = f'{rel_path}: Schema block not found. Expected {{#start_schema ... end_schema#}}'
-            raise ValueError(msg)
-
-        schema_json = match.group(1).strip()
-        parsed = json.loads(schema_json)
-        if not isinstance(parsed, dict):
-            msg = f'{rel_path}: Schema is not a dictionary'
-            raise ValueError(msg)
-        if 'json_schema' not in parsed and 'title' in parsed:
-            # For v1 format without ui_schema
-            json_schema = parsed
-        else:
-            json_schema = parsed.get('json_schema', {})
-
-        tpl_data = {
-            'fun': parsed.get('fun', 'state.apply'),
-            'title': json_schema.get('title', rel_path.stem),
-            'description': parsed.get('description'),
-            'defaults': parsed.get('defaults'),
-            'name': name,
-            'json_schema': json_schema,
-            'ui_schema': parsed.get('ui_schema'),
-            'sls_rel_path': str(rel_path),
-            'source_id': source_id,
-        }
-        return await self._template_service.create(data=tpl_data)
-
     async def create_template_from_raw(
-        self, source_id: PyObjectId, file_name: str, content: str, task_id: str | None = None
+        self, source_id: PyObjectId, file_name: str, meta: dict, sls_raw: str | None = None, task_id: str | None = None
     ) -> PyObjectId:
         source = await self._source_service.get(source_id)
 
@@ -979,37 +947,66 @@ class SyncOrchestrator:
             source_id, {'current_operation': SourceOperation.ADD_TEMPLATE_FROM_RAW, 'current_task_id': task_id}
         )
 
+        custom_root = self._manifest.root if self._manifest and self._manifest.root else source.root
         source_root = Path(SETTINGS.local_repos_dir) / source.local_path
         if source.namespace:
-            rel_path = Path(source.namespace.strip()) / f'{file_name}.sls'
+            rel_path = Path(source.namespace.strip()) / f'{file_name}'
         else:
-            rel_path = Path(f'{file_name}.sls')
+            rel_path = Path(f'{file_name}')
 
         if source.root:
-            local_path = source_root / source.root / rel_path
+            local_path = source_root / custom_root / rel_path
         else:
             local_path = source_root / rel_path
 
-        # check if template already exists
-        if local_path.exists() and local_path.is_file():
-            msg = f'Template file already exists: {local_path}'
+        # create json file
+        json_file_path = local_path.with_suffix('.json')
+        if json_file_path.exists() and json_file_path.is_file():
+            msg = f'JSON file already exists: {json_file_path}'
             logger.error(msg)
             await self._source_service.update(source_id, {'current_operation': None, 'current_task_id': None})
             raise FileExistsError(msg)
         try:
-            local_path.parent.mkdir(parents=True, exist_ok=True)
-            local_path.write_text(content, encoding='utf-8')
+            json_file_path.parent.mkdir(parents=True, exist_ok=True)
+            json_file_path.write_text(json.dumps(meta, indent=2), encoding='utf-8')
         except OSError as e:
-            logger.error('Failed to write template file: %s', e)
+            logger.error('Failed to write JSON file: %s', e)
             await self._source_service.update(
                 source_id, {'state': SourceState.BROKEN, 'last_error': str(e), 'current_task_id': None}
             )
             raise
+
+        # create sls file
+        if sls_raw:
+            sls_file_path = local_path.with_suffix('.sls')
+            if sls_file_path.exists() and sls_file_path.is_file():
+                msg = f'SLS file already exists: {sls_file_path}'
+                logger.error(msg)
+                await self._source_service.update(source_id, {'current_operation': None, 'current_task_id': None})
+                raise FileExistsError(msg)
+            try:
+                sls_file_path.parent.mkdir(parents=True, exist_ok=True)
+                sls_file_path.write_text(sls_raw, encoding='utf-8')
+            except OSError as e:
+                logger.error('Failed to write SLS file: %s', e)
+                await self._source_service.update(
+                    source_id, {'state': SourceState.BROKEN, 'last_error': str(e), 'current_task_id': None}
+                )
+                raise
+
+        name = self._build_template_name(rel_path)
         try:
-            tpl_id = await self._create_template_db_instance_from_raw(source_id, local_path, rel_path, content)
+            tpl_data = self._extract_schema_payload(
+                parsed=meta, file_path=json_file_path, schema_root=source_root, name=name
+            )
+            tpl_id = await self._template_service.create(
+                data=TaskTemplateCreateSchema(**tpl_data, source_id=source_id),
+            )
         except Exception as e:
             logger.error('Failed to create template in DB: %s', e)
-            local_path.unlink(missing_ok=True)
+            local_path.with_suffix('.json').unlink(missing_ok=True)
+            if sls_raw:
+                local_path.with_suffix('.sls').unlink(missing_ok=True)
             await self._source_service.update(
                 source_id, {'state': SourceState.BROKEN, 'last_error': str(e), 'current_task_id': None}
             )

@@ -209,7 +209,8 @@ async def add_user_file_to_source_task(
 async def create_tpl_from_raw_task(
     source_id: str,
     file_name: str,
-    content: str,
+    meta: dict,
+    sls_raw: str | None = None,
     context: Context = TaskiqDepends(),
     progress: ProgressTracker[Any] = TaskiqDepends(),
     orchestrator: SyncOrchestrator = TaskiqDepends(get_sync_orchestrator),
@@ -229,7 +230,7 @@ async def create_tpl_from_raw_task(
         await progress.set_progress(TaskState.STARTED, 'Create template from raw started')
         try:
             tpl_id = await orchestrator.create_template_from_raw(
-                PyObjectId(source_id), file_name, content, task_id=context.message.task_id
+                PyObjectId(source_id), file_name, sls_raw=sls_raw, meta=meta, task_id=context.message.task_id
             )
             await progress.set_progress(TaskState.SUCCESS, 'Create template from raw successful')
             return {'status': 'created', 'template_id': str(tpl_id)}
