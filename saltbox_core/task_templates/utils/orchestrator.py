@@ -1014,7 +1014,9 @@ class SyncOrchestrator:
         )
         return tpl_id
 
-    async def update_template_from_raw(self, template_id: PyObjectId, content: str, task_id: str | None = None) -> None:
+    async def update_template_from_raw(
+        self, template_id: PyObjectId, meta: dict, sls_raw: str | None = None, task_id: str | None = None
+    ) -> None:
         template = await self._template_service.get(template_id, projection_model=TaskTemplateAggregatedModel)
 
         await self._source_service.update(
@@ -1026,25 +1028,53 @@ class SyncOrchestrator:
             },
         )
 
-        if not template.sls_rel_path:
-            msg = f'Template {template.name} does not have a valid SLS relative path.'
+        rel_path = template.schema_rel_path or (
+            str(Path(template.sls_rel_path).with_suffix('.json')) if template.sls_rel_path else None
+        )
+        if not rel_path:
+            msg = f'Template {template.name} does not have a valid relative path.'
             logger.error(msg)
             await self._source_service.update(template.source_id, {'current_operation': None, 'current_task_id': None})
             raise ValueError(msg)
 
         if template.source_root:
-            local_path = (
-                Path(SETTINGS.local_repos_dir) / template.local_path / template.source_root / template.sls_rel_path
-            )
+            schema_root = Path(SETTINGS.local_repos_dir) / template.local_path / template.source_root
         else:
-            local_path = Path(SETTINGS.local_repos_dir) / template.local_path / template.sls_rel_path
+            schema_root = Path(SETTINGS.local_repos_dir) / template.local_path
+        json_file_path = schema_root / rel_path
+        sls_file_path = json_file_path.with_suffix('.sls')
 
+        # rewrite json (meta) and sls (raw) files; drop the sls file when no raw content is provided
         try:
-            local_path.write_text(content, encoding='utf-8')
+            json_file_path.parent.mkdir(parents=True, exist_ok=True)
+            json_file_path.write_text(json.dumps(meta, indent=2), encoding='utf-8')
+            if sls_raw:
+                sls_file_path.write_text(sls_raw, encoding='utf-8')
+            else:
+                sls_file_path.unlink(missing_ok=True)
         except OSError as e:
             logger.error('Failed to write template file: %s', e)
+            await self._source_service.update(
+                template.source_id, {'state': SourceState.BROKEN, 'last_error': str(e), 'current_task_id': None}
+            )
             raise
-        await self._source_service.update(template.source_id, {'current_operation': None, 'current_task_id': None})
+
+        try:
+            tpl_data = self._extract_schema_payload(
+                parsed=meta, file_path=json_file_path, schema_root=schema_root, name=template.name
+            )
+            await self._template_service.update(template_id, tpl_data)
+        except Exception as e:
+            logger.error('Failed to update template in DB: %s', e)
+            await self._source_service.update(
+                template.source_id, {'state': SourceState.BROKEN, 'last_error': str(e), 'current_task_id': None}
+            )
+            raise
+
+        await self._source_service.update(
+            template.source_id,
+            {'state': SourceState.DISCOVERED, 'current_operation': None, 'current_task_id': None},
+        )
 
     async def delete_local_template(self, template_id: PyObjectId, task_id: str | None = None) -> None:
         template = await self._template_service.get(template_id, projection_model=TaskTemplateAggregatedModel)

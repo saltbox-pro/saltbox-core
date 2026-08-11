@@ -252,7 +252,8 @@ async def create_tpl_from_raw_task(
 async def update_tpl_from_raw_task(
     source_id: str,
     template_id: str,
-    content: str,
+    meta: dict,
+    sls_raw: str | None = None,
     context: Context = TaskiqDepends(),
     progress: ProgressTracker[Any] = TaskiqDepends(),
     orchestrator: SyncOrchestrator = TaskiqDepends(get_sync_orchestrator),
@@ -272,7 +273,7 @@ async def update_tpl_from_raw_task(
         await progress.set_progress(TaskState.STARTED, 'Update template from raw started')
         try:
             await orchestrator.update_template_from_raw(
-                PyObjectId(template_id), content, task_id=context.message.task_id
+                PyObjectId(template_id), meta=meta, sls_raw=sls_raw, task_id=context.message.task_id
             )
             await progress.set_progress(TaskState.STARTED, 'Update template from raw successful')
         except Exception:
