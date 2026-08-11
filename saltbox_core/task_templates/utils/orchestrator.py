@@ -949,15 +949,13 @@ class SyncOrchestrator:
 
         custom_root = self._manifest.root if self._manifest and self._manifest.root else source.root
         source_root = Path(SETTINGS.local_repos_dir) / source.local_path
+        schema_root = source_root / custom_root if custom_root else source_root
         if source.namespace:
             rel_path = Path(source.namespace.strip()) / f'{file_name}'
         else:
             rel_path = Path(f'{file_name}')
 
-        if source.root:
-            local_path = source_root / custom_root / rel_path
-        else:
-            local_path = source_root / rel_path
+        local_path = schema_root / rel_path
 
         # create json file
         json_file_path = local_path.with_suffix('.json')
@@ -997,7 +995,7 @@ class SyncOrchestrator:
         name = self._build_template_name(rel_path)
         try:
             tpl_data = self._extract_schema_payload(
-                parsed=meta, file_path=json_file_path, schema_root=source_root, name=name
+                parsed=meta, file_path=json_file_path, schema_root=schema_root, name=name
             )
             tpl_id = await self._template_service.create(
                 data=TaskTemplateCreateSchema(**tpl_data, source_id=source_id),
