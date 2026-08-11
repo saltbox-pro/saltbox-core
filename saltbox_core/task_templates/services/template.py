@@ -1,3 +1,4 @@
+import json
 from typing import Annotated, Any, override
 
 from fastapi import Depends
@@ -125,10 +126,21 @@ class TaskTemplateService(
                 logger.error('Failed to read SLS file %s: %s', sls_file, e)
                 sls_content = ''
 
+        meta: dict = {}
+        if tpl.schema_rel_path:
+            schema_file = path / tpl.schema_rel_path
+            logger.debug('Attempting to read schema file: %s', schema_file)
+            try:
+                meta = json.loads(schema_file.read_text())
+            except Exception as e:
+                logger.error('Failed to read schema file %s: %s', schema_file, e)
+                meta = {}
+
         return TaskTemplatePublicWithContentSchema.model_validate(
             {
                 **tpl.model_dump(),
                 'sls_content': sls_content,
+                'meta': meta,
                 '_id': tpl.id,
             }
         )

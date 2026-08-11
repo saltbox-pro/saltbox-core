@@ -88,6 +88,7 @@ class TaskTemplatePublicSchema(CreatedModifiedMixin, IDMixin):
 
 class TaskTemplatePublicWithContentSchema(TaskTemplatePublicSchema):
     sls_content: str
+    meta: dict = Field(title='Meta content (JSON schema + UI schema + i18n)', default_factory=dict)
 
 
 class TaskTemplateSchemasProjection(BaseModel):
