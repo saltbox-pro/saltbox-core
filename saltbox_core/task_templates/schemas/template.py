@@ -41,7 +41,8 @@ class TaskTemplateFromRawCreateSchema(BaseModel):
 
 
 class TaskTemplateFromRawUpdateSchema(BaseModel):
-    content: str
+    sls_raw: str | None = Field(default=None, title='SLS content')
+    meta: dict = Field(title='Meta content (JSON schema + UI schema + i18n)')
 
 
 class TaskTemplateUpdateSchema(BaseModel):
@@ -87,6 +88,7 @@ class TaskTemplatePublicSchema(CreatedModifiedMixin, IDMixin):
 
 class TaskTemplatePublicWithContentSchema(TaskTemplatePublicSchema):
     sls_content: str
+    meta: dict = Field(title='Meta content (JSON schema + UI schema + i18n)', default_factory=dict)
 
 
 class TaskTemplateSchemasProjection(BaseModel):

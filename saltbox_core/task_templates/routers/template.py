@@ -143,7 +143,12 @@ async def template_update(
     template_id: PyObjectId,
     body: Annotated[TaskTemplateFromRawUpdateSchema, Body()],
 ) -> TaskiqTaskIdResponse:
-    task = await update_tpl_from_raw_task.kiq(str(source_id), str(template_id), body.content)
+    task = await update_tpl_from_raw_task.kiq(
+        str(source_id),
+        str(template_id),
+        sls_raw=body.sls_raw,
+        meta=body.meta,
+    )
     return TaskiqTaskIdResponse(task_id=task.task_id)
 
 

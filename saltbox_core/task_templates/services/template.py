@@ -1,3 +1,4 @@
+import json
 from typing import Annotated, Any, override
 
 from fastapi import Depends
@@ -113,6 +114,18 @@ class TaskTemplateService(
         else:
             path = SETTINGS.local_repos_dir / tpl.local_path
 
+        if not tpl.schema_rel_path:
+            logger.warning('Template %s does not have a schema file path defined.', tpl_id)
+            meta = {}
+        else:
+            schema_file = path / tpl.schema_rel_path
+            logger.debug('Attempting to read schema file: %s', schema_file)
+            try:
+                meta = json.loads(schema_file.read_text())
+            except Exception as e:
+                logger.error('Failed to read schema file %s: %s', schema_file, e)
+                meta = {}
+
         if not tpl.sls_rel_path:
             logger.warning('Template %s does not have an SLS file path defined.', tpl_id)
             sls_content = ''
@@ -129,6 +142,7 @@ class TaskTemplateService(
             {
                 **tpl.model_dump(),
                 'sls_content': sls_content,
+                'meta': meta,
                 '_id': tpl.id,
             }
         )
