@@ -21,7 +21,7 @@ class TaskType(StrEnum):
 
 
 class TaskTemplateShort(IDMixin):
-    title: str = Field(title='Template title')
+    title: str | dict[str, str] = Field(title='Template title')
     name: str = Field(title='Template name')
     repo_id: PyObjectId | None = Field(title='Repository id', default=None)
     commit_hash: str | None = Field(title='Repository commit hash', default=None)
