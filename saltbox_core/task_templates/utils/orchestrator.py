@@ -947,6 +947,7 @@ class SyncOrchestrator:
             source_id, {'current_operation': SourceOperation.ADD_TEMPLATE_FROM_RAW, 'current_task_id': task_id}
         )
 
+        file_name = f'{file_name}.base'  # Ensure the file name has a .base suffix for consistency
         custom_root = self._manifest.root if self._manifest and self._manifest.root else source.root
         source_root = Path(SETTINGS.local_repos_dir) / source.local_path
         if source.namespace:
