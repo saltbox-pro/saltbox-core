@@ -9,7 +9,7 @@ from saltbox_bridge_messages import SaltTgtType
 from saltbox_core.config import SETTINGS
 from saltbox_core.utilities.jid import JID, JidError
 from saltbox_core.utilities.salt import fill_salt_kwarg_from_arg
-from saltbox_sdk.db.mongo.schemas_base import IDMixin, QueryParams, SortParams
+from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId, QueryParams, SortParams
 from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER, CreatedModifiedMixin, SkipLimitParams, SourceMixin, UserShort
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
 
@@ -43,6 +43,7 @@ class JobReadOnlyFieldsMixin(SourceMixin):
     arg: list | None = None
     kwarg: dict | None = None
 
+    template_id: PyObjectId | None = None
     ttl: int = Field(ge=1, le=SETTINGS.jobs_max_ttl, default=SETTINGS.jobs_default_ttl)
 
     user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
@@ -175,6 +176,7 @@ class CreateJobRequest(BaseModel):
     arg: list | None = None
     kwarg: dict | None = None
     ttl: int | None = Field(ge=0, le=SETTINGS.jobs_max_ttl, default=None)
+    template_id: PyObjectId | None = None
 
 
 # Permissions

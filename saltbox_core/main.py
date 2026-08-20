@@ -7,7 +7,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from saltbox_core import __version__
 from saltbox_core.config import APP_DESC, APP_NAME, SETTINGS
-from saltbox_core.jobs.routers.job_sc_router import router as job_schemas_router
 from saltbox_core.jobs.routers.jobs_router import router as jobs_router
 from saltbox_core.masters.routers.master_route import router as masters_router
 from saltbox_core.masters.routers.system_route import router as system_router
@@ -102,7 +101,6 @@ app.include_router(router=task_template_file_router)
 app.include_router(router=task_template_schema_router)
 app.include_router(filters_router)
 app.include_router(jobs_router)
-app.include_router(job_schemas_router)
 app.include_router(task_router)
 app.include_router(collections_router)
 app.include_router(minions_router)

@@ -1,6 +1,4 @@
 from saltbox_core.config import logger
-from saltbox_core.jobs.repositories.job_sc_repository import get_job_schema_repository
-from saltbox_core.jobs.services.job_sc_service import get_job_schema_service
 from saltbox_core.minion_collections.repositories.collection import get_collection_repository
 from saltbox_core.minion_collections.repositories.extra_data import get_extra_data_repository
 from saltbox_core.minion_collections.repositories.extra_data_category import get_extra_data_category_repository
@@ -58,7 +56,6 @@ async def remove_local_sources_without_namespace() -> None:
     task_repo = get_task_repository(db)
     task_status_repo = get_task_status_repository(db)
     task_minion_repo = get_task_minion_repository(db)
-    job_schema_repo = get_job_schema_repository(db)
     collection_repo = get_collection_repository(db)
     extra_data_category_repo = get_extra_data_category_repository(db)
     minion_extra_data_repo = get_extra_data_repository(db, extra_data_category_repo)
@@ -69,7 +66,6 @@ async def remove_local_sources_without_namespace() -> None:
     file_service = get_sshfs_file_service(repo=file_repo, sshfs_sync_service=sshfs_sync_service)
     task_status_service = get_task_status_service(repo=task_status_repo)
     task_minion_service = get_task_minion_service(repo=task_minion_repo, rdb=rdb)
-    job_schema_service = get_job_schema_service(repo=job_schema_repo)
     collections_service = get_collection_service(repo=collection_repo)
     minion_service = get_minion_service(repo=minion_repo)
     crypto_service = get_pillar_crypto_service()
@@ -88,7 +84,6 @@ async def remove_local_sources_without_namespace() -> None:
         task_status_service=task_status_service,
         task_template_service=task_template_service,
         task_minion_service=task_minion_service,
-        job_schema_service=job_schema_service,
         collections_service=collections_service,
         minion_service=minion_service,
         pillar_service=pillar_service,

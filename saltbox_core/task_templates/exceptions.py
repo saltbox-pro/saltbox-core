@@ -21,9 +21,11 @@ class TaskTemplateNotFoundException(TaskTemplateException):
     status_code: int = status.HTTP_400_BAD_REQUEST
     detail: str = 'Task template not found'
 
-    def __init__(self, template_name: str | None = None):
+    def __init__(self, template_name: str | None = None, template_id: str | None = None):
         if template_name:
             self.detail = f'Task template with name "{template_name}" not found'
+        if template_id:
+            self.detail = f'Task template with ID "{template_id}" not found'
         super().__init__(detail=self.detail)
 
 

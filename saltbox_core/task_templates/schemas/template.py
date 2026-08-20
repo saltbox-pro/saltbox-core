@@ -102,6 +102,10 @@ class TaskTemplateSchemasListRequest(BaseModel):
     names: list[str] = Field(title='Template names')
 
 
+class TaskTemplateDefaultsOnlySchema(BaseModel):
+    defaults: TaskTemplateDefaultsSchema | None = Field(title='Default values', default=None)
+
+
 class TaskTemplateSchemaResponse(BaseModel):
     json_schema: dict = Field(title='JSON schema')
     ui_schema: dict = Field(title='UI schema', default_factory=dict)

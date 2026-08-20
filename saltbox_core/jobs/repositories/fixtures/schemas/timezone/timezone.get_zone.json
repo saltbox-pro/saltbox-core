@@ -1,9 +1,0 @@
-{
-  "json_schema": {
-    "type": "object",
-    "title": "timezone.get_zone",
-    "description": "Get current timezone (i.e. America/Denver)",
-    "additionalProperties": false
-  },
-  "ui_schema": {}
-}

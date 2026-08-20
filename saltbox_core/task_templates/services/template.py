@@ -1,7 +1,8 @@
 import json
-from typing import Annotated, Any, override
+from typing import Annotated, Any, TypeVar, overload, override
 
 from fastapi import Depends
+from pydantic import BaseModel
 from pymongo.asynchronous.client_session import AsyncClientSession
 
 from saltbox_core.config import SETTINGS, logger
@@ -12,6 +13,7 @@ from saltbox_core.task_templates.repositories.template import TaskTemplateReposi
 from saltbox_core.task_templates.schemas.template import (
     TaskTemplateAggregatedModel,
     TaskTemplateCreateSchema,
+    TaskTemplateDefaultsOnlySchema,
     TaskTemplateModel,
     TaskTemplatePublicWithContentSchema,
     TaskTemplateSchemasProjection,
@@ -24,6 +26,8 @@ from saltbox_sdk.exceptions import ObjectNotFoundException
 # from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 from saltbox_sdk.utilities.json_schema import Draft4ValidatorWithDefaults
+
+ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
 
 
 class TaskTemplateService(
@@ -147,9 +151,44 @@ class TaskTemplateService(
             }
         )
 
-    async def get_by_name(self, name: str, sid: PyObjectId | None) -> TaskTemplateModel:
-        return await self.repo.get({'name': name, 'source_id': sid})
+    @overload
+    async def get_by_name(
+        self,
+        name: str,
+        sid: PyObjectId | None = None,
+        *,
+        session: AsyncClientSession | None = None,
+    ) -> TaskTemplateModel: ...
 
+    @overload
+    async def get_by_name(
+        self,
+        name: str,
+        sid: PyObjectId | None = None,
+        *,
+        session: AsyncClientSession | None = None,
+        projection_model: type[ProjectionModel],
+    ) -> ProjectionModel: ...
+
+    async def get_by_name(
+        self,
+        name: str,
+        sid: PyObjectId | None = None,
+        *,
+        session: AsyncClientSession | None = None,
+        projection_model: type[ProjectionModel] | None = None,
+    ) -> TaskTemplateModel | ProjectionModel:
+        if sid is None:
+            query: dict[str, str | PyObjectId] = {'name': name}
+        else:
+            query = {'name': name, 'source_id': sid}
+
+        if projection_model:
+            return await self.repo.get(query=query, session=session, projection_model=projection_model)
+
+        return await self.repo.get(query=query, session=session)
+
+    # TODO: Deprecated
     async def get_validated_data(self, name: str, sid: PyObjectId | None, data: dict) -> dict:
         try:
             task_template = await self.get_by_name(name=name, sid=sid)
@@ -159,6 +198,35 @@ class TaskTemplateService(
         Draft4ValidatorWithDefaults(task_template.json_schema).validate(data)
 
         return data
+
+    async def get_validated_data_by_id(
+        self, data: dict, template_id: PyObjectId | None = None, session: AsyncClientSession | None = None
+    ) -> dict:
+        if template_id is None:
+            return data
+        try:
+            task_template = await self.get(query={'_id': template_id}, session=session)
+        except ObjectNotFoundException:
+            raise TaskTemplateNotFoundException(template_id=str(template_id)) from None
+
+        Draft4ValidatorWithDefaults(task_template.json_schema).validate(data)
+
+        return data
+
+    async def get_ttl(self, name: str, session: AsyncClientSession | None = None) -> int:
+        try:
+            template_schema = await self.get_by_name(
+                name=name, session=session, projection_model=TaskTemplateDefaultsOnlySchema
+            )
+        except ObjectNotFoundException:
+            return SETTINGS.jobs_default_ttl
+
+        if template_schema.defaults is None or template_schema.defaults.ttl is None:
+            return SETTINGS.jobs_default_ttl
+        elif template_schema.defaults.ttl == 0:
+            return SETTINGS.jobs_max_ttl
+        else:
+            return template_schema.defaults.ttl
 
     async def get_schemas_by_names(self, names: list[str]) -> dict[str, dict[str, dict]]:
         for name in names:

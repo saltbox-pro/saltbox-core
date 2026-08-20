@@ -17,8 +17,8 @@ from saltbox_core.jobs.repositories.job_repository import JobRepository, get_job
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnStatus
 from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel, JobSimpleSchema, JobStatus, JobUpdateSchema
 from saltbox_core.jobs.services.job_return_service import JobReturnService, get_job_return_service
-from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
+from saltbox_core.task_templates.services.template import TaskTemplateService, get_task_tpl_service
 from saltbox_core.utilities.context import replace_raised
 from saltbox_core.utilities.jid import JID
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
@@ -49,11 +49,11 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         self,
         rdb: Redis,
         job_repository: JobRepository,
-        job_schema_service: JobSchemaService,
+        task_template_service: TaskTemplateService,
         job_return_service: JobReturnService,
         master_service: MasterService,
     ):
-        self.job_schema_service = job_schema_service
+        self.task_template_service = task_template_service
         self.job_return_service = job_return_service
         self.master_service = master_service
         super().__init__(repo=job_repository, rdb=rdb)
@@ -122,7 +122,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
             data.jid = str(JID.generate())
 
         if data.ttl is None:
-            data.ttl = await self.job_schema_service.get_ttl(name=data.fun, session=session)
+            data.ttl = await self.task_template_service.get_ttl(name=data.fun, session=session)
         elif data.ttl == 0:
             data.ttl = SETTINGS.jobs_max_ttl
 
@@ -135,8 +135,8 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
                 data_to_validate['args'] = data.arg
             if data.kwarg:
                 data_to_validate['kwargs'] = data.kwarg
-            validated_data = await self.job_schema_service.get_validated_data(
-                name=data.fun, data=data_to_validate, session=session
+            validated_data = await self.task_template_service.get_validated_data_by_id(
+                template_id=data.template_id, data=data_to_validate, session=session
             )
             data.arg = validated_data.get('args')
             data.kwarg = validated_data.get('kwargs')
@@ -280,14 +280,14 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
 def get_job_service(
     rdb: Annotated[Redis, Depends(get_redis)],
     job_repository: Annotated[JobRepository, Depends(get_job_repository)],
-    job_schema_service: Annotated[JobSchemaService, Depends(get_job_schema_service)],
+    task_template_service: Annotated[TaskTemplateService, Depends(get_task_tpl_service)],
     job_return_service: Annotated[JobReturnService, Depends(get_job_return_service)],
     master_service: Annotated[MasterService, Depends(get_master_service)],
 ) -> JobService:
     return JobService(
         rdb=rdb,
         job_repository=job_repository,
-        job_schema_service=job_schema_service,
+        task_template_service=task_template_service,
         job_return_service=job_return_service,
         master_service=master_service,
     )
