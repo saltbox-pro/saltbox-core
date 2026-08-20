@@ -1,3 +1,4 @@
+from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Annotated, Any
 
@@ -5,6 +6,7 @@ from fastapi import Depends
 from redis.asyncio import Redis
 
 from saltbox_core.config import logger
+from saltbox_core.jobs.schemas.job_return_schemas import JobReturnStatus, JobReturnTgtOnlySchema
 from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobJidOnlySchema, JobStatus
 from saltbox_core.jobs.services.job_return_service import JobReturnService, get_job_return_service
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
@@ -12,8 +14,13 @@ from saltbox_core.masters.services.master_service import MasterService, get_mast
 from saltbox_core.minion_collections.services.collection import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion import MinionService, get_minion_service
 from saltbox_core.tasks.exceptions import TaskServiceException
+from saltbox_core.tasks.policy_ordering import PolicyExecutionInfo, resolve_execution_status
 from saltbox_core.tasks.schemas.task import TaskForLifespanModel, TaskModel, TaskType
-from saltbox_core.tasks.schemas.tasks_minion import TaskMinionStatus, TaskMinionTgtOnlySchema
+from saltbox_core.tasks.schemas.tasks_minion import (
+    TaskMinionForRequirementsCheckSchema,
+    TaskMinionStatus,
+    TaskMinionTgtOnlySchema,
+)
 from saltbox_core.tasks.schemas.tasks_status import TaskStatus
 from saltbox_core.tasks.services.task import TaskService, get_task_service
 from saltbox_core.tasks.services.tasks_minion import TaskMinionService, get_task_minion_service
@@ -208,6 +215,132 @@ class TaskLifespanService:
         # TODO: Get from settings
         return timedelta(seconds=60 * 10)
 
+    async def get_busy_minions_by_tgt(self, tgt: dict[str, list[str]]) -> list[dict[str, str]]:
+        task = await self.get_task()
+        busy_minions_tgt: list[dict[str, str]] = []
+
+        for master, minions_ids in tgt.items():
+            if task.fun == 'state.apply':
+                for busy_minion in await self.job_return_service.get_list(
+                    query={
+                        'fun': 'state.apply',
+                        'status': JobReturnStatus.waiting,
+                        'salt_master': master,
+                        'minion_id': {'$in': minions_ids},
+                    },
+                    projection_model=JobReturnTgtOnlySchema,
+                ):
+                    busy_minions_tgt.append({'minion_id': busy_minion.minion_id, 'master': busy_minion.salt_master})
+
+            for busy_task_minion in await self.task_minion_service.get_list(
+                query={
+                    'task_id': {'$ne': task.id},
+                    'status': TaskMinionStatus.in_work,
+                    'master': master,
+                    'minion_id': {'$in': minions_ids},
+                },
+                projection_model=TaskMinionTgtOnlySchema,
+            ):
+                busy_minion_tgt = {'minion_id': busy_task_minion.minion_id, 'master': busy_task_minion.master}
+                if busy_minion_tgt not in busy_minions_tgt:
+                    busy_minions_tgt.append(busy_minion_tgt)
+
+        return busy_minions_tgt
+
+    async def check_busy_task_minions(self) -> None:
+        task = await self.get_task()
+
+        pending_minions = await self.task_minion_service.get_list(
+            query={'task_id': task.id, 'status': TaskMinionStatus.pending}, projection_model=TaskMinionTgtOnlySchema
+        )
+
+        if pending_minions:
+            pending_minions_ids_by_master: dict[str, list[str]] = {}
+
+            for pending_minion in pending_minions:
+                pending_minions_ids_by_master.setdefault(pending_minion.master, []).append(pending_minion.minion_id)
+
+            busy_minions_tgt = await self.get_busy_minions_by_tgt(tgt=pending_minions_ids_by_master)
+
+            if busy_minions_tgt:
+                await self.task_minion_service.bulk_update(
+                    query={
+                        'task_id': task.id,
+                        'status': TaskMinionStatus.pending,
+                        '$or': busy_minions_tgt,
+                    },
+                    data={'status': TaskMinionStatus.busy},
+                )
+
+        busy_minions = await self.task_minion_service.get_list(
+            query={'task_id': task.id, 'status': TaskMinionStatus.busy}, projection_model=TaskMinionTgtOnlySchema
+        )
+
+        if busy_minions:
+            busy_minions_ids_by_master: dict[str, list[str]] = {}
+
+            for busy_minion in busy_minions:
+                busy_minions_ids_by_master.setdefault(busy_minion.master, []).append(busy_minion.minion_id)
+
+            busy_minions_tgt = await self.get_busy_minions_by_tgt(tgt=busy_minions_ids_by_master)
+            non_busy_minions_tgt: list[dict[str, str]] = []
+
+            for busy_minion in busy_minions:
+                busy_minion_tgt = {'minion_id': busy_minion.minion_id, 'master': busy_minion.master}
+                if busy_minion_tgt not in busy_minions_tgt:
+                    non_busy_minions_tgt.append(busy_minion_tgt)
+
+            if non_busy_minions_tgt:
+                await self.task_minion_service.bulk_update(
+                    query={
+                        'task_id': task.id,
+                        'status': TaskMinionStatus.busy,
+                        '$or': non_busy_minions_tgt,
+                    },
+                    data={'status': TaskMinionStatus.pending},
+                )
+
+    async def check_policy_requirements_task_minions(self) -> None:
+        task = await self.get_task()
+
+        if task.task_type != TaskType.policy:
+            return
+
+        candidates = await self.task_minion_service.get_list(
+            query={
+                'task_id': task.id,
+                'status': {'$in': [TaskMinionStatus.pending, TaskMinionStatus.blocked, TaskMinionStatus.unreachable]},
+            },
+            projection_model=TaskMinionForRequirementsCheckSchema,
+        )
+
+        if not candidates:
+            return
+
+        collections_by_id = await self.task_minion_service.get_collections_order_map()
+        ids_by_new_status: dict[TaskMinionStatus, list[PyObjectId]] = defaultdict(list)
+
+        for candidate in candidates:
+            policies = await self.task_minion_service.get_policies_for_minion(
+                minion_inner_id=candidate.minion_inner_id, collections_by_id=collections_by_id
+            )
+            execution_info = [
+                PolicyExecutionInfo(task_id=policy.task_id, status=policy.status, requirements=policy.task.requirements)
+                for policy in policies
+            ]
+
+            new_status = resolve_execution_status(task_id=task.id, ordered_policies=execution_info)
+
+            if new_status is None:
+                logger.warning(f'Policy task {task.id} not found in its own minion policies list')
+                continue
+
+            if new_status != candidate.status:
+                ids_by_new_status[new_status].append(candidate.id)
+
+        for new_status, ids in ids_by_new_status.items():
+            await self.task_minion_service.bulk_update(query={'_id': {'$in': ids}}, data={'status': new_status})
+
     async def create_job(self, master: str, batch_size: int) -> int:
         task = await self.get_task()
 
@@ -271,6 +404,9 @@ class TaskLifespanService:
                 task_id=task.id, target_collection_id=task.target_collection_id, target_query=task.target_query
             )
 
+        await self.check_policy_requirements_task_minions()
+        await self.check_busy_task_minions()
+
         total_count_minions_in_new_job = 0
         total_count_active_jobs = 0
 
@@ -304,7 +440,14 @@ class TaskLifespanService:
             and not await self.task_minion_service.exists(
                 query={
                     'task_id': task.id,
-                    'status': {'$in': [TaskMinionStatus.pending, TaskMinionStatus.busy, TaskMinionStatus.in_work]},
+                    'status': {
+                        '$in': [
+                            TaskMinionStatus.pending,
+                            TaskMinionStatus.busy,
+                            TaskMinionStatus.in_work,
+                            TaskMinionStatus.blocked,
+                        ]
+                    },
                 }
             )
         ):
@@ -347,6 +490,13 @@ class TaskLifespanService:
                 task_id=task.id, target_collection_id=task.target_collection_id, target_query=task.target_query
             ):
                 await self.update_task(status=TaskStatus.running)
+            else:
+                await self.check_policy_requirements_task_minions()
+
+                if await self.task_minion_service.exists(
+                    query={'task_id': task.id, 'status': TaskMinionStatus.pending}
+                ):
+                    await self.update_task(status=TaskStatus.running)
         else:
             await self.update_task(status=TaskStatus.running)
 

@@ -61,6 +61,10 @@ class CollectionMoveSchema(IDMixin, TreeMixin):
     order: int = Field(title='Order', ge=0, default=0)
 
 
+class CollectionOrderOnlySchema(BaseTreeModel):
+    order: int = Field(title='Order', ge=0, default=0)
+
+
 # REST
 
 

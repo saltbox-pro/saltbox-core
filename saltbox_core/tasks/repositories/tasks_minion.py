@@ -104,6 +104,44 @@ class TaskMinionRepository(BaseMongoRepository[TaskMinionModel]):
                     stages=[AddFieldsAggregationStage(fields={'count_runs': {'$size': '$job_returns'}})],
                     parent_aggregations=['job_returns'],
                 ),
+                AggregatedField(
+                    field_name='task',
+                    stages=[
+                        LookupAggregationStage(
+                            from_collection='tasks',
+                            local_field='task_id',
+                            foreign_field='_id',
+                            as_field='task',
+                        ),
+                        UnwindAggregationStage(path='$task'),
+                    ],
+                ),
+                AggregatedField(
+                    field_name='task_template',
+                    stages=[
+                        LookupAggregationStage(
+                            from_collection='task_templates',
+                            local_field='task.task_template_id',
+                            foreign_field='_id',
+                            as_field='task_template',
+                        ),
+                        UnwindAggregationStage(path='$task_template', preserve_null_and_empty_arrays=True),
+                    ],
+                    parent_aggregations=['task'],
+                ),
+                AggregatedField(
+                    field_name='target_collection',
+                    stages=[
+                        LookupAggregationStage(
+                            from_collection='minion_collections',
+                            local_field='task.target_collection_id',
+                            foreign_field='_id',
+                            as_field='target_collection',
+                        ),
+                        UnwindAggregationStage(path='$target_collection', preserve_null_and_empty_arrays=True),
+                    ],
+                    parent_aggregations=['task'],
+                ),
             ]
         )
 

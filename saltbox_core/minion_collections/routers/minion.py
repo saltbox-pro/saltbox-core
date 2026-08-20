@@ -28,6 +28,8 @@ from saltbox_core.minion_collections.services.extra_data_category import (
     get_extra_data_category_service,
 )
 from saltbox_core.minion_collections.services.minion import MinionService, get_minion_service
+from saltbox_core.tasks.schemas.tasks_minion import TaskMinionForPolicySchema
+from saltbox_core.tasks.services.tasks_minion import TaskMinionService, get_task_minion_service
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
@@ -152,6 +154,21 @@ async def minion_retrieve(
     minion = MinionDetailSchema(**minion.model_dump(exclude={'id'}, by_alias=True), _id=minion.id)
 
     return minion
+
+
+@router.get(
+    '/{mid}/policies',
+    operation_id='minion_policies_list',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.minions.read',
+        action=MinionsActions.READ,
+    ).model_dump(by_alias=True),
+)
+async def minion_policies_list(
+    mid: PyObjectId,
+    task_minion_service: Annotated[TaskMinionService, Depends(get_task_minion_service)],
+) -> list[TaskMinionForPolicySchema]:
+    return await task_minion_service.get_policies_for_minion(minion_inner_id=mid)
 
 
 @router.get(

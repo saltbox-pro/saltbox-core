@@ -16,14 +16,19 @@ from saltbox_core.minion_collections.services.minion import MinionService, get_m
 from saltbox_core.pillars.services.pillar import PillarService, get_pillar_service
 from saltbox_core.task_templates.schemas.template import TaskTemplateModel
 from saltbox_core.task_templates.services.template import TaskTemplateService, get_task_tpl_service
+from saltbox_core.tasks.policy_ordering import PolicyOrderingItem, order_ids_by_requirements
 from saltbox_core.tasks.repositories.task import TaskRepository, get_task_repository
 from saltbox_core.tasks.schemas.task import (
     TaskCreateInputSchema,
     TaskCreateSchema,
     TaskModel,
+    TaskPolicyForCollectionSchema,
+    TaskRequirement,
+    TaskShortForUpdateSchema,
     TaskTargetMinion,
+    TaskType,
     TaskUpdateSchema,
-    TaskWithStatusOnlySchema,
+    TaskWithTargetCollectionIdOnlySchema,
 )
 from saltbox_core.tasks.schemas.tasks_minion import TaskMinionCreateSchema, TaskMinionInnerIdOnly
 from saltbox_core.tasks.schemas.tasks_status import TaskStatus, TaskStatusCreateSchema
@@ -167,6 +172,9 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         return TaskCreateSchema.model_validate(
             {
                 'task_type': data.task_type,
+                'description': data.description,
+                'weight': data.weight,
+                'requirements': data.requirements,
                 'task_template_id': data.task_template_id,
                 'fun': fun,
                 'arg': task_arg,
@@ -186,6 +194,47 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                 'source': data.source,
             }
         ), pillars
+
+    async def __validate_requirements(
+        self,
+        target_collection_id: PyObjectId,
+        requirements: list[TaskRequirement],
+        *,
+        exclude_task_id: PyObjectId | None = None,
+        session: MongoAsyncClientSession | None = None,
+    ) -> None:
+        if not requirements:
+            return
+
+        requirement_task_ids = [requirement.task_id for requirement in requirements]
+
+        if exclude_task_id is not None and exclude_task_id in requirement_task_ids:
+            msg = 'A policy cannot list itself as a requirement'
+            raise SaltBoxValidationException(msg)
+
+        referenced_tasks = await self.get_list(
+            query={'_id': {'$in': requirement_task_ids}},
+            session=session,
+            projection_model=TaskWithTargetCollectionIdOnlySchema,
+        )
+        referenced_by_id = {task.id: task for task in referenced_tasks}
+
+        missing_ids = [task_id for task_id in requirement_task_ids if task_id not in referenced_by_id]
+        if missing_ids:
+            msg = f'Requirement task(s) not found: {", ".join(str(task_id) for task_id in missing_ids)}'
+            raise SaltBoxValidationException(msg)
+
+        wrong_collection_ids = [
+            str(task_id)
+            for task_id in requirement_task_ids
+            if referenced_by_id[task_id].target_collection_id != target_collection_id
+        ]
+        if wrong_collection_ids:
+            msg = (
+                'Requirement task(s) must belong to the same collection as the policy: '
+                f'{", ".join(wrong_collection_ids)}'
+            )
+            raise SaltBoxValidationException(msg)
 
     async def __get_minions_by_targeting(
         self,
@@ -278,6 +327,11 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                 save_pillars_as_default = validated_data.save_pillars_as_default
                 logger.debug(f'Save as default: {save_pillars_as_default}')
                 creation_data, pillars = await self.__parse_input_create_schema(data=validated_data)
+                await self.__validate_requirements(
+                    target_collection_id=creation_data.target_collection_id,
+                    requirements=creation_data.requirements,
+                    session=s,
+                )
 
                 task_id = await self.repo.create(data=creation_data, session=s)
                 task = await self.get(query=task_id, session=s)
@@ -333,13 +387,31 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         session: MongoAsyncClientSession | None = None,
         notify: bool = True,
     ) -> PyObjectId:
-        obj = await self.get(query=query, session=session, projection_model=TaskWithStatusOnlySchema)
+        obj = await self.get(query=query, session=session, projection_model=TaskShortForUpdateSchema)
 
         new_status = None
         if hasattr(data, 'status'):
             new_status = data.status
         elif isinstance(data, dict) and 'status' in data:
             new_status = data.pop('status')
+
+        requirements = None
+        if isinstance(data, BaseModel):
+            if 'requirements' in data.model_fields_set:
+                requirements = data.requirements
+        elif isinstance(data, dict) and 'requirements' in data:
+            requirements = [
+                item if isinstance(item, TaskRequirement) else TaskRequirement.model_validate(item)
+                for item in data['requirements']
+            ]
+
+        if requirements is not None:
+            await self.__validate_requirements(
+                target_collection_id=obj.target_collection_id,
+                requirements=requirements,
+                exclude_task_id=obj.id,
+                session=session,
+            )
 
         if new_status and obj.status.type != new_status:
             await self.task_status_service.create(
@@ -359,6 +431,22 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
             session=session,
             notify=notify,
         )
+
+    async def get_policies_for_collection(
+        self, target_collection_id: PyObjectId
+    ) -> list[TaskPolicyForCollectionSchema]:
+        policies = await self.get_list(
+            query={'task_type': TaskType.policy, 'target_collection_id': target_collection_id},
+            projection_model=TaskPolicyForCollectionSchema,
+        )
+
+        by_task_id = {policy.id: policy for policy in policies}
+        ordering_items = [
+            PolicyOrderingItem(id=policy.id, weight=policy.weight, requirements=policy.requirements)
+            for policy in policies
+        ]
+
+        return [by_task_id[task_id] for task_id in order_ids_by_requirements(ordering_items)]
 
 
 def get_task_service(

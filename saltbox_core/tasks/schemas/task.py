@@ -23,8 +23,6 @@ class TaskType(StrEnum):
 class TaskTemplateShort(IDMixin):
     title: str | dict[str, str] = Field(title='Template title')
     name: str = Field(title='Template name')
-    repo_id: PyObjectId | None = Field(title='Repository id', default=None)
-    commit_hash: str | None = Field(title='Repository commit hash', default=None)
     defaults: TaskTemplateDefaultsSchema | None = Field(title='Default values', default=None)
 
 
@@ -53,7 +51,23 @@ class TaskReadOnlyFieldsMixin(SourceMixin):
     user: UserShort
 
 
+class TaskRequirementResultType(StrEnum):
+    only_success = 'only_success'
+    only_failed = 'only_failed'
+    any = 'any'
+
+
+class TaskRequirement(BaseModel):
+    task_id: PyObjectId = Field(title='Task ID')
+    result_type: TaskRequirementResultType = Field(title='Task result type')
+
+
 class TaskEditableFieldsMixin(BaseModel):
+    description: str = Field(title='Description', default='')
+
+    weight: int = Field(title='Weight', default=1000)
+    requirements: list[TaskRequirement] = Field(title='Requirements', default_factory=list)
+
     batch_size: int = Field(title='Batch size', ge=0, default=SETTINGS.tasks_defaults_batch_size)
     max_jobs_count_at_same_time: int = Field(
         title='Max jobs count at some time', ge=1, default=SETTINGS.tasks_defaults_max_jobs_count_at_same_time
@@ -144,7 +158,20 @@ class TaskForStatusUpdateSchema(IDMixin):
     max_retries: int = Field(title='Max retries', default=SETTINGS.tasks_defaults_max_retries)
 
 
-class TaskWithStatusOnlySchema(TaskStatusJoinedFieldsMixin, IDMixin): ...
+class TaskShortForUpdateSchema(TaskStatusJoinedFieldsMixin, IDMixin):
+    target_collection_id: PyObjectId = Field(title='Target collection id')
+
+
+class TaskWithTargetCollectionIdOnlySchema(IDMixin):
+    target_collection_id: PyObjectId = Field(title='Target collection id')
+
+
+class TaskPolicyForCollectionSchema(TaskStatusJoinedFieldsMixin, CreatedModifiedMixin, IDMixin):
+    description: str = Field(title='Description', default='')
+    weight: int = Field(title='Weight', default=1000, exclude=True)
+    requirements: list[TaskRequirement] = Field(title='Requirements', default_factory=list)
+
+    task_template: TaskTemplateShort | None = Field(title='Task template', default=None)
 
 
 # REST
@@ -162,6 +189,11 @@ class TaskData(BaseModel):  # type: ignore[no-redef]
 
 class TaskCreateRequestSchema(BaseModel):
     task_type: TaskType = Field(title='Task type')
+
+    description: str = Field(title='Description', default='')
+
+    weight: int = Field(title='Weight', default=1000)
+    requirements: list[TaskRequirement] = Field(title='Requirements', default_factory=list)
 
     collection_id: PyObjectId | None = Field(title='Collection ID', default=None)
     collection_slug: str | None = Field(title='Collection slug', default=None)

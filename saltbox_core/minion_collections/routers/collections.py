@@ -14,6 +14,8 @@ from saltbox_core.minion_collections.schemas.collection import (
     CollectionUpdateSchema,
 )
 from saltbox_core.minion_collections.services.collection import CollectionService, get_collection_service
+from saltbox_core.tasks.schemas.task import TaskPolicyForCollectionSchema
+from saltbox_core.tasks.services.task import TaskService, get_task_service
 from saltbox_sdk.db.mongo.schemas_base import SortOrder
 from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
@@ -112,6 +114,24 @@ async def collection_retrieve(
 ) -> CollectionDetailSchema:
     response = await collection_service.get(query={'slug': slug})
     return CollectionDetailSchema(**response.model_dump(exclude={'id'}), _id=response.id)
+
+
+@router.get(
+    '/{slug}/policies',
+    operation_id='minion_collection_policies_list',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.collections.read',
+        action=CollectionActions.READ,
+        cache_ttl=0,
+    ).model_dump(by_alias=True),
+)
+async def collection_policies_list(
+    slug: str,
+    collection_service: Annotated[CollectionService, Depends(get_collection_service)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
+) -> list[TaskPolicyForCollectionSchema]:
+    collection = await collection_service.get_by_slug(slug)
+    return await task_service.get_policies_for_collection(target_collection_id=collection.id)
 
 
 @router.post(

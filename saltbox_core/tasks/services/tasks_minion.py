@@ -1,3 +1,4 @@
+from collections import defaultdict
 from collections.abc import Callable
 from typing import Annotated, TypeVar, cast
 
@@ -8,9 +9,18 @@ from redis.asyncio import Redis
 
 from saltbox_core.config import logger
 from saltbox_core.db.tiq_tasks import send_notify_by_mongo_service
+from saltbox_core.minion_collections.repositories.collection import CollectionRepository
+from saltbox_core.minion_collections.schemas.collection import CollectionOrderOnlySchema
+from saltbox_core.tasks.policy_ordering import PolicyOrderingItem, collection_order_path, order_ids_by_requirements
 from saltbox_core.tasks.repositories.task import TaskRepository
 from saltbox_core.tasks.repositories.tasks_minion import TaskMinionRepository, get_task_minion_repository
-from saltbox_core.tasks.schemas.tasks_minion import TaskMinionCreateSchema, TaskMinionModel, TaskMinionUpdateSchema
+from saltbox_core.tasks.schemas.task import TaskType
+from saltbox_core.tasks.schemas.tasks_minion import (
+    TaskMinionCreateSchema,
+    TaskMinionForPolicySchema,
+    TaskMinionModel,
+    TaskMinionUpdateSchema,
+)
 from saltbox_sdk.db.mongo.config import get_mongo_db
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.redis.config import get_redis
@@ -31,6 +41,7 @@ class TaskMinionService(
         super().__init__(repo=repo, rdb=rdb)
 
         self.task_repository = TaskRepository(database=get_mongo_db())  # TODO (@): Temporary
+        self.collection_repository = CollectionRepository(database=get_mongo_db())  # TODO (@): Temporary
 
     @property
     def notify_taskiq_task(self) -> Callable:
@@ -69,6 +80,53 @@ class TaskMinionService(
             logger.error(e)
         except ObjectNotFoundException:
             logger.debug(f'Object "{self.repo.Meta.collection_name}" for notifying not found by query: {obj_id}')
+
+    async def get_collections_order_map(self) -> dict[PyObjectId, CollectionOrderOnlySchema]:
+        collections = await self.collection_repository.get_list(query=None, projection_model=CollectionOrderOnlySchema)
+        return {collection.id: collection for collection in collections}
+
+    async def get_policies_for_minion(
+        self,
+        minion_inner_id: PyObjectId,
+        *,
+        collections_by_id: dict[PyObjectId, CollectionOrderOnlySchema] | None = None,
+    ) -> list[TaskMinionForPolicySchema]:
+        policies = await self.get_list(
+            query={'minion_inner_id': minion_inner_id, 'task.task_type': TaskType.policy},
+            projection_model=TaskMinionForPolicySchema,
+        )
+
+        if not policies:
+            return []
+
+        if collections_by_id is None:
+            collections_by_id = await self.get_collections_order_map()
+
+        groups: dict[PyObjectId, list[TaskMinionForPolicySchema]] = defaultdict(list)
+        for policy in policies:
+            groups[policy.target_collection.id].append(policy)
+
+        ordered_collection_ids = sorted(
+            groups.keys(), key=lambda collection_id: collection_order_path(collection_id, collections_by_id)
+        )
+
+        result: list[TaskMinionForPolicySchema] = []
+        for collection_id in ordered_collection_ids:
+            result.extend(self.__order_group_by_requirements(groups[collection_id]))
+
+        return result
+
+    @staticmethod
+    def __order_group_by_requirements(
+        policies: list[TaskMinionForPolicySchema],
+    ) -> list[TaskMinionForPolicySchema]:
+        by_task_id = {policy.task.id: policy for policy in policies}
+        ordering_items = [
+            PolicyOrderingItem(id=policy.task.id, weight=policy.task.weight, requirements=policy.task.requirements)
+            for policy in policies
+        ]
+
+        return [by_task_id[task_id] for task_id in order_ids_by_requirements(ordering_items)]
 
 
 def get_task_minion_service(

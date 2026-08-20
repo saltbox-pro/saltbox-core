@@ -3,6 +3,7 @@ from enum import StrEnum
 from pydantic import BaseModel, ConfigDict, Field
 
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnStatus
+from saltbox_core.tasks.schemas.task import CollectionShort, TaskRequirement, TaskTemplateShort
 from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId, QueryParams, SortParams
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
@@ -12,6 +13,8 @@ from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatet
 
 class TaskMinionStatus(StrEnum):
     pending = 'pending'
+    blocked = 'blocked'
+    unreachable = 'unreachable'
     busy = 'busy'
     in_work = 'in_work'
     success = 'success'
@@ -70,6 +73,29 @@ class TaskMinionTgtOnlySchema(IDMixin):
 
 class TaskMinionForTaskStatusUpdateSchema(IDMixin):
     count_runs: int = Field(title='Count runs')
+
+
+class TaskMinionForRequirementsCheckSchema(IDMixin):
+    minion_inner_id: PyObjectId = Field(title='Minion Mongo ID')
+    status: TaskMinionStatus = Field(title='Status', default=TaskMinionStatus.pending)
+
+
+class TaskForTaskMinionMinionSchema(IDMixin):
+    description: str = Field(title='Description', default='')
+    weight: int = Field(title='Weight', default=1000, exclude=True)
+    requirements: list[TaskRequirement] = Field(title='Requirements', default_factory=list)
+
+
+class TaskMinionForPolicySchema(CreatedModifiedMixin, IDMixin):
+    task_id: PyObjectId = Field(title='Task ID')
+    status: TaskMinionStatus = Field(title='Status', default=TaskMinionStatus.pending)
+    start_last_dt: TimezoneAwareDatetime | None = Field(title='Last job start dt', default=None)
+    finished_dt: TimezoneAwareDatetime | None = Field(title='Processing finished dt', default=None)
+
+    # Joined fields
+    task: TaskForTaskMinionMinionSchema = Field(title='Task')
+    task_template: TaskTemplateShort | None = Field(title='Task template', default=None)
+    target_collection: CollectionShort = Field(title='Target collection')
 
 
 # REST

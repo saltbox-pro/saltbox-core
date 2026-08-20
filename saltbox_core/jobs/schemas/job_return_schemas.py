@@ -85,6 +85,11 @@ class JobReturnNotifySchema(
 # System
 
 
+class JobReturnTgtOnlySchema(IDMixin):
+    minion_id: str
+    salt_master: str
+
+
 class JobReturnForJobWatcherSchema(SourceMixin, IDMixin):
     jid: StrJid
     minion_id: str
