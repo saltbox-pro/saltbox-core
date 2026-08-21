@@ -104,6 +104,8 @@ class TaskMinionsCountAggregation(BaseModel):
     total: int = Field(title='Total number of minions', default=0)
     pending: int = Field(title='Pending minions', default=0)
     busy: int = Field(title='Busy', default=0)
+    blocked: int = Field(title='Blocked', default=0)
+    unreachable: int = Field(title='Unreachable', default=0)
     in_work: int = Field(title='In work', default=0)
     success: int = Field(title='Success', default=0)
     failed: int = Field(title='Failed', default=0)
