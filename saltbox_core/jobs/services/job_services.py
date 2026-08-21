@@ -135,7 +135,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
                 data_to_validate['args'] = data.arg
             if data.kwarg:
                 data_to_validate['kwargs'] = data.kwarg
-            validated_data = await self.task_template_service.get_validated_data_by_id(
+            validated_data = await self.task_template_service.get_validated_data(
                 template_id=data.template_id, data=data_to_validate, session=session
             )
             data.arg = validated_data.get('args')

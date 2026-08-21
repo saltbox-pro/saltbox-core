@@ -101,7 +101,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
             fun = task_template.fun
 
             try:
-                validated_data = await self.task_template_service.get_validated_data_by_id(
+                validated_data = await self.task_template_service.get_validated_data(
                     template_id=task_template.id, data=task_data
                 )
             except JsonSchemaValidationError as err:

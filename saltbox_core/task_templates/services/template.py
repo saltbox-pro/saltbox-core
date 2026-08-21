@@ -188,18 +188,7 @@ class TaskTemplateService(
 
         return await self.repo.get(query=query, session=session)
 
-    # TODO: Deprecated
-    async def get_validated_data(self, name: str, sid: PyObjectId | None, data: dict) -> dict:
-        try:
-            task_template = await self.get_by_name(name=name, sid=sid)
-        except ObjectNotFoundException:
-            task_template = await self.get_by_name('default', sid=sid)
-
-        Draft4ValidatorWithDefaults(task_template.json_schema).validate(data)
-
-        return data
-
-    async def get_validated_data_by_id(
+    async def get_validated_data(
         self, data: dict, template_id: PyObjectId | None = None, session: AsyncClientSession | None = None
     ) -> dict:
         if template_id is None:
