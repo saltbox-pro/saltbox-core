@@ -16,6 +16,7 @@ from saltbox_core.tasks.repositories.task import TaskRepository
 from saltbox_core.tasks.repositories.tasks_minion import TaskMinionRepository, get_task_minion_repository
 from saltbox_core.tasks.schemas.task import TaskType
 from saltbox_core.tasks.schemas.tasks_minion import (
+    MinionPolicyGroupSchema,
     TaskMinionCreateSchema,
     TaskMinionForPolicySchema,
     TaskMinionModel,
@@ -127,6 +128,25 @@ class TaskMinionService(
         ]
 
         return [by_task_id[task_id] for task_id in order_ids_by_requirements(ordering_items)]
+
+    async def get_policy_groups_for_minion(
+        self,
+        minion_inner_id: PyObjectId,
+        *,
+        collections_by_id: dict[PyObjectId, CollectionOrderOnlySchema] | None = None,
+    ) -> list[MinionPolicyGroupSchema]:
+        policies = await self.get_policies_for_minion(
+            minion_inner_id=minion_inner_id, collections_by_id=collections_by_id
+        )
+
+        groups: dict[PyObjectId, list[TaskMinionForPolicySchema]] = {}
+        for policy in policies:
+            groups.setdefault(policy.target_collection.id, []).append(policy)
+
+        return [
+            MinionPolicyGroupSchema(target_collection=group_policies[0].target_collection, policies=group_policies)
+            for group_policies in groups.values()
+        ]
 
 
 def get_task_minion_service(

@@ -95,7 +95,12 @@ class TaskMinionForPolicySchema(CreatedModifiedMixin, IDMixin):
     # Joined fields
     task: TaskForTaskMinionMinionSchema = Field(title='Task')
     task_template: TaskTemplateShort | None = Field(title='Task template', default=None)
+    target_collection: CollectionShort = Field(title='Target collection', exclude=True)
+
+
+class MinionPolicyGroupSchema(BaseModel):
     target_collection: CollectionShort = Field(title='Target collection')
+    policies: list[TaskMinionForPolicySchema] = Field(title='Policies', default_factory=list)
 
 
 # REST
