@@ -49,7 +49,11 @@ from saltbox_core.task_templates.schemas.sshfs_file import (
     SshfsFileCreateSchema,
     SshfsFileType,
 )
-from saltbox_core.task_templates.schemas.template import TaskTemplateAggregatedModel, TaskTemplateCreateSchema
+from saltbox_core.task_templates.schemas.template import (
+    TaskTemplateAggregatedModel,
+    TaskTemplateCreateSchema,
+    TaskTemplateMetaSchema,
+)
 from saltbox_core.task_templates.services.source import TemplateSourceService, get_tpl_source_service
 from saltbox_core.task_templates.services.sshfs_file import SshfsFileService, get_sshfs_file_service
 from saltbox_core.task_templates.services.template import TaskTemplateService, get_task_tpl_service
@@ -216,28 +220,6 @@ class SyncOrchestrator:
 
         return pattern.sub(_replace, template)
 
-    @staticmethod
-    def _normalize_i18n(i18n_raw: Any) -> dict[str, dict[str, str]]:
-        if i18n_raw is None:
-            return {}
-        if not isinstance(i18n_raw, dict):
-            msg = '`i18n` must be a dictionary'
-            raise ValueError(msg)
-
-        normalized: dict[str, dict[str, str]] = {}
-        for locale, values in i18n_raw.items():
-            if not isinstance(locale, str):
-                continue
-            if not isinstance(values, dict):
-                msg = f'`i18n.{locale}` must be a dictionary'
-                raise ValueError(msg)
-            normalized_values: dict[str, str] = {}
-            for key, value in values.items():
-                if isinstance(key, str) and isinstance(value, str):
-                    normalized_values[key] = value
-            normalized[locale] = normalized_values
-        return normalized
-
     def _extract_from_i18n_templates(
         self,
         *,
@@ -260,99 +242,54 @@ class SyncOrchestrator:
 
         return rendered_values
 
-    @staticmethod
-    def _resolve_fun_and_paths(
-        *,
-        file_path: Path,
-        schema_root: Path,
-    ) -> tuple[str, str | None, str | None]:
-        if file_path.suffix != '.json':
-            return 'state.apply', str(file_path.relative_to(schema_root)), None
-
-        schema_rel_path = str(file_path.relative_to(schema_root))
-        sls_file = file_path.with_suffix('.sls')
-        if sls_file.exists():
-            return 'state.apply', str(sls_file.relative_to(schema_root)), schema_rel_path
-        return file_path.stem, None, schema_rel_path
-
-    async def _parse_and_save_templates(self, source_id: PyObjectId) -> None:
-        parsed_schemas = await self._parse_from_local(source_id)
-        parsed_schemas_v2 = await self._parse_from_local_v2(source_id)
-        merged_schemas = {**parsed_schemas, **parsed_schemas_v2}
-        await self._save_templates_to_db(source_id, merged_schemas)
-
-    def _extract_schema_payload(
+    async def _extract_schema_payload(
         self,
-        parsed: dict[str, Any],
+        meta: TaskTemplateMetaSchema,
         *,
         file_path: Path,
         schema_root: Path,
         name: str,
     ) -> dict[str, Any]:
-        raw_json_schema = parsed.get('json_schema', {})
-        raw_ui_schema = parsed.get('ui_schema', {})
-        raw_i18n: Any = parsed.get('i18n', {})
-        secret_pillars = parsed.get('secret_pillars', [])
-        if not isinstance(raw_json_schema, dict):
-            msg = '`json_schema` must be a dictionary'
-            raise ValueError(msg)
-        if not isinstance(raw_ui_schema, dict):
-            msg = '`ui_schema` must be a dictionary'
-            raise ValueError(msg)
-        normalized_i18n = self._normalize_i18n(raw_i18n)
+        sls_path = file_path.with_suffix('.sls')
+        if sls_path.exists() and sls_path.is_file():
+            async with await anyio.open_file(sls_path, 'rb') as f:
+                sls_content = (await f.read()).decode('utf-8')
+            sls_rel_path = sls_path.relative_to(schema_root)
+        else:
+            sls_content = None
+            sls_rel_path = None
+        schema_rel_path = file_path.relative_to(schema_root)
 
-        fun, sls_rel_path, schema_rel_path = self._resolve_fun_and_paths(
-            file_path=file_path,
-            schema_root=schema_root,
+        # Get translated text from i18n templates if available
+        title = self._extract_from_i18n_templates(
+            i18n=meta.i18n,
+            raw_value=meta.title if isinstance(meta.title, str) else None,
         )
+        if title is None:
+            title = name
 
-        title_from_json_schema_raw = raw_json_schema.get('title')
-        title_from_json_schema = title_from_json_schema_raw if isinstance(title_from_json_schema_raw, str) else None
-
-        ui_title_template = raw_ui_schema.get('ui:title')
-        title_value = self._extract_from_i18n_templates(
-            i18n=normalized_i18n,
-            raw_value=ui_title_template if isinstance(ui_title_template, str) else None,
+        description = self._extract_from_i18n_templates(
+            i18n=meta.i18n,
+            raw_value=meta.description if isinstance(meta.description, str) else None,
         )
-        if title_value is None:
-            title_value = title_from_json_schema
-        if title_value is None:
-            title_value = name
-
-        ui_description_template = raw_ui_schema.get('ui:description')
-        description_value = self._extract_from_i18n_templates(
-            i18n=normalized_i18n,
-            raw_value=ui_description_template if isinstance(ui_description_template, str) else None,
-        )
-        if description_value is None:
-            description_value = parsed.get('description')
-            if isinstance(description_value, dict):
-                description_value = {
-                    locale: value
-                    for locale, value in description_value.items()
-                    if isinstance(locale, str) and isinstance(value, str)
-                } or None
-            elif not isinstance(description_value, str):
-                description_value = None
-        if description_value is None:
-            description_value = ''
 
         return {
-            'fun': parsed.get('fun', fun),
+            'fun': meta.fun,
             'name': name,
-            'title': title_value,
-            'query': parsed.get('query', {}),
-            'description': description_value,
-            'defaults': parsed.get('defaults'),
-            'json_schema': raw_json_schema,
-            'ui_schema': raw_ui_schema,
-            'i18n': normalized_i18n,
-            'sls_rel_path': sls_rel_path,
-            'schema_rel_path': schema_rel_path,
-            'secret_pillars': secret_pillars,
+            'title': title,
+            'description': description,
+            'query': meta.query,
+            'defaults': meta.defaults,
+            'json_schema': meta.json_schema,
+            'ui_schema': meta.ui_schema,
+            'i18n': meta.i18n,
+            'sls_rel_path': str(sls_rel_path) if sls_rel_path else None,
+            'schema_rel_path': str(schema_rel_path) if schema_rel_path else None,
+            'sls_content': sls_content,
+            'secret_pillars': meta.secret_pillars,
         }
 
-    async def _parse_from_local_v2(self, source_id: PyObjectId) -> dict[str, dict[str, Any]]:
+    async def _parse_from_local(self, source_id: PyObjectId) -> dict[str, dict[str, Any]]:
         source = await self._source_service.get(source_id)
 
         parsed_schemas: dict[str, dict[str, Any]] = {}
@@ -384,52 +321,10 @@ class SyncOrchestrator:
                 continue
 
             name = self._build_template_name(schema_file.relative_to(schema_root))
-            schema_payload = self._extract_schema_payload(
-                parsed, file_path=schema_file, schema_root=schema_root, name=name
+            schema_payload = await self._extract_schema_payload(
+                TaskTemplateMetaSchema.model_validate(parsed), file_path=schema_file, schema_root=schema_root, name=name
             )
             parsed_schemas[name] = schema_payload
-
-        return parsed_schemas
-
-    async def _parse_from_local(self, source_id: PyObjectId) -> dict[str, dict[str, Any]]:
-        source = await self._source_service.get(source_id)
-
-        parsed_schemas: dict[str, dict[str, Any]] = {}
-
-        custom_root = self._manifest.root if self._manifest and self._manifest.root else source.root
-        source_root = Path(SETTINGS.local_repos_dir) / source.local_path
-        sls_root = source_root if not custom_root else source_root / custom_root
-
-        if not sls_root.exists() or not sls_root.is_dir():
-            msg = f'Local path {sls_root} does not exist or is not a directory.'
-            logger.error(msg)
-            raise FileNotFoundError(msg)
-
-        pattern = re.compile(r'{#start_schema(.*?)end_schema#}', re.DOTALL)
-
-        for sls_file in sls_root.rglob('*.sls'):
-            try:
-                content = sls_file.read_text(encoding='utf-8')
-            except OSError as e:
-                logger.error(f'Failed to read SLS file {sls_file}: {e}')
-                continue
-
-            rel_path = sls_file.relative_to(sls_root)
-            name = self._build_template_name(rel_path)
-            match = pattern.search(content)
-
-            if match:
-                try:
-                    parsed = json.loads(match.group(1).strip())
-                except json.JSONDecodeError as e:
-                    msg = f'Failed to parse JSON schema in {sls_file}: {e}'
-                    logger.error(msg)
-                    raise ValueError(msg) from e
-
-                schema_payload = self._extract_schema_payload(
-                    parsed, file_path=sls_file, schema_root=sls_root, name=name
-                )
-                parsed_schemas[name] = schema_payload
 
         return parsed_schemas
 
@@ -449,12 +344,22 @@ class SyncOrchestrator:
         removed_tpl_count = await self._template_service.delete_many(query)
         logger.debug('removed_tpl_count: %s', removed_tpl_count)
 
+        source = await self._source_service.get(source_id)
+
         for name, schema in parsed_schemas.items():
             try:
                 existing_tpl = await self._template_service.get({'name': name, 'source_id': source_id})
             except ObjectNotFoundException:
                 existing_tpl = None
 
+            if schema.get('sls_rel_path'):
+                sls_file = (
+                    Path(SETTINGS.local_repos_dir) / source.local_path / (source.root or '') / schema['sls_rel_path']
+                )
+                async with await anyio.open_file(sls_file, 'rb') as f:
+                    schema['sls_content'] = (await f.read()).decode('utf-8')
+            else:
+                schema['sls_content'] = None
             if not existing_tpl:
                 logger.debug('Try create: %s, schema: %s', name, schema)
                 await self._template_service.create(
@@ -663,7 +568,8 @@ class SyncOrchestrator:
             raise
 
         try:
-            await self._parse_and_save_templates(source_id)
+            parsed_schemas = await self._parse_from_local(source_id)
+            await self._save_templates_to_db(source_id, parsed_schemas)
         except Exception as e:
             logger.error('Parse failed: %s', e)
             await self._source_service.update(
@@ -939,7 +845,12 @@ class SyncOrchestrator:
             raise
 
     async def create_template_from_raw(
-        self, source_id: PyObjectId, file_name: str, meta: dict, sls_raw: str | None = None, task_id: str | None = None
+        self,
+        source_id: PyObjectId,
+        file_name: str,
+        meta: TaskTemplateMetaSchema,
+        sls_raw: str | None = None,
+        task_id: str | None = None,
     ) -> PyObjectId:
         source = await self._source_service.get(source_id)
 
@@ -995,8 +906,8 @@ class SyncOrchestrator:
 
         name = self._build_template_name(rel_path)
         try:
-            tpl_data = self._extract_schema_payload(
-                parsed=meta, file_path=json_file_path, schema_root=schema_root, name=name
+            tpl_data = await self._extract_schema_payload(
+                meta=meta, file_path=json_file_path, schema_root=schema_root, name=name
             )
             tpl_id = await self._template_service.create(
                 data=TaskTemplateCreateSchema(**tpl_data, source_id=source_id),
@@ -1016,7 +927,11 @@ class SyncOrchestrator:
         return tpl_id
 
     async def update_template_from_raw(
-        self, template_id: PyObjectId, meta: dict, sls_raw: str | None = None, task_id: str | None = None
+        self,
+        template_id: PyObjectId,
+        meta: TaskTemplateMetaSchema,
+        sls_raw: str,
+        task_id: str | None = None,
     ) -> None:
         template = await self._template_service.get(template_id, projection_model=TaskTemplateAggregatedModel)
 
@@ -1043,13 +958,19 @@ class SyncOrchestrator:
             local_path = Path(SETTINGS.local_repos_dir) / template.local_path / template.schema_rel_path
 
         # update json file
+        if not meta:
+            msg = f'Template {template.name} does not have a valid meta data.'
+            logger.error(msg)
+            await self._source_service.update(template.source_id, {'current_operation': None, 'current_task_id': None})
+            raise ValueError(msg)
+
         try:
             local_path.parent.mkdir(parents=True, exist_ok=True)
             local_path.write_text(json.dumps(meta, indent=2), encoding='utf-8')
         except OSError as e:
             logger.error('Failed to write schema file: %s', e)
             raise
-        if sls_raw is None:
+        if sls_raw == '':
             # Remove the SLS file if it exists
             try:
                 sls_file_path = local_path.with_suffix('.sls')
@@ -1090,9 +1011,11 @@ class SyncOrchestrator:
         try:
             if template.sls_rel_path:
                 sls_local_path = local_path / template.sls_rel_path
+                logger.debug('Attempting to delete SLS file: %s', sls_local_path)
                 sls_local_path.unlink(missing_ok=True)
             if template.schema_rel_path:
                 schema_local_path = local_path / template.schema_rel_path
+                logger.debug('Attempting to delete schema file: %s', schema_local_path)
                 schema_local_path.unlink(missing_ok=True)
         except OSError as e:
             logger.error('Failed to delete template file: %s', e)

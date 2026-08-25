@@ -7,6 +7,7 @@ from taskiq.depends.progress_tracker import ProgressTracker, TaskState
 
 from saltbox_core.config import Settings, logger
 from saltbox_core.task_templates.exceptions import SourceRepoCloneException, TaskTemplateSourceLockException
+from saltbox_core.task_templates.schemas.template import TaskTemplateMetaSchema
 from saltbox_core.task_templates.utils.orchestrator import SyncOrchestrator, get_sync_orchestrator
 from saltbox_core.tkq import broker, queue_default
 from saltbox_core.utilities.redis_locker import AsyncRedisLockFactory
@@ -209,7 +210,7 @@ async def add_user_file_to_source_task(
 async def create_tpl_from_raw_task(
     source_id: str,
     file_name: str,
-    meta: dict,
+    meta: TaskTemplateMetaSchema,
     sls_raw: str | None = None,
     context: Context = TaskiqDepends(),
     progress: ProgressTracker[Any] = TaskiqDepends(),
@@ -238,22 +239,13 @@ async def create_tpl_from_raw_task(
             await progress.set_progress(TaskState.FAILURE, 'Create template from raw failed')
             raise
 
-        # try:
-        #     await orchestrator.discover(PyObjectId(source_id), task_id=context.message.task_id)
-        #     await progress.set_progress(TaskState.SUCCESS, 'Fetch successful')
-        # except Exception:
-        #     await progress.set_progress(TaskState.FAILURE, 'Fetch failed')
-        #     raise
-
-    # return {'status': 'created'}
-
 
 @broker.task(queue_name=queue_default.name)
 async def update_tpl_from_raw_task(
     source_id: str,
     template_id: str,
-    meta: dict,
-    sls_raw: str | None = None,
+    meta: TaskTemplateMetaSchema,
+    sls_raw: str,
     context: Context = TaskiqDepends(),
     progress: ProgressTracker[Any] = TaskiqDepends(),
     orchestrator: SyncOrchestrator = TaskiqDepends(get_sync_orchestrator),

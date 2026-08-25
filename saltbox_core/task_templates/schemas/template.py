@@ -28,6 +28,19 @@ class TaskTemplateCreateSchema(BaseModel):
     secret_pillars: list[str] | None = Field(title='Secret pillar names', default=None)
     json_schema: dict = Field(title='JSON schema', default_factory=dict)
     ui_schema: dict = Field(title='UI schema', default_factory=dict)
+    sls_content: str | None = Field(title='SLS content', default=None)
+    i18n: dict[str, dict[str, str]] = Field(title='I18n dictionary', default_factory=dict)
+
+
+class TaskTemplateMetaSchema(BaseModel):
+    title: str | dict[str, str] | None = None
+    description: str | dict[str, str] | None = None
+    fun: str
+    query: MongoQuery = MongoQueryField
+    defaults: TaskTemplateDefaultsSchema | None = Field(title='Default values', default=None)
+    secret_pillars: list[str] | None = Field(title='Secret pillar names', default=None)
+    json_schema: dict = Field(title='JSON schema', default_factory=dict)
+    ui_schema: dict = Field(title='UI schema', default_factory=dict)
     i18n: dict[str, dict[str, str]] = Field(title='I18n dictionary', default_factory=dict)
 
 
@@ -37,12 +50,12 @@ class TaskTemplateFromRawCreateSchema(BaseModel):
         pattern=r'^\w[\w-]*(?:\.[\w-]+)*(?:,\w[\w-]*(?:\.[\w-]+)*)*$',
     )
     sls_raw: str | None = Field(default=None, title='SLS content')
-    meta: dict = Field(title='Meta content (JSON schema + UI schema + i18n)')
+    meta: TaskTemplateMetaSchema = Field(title='Meta content (JSON schema + UI schema + i18n)')
 
 
 class TaskTemplateFromRawUpdateSchema(BaseModel):
-    sls_raw: str | None = Field(default=None, title='SLS content')
-    meta: dict = Field(title='Meta content (JSON schema + UI schema + i18n)')
+    sls_raw: str = Field(title='SLS content')
+    meta: TaskTemplateMetaSchema = Field(title='Meta content (JSON schema + UI schema + i18n)')
 
 
 class TaskTemplateUpdateSchema(BaseModel):
@@ -64,6 +77,7 @@ class TaskTemplateModel(CreatedModifiedMixin, IDMixin):
     secret_pillars: list[str] | None = Field(title='Secret pillar names', default=None)
     json_schema: dict = Field(title='JSON schema', default_factory=dict)
     ui_schema: dict = Field(title='UI schema', default_factory=dict)
+    sls_content: str | None = Field(title='SLS content', default=None)
     i18n: dict[str, dict[str, str]] = Field(title='I18n dictionary', default_factory=dict)
 
 
@@ -88,7 +102,7 @@ class TaskTemplatePublicSchema(CreatedModifiedMixin, IDMixin):
 
 class TaskTemplatePublicWithContentSchema(TaskTemplatePublicSchema):
     sls_content: str
-    meta: dict = Field(title='Meta content (JSON schema + UI schema + i18n)', default_factory=dict)
+    meta: TaskTemplateMetaSchema = Field(title='Meta content (JSON schema + UI schema + i18n)')
 
 
 class TaskTemplateSchemasProjection(BaseModel):
