@@ -156,7 +156,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
                 template_id=data.template_id, data=data_to_validate, session=session
             )
             data.arg = validated_data.get('args')
-            data.kwarg = validated_data.get('kwargs')
+            data.kwarg = validated_data.get('kwargs', {})
             if data.fun == 'state.apply' and data.kwarg and 'mods' not in data.kwarg and data.template_id:
                 data.kwarg['mods'] = template.name
         except JsonSchemaValidationError as e:
