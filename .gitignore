@@ -21,6 +21,7 @@ openapi.json
 /.vscode
 /.idea
 /.continue
+/.github
 
 # Other
 /.gitlab-ci-local

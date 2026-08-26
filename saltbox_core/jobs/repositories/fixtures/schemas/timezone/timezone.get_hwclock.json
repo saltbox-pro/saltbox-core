@@ -1,9 +1,0 @@
-{
-  "json_schema": {
-    "type": "object",
-    "title": "timezone.get_hwclock",
-    "description": "Get current hardware clock setting (UTC or localtime)",
-    "additionalProperties": false
-  },
-  "ui_schema": {}
-}

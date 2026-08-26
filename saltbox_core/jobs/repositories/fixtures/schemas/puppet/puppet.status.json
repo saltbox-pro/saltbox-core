@@ -1,8 +1,0 @@
-{
-  "json_schema": {
-    "type": "object",
-    "title": "puppet.status",
-    "description": "Display puppet agent status."
-  },
-  "ui_schema": {}
-}

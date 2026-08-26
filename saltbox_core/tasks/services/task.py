@@ -9,7 +9,6 @@ from redis.asyncio import Redis
 
 from saltbox_core.config import SETTINGS, logger
 from saltbox_core.db.tiq_tasks import send_notify_by_mongo_service
-from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
 from saltbox_core.minion_collections.schemas.collection import CollectionModel
 from saltbox_core.minion_collections.services.collection import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion import MinionService, get_minion_service
@@ -54,7 +53,6 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         task_status_service: TaskStatusService,
         task_template_service: TaskTemplateService,
         task_minion_service: TaskMinionService,
-        job_schema_service: JobSchemaService,
         collections_service: CollectionService,
         minion_service: MinionService,
         pillar_service: PillarService | None = None,
@@ -64,7 +62,6 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         self.task_status_service = task_status_service
         self.task_template_service = task_template_service
         self.task_minion_service = task_minion_service
-        self.job_schema_service = job_schema_service
         self.collections_service = collections_service
         self.minion_service = minion_service
         self.pillar_service = pillar_service
@@ -105,20 +102,16 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
 
             try:
                 validated_data = await self.task_template_service.get_validated_data(
-                    name=task_template.name, sid=task_template.source_id, data=task_data
+                    template_id=task_template.id, data=task_data
                 )
             except JsonSchemaValidationError as err:
                 raise SaltBoxValidationException(str(err)) from err
 
         elif data.fun:
             fun = data.fun
-
-            try:
-                validated_data = await self.job_schema_service.get_validated_data(name=fun, data=task_data)
-            except JsonSchemaValidationError as err:
-                raise SaltBoxValidationException(str(err)) from err
+            validated_data = task_data
         else:
-            msg = 'Task salt fun must be provided from direct fun or task template'
+            msg = 'Either task_template_id or fun must be provided'
             raise SaltBoxValidationException(msg)
 
         task_arg = validated_data.get('args')
@@ -169,6 +162,11 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         else:
             pillars = {}
 
+        if task_template and task_template.query:
+            target_query = {'$and': [task_template.query, data.query]} if data.query else task_template.query
+        else:
+            target_query = data.query
+
         return TaskCreateSchema.model_validate(
             {
                 'task_type': data.task_type,
@@ -180,7 +178,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                 'arg': task_arg,
                 'kwarg': task_kwarg,
                 'target_collection_id': collection.id,
-                'target_query': data.query,
+                'target_query': target_query,
                 'batch_size': data.batch_size if data.batch_size is not None else task_defaults['batch_size'],
                 'max_retries': data.max_retries if data.max_retries is not None else task_defaults['max_retries'],
                 'retry_delay': data.retry_delay if data.retry_delay is not None else task_defaults['retry_delay'],
@@ -455,7 +453,6 @@ def get_task_service(
     task_status_service: Annotated[TaskStatusService, Depends(get_task_status_service)],
     task_template_service: Annotated[TaskTemplateService, Depends(get_task_tpl_service)],
     task_minion_service: Annotated[TaskMinionService, Depends(get_task_minion_service)],
-    job_schema_service: Annotated[JobSchemaService, Depends(get_job_schema_service)],
     collections_service: Annotated[CollectionService, Depends(get_collection_service)],
     minion_service: Annotated[MinionService, Depends(get_minion_service)],
     pillar_service: Annotated[PillarService | None, Depends(get_pillar_service)] = None,
@@ -466,7 +463,6 @@ def get_task_service(
         task_status_service=task_status_service,
         task_template_service=task_template_service,
         task_minion_service=task_minion_service,
-        job_schema_service=job_schema_service,
         collections_service=collections_service,
         minion_service=minion_service,
         pillar_service=pillar_service,

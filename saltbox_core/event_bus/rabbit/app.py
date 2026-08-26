@@ -11,9 +11,7 @@ from saltbox_core.event_bus.rabbit.routers.minions import router as minion_route
 from saltbox_core.event_bus.rabbit.routers.scheduler import router as scheduler_router
 from saltbox_core.jobs.repositories.job_repository import get_job_repository
 from saltbox_core.jobs.repositories.job_return_repository import get_job_return_repository
-from saltbox_core.jobs.repositories.job_sc_repository import get_job_schema_repository
 from saltbox_core.jobs.services.job_return_service import get_job_return_service
-from saltbox_core.jobs.services.job_sc_service import get_job_schema_service
 from saltbox_core.jobs.services.job_services import get_job_service
 from saltbox_core.masters.repositories.master_repository import get_master_repository
 from saltbox_core.masters.services.master_service import get_master_service
@@ -58,18 +56,10 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
     extra_data_service = get_extra_data_service(repo=extra_data_repository)
     minion_repository = get_minion_repository(db=mongo_db, extra_data_repository=extra_data_repository)
     minion_service = get_minion_service(repo=minion_repository)
-    job_schema_repository = get_job_schema_repository(db=mongo_db)
-    job_schema_service = get_job_schema_service(repo=job_schema_repository)
     job_repository = get_job_repository(db=mongo_db)
     job_return_repository = get_job_return_repository(db=mongo_db, rdb=redis_db)
     job_return_service = get_job_return_service(rdb=redis_db, repo=job_return_repository)
-    job_service = get_job_service(
-        rdb=redis_db,
-        job_repository=job_repository,
-        job_schema_service=job_schema_service,
-        job_return_service=job_return_service,
-        master_service=master_service,
-    )
+
     task_template_repository = get_task_template_repository(db=mongo_db)
     pillar_repository = get_pillar_repository(db=mongo_db)
     task_template_service = get_task_tpl_service(repo=task_template_repository, pillar_repo=pillar_repository)
@@ -84,9 +74,15 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
         task_status_service=task_status_service,
         task_template_service=task_template_service,
         task_minion_service=task_minion_service,
-        job_schema_service=job_schema_service,
         collections_service=collection_service,
         minion_service=minion_service,
+    )
+    job_service = get_job_service(
+        rdb=redis_db,
+        job_repository=job_repository,
+        task_template_service=task_template_service,
+        job_return_service=job_return_service,
+        master_service=master_service,
     )
 
     context.set_global('service_name', 'core')
@@ -97,7 +93,6 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
     context.set_global('extra_data_category_service', extra_data_category_service)
     context.set_global('extra_data_service', extra_data_service)
     context.set_global('minion_service', minion_service)
-    context.set_global('job_schema_service', job_schema_service)
     context.set_global('job_service', job_service)
     context.set_global('job_return_service', job_return_service)
     context.set_global('task_template_service', task_template_service)
@@ -117,8 +112,6 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
         del job_return_repository
         del job_service
         del job_repository
-        del job_schema_service
-        del job_schema_repository
         del minion_service
         del minion_repository
         del extra_data_service
@@ -146,10 +139,7 @@ async def async_main() -> None:
         await app.run()
         await shutdown_broker()
     except AMQPConnectionError as ex:
-        logger.warning(
-            f'RabbitMQ is unavailable during startup: {ex}. '
-            'The broker will reconnect automatically.'
-        )
+        logger.warning(f'RabbitMQ is unavailable during startup: {ex}. The broker will reconnect automatically.')
 
 
 def main() -> None:

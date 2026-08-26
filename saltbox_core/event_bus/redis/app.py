@@ -16,9 +16,7 @@ from saltbox_core.event_bus.redis.masters_subscribers import router as masters_r
 from saltbox_core.event_bus.redis.masters_subscribers import router_not_auth as masters_router_not_auth
 from saltbox_core.jobs.repositories.job_repository import JobRepository, get_job_repository
 from saltbox_core.jobs.repositories.job_return_repository import JobReturnRepository, get_job_return_repository
-from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository, get_job_schema_repository
 from saltbox_core.jobs.services.job_return_service import JobReturnService, get_job_return_service
-from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.masters.repositories.master_repository import MasterRepository, get_master_repository
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
@@ -31,6 +29,8 @@ from saltbox_core.minion_collections.services.minion import MinionService, get_m
 from saltbox_core.pillars.repository import PillarRepository, get_pillar_repository
 from saltbox_core.pillars.services.pillar import PillarService, get_pillar_service
 from saltbox_core.pillars.services.pillar_crypto import PillarCryptoService, get_pillar_crypto_service
+from saltbox_core.task_templates.repositories.template import get_task_template_repository
+from saltbox_core.task_templates.services.template import get_task_tpl_service
 from saltbox_core.tkq import shutdown_broker, startup_broker
 from saltbox_sdk.config.redis_config import REDIS_SETTINGS
 from saltbox_sdk.db.mongo.config import get_mongo_db
@@ -85,16 +85,8 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
     minion_service: MinionService = get_minion_service(repo=minion_repository)
     job_return_repository: JobReturnRepository = get_job_return_repository(db=mongo_db, rdb=redis_db)
     job_return_service: JobReturnService = get_job_return_service(rdb=redis_db, repo=job_return_repository)
-    job_schema_repository: JobSchemaRepository = get_job_schema_repository(db=mongo_db)
-    job_schema_service: JobSchemaService = get_job_schema_service(repo=job_schema_repository)
     job_repository: JobRepository = get_job_repository(db=mongo_db)
-    job_service: JobService = get_job_service(
-        rdb=redis_db,
-        job_repository=job_repository,
-        job_schema_service=job_schema_service,
-        job_return_service=job_return_service,
-        master_service=master_service,
-    )
+
     collection_repository: CollectionRepository = get_collection_repository(db=mongo_db)
     collection_service: CollectionService = get_collection_service(repo=collection_repository)
     pillar_repository: PillarRepository = get_pillar_repository(db=mongo_db)
@@ -105,10 +97,19 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
         minion_service=minion_service,
         crypto_service=pillar_crypto_service,
     )
+    task_template_repository = get_task_template_repository(db=mongo_db)
+    task_template_service = get_task_tpl_service(repo=task_template_repository, pillar_repo=pillar_repository)
+
+    job_service: JobService = get_job_service(
+        rdb=redis_db,
+        job_repository=job_repository,
+        task_template_service=task_template_service,
+        job_return_service=job_return_service,
+        master_service=master_service,
+    )
 
     context.set_global('master_service', master_service)
     context.set_global('minion_service', minion_service)
-    context.set_global('job_schema_repository', job_schema_repository)
     context.set_global('job_service', job_service)
     context.set_global('pillar_service', pillar_service)
     context.set_global('collection_service', collection_service)

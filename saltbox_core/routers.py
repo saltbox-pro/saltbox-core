@@ -1,9 +1,13 @@
-from fastapi import APIRouter
+from typing import Annotated
+
+from fastapi import APIRouter, Depends
 
 from saltbox_core.db.schemas_base import TaskiqTaskResult
 from saltbox_core.tkq import broker
 from saltbox_sdk.config.discovery_config import DISCOVERY_SETTINGS
+from saltbox_sdk.db.schemas_base import UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig, HealthCheckResponse
+from saltbox_sdk.fastapi_utils.dependencies import get_current_user
 
 router = APIRouter(prefix='', tags=['Utils'])
 
@@ -57,3 +61,32 @@ async def get_sync_status(task_id: str) -> TaskiqTaskResult:
             error=None,
         )
     return response
+
+
+@router.post(
+    '/user-settings',
+    operation_id='save_user_settings',
+    openapi_extra=GatewayEndpointConfig(
+        policy='public',
+        action='create',
+    ).model_dump(by_alias=True),
+)
+async def save_user_settings(
+    data: dict,
+    user: Annotated[UserShort, Depends(get_current_user)],
+) -> dict:
+    return {'message': 'User settings saved successfully', 'data': data}
+
+
+@router.get(
+    '/user-settings',
+    operation_id='get_user_settings',
+    openapi_extra=GatewayEndpointConfig(
+        policy='public',
+        action='read',
+    ).model_dump(by_alias=True),
+)
+async def get_user_settings(
+    user: Annotated[UserShort, Depends(get_current_user)],
+) -> dict:
+    return {'message': 'User settings retrieved successfully', 'data': {'theme': 'dark', 'notifications': True}}

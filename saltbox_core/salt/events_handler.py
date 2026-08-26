@@ -5,9 +5,7 @@ from redis import asyncio as aioredis
 from saltbox_core.config import SETTINGS, logger
 from saltbox_core.jobs.repositories.job_repository import get_job_repository
 from saltbox_core.jobs.repositories.job_return_repository import get_job_return_repository
-from saltbox_core.jobs.repositories.job_sc_repository import get_job_schema_repository
 from saltbox_core.jobs.services.job_return_service import get_job_return_service
-from saltbox_core.jobs.services.job_sc_service import get_job_schema_service
 from saltbox_core.jobs.services.job_services import get_job_service
 from saltbox_core.masters.repositories.master_repository import get_master_repository
 from saltbox_core.masters.services.master_service import get_master_service
@@ -57,18 +55,11 @@ class SaltEventsHandler:
         self.minion_service = get_minion_service(repo=self.minion_repository)
         self.collection_repository = get_collection_repository(db=self.mongo_db)
         self.collection_service = get_collection_service(repo=self.collection_repository)
-        self.job_schema_repository = get_job_schema_repository(db=self.mongo_db)
-        self.job_schema_service = get_job_schema_service(repo=self.job_schema_repository)
+
         self.job_return_repository = get_job_return_repository(db=self.mongo_db, rdb=self.redis)
         self.job_return_service = get_job_return_service(rdb=self.redis, repo=self.job_return_repository)
         self.job_repository = get_job_repository(db=self.mongo_db)
-        self.job_service = get_job_service(
-            rdb=self.redis,
-            job_repository=self.job_repository,
-            job_schema_service=self.job_schema_service,
-            job_return_service=self.job_return_service,
-            master_service=self.master_service,
-        )
+
         self.pillar_repository = get_pillar_repository(db=self.mongo_db)
         self.task_template_repository = get_task_template_repository(db=self.mongo_db)
         self.task_template_service = get_task_tpl_service(
@@ -85,10 +76,17 @@ class SaltEventsHandler:
             task_status_service=self.task_status_service,
             task_template_service=self.task_template_service,
             task_minion_service=self.task_minion_service,
-            job_schema_service=self.job_schema_service,
             collections_service=self.collection_service,
             minion_service=self.minion_service,
         )
+        self.job_service = get_job_service(
+            rdb=self.redis,
+            job_repository=self.job_repository,
+            task_template_service=self.task_template_service,
+            job_return_service=self.job_return_service,
+            master_service=self.master_service,
+        )
+
         self.broker = get_faststream_broker()
 
         self.salt_handlers: list[BaseMessageHandler] = [

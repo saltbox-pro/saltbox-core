@@ -21,9 +21,7 @@ class _NotifyServicesStoreSingleton:
     def __get_services(cls) -> dict[str, MongoBaseWithNotifyService]:
         from saltbox_core.jobs.repositories.job_repository import JobRepository
         from saltbox_core.jobs.repositories.job_return_repository import JobReturnRepository
-        from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository
         from saltbox_core.jobs.services.job_return_service import JobReturnService
-        from saltbox_core.jobs.services.job_sc_service import JobSchemaService
         from saltbox_core.jobs.services.job_services import JobService
         from saltbox_core.masters.repositories.master_repository import MasterRepository
         from saltbox_core.masters.services.master_service import MasterService
@@ -49,18 +47,9 @@ class _NotifyServicesStoreSingleton:
 
         master_repository = MasterRepository(database=mongo_db)
         master_service = MasterService(repo=master_repository)
-        job_schema_repository = JobSchemaRepository(database=mongo_db)
-        job_schema_service = JobSchemaService(repo=job_schema_repository)
         job_return_repository = JobReturnRepository(database=mongo_db, rdb=rdb)
         job_return_service = JobReturnService(repo=job_return_repository, rdb=rdb)
         job_repository = JobRepository(database=mongo_db)
-        job_service = JobService(
-            rdb=rdb,
-            job_repository=job_repository,
-            job_schema_service=job_schema_service,
-            job_return_service=job_return_service,
-            master_service=master_service,
-        )
 
         collection_repository = CollectionRepository(database=mongo_db)
         collection_service = CollectionService(repo=collection_repository)
@@ -85,9 +74,15 @@ class _NotifyServicesStoreSingleton:
             task_status_service=task_status_service,
             task_template_service=task_template_service,
             task_minion_service=task_minion_service,
-            job_schema_service=job_schema_service,
             collections_service=collection_service,
             minion_service=minion_service,
+        )
+        job_service = JobService(
+            rdb=rdb,
+            job_repository=job_repository,
+            task_template_service=task_template_service,
+            job_return_service=job_return_service,
+            master_service=master_service,
         )
 
         return {

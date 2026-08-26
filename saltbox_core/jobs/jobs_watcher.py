@@ -6,11 +6,9 @@ from redis import asyncio as aioredis
 from saltbox_core.config import logger
 from saltbox_core.jobs.repositories.job_repository import JobRepository
 from saltbox_core.jobs.repositories.job_return_repository import JobReturnRepository
-from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnForJobWatcherSchema, JobReturnStatus
 from saltbox_core.jobs.schemas.job_schemas import JobJidOnlySchema, JobStatus
 from saltbox_core.jobs.services.job_return_service import JobReturnService
-from saltbox_core.jobs.services.job_sc_service import JobSchemaService
 from saltbox_core.jobs.services.job_services import JobService
 from saltbox_core.masters.repositories.master_repository import MasterRepository
 from saltbox_core.masters.services.master_service import MasterService
@@ -45,7 +43,6 @@ class JobsWatcher:
         self.db = get_mongo_db()
 
         self.job_repository = JobRepository(self.db)
-        self.job_schema_repository = JobSchemaRepository(self.db)
         self.extra_data_category_repository = ExtraDataCategoryRepository(self.db)
         self.extra_data_repository = ExtraDataRepository(
             self.db, extra_data_category_repository=self.extra_data_category_repository
@@ -70,7 +67,6 @@ class JobsWatcher:
 
         job_return_repository = JobReturnRepository(database=self.db, rdb=redis)
         job_return_service = JobReturnService(repo=job_return_repository, rdb=redis)
-        job_schema_service = JobSchemaService(repo=self.job_schema_repository)
         task_minion_service = TaskMinionService(repo=self.task_minion_repository, rdb=redis)
         task_status_service = TaskStatusService(repo=self.task_status_repository)
         pillar_repository = get_pillar_repository(db=self.db)
@@ -83,7 +79,6 @@ class JobsWatcher:
             task_status_service=task_status_service,
             task_template_service=task_template_service,
             task_minion_service=task_minion_service,
-            job_schema_service=job_schema_service,
             collections_service=collections_service,
             minion_service=minion_service,
         )
@@ -91,8 +86,8 @@ class JobsWatcher:
         job_service = JobService(
             rdb=redis,
             job_repository=self.job_repository,
-            job_schema_service=job_schema_service,
             job_return_service=job_return_service,
+            task_template_service=task_template_service,
             master_service=master_service,
         )
 

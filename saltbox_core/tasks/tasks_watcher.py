@@ -5,9 +5,7 @@ from redis import asyncio as aioredis
 from saltbox_core.config import logger
 from saltbox_core.jobs.repositories.job_repository import JobRepository
 from saltbox_core.jobs.repositories.job_return_repository import JobReturnRepository
-from saltbox_core.jobs.repositories.job_sc_repository import JobSchemaRepository
 from saltbox_core.jobs.services.job_return_service import JobReturnService
-from saltbox_core.jobs.services.job_sc_service import JobSchemaService
 from saltbox_core.jobs.services.job_services import JobService
 from saltbox_core.masters.repositories.master_repository import MasterRepository
 from saltbox_core.masters.services.master_service import MasterService
@@ -17,7 +15,7 @@ from saltbox_core.minion_collections.repositories.extra_data_category import Ext
 from saltbox_core.minion_collections.repositories.minion import MinionRepository
 from saltbox_core.minion_collections.services.collection import CollectionService
 from saltbox_core.minion_collections.services.minion import MinionService
-from saltbox_core.pillars.repository import get_pillar_repository
+from saltbox_core.pillars.repository import PillarRepository, get_pillar_repository
 from saltbox_core.task_templates.repositories.template import TaskTemplateRepository
 from saltbox_core.task_templates.services.template import TaskTemplateService
 from saltbox_core.tasks.repositories.task import TaskRepository
@@ -40,7 +38,6 @@ class TasksWatcher:
         self.db = get_mongo_db()
 
         self.job_repository = JobRepository(self.db)
-        self.job_schema_repository = JobSchemaRepository(self.db)
         self.master_repository = MasterRepository(self.db)
         self.collections_repository = CollectionRepository(self.db)
         self.extra_data_category_repository = ExtraDataCategoryRepository(self.db)
@@ -52,6 +49,7 @@ class TasksWatcher:
         self.task_status_repository = TaskStatusRepository(self.db)
         self.task_minion_repository = TaskMinionRepository(self.db)
         self.task_template_repository = TaskTemplateRepository(self.db)
+        self.pillar_repository = PillarRepository(self.db)
 
         logger.info('Tasks watcher started')
 
@@ -66,12 +64,15 @@ class TasksWatcher:
 
         job_return_repository = JobReturnRepository(database=self.db, rdb=redis)
         job_return_service = JobReturnService(repo=job_return_repository, rdb=redis)
-        job_schema_service = JobSchemaService(repo=self.job_schema_repository)
+        task_template_service = TaskTemplateService(
+            repo=self.task_template_repository, pillar_repo=self.pillar_repository
+        )
         master_service = MasterService(repo=self.master_repository)
+
         job_service = JobService(
             rdb=redis,
             job_repository=self.job_repository,
-            job_schema_service=job_schema_service,
+            task_template_service=task_template_service,
             job_return_service=job_return_service,
             master_service=master_service,
         )
@@ -87,7 +88,6 @@ class TasksWatcher:
             task_status_service=task_status_service,
             task_template_service=task_template_service,
             task_minion_service=task_minion_service,
-            job_schema_service=job_schema_service,
             collections_service=collection_service,
             minion_service=minion_service,
         )

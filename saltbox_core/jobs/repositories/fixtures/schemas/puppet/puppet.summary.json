@@ -1,8 +1,0 @@
-{
-  "json_schema": {
-    "type": "object",
-    "title": "puppet.summary",
-    "description": "Show a summary of the last puppet agent run."
-  },
-  "ui_schema": {}
-}

@@ -17,8 +17,8 @@ from saltbox_core.jobs.repositories.job_repository import JobRepository, get_job
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnStatus
 from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobModel, JobSimpleSchema, JobStatus, JobUpdateSchema
 from saltbox_core.jobs.services.job_return_service import JobReturnService, get_job_return_service
-from saltbox_core.jobs.services.job_sc_service import JobSchemaService, get_job_schema_service
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
+from saltbox_core.task_templates.services.template import TaskTemplateService, get_task_tpl_service
 from saltbox_core.utilities.context import replace_raised
 from saltbox_core.utilities.jid import JID
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
@@ -49,11 +49,11 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         self,
         rdb: Redis,
         job_repository: JobRepository,
-        job_schema_service: JobSchemaService,
+        task_template_service: TaskTemplateService,
         job_return_service: JobReturnService,
         master_service: MasterService,
     ):
-        self.job_schema_service = job_schema_service
+        self.task_template_service = task_template_service
         self.job_return_service = job_return_service
         self.master_service = master_service
         super().__init__(repo=job_repository, rdb=rdb)
@@ -112,7 +112,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         except ObjectNotFoundException:
             logger.debug(f'Object "{self.repo.Meta.collection_name}" for notifying not found by query: {obj_id}')
 
-    async def __prepare_create_obj(
+    async def __prepare_create_obj(  # noqa: C901
         self,
         data: JobCreateSchema,
         validate_data: bool = True,
@@ -121,8 +121,25 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         if not data.jid:
             data.jid = str(JID.generate())
 
+        if data.template_id:
+            try:
+                template = await self.task_template_service.get({'_id': data.template_id}, session=session)
+                data.fun = template.fun
+
+                if template.defaults is None or template.defaults.ttl is None:
+                    ttl = SETTINGS.jobs_default_ttl
+                elif template.defaults.ttl == 0:
+                    ttl = SETTINGS.jobs_max_ttl
+                else:
+                    ttl = template.defaults.ttl
+            except ObjectNotFoundException:
+                msg = f'Template with id "{data.template_id}" not found'
+                raise JobCreateException(msg) from None
+        else:
+            ttl = SETTINGS.jobs_default_ttl
+
         if data.ttl is None:
-            data.ttl = await self.job_schema_service.get_ttl(name=data.fun, session=session)
+            data.ttl = ttl
         elif data.ttl == 0:
             data.ttl = SETTINGS.jobs_max_ttl
 
@@ -135,11 +152,13 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
                 data_to_validate['args'] = data.arg
             if data.kwarg:
                 data_to_validate['kwargs'] = data.kwarg
-            validated_data = await self.job_schema_service.get_validated_data(
-                name=data.fun, data=data_to_validate, session=session
+            validated_data = await self.task_template_service.get_validated_data(
+                template_id=data.template_id, data=data_to_validate, session=session
             )
             data.arg = validated_data.get('args')
             data.kwarg = validated_data.get('kwargs')
+            if data.fun == 'state.apply' and data.kwarg and 'mods' not in data.kwarg and data.template_id:
+                data.kwarg['mods'] = template.name
         except JsonSchemaValidationError as e:
             raise JobCreateException(str(e)) from e
 
@@ -280,14 +299,14 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
 def get_job_service(
     rdb: Annotated[Redis, Depends(get_redis)],
     job_repository: Annotated[JobRepository, Depends(get_job_repository)],
-    job_schema_service: Annotated[JobSchemaService, Depends(get_job_schema_service)],
+    task_template_service: Annotated[TaskTemplateService, Depends(get_task_tpl_service)],
     job_return_service: Annotated[JobReturnService, Depends(get_job_return_service)],
     master_service: Annotated[MasterService, Depends(get_master_service)],
 ) -> JobService:
     return JobService(
         rdb=rdb,
         job_repository=job_repository,
-        job_schema_service=job_schema_service,
+        task_template_service=task_template_service,
         job_return_service=job_return_service,
         master_service=master_service,
     )

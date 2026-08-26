@@ -95,8 +95,6 @@ async def job_create(
             {
                 'user': user.model_dump(),
                 'source': Source(type='rest'),
-                # 'arg': item.data.data_args if item.data else [],
-                # 'kwarg': item.data.data_kwargs if item.data else {},
                 **item.model_dump(by_alias=True),
             }
         ),
