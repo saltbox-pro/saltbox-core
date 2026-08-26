@@ -58,9 +58,6 @@ class JobEditableFieldsMixin(BaseModel):
     launch_error_type: str | None = None
 
 
-class JobComputedFieldsMixin(BaseModel): ...
-
-
 class JobMinionsCountAggregation(BaseModel):
     total: int = Field(title='Total number of minions', default=0)
     waiting: int = Field(title='Waiting', default=0)
@@ -73,6 +70,7 @@ class JobMinionsCountAggregation(BaseModel):
 class JobAggregateFieldsMixin(BaseModel):
     minions_count: JobMinionsCountAggregation = Field()
     waiting_expires_at_dt: datetime
+    template_source_id: PyObjectId | None = None
 
 
 class JobCreateSchema(JobReadOnlyFieldsMixin, JobEditableFieldsMixin):
@@ -103,7 +101,6 @@ class JobModel(
     CreatedModifiedMixin,
     JobReadOnlyFieldsMixin,
     JobEditableFieldsMixin,
-    JobComputedFieldsMixin,
     JobAggregateFieldsMixin,
     IDMixin,
 ):
@@ -154,7 +151,7 @@ class JobListBody(SkipLimitParams, QueryParams, SortParams):
     )
 
 
-class JobsListResponse(CreatedModifiedMixin, JobComputedFieldsMixin, SourceMixin, IDMixin):
+class JobsListResponse(CreatedModifiedMixin, SourceMixin, IDMixin):
     jid: StrJid
     tgt: str | list[str]
     tgt_type: SaltTgtType

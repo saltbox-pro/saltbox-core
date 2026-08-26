@@ -112,7 +112,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         except ObjectNotFoundException:
             logger.debug(f'Object "{self.repo.Meta.collection_name}" for notifying not found by query: {obj_id}')
 
-    async def __prepare_create_obj(
+    async def __prepare_create_obj(  # noqa: C901
         self,
         data: JobCreateSchema,
         validate_data: bool = True,
@@ -121,8 +121,25 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         if not data.jid:
             data.jid = str(JID.generate())
 
+        if data.template_id:
+            try:
+                template = await self.task_template_service.get({'_id': data.template_id}, session=session)
+                data.fun = template.fun
+
+                if template.defaults is None or template.defaults.ttl is None:
+                    ttl = SETTINGS.jobs_default_ttl
+                elif template.defaults.ttl == 0:
+                    ttl = SETTINGS.jobs_max_ttl
+                else:
+                    ttl = template.defaults.ttl
+            except ObjectNotFoundException:
+                msg = f'Template with id "{data.template_id}" not found'
+                raise JobCreateException(msg) from None
+        else:
+            ttl = SETTINGS.jobs_default_ttl
+
         if data.ttl is None:
-            data.ttl = await self.task_template_service.get_ttl(name=data.fun, session=session)
+            data.ttl = ttl
         elif data.ttl == 0:
             data.ttl = SETTINGS.jobs_max_ttl
 
@@ -140,6 +157,8 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
             )
             data.arg = validated_data.get('args')
             data.kwarg = validated_data.get('kwargs')
+            if data.fun == 'state.apply' and data.kwarg and 'mods' not in data.kwarg and data.template_id:
+                data.kwarg['mods'] = template.name
         except JsonSchemaValidationError as e:
             raise JobCreateException(str(e)) from e
 

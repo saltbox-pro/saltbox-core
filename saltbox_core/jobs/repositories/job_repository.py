@@ -81,6 +81,19 @@ class JobRepository(BaseMongoRepository[JobModel]):
                     ],
                 ),
                 AggregatedField(
+                    field_name='template_source_id',
+                    stages=[
+                        LookupAggregationStage(
+                            from_collection='task_templates',
+                            local_field='template_id',
+                            foreign_field='_id',
+                            as_field='template',
+                        ),
+                        UnwindAggregationStage(path='$template', preserve_null_and_empty_arrays=True),
+                        AddFieldsAggregationStage(fields={'template_source_id': '$template.source_id'}),
+                    ],
+                ),
+                AggregatedField(
                     field_name='has_failed_job_returns',
                     stages=[
                         AddFieldsAggregationStage(
