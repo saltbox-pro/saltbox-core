@@ -125,7 +125,7 @@ class JobsWatcher:
                                     'task_id': task.id,
                                     'minion_id': job_return.minion_id,
                                     'master': job_return.salt_master,
-                                    'status': {'ne': TaskMinionStatus.pending},
+                                    'status': {'$ne': TaskMinionStatus.pending},
                                 },
                                 projection_model=TaskMinionForTaskStatusUpdateSchema,
                             )

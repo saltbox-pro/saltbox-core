@@ -24,6 +24,7 @@ from saltbox_core.tasks.schemas.task import (
     TaskPolicyForCollectionSchema,
     TaskRequirement,
     TaskShortForUpdateSchema,
+    TaskStatusOnlySchema,
     TaskTargetMinion,
     TaskType,
     TaskUpdateSchema,
@@ -445,6 +446,17 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         ]
 
         return [by_task_id[task_id] for task_id in order_ids_by_requirements(ordering_items)]
+
+    async def get_task_statuses(self, task_ids: list[PyObjectId]) -> dict[PyObjectId, TaskStatus]:
+        if not task_ids:
+            return {}
+
+        tasks = await self.get_list(
+            query={'_id': {'$in': task_ids}},
+            projection_model=TaskStatusOnlySchema,
+        )
+
+        return {task.id: task.status.type for task in tasks}
 
 
 def get_task_service(

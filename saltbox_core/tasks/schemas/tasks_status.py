@@ -17,6 +17,9 @@ class TaskStatus(StrEnum):
     finished = 'finished'
 
 
+ACTIVE_TASK_STATUSES = (TaskStatus.wait_minions, TaskStatus.running, TaskStatus.stopping)
+
+
 class TaskStatusReadOnlyFieldsMixin(BaseModel):
     task_id: PyObjectId = Field(title='Task ID')
 

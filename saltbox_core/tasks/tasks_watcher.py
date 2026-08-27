@@ -22,7 +22,7 @@ from saltbox_core.tasks.repositories.task import TaskRepository
 from saltbox_core.tasks.repositories.tasks_minion import TaskMinionRepository
 from saltbox_core.tasks.repositories.tasks_status import TaskStatusRepository
 from saltbox_core.tasks.schemas.task import TaskForLifespanModel
-from saltbox_core.tasks.schemas.tasks_status import TaskStatus
+from saltbox_core.tasks.schemas.tasks_status import ACTIVE_TASK_STATUSES
 from saltbox_core.tasks.services.task import TaskService
 from saltbox_core.tasks.services.tasks_lifespan import TaskLifespanService
 from saltbox_core.tasks.services.tasks_minion import TaskMinionService
@@ -96,7 +96,7 @@ class TasksWatcher:
 
         while True:
             tasks: list[TaskForLifespanModel] = await task_service.get_list(
-                query={'status.type': {'$in': [TaskStatus.wait_minions, TaskStatus.running, TaskStatus.stopping]}},
+                query={'status.type': {'$in': list(ACTIVE_TASK_STATUSES)}},
                 limit=0,
                 skip=0,
                 projection_model=TaskForLifespanModel,

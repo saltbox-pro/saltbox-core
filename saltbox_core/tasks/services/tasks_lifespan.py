@@ -14,7 +14,7 @@ from saltbox_core.masters.services.master_service import MasterService, get_mast
 from saltbox_core.minion_collections.services.collection import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion import MinionService, get_minion_service
 from saltbox_core.tasks.exceptions import TaskServiceException
-from saltbox_core.tasks.policy_ordering import PolicyExecutionInfo, resolve_execution_status
+from saltbox_core.tasks.policy_ordering import PolicyExecutionInfo, is_active_predecessor, resolve_execution_status
 from saltbox_core.tasks.schemas.task import TaskForLifespanModel, TaskModel, TaskType
 from saltbox_core.tasks.schemas.tasks_minion import (
     TaskMinionForRequirementsCheckSchema,
@@ -319,14 +319,22 @@ class TaskLifespanService:
 
         collections_by_id = await self.task_minion_service.get_collections_order_map()
         ids_by_new_status: dict[TaskMinionStatus, list[PyObjectId]] = defaultdict(list)
+        task_status_cache: dict[PyObjectId, TaskStatus] = {}
 
         for candidate in candidates:
             policies = await self.task_minion_service.get_policies_for_minion(
                 minion_inner_id=candidate.minion_inner_id, collections_by_id=collections_by_id
             )
+
+            missing_task_ids = [policy.task_id for policy in policies if policy.task_id not in task_status_cache]
+            if missing_task_ids:
+                task_status_cache.update(await self.task_service.get_task_statuses(task_ids=missing_task_ids))
+
             execution_info = [
                 PolicyExecutionInfo(task_id=policy.task_id, status=policy.status, requirements=policy.task.requirements)
                 for policy in policies
+                if policy.task_id == task.id
+                or is_active_predecessor(task_status_cache.get(policy.task_id), policy.status)
             ]
 
             new_status = resolve_execution_status(task_id=task.id, ordered_policies=execution_info)

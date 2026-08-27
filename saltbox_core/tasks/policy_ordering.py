@@ -4,6 +4,7 @@ from typing import NamedTuple
 from saltbox_core.minion_collections.schemas.collection import CollectionOrderOnlySchema
 from saltbox_core.tasks.schemas.task import TaskRequirement, TaskRequirementResultType
 from saltbox_core.tasks.schemas.tasks_minion import TaskMinionStatus
+from saltbox_core.tasks.schemas.tasks_status import ACTIVE_TASK_STATUSES, TaskStatus
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 
 
@@ -73,6 +74,16 @@ def collection_order_path(
 
 
 QUEUE_RESOLVED_STATUSES = (TaskMinionStatus.success, TaskMinionStatus.failed, TaskMinionStatus.unreachable)
+
+
+def is_active_predecessor(task_status: TaskStatus | None, minion_status: TaskMinionStatus) -> bool:
+    if task_status not in ACTIVE_TASK_STATUSES:
+        return False
+
+    if task_status == TaskStatus.stopping:
+        return minion_status == TaskMinionStatus.in_work
+
+    return True
 
 
 class PolicyExecutionInfo(NamedTuple):

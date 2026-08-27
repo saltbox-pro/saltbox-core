@@ -164,6 +164,9 @@ class TaskShortForUpdateSchema(TaskStatusJoinedFieldsMixin, IDMixin):
     target_collection_id: PyObjectId = Field(title='Target collection id')
 
 
+class TaskStatusOnlySchema(TaskStatusJoinedFieldsMixin, IDMixin): ...
+
+
 class TaskWithTargetCollectionIdOnlySchema(IDMixin):
     target_collection_id: PyObjectId = Field(title='Target collection id')
 
