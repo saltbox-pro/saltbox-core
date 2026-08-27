@@ -17,7 +17,6 @@ async def create(
 ) -> None | dict[str, str | dict | Source | None]:
     if message.target != 'core':
         return None
-    logger.info('Received job creation request: %s', message)
     job_service: JobService = context.get('job_service')
 
     try:
