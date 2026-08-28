@@ -217,15 +217,18 @@ class TaskTemplateService(
         else:
             return template_schema.defaults.ttl
 
-    async def get_schemas_by_names(self, names: list[str]) -> dict[str, dict[str, dict]]:
+    async def get_schemas_by_names(self, names: list[str]) -> dict[str, dict[str, Any]]:
         for name in names:
             if not await self.exists({'name': name}):
                 raise TaskTemplateNotFoundException(template_name=name)
         templates = await self.get_list({'name': {'$in': names}}, projection_model=TaskTemplateSchemasProjection)
         return {
             template.name: {
+                'title': template.title,
+                'description': template.description,
                 'json-schema': template.json_schema,
                 'ui-schema': template.ui_schema,
+                'i18n': template.i18n,
             }
             for template in templates
         }

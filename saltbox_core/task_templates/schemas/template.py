@@ -106,9 +106,12 @@ class TaskTemplatePublicWithContentSchema(TaskTemplatePublicSchema):
 
 
 class TaskTemplateSchemasProjection(BaseModel):
+    title: str | dict[str, str] = Field(title='Template title')
+    description: str | dict[str, str] | None = Field(title='Template description', default=None)
     name: str
     json_schema: dict
     ui_schema: dict
+    i18n: dict[str, dict[str, str]] = Field(default_factory=dict)
     query: MongoQuery
 
 
@@ -123,6 +126,7 @@ class TaskTemplateDefaultsOnlySchema(BaseModel):
 class TaskTemplateSchemaResponse(BaseModel):
     json_schema: dict = Field(title='JSON schema')
     ui_schema: dict = Field(title='UI schema', default_factory=dict)
+    i18n: dict[str, dict[str, str]] = Field(default_factory=dict)
 
 
 class TaskTemplateActions(StrEnum):
