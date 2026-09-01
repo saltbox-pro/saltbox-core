@@ -201,8 +201,10 @@ class TaskLifespanService:
                         'fun': 'test.ping',
                         'source': Source(type='task_system', id=str(task.id)),
                         'user': task.user,
+                        'template_id': task.task_template_id,
                     },
                 ),
+                validate_data=False,
             )
 
     @staticmethod
@@ -386,8 +388,10 @@ class TaskLifespanService:
                         'ttl': ttl,
                         'source': Source(type='task', id=str(task.id)),
                         'user': task.user,
+                        'template_id': task.task_template_id,
                     }
                 ),
+                validate_data=False,
                 extra_pillarenv=[f'task:{task.id!s}'],
             )
 
