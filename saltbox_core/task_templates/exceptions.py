@@ -65,6 +65,18 @@ class SourceRepoCloneException(TaskTemplateException):
         super().__init__(detail=self.detail)
 
 
+class SourceUpdateDuplicateNameException(TaskTemplateException):
+    """Exception raised when a source update operation violates a unique name constraint."""
+
+    status_code: int = status.HTTP_400_BAD_REQUEST
+    detail: str = 'Source update operation violated a unique name constraint'
+
+    def __init__(self, detail: str | None = None):
+        if detail:
+            self.detail = detail
+        super().__init__(detail=self.detail)
+
+
 class TaskTemplateSourceLockException(TaskTemplateException):
     """Exception raised when a task template source is locked."""
 

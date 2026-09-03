@@ -5,8 +5,10 @@ from typing import Annotated, Any, override
 
 from fastapi import Depends
 from pymongo.asynchronous.client_session import AsyncClientSession
+from pymongo.errors import DuplicateKeyError
 
 from saltbox_core.config import SETTINGS, logger
+from saltbox_core.task_templates.exceptions import SourceUpdateDuplicateNameException
 from saltbox_core.task_templates.repositories.source import TemplateSourceRepository, get_template_source_repository
 from saltbox_core.task_templates.schemas.source import (
     SourceOperation,
@@ -23,6 +25,7 @@ from saltbox_core.task_templates.services.sshfs_file import SshfsFileService, ge
 from saltbox_core.task_templates.services.template import TaskTemplateService, get_task_tpl_service
 from saltbox_core.tasks.services.task import TaskService, get_task_service
 from saltbox_sdk.db.mongo.config import get_mongo_session_with_transaction
+from saltbox_sdk.db.mongo.repository_base import MongoUpdateOperator
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 
 # from saltbox_sdk.exceptions import ObjectNotFoundException
@@ -48,6 +51,27 @@ class TemplateSourceService(
         self._template_service = template_service
         self._file_service = file_service
         self._task_service = task_service
+
+    @override
+    async def update(
+        self,
+        query: dict[str, Any] | PyObjectId,
+        data: TemplateSourceUpdateSchema | dict[str, Any],
+        exclude_unset: bool = True,
+        *,
+        operator: MongoUpdateOperator = MongoUpdateOperator.set,
+        session: AsyncClientSession | None = None,
+    ) -> PyObjectId:
+        try:
+            return await super().update(
+                query=query,
+                data=data,
+                exclude_unset=exclude_unset,
+                operator=operator,
+                session=session,
+            )
+        except DuplicateKeyError:
+            raise SourceUpdateDuplicateNameException() from None
 
     async def create_from_url(
         self,
