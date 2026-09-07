@@ -878,7 +878,7 @@ class SyncOrchestrator:
             raise FileExistsError(msg)
         try:
             json_file_path.parent.mkdir(parents=True, exist_ok=True)
-            json_file_path.write_text(json.dumps(meta, indent=2), encoding='utf-8')
+            json_file_path.write_text(json.dumps(meta.model_dump(mode='json'), indent=2), encoding='utf-8')
         except OSError as e:
             logger.error('Failed to write JSON file: %s', e)
             await self._source_service.update(
@@ -966,7 +966,7 @@ class SyncOrchestrator:
 
         try:
             local_path.parent.mkdir(parents=True, exist_ok=True)
-            local_path.write_text(json.dumps(meta, indent=2), encoding='utf-8')
+            local_path.write_text(json.dumps(meta.model_dump(mode='json'), indent=2), encoding='utf-8')
         except OSError as e:
             logger.error('Failed to write schema file: %s', e)
             raise
