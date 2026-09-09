@@ -26,4 +26,4 @@ async def run_job_handler(message: RunTaskEventBusMessage, context: ContextRepo)
     )
     job = await job_service.get(query=job_obj_id, projection_model=JobSimpleSchema)
 
-    return {'jid': job.jid}
+    return {'id': str(job.id), 'jid': str(job.jid), 'salt_master': job.salt_master}

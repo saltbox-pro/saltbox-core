@@ -108,10 +108,10 @@ class JobReturnMessageHandler(BaseJobMessageHandler[JobForJobReturnSaltHandlerSc
         )
 
         # TODO (@): "force=True" is temporary! Remove this after frontend changes to use WS with job-returns
-        await self.job_service.update_status(jid=JID(jid), force=True, notify=True)
+        await self.job_service.update_status(jid=JID(jid), salt_master=master_id, force=True, notify=True)
 
         if tid:
-            await process_task_job_return.kiq(jid=jid, minion_id=mid)  # type: ignore
+            await process_task_job_return.kiq(jid=jid, salt_master=master_id, minion_id=mid)  # type: ignore
 
         process_return_coro = self._process_return(job_return=job_return, is_new_return=is_new_return)
         send_presence_coro = self._send_presence(master_id=master_id, mid=mid, data=data)

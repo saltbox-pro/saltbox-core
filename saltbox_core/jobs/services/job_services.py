@@ -67,13 +67,13 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         return 'job_service'
 
     def _get_notify_channel(self, obj: BaseModel, action: str) -> str | None:
-        if not hasattr(obj, 'jid'):
+        if not hasattr(obj, 'id'):
             return None
 
         channels: dict[str, str] = {
-            'create': f'job:{obj.jid}:create',
-            'update': f'job:{obj.jid}:update',
-            'delete': f'job:{obj.jid}:delete',
+            'create': f'job:{obj.id}:create',
+            'update': f'job:{obj.id}:update',
+            'delete': f'job:{obj.id}:delete',
         }
 
         if (
@@ -85,9 +85,9 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         ):
             channels.update(
                 {
-                    'create_task': f'task:{obj.source.id}:job:{obj.jid}:create',
-                    'update_task': f'task:{obj.source.id}:job:{obj.jid}:update',
-                    'delete_task': f'task:{obj.source.id}:job:{obj.jid}:delete',
+                    'create_task': f'task:{obj.source.id}:job:{obj.id}:create',
+                    'update_task': f'task:{obj.source.id}:job:{obj.id}:update',
+                    'delete_task': f'task:{obj.source.id}:job:{obj.id}:delete',
                 }
             )
 
@@ -226,12 +226,13 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
     async def update_status(
         self,
         jid: JID,
+        salt_master: str,
         *,
         session: MongoAsyncClientSession | None = None,
         force: bool = False,
         notify: bool = True,
     ) -> None:
-        job = await self.get(query={'jid': str(jid)}, projection_model=JobSimpleSchema)
+        job = await self.get(query={'jid': str(jid), 'salt_master': salt_master}, projection_model=JobSimpleSchema)
 
         data_to_update = {}
 

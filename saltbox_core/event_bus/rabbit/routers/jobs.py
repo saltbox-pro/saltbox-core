@@ -26,4 +26,4 @@ async def create(
 
     job = await job_service.get(query=obj_id, projection_model=JobSimpleWithSourceSchema)
 
-    return {'jid': str(job.jid), 'source': job.source}
+    return {'id': str(job.id), 'jid': str(job.jid), 'salt_master': job.salt_master, 'source': job.source}

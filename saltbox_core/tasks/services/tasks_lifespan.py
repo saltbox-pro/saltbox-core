@@ -7,7 +7,7 @@ from redis.asyncio import Redis
 
 from saltbox_core.config import logger
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnStatus, JobReturnTgtOnlySchema
-from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobJidOnlySchema, JobStatus
+from saltbox_core.jobs.schemas.job_schemas import JobCreateSchema, JobStatus, JobWithJidAndSaltMasterOnlySchema
 from saltbox_core.jobs.services.job_return_service import JobReturnService, get_job_return_service
 from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
@@ -151,11 +151,11 @@ class TaskLifespanService:
             },
             limit=0,
             skip=0,
-            projection_model=JobJidOnlySchema,
+            projection_model=JobWithJidAndSaltMasterOnlySchema,
         )
 
         for task_job in task_jobs:
-            await self.job_service.update_status(jid=JID(task_job.jid), notify=True)
+            await self.job_service.update_status(jid=JID(task_job.jid), salt_master=task_job.salt_master, notify=True)
 
     async def check_unactive_minions(self, master: str, batch_size: int) -> None:
         task = await self.get_task()

@@ -10,7 +10,13 @@ from redis.asyncio import Redis
 
 from saltbox_core.config import logger
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnModel
-from saltbox_sdk.db.mongo.aggregations import AddFieldsAggregationStage, AggregatedField, AggregationsStore
+from saltbox_sdk.db.mongo.aggregations import (
+    AddFieldsAggregationStage,
+    AggregatedField,
+    AggregationsStore,
+    LookupAggregationStage,
+    UnwindAggregationStage,
+)
 from saltbox_sdk.db.mongo.config import get_mongo
 from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository, ProjectionModel
 from saltbox_sdk.db.redis.config import get_redis
@@ -59,6 +65,29 @@ class JobReturnRepository(BaseMongoRepository[JobReturnModel]):
                                 }
                             }
                         )
+                    ],
+                ),
+                AggregatedField(
+                    field_name='job',
+                    stages=[
+                        LookupAggregationStage(
+                            from_collection='jobs',
+                            let={'jid': '$jid', 'salt_master': '$salt_master'},
+                            pipeline=[
+                                {
+                                    '$match': {
+                                        '$expr': {
+                                            '$and': [
+                                                {'$eq': ['$jid', '$$jid']},
+                                                {'$eq': ['$salt_master', '$$salt_master']},
+                                            ]
+                                        }
+                                    }
+                                },
+                            ],
+                            as_field='job',
+                        ),
+                        UnwindAggregationStage(path='$job'),
                     ],
                 ),
             ]

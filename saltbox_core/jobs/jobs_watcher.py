@@ -7,7 +7,7 @@ from saltbox_core.config import logger
 from saltbox_core.jobs.repositories.job_repository import JobRepository
 from saltbox_core.jobs.repositories.job_return_repository import JobReturnRepository
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnForJobWatcherSchema, JobReturnStatus
-from saltbox_core.jobs.schemas.job_schemas import JobJidOnlySchema, JobStatus
+from saltbox_core.jobs.schemas.job_schemas import JobStatus, JobWithJidAndSaltMasterOnlySchema
 from saltbox_core.jobs.services.job_return_service import JobReturnService
 from saltbox_core.jobs.services.job_services import JobService
 from saltbox_core.masters.repositories.master_repository import MasterRepository
@@ -99,12 +99,12 @@ class JobsWatcher:
                     'status': JobStatus.running,
                     'waiting_expires_at_dt': {'$lt': utc_now()},
                 },
-                projection_model=JobJidOnlySchema,
+                projection_model=JobWithJidAndSaltMasterOnlySchema,
             )
 
             for job in jobs:
                 job_returns = await job_return_service.get_list(
-                    query={'jid': job.jid, 'status': JobReturnStatus.waiting},
+                    query={'jid': job.jid, 'salt_master': job.salt_master, 'status': JobReturnStatus.waiting},
                     projection_model=JobReturnForJobWatcherSchema,
                 )
 

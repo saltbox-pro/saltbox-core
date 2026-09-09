@@ -133,8 +133,9 @@ class JobSimpleSchema(IDMixin):
 class JobSimpleWithSourceSchema(JobSimpleSchema, SourceMixin): ...
 
 
-class JobJidOnlySchema(IDMixin):
+class JobWithJidAndSaltMasterOnlySchema(IDMixin):
     jid: StrJid
+    salt_master: str
 
 
 class JobForTaskStatusUpdateSchema(SourceMixin, IDMixin):

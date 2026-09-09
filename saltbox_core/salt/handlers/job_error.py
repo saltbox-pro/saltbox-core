@@ -46,7 +46,7 @@ class JobErrorHandler(BaseMessageHandler):
             )
 
             if tid:
-                await process_task_job_error.kiq(jid=jid)  # type: ignore
+                await process_task_job_error.kiq(jid=jid, salt_master=master_id)  # type: ignore
 
         except ObjectNotFoundException:
             logger.debug(f'Job with jid "{jid}" not found on master "{master_id}"')
