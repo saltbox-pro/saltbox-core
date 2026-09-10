@@ -1,0 +1,16 @@
+name: Sync PR to GitLab
+
+
+on:
+  pull_request_target:
+    types: 
+      - opened
+      - synchronize
+      - reopened
+
+
+jobs:
+  sync:
+    uses: saltbox-pro/.github/.github/workflows/sync-pr-to-gitlab.yml@main
+    secrets:
+      GITLAB_PR_SYNC_TOKEN: ${{ secrets.GITLAB_PR_SYNC_TOKEN }}

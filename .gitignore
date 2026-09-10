@@ -21,7 +21,6 @@ openapi.json
 /.vscode
 /.idea
 /.continue
-/.github
 
 # Other
 .DS_Store
