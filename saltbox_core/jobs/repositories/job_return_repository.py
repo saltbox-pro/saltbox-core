@@ -28,6 +28,7 @@ class JobReturnRepository(BaseMongoRepository[JobReturnModel]):
         auto_now_add_fields: ClassVar[list[str]] = ['created']
         auto_now_fields: ClassVar[list[str]] = ['modified']
         collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
+            'job_return_job_id_index_asc': [('job_id', pymongo.ASCENDING)],
             'job_return_jid_index_asc': [('jid', pymongo.ASCENDING)],
             'job_return_jid_salt_master_index_asc': [('jid', pymongo.ASCENDING), ('salt_master', pymongo.ASCENDING)],
             'jid__salt_master__status_index_asc': [

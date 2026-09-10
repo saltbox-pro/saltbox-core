@@ -67,6 +67,7 @@ class JobNewMessageHandler(BaseJobMessageHandler[JobForNewJobSaltHandlerSchema])
         if job:
             job_return_data = {
                 'salt_master': master_id,
+                'job_id': job.id,
                 'jid': data['jid'],
                 'fun': data['fun'],
                 'fun_args': job.arg,

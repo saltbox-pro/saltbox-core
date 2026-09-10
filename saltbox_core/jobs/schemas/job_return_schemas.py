@@ -4,7 +4,7 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from saltbox_core.jobs.schemas.job_schemas import StrJid
-from saltbox_sdk.db.mongo.schemas_base import EmptyModel, IDMixin, QueryParams, SortParams
+from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId, QueryParams, SortParams
 from saltbox_sdk.db.schemas_base import (
     SYSTEM_SHORT_USER,
     CreatedModifiedMixin,
@@ -29,6 +29,7 @@ class JobReturnStatus(StrEnum):
 class JobReturnReadOnlyFieldsMixin(SourceMixin):
     minion_id: str
     salt_master: str
+    job_id: PyObjectId
     jid: StrJid
     fun: str
     user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
@@ -79,8 +80,7 @@ class JobReturnNotifySchema(
     JobReturnReadOnlyFieldsMixin,
     JobReturnEditableFieldsMixin,
     IDMixin,
-):
-    job: EmptyModel = Field(exclude=True)
+): ...
 
 
 # System

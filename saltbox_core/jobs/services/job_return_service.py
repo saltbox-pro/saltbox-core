@@ -89,13 +89,13 @@ class JobReturnService(
         return 'job_return_service'
 
     def _get_notify_channel(self, obj: BaseModel, action: str) -> str | None:
-        if not hasattr(obj, 'job') or not hasattr(obj.job, 'id'):
+        if not hasattr(obj, 'job_id'):
             return None
 
         channels: dict[str, str] = {
-            'create': f'job-return:{obj.job.id}:create',
-            'update': f'job-return:{obj.job.id}:update',
-            'delete': f'job-return:{obj.job.id}:delete',
+            'create': f'job-return:{obj.job_id}:create',
+            'update': f'job-return:{obj.job_id}:update',
+            'delete': f'job-return:{obj.job_id}:delete',
         }
 
         if (
@@ -107,9 +107,9 @@ class JobReturnService(
         ):
             channels.update(
                 {
-                    'create_task': f'task:{obj.source.id}:job-return:{obj.job.id}:create',
-                    'update_task': f'task:{obj.source.id}:job-return:{obj.job.id}:update',
-                    'delete_task': f'task:{obj.source.id}:job-return:{obj.job.id}:delete',
+                    'create_task': f'task:{obj.source.id}:job-return:{obj.job_id}:create',
+                    'update_task': f'task:{obj.source.id}:job-return:{obj.job_id}:update',
+                    'delete_task': f'task:{obj.source.id}:job-return:{obj.job_id}:delete',
                 }
             )
 
