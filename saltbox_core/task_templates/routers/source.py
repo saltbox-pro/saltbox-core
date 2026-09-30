@@ -21,6 +21,10 @@ from saltbox_core.task_templates.tiq_tasks import (
     source_remove_task,
     source_sync_task,
     source_unplug_task,
+    source_update_apply_archive_task,
+    source_update_apply_git_task,
+    source_update_check_archive_task,
+    source_update_check_git_task,
 )
 from saltbox_core.task_templates.utils.orchestrator import SyncOrchestrator, get_sync_orchestrator
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
@@ -269,4 +273,84 @@ async def source_action_unplug(source_id: PyObjectId) -> TaskiqTaskIdResponse:
 )
 async def source_action_sync(source_id: PyObjectId) -> TaskiqTaskIdResponse:
     task = await source_sync_task.kiq(source_id=str(source_id))
+    return TaskiqTaskIdResponse(task_id=task.task_id)
+
+
+@router.post(
+    '/{source_id}/actions/update-check-git',
+    operation_id='template_source_action_update_check',
+    openapi_extra=GatewayEndpointConfig(
+        policy='public',
+        action=TemplateSourceActions.READ,
+    ).model_dump(by_alias=True),
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=TaskiqTaskIdResponse,
+)
+async def source_action_update_check_git(source_id: PyObjectId) -> TaskiqTaskIdResponse:
+    task = await source_update_check_git_task.kiq(source_id=str(source_id))
+    return TaskiqTaskIdResponse(task_id=task.task_id)
+
+
+@router.post(
+    '/{source_id}/actions/update-check-archive',
+    operation_id='template_source_action_update_check',
+    openapi_extra=GatewayEndpointConfig(
+        policy='public',
+        action=TemplateSourceActions.READ,
+    ).model_dump(by_alias=True),
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=TaskiqTaskIdResponse,
+)
+async def source_action_update_check_archive(
+    source_id: PyObjectId,
+    file: Annotated[UploadFile, File(description='Archive to upload')],
+    orchestrator: Annotated[SyncOrchestrator, Depends(get_sync_orchestrator)],
+) -> TaskiqTaskIdResponse:
+    try:
+        archive_name = await orchestrator.save_archive_and_return_path(file, source_id=source_id)
+    except Exception as e:
+        raise ArchiveUnpackException(detail=str(e)) from None
+    task = await source_update_check_archive_task.kiq(source_id=str(source_id), archive_name=archive_name)
+    return TaskiqTaskIdResponse(task_id=task.task_id)
+
+
+@router.post(
+    '/{source_id}/actions/update-apply-git',
+    operation_id='template_source_action_update_apply_git',
+    openapi_extra=GatewayEndpointConfig(
+        policy='public',
+        action=TemplateSourceActions.READ,
+    ).model_dump(by_alias=True),
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=TaskiqTaskIdResponse,
+)
+async def source_action_update_apply_git(
+    source_id: PyObjectId,
+    token: Annotated[str, Body(embed=True)],
+    stop_dependents: Annotated[bool, Body(embed=True)],
+) -> TaskiqTaskIdResponse:
+    task = await source_update_apply_git_task.kiq(
+        source_id=str(source_id), token=token, stop_dependents=stop_dependents
+    )
+    return TaskiqTaskIdResponse(task_id=task.task_id)
+
+
+@router.post(
+    '/{source_id}/actions/update-apply-archive',
+    operation_id='template_source_action_update_apply_archive',
+    openapi_extra=GatewayEndpointConfig(
+        policy='public',
+        action=TemplateSourceActions.READ,
+    ).model_dump(by_alias=True),
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=TaskiqTaskIdResponse,
+)
+async def source_action_update_apply_archive(
+    source_id: PyObjectId,
+    token: Annotated[str, Body(embed=True)],
+    stop_dependents: Annotated[bool, Body(embed=True)],
+) -> TaskiqTaskIdResponse:
+    task = await source_update_apply_archive_task.kiq(
+        source_id=str(source_id), token=token, stop_dependents=stop_dependents
+    )
     return TaskiqTaskIdResponse(task_id=task.task_id)

@@ -58,8 +58,7 @@ class TaskTemplateFromRawUpdateSchema(BaseModel):
     meta: TaskTemplateMetaSchema = Field(title='Meta content (JSON schema + UI schema + i18n)')
 
 
-class TaskTemplateUpdateSchema(BaseModel):
-    pass
+class TaskTemplateUpdateSchema(BaseModel): ...
 
 
 class TaskTemplateModel(CreatedModifiedMixin, IDMixin):

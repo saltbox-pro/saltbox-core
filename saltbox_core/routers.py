@@ -1,4 +1,4 @@
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends
 
@@ -29,7 +29,7 @@ async def health_check() -> HealthCheckResponse:
         action='read_bg_task_result',
     ).model_dump(by_alias=True),
 )
-async def get_sync_status(task_id: str) -> TaskiqTaskResult:
+async def get_sync_status(task_id: str) -> TaskiqTaskResult[Any]:
     """
     Get task status by task_id.
     """
@@ -39,7 +39,7 @@ async def get_sync_status(task_id: str) -> TaskiqTaskResult:
     if is_ready:
         result = await broker.result_backend.get_result(task_id)
 
-        response = TaskiqTaskResult(
+        response = TaskiqTaskResult[Any](
             task_id=task_id,
             progress=progress.state if progress else None,
             progress_meta=progress.meta if progress else None,
@@ -50,7 +50,7 @@ async def get_sync_status(task_id: str) -> TaskiqTaskResult:
             error=result.error,
         )
     else:
-        response = TaskiqTaskResult(
+        response = TaskiqTaskResult[Any](
             task_id=task_id,
             progress=progress.state if progress else None,
             progress_meta=progress.meta if progress else None,

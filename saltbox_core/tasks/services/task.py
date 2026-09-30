@@ -452,7 +452,9 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
 
         return result
 
-    async def __get_active_task_jobs(self, task_id: PyObjectId) -> list[EmptyModel]:
+    async def __get_active_task_jobs(
+        self, task_id: PyObjectId, session: MongoAsyncClientSession | None = None
+    ) -> list[EmptyModel]:
         return await self.job_service.get_list(
             query={
                 'source.type': 'task',
@@ -462,6 +464,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
             limit=0,
             skip=0,
             projection_model=EmptyModel,
+            session=session,
         )
 
     async def run(self, query: dict[str, Any] | PyObjectId, force: bool = False) -> None:
@@ -472,18 +475,27 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                 query=task.id, data={'status': TaskStatus.running, 'status_data': {'reason': TaskRunReason.started}}
             )
 
-    async def stop(self, query: dict[str, Any] | PyObjectId, reason: TaskStopReason = TaskStopReason.user) -> None:
-        task = await self.get(query=query, projection_model=TaskStatusOnlySchema)
+    async def stop(
+        self,
+        query: dict[str, Any] | PyObjectId,
+        reason: TaskStopReason = TaskStopReason.user,
+        session: MongoAsyncClientSession | None = None,
+    ) -> None:
+        async with get_mongo_session_with_transaction(session) as s:
+            task = await self.get(query=query, session=s, projection_model=TaskStatusOnlySchema)
 
-        if task.status and task.status.type in [TaskStatus.running, TaskStatus.wait_minions]:
-            for task_job in await self.__get_active_task_jobs(task.id):
-                await self.job_service.stop_job(task_job.id)
+            if task.status and task.status.type in [TaskStatus.running, TaskStatus.wait_minions]:
+                for task_job in await self.__get_active_task_jobs(task.id, session=s):
+                    await self.job_service.stop_job(task_job.id, session=s)
 
-            await self.task_minion_service.bulk_update(
-                query={'task_id': task.id, 'status': TaskMinionStatus.busy},
-                data={'status': TaskMinionStatus.pending},
-            )
-            await self.update(query=task.id, data={'status': TaskStatus.stopping, 'status_data': {'reason': reason}})
+                await self.task_minion_service.bulk_update(
+                    query={'task_id': task.id, 'status': TaskMinionStatus.busy},
+                    data={'status': TaskMinionStatus.pending},
+                    session=s,
+                )
+                await self.update(
+                    query=task.id, data={'status': TaskStatus.stopping, 'status_data': {'reason': reason}}, session=s
+                )
 
     async def get_policies_for_collection(
         self, target_collection_id: PyObjectId

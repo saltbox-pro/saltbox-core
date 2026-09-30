@@ -126,5 +126,6 @@ async def run_stage() -> None:
             pillar_service=pillar_service,
             master_service=master_service,
             sshfs_sync_service=sshfs_sync_service,
+            task_service=task_service,
         )
         await orchestrator.discover(created_id)

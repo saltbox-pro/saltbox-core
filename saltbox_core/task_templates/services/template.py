@@ -22,8 +22,6 @@ from saltbox_core.task_templates.schemas.template import (
 from saltbox_sdk.db.mongo.config import get_mongo_session_with_transaction
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.exceptions import ObjectNotFoundException
-
-# from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 from saltbox_sdk.utilities.json_schema import Draft4ValidatorWithDefaults
 

@@ -6,7 +6,11 @@ from taskiq import Context, TaskiqDepends
 from taskiq.depends.progress_tracker import ProgressTracker, TaskState
 
 from saltbox_core.config import Settings, logger
-from saltbox_core.task_templates.exceptions import SourceRepoCloneException, TaskTemplateSourceLockException
+from saltbox_core.task_templates.exceptions import (
+    SourceRepoCloneException,
+    SourceUpdateConflictException,
+    TaskTemplateSourceLockException,
+)
 from saltbox_core.task_templates.schemas.template import TaskTemplateMetaSchema
 from saltbox_core.task_templates.utils.orchestrator import SyncOrchestrator, get_sync_orchestrator
 from saltbox_core.tkq import broker, queue_default
@@ -333,3 +337,156 @@ async def delete_local_template_task(
             raise
 
     return {'status': 'deleted'}
+
+
+# Source update actions
+@broker.task(queue_name=queue_default.name)
+async def source_update_check_git_task(
+    source_id: str,
+    context: Context = TaskiqDepends(),
+    progress: ProgressTracker[Any] = TaskiqDepends(),
+    orchestrator: SyncOrchestrator = TaskiqDepends(get_sync_orchestrator),
+    redis: Redis = TaskiqDepends(get_redis),
+) -> dict[str, Any]:
+    lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=300, prefix='template_source')
+    lock = lock_factory.create(source_id)
+    logger.debug('is_locked: %s', await lock.locked())
+
+    if await lock.locked():
+        msg = f'Source {source_id} is locked by another task.'
+        logger.warning(msg)
+        await progress.set_progress(TaskState.FAILURE, msg)
+        raise TaskTemplateSourceLockException(source_id=source_id)
+
+    async with lock:
+        try:
+            await progress.set_progress(TaskState.STARTED, 'Checking for Git updates')
+            result = await orchestrator.update_check_git(PyObjectId(source_id))
+            await progress.set_progress(TaskState.SUCCESS, 'Git update check successful')
+            return {'status': 'checked', 'result': result}
+        except Exception:
+            await progress.set_progress(TaskState.FAILURE, 'Git update check failed')
+            raise
+
+
+@broker.task(queue_name=queue_default.name)
+async def source_update_check_archive_task(
+    source_id: str,
+    archive_name: str,
+    context: Context = TaskiqDepends(),
+    progress: ProgressTracker[Any] = TaskiqDepends(),
+    orchestrator: SyncOrchestrator = TaskiqDepends(get_sync_orchestrator),
+    redis: Redis = TaskiqDepends(get_redis),
+) -> dict[str, Any]:
+    lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=300, prefix='template_source')
+    lock = lock_factory.create(source_id)
+    logger.debug('is_locked: %s', await lock.locked())
+
+    if await lock.locked():
+        msg = f'Source {source_id} is locked by another task.'
+        logger.warning(msg)
+        await progress.set_progress(TaskState.FAILURE, msg)
+        raise TaskTemplateSourceLockException(source_id=source_id)
+
+    async with lock:
+        try:
+            await progress.set_progress(TaskState.STARTED, 'Checking for archive updates')
+            await orchestrator.unpack_archive(PyObjectId(source_id), archive_name=archive_name)
+            result = await orchestrator.update_check_archive(PyObjectId(source_id))
+            await progress.set_progress(TaskState.SUCCESS, 'Archive update check successful')
+            return {'status': 'checked', 'result': result}
+        except Exception:
+            await progress.set_progress(TaskState.FAILURE, 'Archive update check failed')
+            raise
+
+
+@broker.task(queue_name=queue_default.name)
+async def source_update_apply_git_task(
+    source_id: str,
+    token: str,
+    stop_dependents: bool,
+    context: Context = TaskiqDepends(),
+    progress: ProgressTracker[Any] = TaskiqDepends(),
+    orchestrator: SyncOrchestrator = TaskiqDepends(get_sync_orchestrator),
+    redis: Redis = TaskiqDepends(get_redis),
+) -> dict[str, Any]:
+    lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=300, prefix='template_source')
+    lock = lock_factory.create(source_id)
+    logger.debug('is_locked: %s', await lock.locked())
+
+    if await lock.locked():
+        msg = f'Source {source_id} is locked by another task.'
+        logger.warning(msg)
+        await progress.set_progress(TaskState.FAILURE, msg)
+        raise TaskTemplateSourceLockException(source_id=source_id)
+
+    async with lock:
+        try:
+            await progress.set_progress(TaskState.STARTED, 'Verifying source has not changed since it was checked')
+            guard_check = await orchestrator.update_check_git(PyObjectId(source_id))
+            if guard_check.token != token:
+                raise SourceUpdateConflictException(source_id=str(source_id))
+            if stop_dependents:
+                await progress.set_progress(TaskState.STARTED, 'Stopping dependant tasks')
+                stopped_tasks = await orchestrator.stop_dependant_tasks(
+                    task_ids=[task.id for task in guard_check.dependant_tasks],
+                )
+                await progress.set_progress('IN_PROGRESS', 'Dependants stopped')
+            else:
+                stopped_tasks = []
+            await orchestrator.discover(PyObjectId(source_id))
+            await orchestrator.prepare(PyObjectId(source_id))
+            await orchestrator.sync(PyObjectId(source_id))
+
+            await progress.set_progress(TaskState.SUCCESS, 'Git pull successful')
+            return {'status': 'updated', 'stopped_tasks': [str(tid) for tid in stopped_tasks]}
+        except Exception:
+            await progress.set_progress(TaskState.FAILURE, 'Git pull failed')
+            raise
+
+
+@broker.task(queue_name=queue_default.name)
+async def source_update_apply_archive_task(
+    source_id: str,
+    token: str,
+    stop_dependents: bool,
+    context: Context = TaskiqDepends(),
+    progress: ProgressTracker[Any] = TaskiqDepends(),
+    orchestrator: SyncOrchestrator = TaskiqDepends(get_sync_orchestrator),
+    redis: Redis = TaskiqDepends(get_redis),
+) -> dict[str, Any]:
+    lock_factory = AsyncRedisLockFactory(rdb=redis, ttl=300, prefix='template_source')
+    lock = lock_factory.create(source_id)
+    logger.debug('is_locked: %s', await lock.locked())
+
+    if await lock.locked():
+        msg = f'Source {source_id} is locked by another task.'
+        logger.warning(msg)
+        await progress.set_progress(TaskState.FAILURE, msg)
+        raise TaskTemplateSourceLockException(source_id=source_id)
+
+    async with lock:
+        await progress.set_progress(TaskState.STARTED, 'Verifying source has not changed since it was checked')
+        try:
+            guard_check = await orchestrator.update_check_archive(PyObjectId(source_id))
+            if guard_check.token != token:
+                raise SourceUpdateConflictException(source_id=str(source_id))
+            if stop_dependents:
+                await progress.set_progress('IN_PROGRESS', 'Stopping dependant tasks')
+                stopped_tasks = await orchestrator.stop_dependant_tasks(
+                    task_ids=[task.id for task in guard_check.dependant_tasks]
+                )
+                await progress.set_progress('IN_PROGRESS', 'Dependants stopped')
+            else:
+                stopped_tasks = []
+            await orchestrator.update_archive_apply(PyObjectId(source_id))
+            await progress.set_progress('IN_PROGRESS', 'Archive update applied')
+            await orchestrator.discover(PyObjectId(source_id))
+            await orchestrator.prepare(PyObjectId(source_id))
+            await orchestrator.sync(PyObjectId(source_id))
+
+            await progress.set_progress(TaskState.SUCCESS, 'Archive update successful')
+            return {'status': 'updated', 'stopped_tasks': [str(tid) for tid in stopped_tasks]}
+        except Exception:
+            await progress.set_progress(TaskState.FAILURE, 'Archive update failed')
+            raise

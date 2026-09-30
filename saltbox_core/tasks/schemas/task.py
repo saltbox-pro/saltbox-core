@@ -4,8 +4,8 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
 from saltbox_core.config import SETTINGS
+from saltbox_core.task_templates.schemas.template import TaskTemplateDefaultsSchema
 from saltbox_core.tasks.schemas.tasks_status import TaskStatus
-from saltbox_core.tasks.schemas.tasks_template import TaskTemplateDefaultsSchema
 from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId, QueryParams, SortParams
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams, SourceMixin, UserShort
 from saltbox_sdk.exceptions import SaltBoxValidationException

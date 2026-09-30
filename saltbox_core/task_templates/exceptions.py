@@ -89,6 +89,18 @@ class TaskTemplateSourceLockException(TaskTemplateException):
         super().__init__(detail=self.detail)
 
 
+class SourceUpdateConflictException(TaskTemplateException):
+    """Exception raised when a source's files or dependant tasks changed since they were last checked."""
+
+    status_code: int = status.HTTP_409_CONFLICT
+    detail: str = 'Source changed since it was last checked, please check again'
+
+    def __init__(self, source_id: str | None = None):
+        if source_id:
+            self.detail = f'Task template source with ID "{source_id}" changed since it was last checked'
+        super().__init__(detail=self.detail)
+
+
 class TaskTemplateSourceServeUpdateException(TaskTemplateException):
     """Exception raised when a task template source fails to update."""
 

@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl, SecretStr, field_ser
 
 from saltbox_core.task_templates.schemas.sshfs_file import SshfsFilePublicSchema
 from saltbox_core.task_templates.schemas.template import TaskTemplatePublicSchema
+from saltbox_core.tasks.schemas.task import TaskListResponseSchema
 from saltbox_sdk.db.mongo.schemas_base import IDMixin, QueryParams, SortParams
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime
@@ -45,6 +46,31 @@ class SourceOperation(StrEnum):
     SYNC = 'sync'
     REMOVE = 'remove'
     UNPLUG = 'unplug'
+
+
+class DiffFileChangeType(StrEnum):
+    ADDED = 'A'
+    DELETED = 'D'
+    COPIED = 'C'
+    MODIFIED = 'M'
+    RENAMED = 'R'
+    TYPE_CHANGED = 'T'
+    UNMERGED = 'U'
+
+
+class DiffFile(BaseModel):
+    path: str = Field(title='File path')
+    change_type: DiffFileChangeType = Field(
+        title='Change type', description='A - Added, D - Deleted, M - Modified, R - Renamed'
+    )
+    checksum: str | None = Field(default=None, title='Checksum of the file after change')
+
+
+class TemplateSourceUpdateCheckResultSchema(BaseModel):
+    token: str = Field(title='Update token for the changes')
+    files: list[DiffFile] = Field(default_factory=list, title='List of changed files')
+    templates: list[TaskTemplatePublicSchema] = Field(default_factory=list, title='List of changed templates')
+    dependant_tasks: list[TaskListResponseSchema] = Field(default_factory=list, title='List of dependant tasks')
 
 
 class TemplateSourceImportFromGitSchema(BaseModel):

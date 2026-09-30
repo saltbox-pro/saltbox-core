@@ -13,7 +13,7 @@ from urllib.parse import quote
 import anyio
 import httpx
 from fastapi import Depends, UploadFile
-from git import Repo
+from git import Commit, Diff, DiffIndex, Reference, Remote, RemoteReference, Repo
 from pydantic import HttpUrl
 from ruamel.yaml import YAML
 from ruamel.yaml.scanner import ScannerError
@@ -36,12 +36,16 @@ from saltbox_core.task_templates.exceptions import (
     SourceRepoCloneException,
 )
 from saltbox_core.task_templates.schemas.source import (
+    DiffFile,
+    DiffFileChangeType,
     GitlabProjectSchema,
     SourceOperation,
     SourceState,
     SourceType,
     TemplateSourceImportFromGitSchema,
     TemplateSourceImportFromMountedSchema,
+    TemplateSourcePublicSchema,
+    TemplateSourceUpdateCheckResultSchema,
 )
 from saltbox_core.task_templates.schemas.sshfs_file import (
     ManifestDigest,
@@ -53,12 +57,16 @@ from saltbox_core.task_templates.schemas.template import (
     TaskTemplateAggregatedModel,
     TaskTemplateCreateSchema,
     TaskTemplateMetaSchema,
+    TaskTemplatePublicSchema,
 )
 from saltbox_core.task_templates.services.source import TemplateSourceService, get_tpl_source_service
 from saltbox_core.task_templates.services.sshfs_file import SshfsFileService, get_sshfs_file_service
 from saltbox_core.task_templates.services.template import TaskTemplateService, get_task_tpl_service
 from saltbox_core.task_templates.utils.file_config import file_storage_config
 from saltbox_core.task_templates.utils.manifest import SourceServeUpdater, SshfsSync, get_sshfs_sync
+from saltbox_core.tasks.schemas.task import TaskListResponseSchema
+from saltbox_core.tasks.schemas.tasks_status import TaskStatus
+from saltbox_core.tasks.services.task import TaskService, get_task_service
 from saltbox_core.utilities.filesystem import TreePermissionsApplicator
 from saltbox_core.utilities.httpx_client import HttpxClientSingletoneFactory
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
@@ -76,6 +84,7 @@ class SyncOrchestrator:
         pillar_service: PillarService,
         master_service: MasterService,
         sshfs_sync_service: SshfsSync,
+        task_service: TaskService,
         httpx_client: httpx.AsyncClient,
     ) -> None:
         self._source_service = source_service
@@ -85,6 +94,7 @@ class SyncOrchestrator:
         self._master_service = master_service
         self._httpx_client = httpx_client
         self._sshfs_sync_service = sshfs_sync_service
+        self._task_service = task_service
         self._manifest: ManifestSchema | None = None
         self._local_path: Path | None = None
         self._tmp_filename_digest_size = 16
@@ -328,7 +338,6 @@ class SyncOrchestrator:
 
         return parsed_schemas
 
-    # TODO: Temporary deprecated
     def _make_checksum(self, file_path: Path) -> str:
         with file_path.open('rb') as file_stream:
             digest_obj = hashlib.file_digest(file_stream, 'sha256')
@@ -367,7 +376,11 @@ class SyncOrchestrator:
                 )
             else:
                 logger.debug('Try update: %s', name)
-                await self._template_service.update(query={'name': name, 'source_id': source_id}, data={**schema})
+                updated_tpl = TaskTemplateCreateSchema(**schema, source_id=source_id)
+                await self._template_service.update(
+                    query={'name': name, 'source_id': source_id},
+                    data=updated_tpl.model_dump(),
+                )
 
     async def _get_manifest_path(self, source_root: Path) -> Path | None:
         for name in ['manifest.yaml', 'manifest.yml']:
@@ -384,10 +397,8 @@ class SyncOrchestrator:
 
         manifest_path = await self._get_manifest_path(self._local_path)
         if not manifest_path:
-            logger.debug('No manifest file found in the repo.')
             self._manifest = None
             return None
-        logger.debug('Manifest file found: %s', manifest_path)
         try:
             manifest_data: dict[str, Any] = yaml.load(manifest_path)
         except ScannerError as err:
@@ -451,7 +462,7 @@ class SyncOrchestrator:
                     query=file.id,
                     data={'synced_on_sshfs': True, 'last_sync_error': None},
                 )
-                logger.info('Synced manifest file: %s', file.rel_path)
+                logger.debug('Synced manifest file: %s', file.rel_path)
             except Exception as e:
                 logger.error('Failed to sync file to SSHFS: %s', e)
                 await self._sshfs_file_service.update(
@@ -469,7 +480,7 @@ class SyncOrchestrator:
             limit=0,
         )
         salt_modules_serve_updater = SourceServeUpdater(active_sources)
-        logger.info('Updating serve dir with templates from %d active sources...', len(active_sources))
+        logger.debug('Updating serve dir with templates from %d active sources...', len(active_sources))
         try:
             salt_modules_serve_updater.update()
         except Exception as e:
@@ -515,6 +526,10 @@ class SyncOrchestrator:
         tmp_file_path = tmp_path / safe_name
 
         dest_path = SETTINGS.local_repos_dir / local_path
+
+        if dest_path.exists() and dest_path.is_dir():
+            shutil.rmtree(dest_path)
+
         dest_path.mkdir(parents=True, exist_ok=True)
 
         logger.debug('Saving uploaded file to temporary path: %s', tmp_path)
@@ -634,7 +649,7 @@ class SyncOrchestrator:
             source_id, {'current_operation': SourceOperation.PREPARE_TEMPLATES, 'current_task_id': task_id}
         )
         try:
-            logger.info('Syncing templates to serve dir...')
+            logger.debug('Syncing templates to serve dir...')
             await self._serve_templates_to_serve_dir(source_id)
         except Exception as e:
             logger.error('Failed to serve templates to serve dir: %s', e)
@@ -647,10 +662,10 @@ class SyncOrchestrator:
             source_id, {'current_operation': SourceOperation.PREPARE_FILES, 'current_task_id': task_id}
         )
         try:
-            logger.info('Syncing files to serve dir...')
+            logger.debug('Syncing files to serve dir...')
             sync_file_errors = await self._sync_manifest_files_to_sshfs(source_id)
 
-            logger.info('Updating SSHFS files permissions...')
+            logger.debug('Updating SSHFS files permissions...')
             await self._update_sshfs_permissions()
 
         except Exception as e:
@@ -699,13 +714,6 @@ class SyncOrchestrator:
                     logger.debug('Removing empty directory: %s', parent)
                     parent.rmdir()
                     parent = parent.parent
-            # Remove files from SSHFS
-            # sshfs_files = await self._sshfs_file_service.get_list(query={'source_id': source_id}, skip=0, limit=0)
-            # for file in sshfs_files:
-            #     await self._sshfs_sync_service.remove(file)
-            #     await self._sshfs_file_service.update(
-            #         query=file.id, data={'synced_on_sshfs': False, 'last_sync_error': None}
-            #     )
         except Exception as e:
             logger.error('Failed to unplug source: %s', e)
             await self._source_service.update(
@@ -754,7 +762,7 @@ class SyncOrchestrator:
                 ],
                 return_exceptions=True,
             )
-            logger.info('Sync results: %s', results)
+            logger.debug('Sync results: %s', results)
         errors = [r for r in results if isinstance(r, BaseException)]
         if errors:
             error_msg = '; '.join(str(e) for e in errors)
@@ -1135,6 +1143,315 @@ class SyncOrchestrator:
             except Exception as e:
                 logger.error(f'Failed to discover source {created_source_id} created from mounted repo: {e}')
 
+    # Final realization
+    async def _get_remote_origin(self, repo: Repo) -> Remote:
+        local_branch = repo.active_branch
+        tracking = local_branch.tracking_branch()
+
+        if tracking is None:
+            msg = f"Local branch '{local_branch.name}' has no upstream configured"
+            raise ValueError(msg)
+
+        remote_name = tracking.remote_name
+        # remote_branch_name = tracking.remote_head
+        # logger.debug(f"Using remote '{remote_name}/{remote_branch_name}'")
+
+        return repo.remote(name=remote_name)
+
+    async def _get_remote_commit(self, repo: Repo) -> Commit:
+        tracking_branch: RemoteReference | Reference | None = repo.head.ref.tracking_branch()
+        if not tracking_branch:
+            active_branch_name = repo.active_branch.name
+            tracking_branch = repo.refs[f'origin/{active_branch_name}']
+
+        remote_commit: Commit = tracking_branch.commit
+        return remote_commit
+
+    async def _get_changes_between_commits(self, local_commit: Commit, remote_commit: Commit) -> DiffIndex[Diff] | None:
+        if local_commit.hexsha != remote_commit.hexsha:
+            changes = local_commit.diff(remote_commit)
+            return changes
+        else:
+            logger.debug('No changes detected, we are in sync.')
+            return None
+
+    async def _get_repo_by_id(self, source_id: PyObjectId) -> Repo:
+        source = await self._source_service.get(source_id)
+        if source.source_type != SourceType.GIT_REPO:
+            msg = 'Local repo path retrieval is only supported for git_repo source type.'
+            raise ValueError(msg)
+        if not source.repo_url:
+            raise RepoURLMissingException(source_id=str(source_id))
+
+        local_path = Path(SETTINGS.local_repos_dir) / source.local_path
+        if not local_path.exists() or not local_path.is_dir():
+            msg = f'Local repo path {local_path} does not exist or is not a directory.'
+            logger.error(msg)
+            raise FileNotFoundError(msg)
+
+        try:
+            repo = Repo(local_path)
+            repo.git.update_environment(GIT_TERMINAL_PROMPT='0')
+            return repo
+        except Exception as e:
+            logger.error('Failed to access repo: %s', e)
+            raise
+
+    @staticmethod
+    def _build_changed_git_files_with_checksums(
+        repo: Repo, remote_commit: Commit, changes: DiffIndex[Diff]
+    ) -> list[DiffFile]:
+        changed_files: list[DiffFile] = []
+        for change in changes:
+            file_path = change.b_path or change.a_path
+            if not file_path:
+                continue
+            file_commit = next(
+                repo.iter_commits(rev=remote_commit.hexsha, paths=file_path, max_count=1),
+                None,
+            )
+            changed_files.append(
+                DiffFile(
+                    path=file_path,
+                    change_type=change.change_type,
+                    checksum=file_commit.hexsha if file_commit else None,
+                )
+            )
+        return changed_files
+
+    async def save_archive_and_return_path(self, file: UploadFile, source_id: PyObjectId) -> str:
+        if file.filename is None or file.filename == '':
+            raise FileNameMissingException()
+
+        ext = self._detect_archive_ext(file.filename)
+        if ext is None:
+            detected_ext = ''.join(Path(file.filename).suffixes) or Path(file.filename).suffix or '.bin'
+            raise FileTypeNotSupportedException(ext=detected_ext)
+
+        safe_name = f'{uuid.uuid4()}{ext}'
+        tmp_path = SETTINGS.local_repos_dir / file_storage_config.tmp_dir / str(source_id)
+        tmp_path.mkdir(parents=True, exist_ok=True)
+        tmp_file_path = tmp_path / safe_name
+
+        logger.debug('Saving uploaded file to temporary path: %s', tmp_path)
+
+        total_size = 0
+        try:
+            async with await anyio.open_file(tmp_file_path, 'wb') as f:
+                while chunk := await file.read(file_storage_config.chunk_size):
+                    total_size += len(chunk)
+                    if total_size > file_storage_config.max_size:
+                        raise FileTooLargeException(size=total_size, max_size=file_storage_config.max_size)
+                    await f.write(chunk)
+        except Exception as exc:
+            if tmp_file_path.exists():
+                await anyio.Path(tmp_file_path).unlink()
+            raise FileUploadException(detail=str(exc)) from exc
+
+        logger.debug('File exists on disk: %s', tmp_file_path.exists())
+        return safe_name
+
+    @staticmethod
+    def _compute_diff_token(changed_files: list[DiffFile]) -> str:
+        payload_data = [file.model_dump() for file in sorted(changed_files, key=lambda item: item.path)]
+        payload = json.dumps(payload_data, sort_keys=True).encode('utf-8')
+        return hashlib.sha256(payload).hexdigest()
+
+    def _diff_archive_files(self, source_path: Path, target_path: Path) -> list[DiffFile]:
+        changed_files: list[DiffFile] = []
+        for file_path in source_path.rglob('*'):
+            if not file_path.is_file():
+                continue
+            rel_path = file_path.relative_to(source_path)
+            update_file_path = target_path / rel_path
+            if not update_file_path.is_file():
+                diff_file = DiffFile(path=str(rel_path), change_type=DiffFileChangeType.DELETED, checksum=None)
+                changed_files.append(diff_file)
+                continue
+            current_file_checksum = self._make_checksum(file_path)
+            update_file_checksum = self._make_checksum(update_file_path)
+            if current_file_checksum != update_file_checksum:
+                diff_file = DiffFile(
+                    path=str(rel_path), change_type=DiffFileChangeType.MODIFIED, checksum=update_file_checksum
+                )
+                changed_files.append(diff_file)
+        for file_path in target_path.rglob('*'):
+            if not file_path.is_file():
+                continue
+            rel_path = file_path.relative_to(target_path)
+            # if str(rel_path) in IGNORE_LIST:
+            #     continue
+            local_file_path = source_path / rel_path
+            if not local_file_path.is_file():
+                checksum = self._make_checksum(file_path)
+                diff_file = DiffFile(path=str(rel_path), change_type=DiffFileChangeType.ADDED, checksum=checksum)
+                changed_files.append(diff_file)
+        return changed_files
+
+    async def stop_dependant_tasks(self, task_ids: list[PyObjectId] | None = None) -> list[PyObjectId]:
+        if not task_ids:
+            return []
+
+        logger.debug(f'Dependant task IDs: {task_ids}')
+        statuses = [
+            TaskStatus.created,
+            TaskStatus.wait_minions,
+            TaskStatus.running,
+        ]
+        query = {
+            '_id': {'$in': task_ids},
+            'status.type': {'$in': statuses},
+        }
+        dependant_tasks = await self._task_service.get_list(query=query)
+        stopped_tasks: list[PyObjectId] = []
+        for task in dependant_tasks:
+            await self._task_service.stop(task.id)
+            stopped_tasks.append(task.id)
+
+        return stopped_tasks
+
+    async def _get_dependant_tasks_for_templates(self, template_ids: list[PyObjectId]) -> list[TaskListResponseSchema]:
+        if not template_ids:
+            return []
+        statuses = [
+            TaskStatus.created,
+            TaskStatus.wait_minions,
+            TaskStatus.running,
+        ]
+
+        dep_query = {
+            'task_template_id': {'$in': template_ids},
+            'status.type': {'$in': statuses},
+        }
+        dependant_tasks = await self._task_service.get_list(query=dep_query, projection_model=TaskListResponseSchema)
+        return dependant_tasks
+
+    async def update_check_git(self, source_id: PyObjectId) -> TemplateSourceUpdateCheckResultSchema:
+        repo = await self._get_repo_by_id(source_id)
+        try:
+            origin = await self._get_remote_origin(repo)
+            await asyncio.wait_for(
+                asyncio.to_thread(origin.fetch),
+                timeout=SETTINGS.local_repo_sync_timeout_sec,
+            )
+        except Exception as e:
+            logger.error('Failed to fetch updates from remote: %s', e)
+            raise
+        local_commit: Commit = repo.head.commit
+        remote_commit = await self._get_remote_commit(repo)
+
+        if local_commit.hexsha == remote_commit.hexsha:
+            return TemplateSourceUpdateCheckResultSchema(
+                token=remote_commit.hexsha, files=[], templates=[], dependant_tasks=[]
+            )
+
+        changes = await self._get_changes_between_commits(local_commit, remote_commit)
+        if not changes:
+            return TemplateSourceUpdateCheckResultSchema(files=[], templates=[], token=remote_commit.hexsha)
+
+        changed_files = await asyncio.to_thread(
+            self._build_changed_git_files_with_checksums, repo, remote_commit, changes
+        )
+        file_paths = [file.path for file in changed_files]
+        query = {'$or': [{'schema_rel_path': {'$in': file_paths}}, {'sls_rel_path': {'$in': file_paths}}]}
+        changed_templates = await self._template_service.get_list(
+            query=query, projection_model=TaskTemplatePublicSchema
+        )
+        dependant_tasks = await self._get_dependant_tasks_for_templates(
+            template_ids=[tpl.id for tpl in changed_templates]
+        )
+
+        return TemplateSourceUpdateCheckResultSchema(
+            token=remote_commit.hexsha,
+            files=changed_files,
+            templates=changed_templates,
+            dependant_tasks=dependant_tasks,
+        )
+
+    async def update_check_archive(self, source_id: PyObjectId) -> TemplateSourceUpdateCheckResultSchema:
+        source = await self._source_service.get(source_id, projection_model=TemplateSourcePublicSchema)
+        if source.source_type != SourceType.ARCHIVE_BUNDLE:
+            msg = f'Source {source_id} is not of type ARCHIVE_BUNDLE.'
+            raise ValueError(msg)
+        local_path = SETTINGS.local_repos_dir / source.local_path
+        tmp_path = SETTINGS.local_repos_dir / file_storage_config.tmp_dir / str(source_id)
+        dest_path = tmp_path / 'extracted' / str(source_id)
+        if not dest_path.exists():
+            msg_0 = f'Destination path {dest_path} does not exist.'
+            raise ValueError(msg_0)
+
+        changed_files = await asyncio.to_thread(
+            self._diff_archive_files,
+            local_path,
+            dest_path,
+        )
+        if not changed_files:
+            return TemplateSourceUpdateCheckResultSchema(
+                token=self._compute_diff_token(changed_files),
+                files=[],
+                templates=[],
+                dependant_tasks=[],
+            )
+        file_paths = [file.path for file in changed_files]
+        query = {'$or': [{'schema_rel_path': {'$in': file_paths}}, {'sls_rel_path': {'$in': file_paths}}]}
+        changed_templates = await self._template_service.get_list(
+            query=query, projection_model=TaskTemplatePublicSchema
+        )
+        dependant_tasks = await self._get_dependant_tasks_for_templates(
+            template_ids=[tpl.id for tpl in changed_templates]
+        )
+        return TemplateSourceUpdateCheckResultSchema(
+            token=self._compute_diff_token(changed_files),
+            files=changed_files,
+            templates=changed_templates,
+            dependant_tasks=dependant_tasks,
+        )
+
+    async def unpack_archive(self, source_id: PyObjectId, archive_name: str) -> None:
+        source = await self._source_service.get(source_id, projection_model=TemplateSourcePublicSchema)
+        if source.source_type != SourceType.ARCHIVE_BUNDLE:
+            msg = f'Source {source_id} is not of type ARCHIVE_BUNDLE.'
+            raise ValueError(msg)
+        tmp_path = SETTINGS.local_repos_dir / file_storage_config.tmp_dir / str(source_id)
+        archive_path = tmp_path / archive_name
+        dest_path = tmp_path / 'extracted' / str(source_id)
+        if not tmp_path.exists():
+            tmp_path.mkdir(parents=True, exist_ok=True)
+        if dest_path.exists() and dest_path.is_dir():
+            shutil.rmtree(dest_path)
+        dest_path.mkdir(parents=True, exist_ok=True)
+
+        await asyncio.to_thread(
+            self._unpack_archive_strip_root,
+            archive_path,
+            dest_path,
+            tmp_path,
+        )
+
+    async def update_archive_apply(self, source_id: PyObjectId) -> None:
+        source = await self._source_service.get(source_id, projection_model=TemplateSourcePublicSchema)
+        local_path = SETTINGS.local_repos_dir / source.local_path
+        update_path = (
+            SETTINGS.local_repos_dir / file_storage_config.tmp_dir / str(source_id) / 'extracted' / str(source_id)
+        )
+        if not update_path.is_dir():
+            msg = f'Update path {update_path} does not exist.'
+            raise ValueError(msg)
+
+        backup_path = Path(SETTINGS.local_repos_dir) / f'{source.local_path}_backup'
+
+        shutil.rmtree(backup_path, ignore_errors=True)
+        if local_path.is_dir():
+            local_path.rename(backup_path)
+        try:
+            shutil.move(update_path, local_path)
+        except OSError as e:
+            logger.error('Failed to promote update path to local path: %s', e)
+            if backup_path.is_dir():
+                backup_path.rename(local_path)
+            raise
+        shutil.rmtree(backup_path, ignore_errors=True)
+
 
 async def get_sync_orchestrator(
     source_service: Annotated[TemplateSourceService, Depends(get_tpl_source_service)],
@@ -1143,6 +1460,7 @@ async def get_sync_orchestrator(
     pillar_service: Annotated[PillarService, Depends(get_pillar_service)],
     master_service: Annotated[MasterService, Depends(get_master_service)],
     sshfs_sync_service: Annotated[SshfsSync, Depends(get_sshfs_sync)],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
 ) -> SyncOrchestrator:
     httpx_client = HttpxClientSingletoneFactory.get_instance()
     return SyncOrchestrator(
@@ -1152,5 +1470,6 @@ async def get_sync_orchestrator(
         pillar_service=pillar_service,
         master_service=master_service,
         sshfs_sync_service=sshfs_sync_service,
+        task_service=task_service,
         httpx_client=httpx_client,
     )
