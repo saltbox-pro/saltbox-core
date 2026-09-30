@@ -278,7 +278,7 @@ async def source_action_sync(source_id: PyObjectId) -> TaskiqTaskIdResponse:
 
 @router.post(
     '/{source_id}/actions/update-check-git',
-    operation_id='template_source_action_update_check',
+    operation_id='template_source_action_update_check_git',
     openapi_extra=GatewayEndpointConfig(
         policy='public',
         action=TemplateSourceActions.READ,
@@ -293,7 +293,7 @@ async def source_action_update_check_git(source_id: PyObjectId) -> TaskiqTaskIdR
 
 @router.post(
     '/{source_id}/actions/update-check-archive',
-    operation_id='template_source_action_update_check',
+    operation_id='template_source_action_update_check_archive',
     openapi_extra=GatewayEndpointConfig(
         policy='public',
         action=TemplateSourceActions.READ,
