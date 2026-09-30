@@ -25,12 +25,6 @@ include:
   - project: 'saltbox/ci-lib'
     file: 'set-version.yml'
 
-  - project: 'saltbox/ci-lib'
-    file: 'mirror-repo.yml'
-
-  - project: 'saltbox/ci-lib'
-    file: 'close-github-pr.yml'
-
 
 .python-base:
   variables:
@@ -88,16 +82,6 @@ Build Core image:
   extends: .build-image
   variables:
     TARGET: main
-
-
-Mirror Repository:
-  extends: .mirror-repo
-  stage: build
-
-
-Check for GitHub PR to close:
-  extends: .close-github-pr
-  stage: build
 
 
 Trigger API Client pipeline:
