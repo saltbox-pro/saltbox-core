@@ -120,6 +120,7 @@ class JobForNewJobSaltHandlerSchema(JobForSaltHandlerBaseSchema):
 
 
 class JobForJobReturnSaltHandlerSchema(JobForSaltHandlerBaseSchema):
+    created: TimezoneAwareDatetime
     stamp: TimezoneAwareDatetime | None = Field(default=None)
     user: UserShort | None = Field(default=SYSTEM_SHORT_USER)
 

@@ -1,6 +1,6 @@
 import json
 import re
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any, ClassVar
 
 import redis.asyncio as aioredis
@@ -168,11 +168,23 @@ class JobReturnMessageHandler(BaseJobMessageHandler[JobForJobReturnSaltHandlerSc
     async def _update_job_return_object(
         self, master_id: str, jid: str, mid: str, job: JobForJobReturnSaltHandlerSchema, data: dict
     ) -> tuple[bool, PyObjectId | None]:
+        stamp = data.get('stamp')
+        if job.stamp and stamp and stamp >= job.stamp:
+            duration = stamp - job.stamp
+        else:
+            duration = max(datetime.now(UTC) - job.created, timedelta(0))
+
         try:
             job_return_id = await self.job_return_service.update(
                 query={'jid': jid, 'salt_master': master_id, 'minion_id': mid, 'retcode': None},
                 data=JobReturnUpdateSchema.model_validate(
-                    {'source': job.source, 'user': job.user, 'stamp_job': job.stamp, **data}
+                    {
+                        'source': job.source,
+                        'user': job.user,
+                        'stamp_job': job.stamp,
+                        'duration_ms': int(duration.total_seconds() * 1000),
+                        **data,
+                    }
                 ),
                 notify=True,
             )
