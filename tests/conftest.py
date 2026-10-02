@@ -26,7 +26,7 @@ class AsyncMockCollection:
         """Эмуляция метода find"""
         cursor_results = []
 
-        if filter and '_id' in filter:
+        if filter and '_id' in filter and not isinstance(filter['_id'], dict):
             # If the filter contains an _id, we check if it exists in the inserted documents
             doc_id = filter['_id']
             if doc_id in self._inserted_docs:

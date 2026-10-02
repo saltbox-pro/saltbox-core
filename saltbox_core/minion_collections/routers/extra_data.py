@@ -7,8 +7,10 @@ from saltbox_core.minion_collections.schemas.extra_data import (
     CollectionExtraDataListItemSchema,
     ExtraDataActions,
     ExtraDataListItemSchema,
-    StaticExtraDataItemRequestSchema,
+    StaticExtraDataItemCreateRequestSchema,
     StaticExtraDataItemSchema,
+    StaticExtraDataItemsCreateResponseSchema,
+    StaticExtraDataItemUpdateRequestSchema,
 )
 from saltbox_core.minion_collections.schemas.extra_data_category import (
     CollectionExtraDataListBody,
@@ -276,18 +278,20 @@ async def extra_data_items_by_collection_export(
     ).model_dump(by_alias=True),
 )
 async def extra_data_item_create(
-    item: StaticExtraDataItemRequestSchema,
+    item: StaticExtraDataItemCreateRequestSchema,
     category_service: ExtraDataCategoryServiceDep,
     minion_service: MinionServiceDep,
-) -> StaticExtraDataItemSchema:
+) -> StaticExtraDataItemsCreateResponseSchema:
     category = await category_service.get_manual_static_category(item.category_source, item.category_name)
     data = category_service.clean_manual_data(category, item.data)
 
-    created_item = await minion_service.add_static_extra_data_item(
-        item.minion_id, item.category_source, item.category_name, data
+    created_items = await minion_service.add_static_extra_data_items(
+        item.minion_ids, item.category_source, item.category_name, data, replace_manual=category.is_single_item
     )
 
-    return StaticExtraDataItemSchema.model_validate(created_item)
+    return StaticExtraDataItemsCreateResponseSchema.model_validate(
+        {'minions_count': len(created_items), 'items': created_items}
+    )
 
 
 @router.put(
@@ -300,7 +304,7 @@ async def extra_data_item_create(
 )
 async def extra_data_item_update(
     item_id: PyObjectId,
-    item: StaticExtraDataItemRequestSchema,
+    item: StaticExtraDataItemUpdateRequestSchema,
     category_service: ExtraDataCategoryServiceDep,
     minion_service: MinionServiceDep,
 ) -> StaticExtraDataItemSchema:

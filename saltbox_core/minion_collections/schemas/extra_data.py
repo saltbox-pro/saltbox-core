@@ -70,11 +70,18 @@ class ExtraDataActions(StrEnum):
     EXPORT = 'export'
 
 
-class StaticExtraDataItemRequestSchema(BaseModel):
+class StaticExtraDataItemBaseRequestSchema(BaseModel):
     category_source: str = Field(title='Category source')
     category_name: str = Field(title='Category name')
-    minion_id: PyObjectId = Field(title='Minion ID')
     data: dict[str, Any] = Field(title='Data')
+
+
+class StaticExtraDataItemCreateRequestSchema(StaticExtraDataItemBaseRequestSchema):
+    minion_ids: list[PyObjectId] = Field(title='Minion IDs', min_length=1)
+
+
+class StaticExtraDataItemUpdateRequestSchema(StaticExtraDataItemBaseRequestSchema):
+    minion_id: PyObjectId = Field(title='Minion ID')
 
 
 class StaticExtraDataItemSchema(BaseModel):
@@ -84,3 +91,12 @@ class StaticExtraDataItemSchema(BaseModel):
     data: dict[str, Any] = Field(title='Data')
 
     model_config = ConfigDict(populate_by_name=True)
+
+
+class StaticExtraDataMinionItemSchema(StaticExtraDataItemSchema):
+    minion_id: PyObjectId = Field(title='Minion ID')
+
+
+class StaticExtraDataItemsCreateResponseSchema(BaseModel):
+    minions_count: int = Field(title='Minions count')
+    items: list[StaticExtraDataMinionItemSchema] = Field(title='Items')

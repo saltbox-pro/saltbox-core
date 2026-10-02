@@ -1,4 +1,5 @@
 import pytest
+from pydantic import ValidationError
 
 from saltbox_core.minion_collections.repositories.extra_data import ExtraDataRepository
 from saltbox_core.minion_collections.repositories.extra_data_category import ExtraDataCategoryRepository
@@ -68,6 +69,38 @@ async def test_update_manual_category_is_allowed(mocked_db):
 
 
 @pytest.mark.asyncio
+async def test_update_manual_category_title_description_icon(mocked_db):
+    category_service, *_ = _build_services(mocked_db)
+
+    category_id = await category_service.create(
+        ExtraDataCategoryCreateSchema(
+            source='manual', name='notes', type=ExtraDataCategoryType.STATIC, is_single_item=True
+        )
+    )
+    category = await category_service.get(query=category_id)
+    assert category.title is None
+    assert category.is_single_item is True
+
+    await category_service.update(
+        query=category_id,
+        data=ExtraDataCategoryUpdateSchema(
+            title={'ru': 'Заметки', 'en': 'Notes'}, description={'en': 'Manual notes'}, icon='note'
+        ),
+    )
+
+    category = await category_service.get(query=category_id)
+    assert category.title == {'ru': 'Заметки', 'en': 'Notes'}
+    assert category.description == {'en': 'Manual notes'}
+    assert category.icon == 'note'
+    assert category.is_single_item is True
+
+
+def test_is_single_item_is_not_updatable():
+    with pytest.raises(ValidationError):
+        ExtraDataCategoryUpdateSchema.model_validate({'is_single_item': True})
+
+
+@pytest.mark.asyncio
 async def test_delete_static_category_removes_minion_data(mocked_db):
     category_service, _extra_data_service, minion_service, minion_repo = _build_services(mocked_db)
 
@@ -76,7 +109,9 @@ async def test_delete_static_category_removes_minion_data(mocked_db):
     )
     minion_id = await minion_repo.create(MinionCreateSchema(minion_id='m1', master='master1', grains=GrainsSchema()))
 
-    await minion_service.add_static_extra_data_item(minion_id, 'manual', 'notes', {'text': 'hello'})
+    await minion_service.add_static_extra_data_items(
+        [minion_id], 'manual', 'notes', {'text': 'hello'}, replace_manual=False
+    )
     assert (await minion_repo.collection.find_one({'_id': minion_id}))['extra_static']['manual']['notes']
 
     await category_service.delete(query=category_id)

@@ -23,26 +23,48 @@ async def _create_minion(minion_repo):
 
 
 @pytest.mark.asyncio
-async def test_add_static_extra_data_item(mocked_db):
+async def test_add_static_extra_data_items(mocked_db):
     minion_service, minion_repo = _build_minion_service(mocked_db)
-    minion_id = await _create_minion(minion_repo)
+    first_minion_id = await _create_minion(minion_repo)
+    second_minion_id = await minion_repo.create(
+        MinionCreateSchema(minion_id='m2', master='master1', grains=GrainsSchema())
+    )
 
-    item = await minion_service.add_static_extra_data_item(minion_id, 'manual', 'notes', {'text': 'hello'})
+    items = await minion_service.add_static_extra_data_items(
+        [first_minion_id, second_minion_id], 'manual', 'notes', {'text': 'hello'}, replace_manual=False
+    )
 
-    assert item['is_system'] is False
-    assert item['data'] == {'text': 'hello'}
+    assert {item['minion_id'] for item in items} == {first_minion_id, second_minion_id}
+    assert items[0]['_id'] != items[1]['_id']
 
-    stored = await minion_repo.get_static_extra_data_item(minion_id, 'manual', 'notes', item['_id'])
-    assert stored is not None
-    assert stored['data'] == {'text': 'hello'}
+    for item in items:
+        assert item['is_system'] is False
+        stored = await minion_repo.get_static_extra_data_item(item['minion_id'], 'manual', 'notes', item['_id'])
+        assert stored is not None
+        assert stored['data'] == {'text': 'hello'}
 
 
 @pytest.mark.asyncio
-async def test_add_static_extra_data_item_to_missing_minion(mocked_db):
+async def test_add_static_extra_data_items_skips_missing_minions(mocked_db):
+    minion_service, minion_repo = _build_minion_service(mocked_db)
+    minion_id = await _create_minion(minion_repo)
+
+    items = await minion_service.add_static_extra_data_items(
+        [minion_id, PyObjectId()], 'manual', 'notes', {'text': 'hello'}, replace_manual=False
+    )
+
+    assert [item['minion_id'] for item in items] == [minion_id]
+
+
+@pytest.mark.asyncio
+async def test_add_static_extra_data_items_to_missing_minions(mocked_db):
     minion_service, _minion_repo = _build_minion_service(mocked_db)
 
-    with pytest.raises(ObjectNotFoundException):
-        await minion_service.add_static_extra_data_item(PyObjectId(), 'manual', 'notes', {'text': 'hello'})
+    items = await minion_service.add_static_extra_data_items(
+        [PyObjectId()], 'manual', 'notes', {'text': 'hello'}, replace_manual=False
+    )
+
+    assert items == []
 
 
 @pytest.mark.asyncio
@@ -50,7 +72,9 @@ async def test_delete_manual_static_extra_data_item(mocked_db):
     minion_service, minion_repo = _build_minion_service(mocked_db)
     minion_id = await _create_minion(minion_repo)
 
-    item = await minion_service.add_static_extra_data_item(minion_id, 'manual', 'notes', {'text': 'hello'})
+    [item] = await minion_service.add_static_extra_data_items(
+        [minion_id], 'manual', 'notes', {'text': 'hello'}, replace_manual=False
+    )
     await minion_service.delete_static_extra_data_item(minion_id, 'manual', 'notes', item['_id'])
 
     assert await minion_repo.get_static_extra_data_item(minion_id, 'manual', 'notes', item['_id']) is None
@@ -62,7 +86,7 @@ async def test_cannot_delete_system_item(mocked_db):
     minion_id = await _create_minion(minion_repo)
 
     system_item = {'_id': PyObjectId(), 'is_system': True, 'updated_at': utc_now(), 'data': {'model': 'x86'}}
-    await minion_repo.push_static_extra_data_item(minion_id, 'inventory', 'cpu', system_item)
+    await minion_repo.add_static_extra_data_items('inventory', 'cpu', {minion_id: system_item}, replace_manual=False)
 
     with pytest.raises(PermissionDeniedException):
         await minion_service.delete_static_extra_data_item(minion_id, 'inventory', 'cpu', system_item['_id'])

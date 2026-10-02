@@ -42,6 +42,10 @@ async def extra_categories_sync(
                 'minion_fields': category.minion_fields,
                 'is_system': True,
                 'is_manual_data_allowed': bool(category.is_manual_data_allowed),
+                'title': category.title,
+                'description': category.description,
+                'icon': category.icon,
+                'is_single_item': category.is_single_item,
             },
         )
 

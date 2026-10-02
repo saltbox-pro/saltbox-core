@@ -313,16 +313,21 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
         msg = 'Extra data items collected automatically cannot be changed manually.'
         raise PermissionDeniedException(msg)
 
-    async def add_static_extra_data_item(
-        self, minion_id: PyObjectId, source: str, name: str, data: dict[str, Any]
-    ) -> dict[str, Any]:
-        item = self._new_static_extra_data_item(data, is_system=False, updated_at=utc_now())
+    async def add_static_extra_data_items(
+        self, minion_ids: list[PyObjectId], source: str, name: str, data: dict[str, Any], *, replace_manual: bool
+    ) -> list[dict[str, Any]]:
+        existing_minion_ids = await self.repo.get_ids({'_id': {'$in': minion_ids}})
+        if not existing_minion_ids:
+            return []
 
-        result = await self.repo.push_static_extra_data_item(minion_id, source, name, item)
-        if result.matched_count == 0:
-            raise ObjectNotFoundException(obj_type='minion', query={'_id': minion_id})
+        updated_at = utc_now()
+        items_by_minion = {
+            minion_id: self._new_static_extra_data_item(data, is_system=False, updated_at=updated_at)
+            for minion_id in existing_minion_ids
+        }
+        await self.repo.add_static_extra_data_items(source, name, items_by_minion, replace_manual=replace_manual)
 
-        return item
+        return [{'minion_id': minion_id, **item} for minion_id, item in items_by_minion.items()]
 
     async def update_static_extra_data_item(
         self, minion_id: PyObjectId, source: str, name: str, item_id: PyObjectId, data: dict[str, Any]

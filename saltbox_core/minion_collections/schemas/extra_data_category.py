@@ -18,9 +18,13 @@ class ExtraDataCategoryReadOnlyFieldsMixin(BaseModel):
     type: ExtraDataCategoryType = Field(title='Type')
     is_system: bool = Field(default=False, title='Created by system')
     is_manual_data_allowed: bool = Field(default=False, title='Manual data entries allowed')
+    is_single_item: bool = Field(default=False)
 
 
 class ExtraDataCategoryEditableFieldsMixin(BaseModel):
+    title: dict[str, str] | None = Field(default=None)
+    description: dict[str, str] | None = Field(default=None)
+    icon: str | None = Field(default=None)
     extra_fields_policy: MinionExtraDataExtraFieldsPolicy = Field(default=MinionExtraDataExtraFieldsPolicy.IGNORE)
     fields: list[MinionExtraDataCategoryField] = Field(default_factory=list)
     minion_fields: list[str] = Field(default_factory=list)
@@ -66,6 +70,10 @@ class ExtraDataCategoryCreateRequestSchema(BaseModel):
     extra_fields_policy: MinionExtraDataExtraFieldsPolicy = Field(default=MinionExtraDataExtraFieldsPolicy.IGNORE)
     fields: list[MinionExtraDataCategoryField] = Field(default_factory=list)
     minion_fields: list[str] = Field(default_factory=list)
+    title: dict[str, str] | None = Field(default=None)
+    description: dict[str, str] | None = Field(default=None)
+    icon: str | None = Field(default=None)
+    is_single_item: bool = Field(default=False)
 
 
 class ExtraDataCategoryListBody(SkipLimitParams, QueryParams, SortParams):

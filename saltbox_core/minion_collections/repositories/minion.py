@@ -8,7 +8,7 @@ from fastapi import Depends
 from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
 from pymongo.asynchronous.database import AsyncDatabase
 from pymongo.asynchronous.database import AsyncDatabase as MongoAsyncDatabase
-from pymongo.operations import _IndexKeyHint
+from pymongo.operations import UpdateOne, _IndexKeyHint
 from pymongo.results import UpdateResult
 
 from saltbox_core.minion_collections.repositories.extra_data import ExtraDataRepository, get_extra_data_repository
@@ -157,20 +157,36 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
 
         return next((item for item in items if item.get('_id') == item_id), None)
 
-    async def push_static_extra_data_item(
+    async def add_static_extra_data_items(
         self,
-        minion_id: PyObjectId,
         source: str,
         name: str,
-        item: dict[str, Any],
+        items_by_minion: dict[PyObjectId, dict[str, Any]],
         *,
+        replace_manual: bool,
         session: MongoAsyncClientSession | None = None,
-    ) -> UpdateResult:
-        return await self.collection.update_one(
-            filter={'_id': minion_id},
-            update={'$push': {f'extra_static.{source}.{name}': item}, '$set': {'modified': utc_now()}},
-            session=session,
-        )
+    ) -> None:
+        field_path = f'extra_static.{source}.{name}'
+        now = utc_now()
+        operations: list[UpdateOne] = []
+
+        for minion_id, item in items_by_minion.items():
+            if replace_manual:
+                system_items = {
+                    '$filter': {
+                        'input': {'$ifNull': [f'${field_path}', []]},
+                        'cond': {'$eq': ['$$this.is_system', True]},
+                    }
+                }
+                update: dict[str, Any] | list[dict[str, Any]] = [
+                    {'$set': {field_path: {'$concatArrays': [system_items, {'$literal': [item]}]}, 'modified': now}}
+                ]
+            else:
+                update = {'$push': {field_path: item}, '$set': {'modified': now}}
+
+            operations.append(UpdateOne({'_id': minion_id}, update))
+
+        await self.collection.bulk_write(operations, session=session)
 
     async def set_manual_static_extra_data_item_data(
         self,
