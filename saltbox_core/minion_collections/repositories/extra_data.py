@@ -8,7 +8,9 @@ from pymongo.asynchronous.client_session import (
 )
 from pymongo.asynchronous.database import AsyncDatabase
 from pymongo.asynchronous.database import AsyncDatabase as MongoAsyncDatabase
+from pymongo.errors import DuplicateKeyError as MongoDuplicateKeyError
 from pymongo.operations import _IndexKeyHint
+from pymongo.results import UpdateResult
 
 from saltbox_core.minion_collections.repositories.extra_data_category import (
     ExtraDataCategoryRepository,
@@ -19,6 +21,7 @@ from saltbox_sdk.db.mongo.aggregations import AnySearchAggregationStage
 from saltbox_sdk.db.mongo.config import get_mongo
 from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
+from saltbox_sdk.utilities.helpers import utc_now
 
 
 class ExtraDataRepository(BaseMongoRepository[ExtraDataModel]):
@@ -54,6 +57,107 @@ class ExtraDataRepository(BaseMongoRepository[ExtraDataModel]):
     ) -> None:
         super().__init__(database=database, kwargs=kwargs)
         self.extra_data_category_repository = extra_data_category_repository
+
+    async def push_minions_entries(
+        self,
+        source: str,
+        name: str,
+        data: dict[str, Any],
+        entries: list[dict[str, Any]],
+        *,
+        session: MongoAsyncClientSession | None = None,
+    ) -> None:
+        query = {'source': source, 'name': name, 'data': data}
+        now = utc_now()
+        update = {'$push': {'minions': {'$each': entries}}, '$set': {'modified': now}, '$setOnInsert': {'created': now}}
+
+        try:
+            await self.collection.update_one(query, update, upsert=True, session=session)
+        except MongoDuplicateKeyError:
+            await self.collection.update_one(query, update, upsert=True, session=session)
+
+    async def pull_minions_entries(
+        self,
+        source: str,
+        name: str,
+        minion_ids: list[PyObjectId],
+        *,
+        is_system: bool,
+        session: MongoAsyncClientSession | None = None,
+    ) -> None:
+        entry = {'minion_id': {'$in': minion_ids}, 'is_system': is_system}
+        await self.collection.update_many(
+            filter={'source': source, 'name': name, 'minions': {'$elemMatch': entry}},
+            update={'$pull': {'minions': entry}, '$set': {'modified': utc_now()}},
+            session=session,
+        )
+
+    async def get_minion_entry(
+        self,
+        source: str,
+        name: str,
+        minion_id: PyObjectId,
+        entry_id: PyObjectId,
+        *,
+        session: MongoAsyncClientSession | None = None,
+    ) -> dict[str, Any] | None:
+        entry = {'_id': entry_id, 'minion_id': minion_id}
+        doc = await self.collection.find_one(
+            filter={'source': source, 'name': name, 'minions': {'$elemMatch': entry}},
+            projection={'data': 1, 'minions.$': 1},
+            session=session,
+        )
+        if doc is None:
+            return None
+
+        minion_entry = doc['minions'][0]
+        return {**minion_entry, 'data': {**doc['data'], **minion_entry['data']}}
+
+    async def set_manual_minion_entry_data(
+        self,
+        source: str,
+        name: str,
+        minion_id: PyObjectId,
+        entry_id: PyObjectId,
+        data: dict[str, Any],
+        *,
+        session: MongoAsyncClientSession | None = None,
+    ) -> UpdateResult:
+        manual_entry = {'_id': entry_id, 'minion_id': minion_id, 'is_system': False}
+        now = utc_now()
+
+        return await self.collection.update_one(
+            filter={'source': source, 'name': name, 'minions': {'$elemMatch': manual_entry}},
+            update={'$set': {'minions.$[entry].data': data, 'minions.$[entry].updated_at': now, 'modified': now}},
+            array_filters=[{f'entry.{key}': value for key, value in manual_entry.items()}],
+            session=session,
+        )
+
+    async def pull_manual_minion_entry(
+        self,
+        source: str,
+        name: str,
+        minion_id: PyObjectId,
+        entry_id: PyObjectId,
+        *,
+        session: MongoAsyncClientSession | None = None,
+    ) -> UpdateResult:
+        manual_entry = {'_id': entry_id, 'minion_id': minion_id, 'is_system': False}
+
+        return await self.collection.update_one(
+            filter={'source': source, 'name': name, 'minions': {'$elemMatch': manual_entry}},
+            update={'$pull': {'minions': manual_entry}, '$set': {'modified': utc_now()}},
+            session=session,
+        )
+
+    async def unset_minions_data_field(
+        self, source: str, name: str, field_name: str, *, session: MongoAsyncClientSession | None = None
+    ) -> None:
+        await self.collection.update_many(
+            filter={'source': source, 'name': name, f'minions.data.{field_name}': {'$exists': True}},
+            update={'$unset': {f'minions.$[].data.{field_name}': ''}, '$set': {'modified': utc_now()}},
+            session=session,
+        )
 
     async def get_minion_ids_by_filter(  # noqa: C901
         self,

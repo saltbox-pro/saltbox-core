@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
@@ -9,8 +10,13 @@ from saltbox_sdk.utilities.helpers import Iso8601ZDatetime
 
 
 class ExtraDataForMinion(BaseModel):
+    id: PyObjectId = Field(alias='_id', title='ID')
     minion_id: PyObjectId = Field(title='Minion MongoDB id')
+    is_system: bool = Field(title='Created by system')
+    updated_at: datetime = Field(title='Updated at')
     data: dict = Field(title='Minion data')
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class ExtraDataReadOnlyFieldsMixin(BaseModel):
@@ -70,22 +76,23 @@ class ExtraDataActions(StrEnum):
     EXPORT = 'export'
 
 
-class StaticExtraDataItemBaseRequestSchema(BaseModel):
+class ExtraDataItemBaseRequestSchema(BaseModel):
     category_source: str = Field(title='Category source')
     category_name: str = Field(title='Category name')
     data: dict[str, Any] = Field(title='Data')
 
 
-class StaticExtraDataItemCreateRequestSchema(StaticExtraDataItemBaseRequestSchema):
+class ExtraDataItemCreateRequestSchema(ExtraDataItemBaseRequestSchema):
     minion_ids: list[PyObjectId] = Field(title='Minion IDs', min_length=1)
 
 
-class StaticExtraDataItemUpdateRequestSchema(StaticExtraDataItemBaseRequestSchema):
+class ExtraDataItemUpdateRequestSchema(ExtraDataItemBaseRequestSchema):
     minion_id: PyObjectId = Field(title='Minion ID')
 
 
-class StaticExtraDataItemSchema(BaseModel):
+class ExtraDataItemSchema(BaseModel):
     id: PyObjectId = Field(alias='_id', title='ID')
+    minion_id: PyObjectId = Field(title='Minion ID')
     is_system: bool = Field(title='Created by system')
     updated_at: Iso8601ZDatetime = Field(title='Updated at')
     data: dict[str, Any] = Field(title='Data')
@@ -93,10 +100,6 @@ class StaticExtraDataItemSchema(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
 
-class StaticExtraDataMinionItemSchema(StaticExtraDataItemSchema):
-    minion_id: PyObjectId = Field(title='Minion ID')
-
-
-class StaticExtraDataItemsCreateResponseSchema(BaseModel):
+class ExtraDataItemsCreateResponseSchema(BaseModel):
     minions_count: int = Field(title='Minions count')
-    items: list[StaticExtraDataMinionItemSchema] = Field(title='Items')
+    items: list[ExtraDataItemSchema] = Field(title='Items')

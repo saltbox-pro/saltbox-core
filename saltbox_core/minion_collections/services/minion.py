@@ -1,7 +1,6 @@
 import csv
-from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from typing import Annotated, Any, NoReturn, overload
+from typing import Annotated, Any, overload
 
 from anyio import Path
 from fastapi import Depends
@@ -10,10 +9,6 @@ from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsync
 from saltbox_core.config import logger
 from saltbox_core.minion_collections.repositories.minion import MinionRepository, get_minion_repository
 from saltbox_core.minion_collections.schemas.collection import CollectionModel
-from saltbox_core.minion_collections.schemas.extra_data import (
-    CollectionExtraDataListItemSchema,
-    ExtraDataListItemSchema,
-)
 from saltbox_core.minion_collections.schemas.filter import UniqueGrainValuesResponse
 from saltbox_core.minion_collections.schemas.minion import (
     GrainsSchema,
@@ -24,12 +19,9 @@ from saltbox_core.minion_collections.schemas.minion import (
     MinionUpdateSchema,
 )
 from saltbox_core.minion_collections.services.pipeline_builder import MongoPipelineBuilder
-from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
-from saltbox_sdk.db.schemas_base import PaginatedResponse
-from saltbox_sdk.event_bus.schemas import ExtraDataCategoryType
-from saltbox_sdk.exceptions import ObjectNotFoundException, PermissionDeniedException
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService, ProjectionModel
-from saltbox_sdk.utilities.helpers import utc_now
 
 
 class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreateSchema, MinionUpdateSchema]):
@@ -150,219 +142,6 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
                 await writer.writerow(row)
 
         return file_path
-
-    async def get_paginated_extra_data_list(
-        self,
-        *,
-        query: dict[str, Any] | None = None,
-        category_source: str,
-        category_name: str,
-        category_type: ExtraDataCategoryType,
-        field_names: list[str] | None = None,
-        search_str: str | None = None,
-        escape_search_str: bool = True,
-        limit: int = 0,
-        skip: int = 0,
-        sort: dict[str, SortOrder] | None = None,
-        session: MongoAsyncClientSession | None = None,
-    ) -> PaginatedResponse[ExtraDataListItemSchema]:
-        query = await self.repo.__prepare_query__(query)
-
-        total, data = await self.repo.get_extra_data_list_paginated(
-            query=query,
-            category_source=category_source,
-            category_name=category_name,
-            category_type=category_type,
-            field_names=field_names,
-            search_str=search_str,
-            escape_search_str=escape_search_str,
-            limit=limit,
-            skip=skip,
-            sort=sort,
-            session=session,
-        )
-
-        return PaginatedResponse[ExtraDataListItemSchema](total=total, data=data)
-
-    async def get_paginated_grouped_extra_data_list(
-        self,
-        *,
-        group_by_fields: list[str],
-        query: dict[str, Any] | None = None,
-        category_source: str,
-        category_name: str,
-        category_type: ExtraDataCategoryType,
-        search_str: str | None = None,
-        escape_search_str: bool = True,
-        limit: int = 0,
-        skip: int = 0,
-        sort: dict[str, SortOrder] | None = None,
-        session: MongoAsyncClientSession | None = None,
-    ) -> PaginatedResponse[CollectionExtraDataListItemSchema]:
-        query = await self.repo.__prepare_query__(query)
-
-        if category_type == ExtraDataCategoryType.AGGREGATED:
-            minion_ids = await self.repo.get_ids(query, session=session)
-
-            total, data = await self.repo.extra_data_repository.get_grouped_paginated(
-                minion_ids=minion_ids,
-                category_source=category_source,
-                category_name=category_name,
-                group_by_fields=group_by_fields,
-                search_str=search_str,
-                escape_search_str=escape_search_str,
-                limit=limit,
-                skip=skip,
-                sort=sort,
-                session=session,
-            )
-
-            return PaginatedResponse[CollectionExtraDataListItemSchema](total=total, data=data)
-
-        total, data = await self.repo.get_extra_data_list_paginated(
-            query=query,
-            category_source=category_source,
-            category_name=category_name,
-            category_type=category_type,
-            group_by_fields=group_by_fields,
-            search_str=search_str,
-            escape_search_str=escape_search_str,
-            limit=limit,
-            skip=skip,
-            sort=sort,
-            session=session,
-        )
-
-        return PaginatedResponse[CollectionExtraDataListItemSchema](total=total, data=data)
-
-    async def iter_extra_data_list(
-        self,
-        *,
-        query: dict[str, Any] | None = None,
-        category_source: str,
-        category_name: str,
-        category_type: ExtraDataCategoryType,
-        field_names: list[str] | None = None,
-        search_str: str | None = None,
-        escape_search_str: bool = True,
-        sort: dict[str, SortOrder] | None = None,
-    ) -> AsyncIterator[dict[str, Any]]:
-        query = await self.repo.__prepare_query__(query)
-
-        async for row in self.repo.iter_extra_data(
-            query=query,
-            category_source=category_source,
-            category_name=category_name,
-            category_type=category_type,
-            field_names=field_names,
-            search_str=search_str,
-            escape_search_str=escape_search_str,
-            sort=sort,
-        ):
-            yield row
-
-    async def iter_grouped_extra_data_list(
-        self,
-        *,
-        group_by_fields: list[str],
-        query: dict[str, Any] | None = None,
-        category_source: str,
-        category_name: str,
-        category_type: ExtraDataCategoryType,
-        search_str: str | None = None,
-        escape_search_str: bool = True,
-        sort: dict[str, SortOrder] | None = None,
-    ) -> AsyncIterator[dict[str, Any]]:
-        query = await self.repo.__prepare_query__(query)
-
-        if category_type == ExtraDataCategoryType.AGGREGATED:
-            rows = self.repo.extra_data_repository.iter_grouped(
-                minion_ids=await self.repo.get_ids(query),
-                category_source=category_source,
-                category_name=category_name,
-                group_by_fields=group_by_fields,
-                search_str=search_str,
-                escape_search_str=escape_search_str,
-                sort=sort,
-            )
-        else:
-            rows = self.repo.iter_extra_data(
-                query=query,
-                category_source=category_source,
-                category_name=category_name,
-                category_type=category_type,
-                group_by_fields=group_by_fields,
-                search_str=search_str,
-                escape_search_str=escape_search_str,
-                sort=sort,
-            )
-
-        async for row in rows:
-            yield row
-
-    @staticmethod
-    def _new_static_extra_data_item(data: dict[str, Any], *, is_system: bool, updated_at: datetime) -> dict[str, Any]:
-        return {'_id': PyObjectId(), 'is_system': is_system, 'updated_at': updated_at, 'data': data}
-
-    async def _raise_for_unchanged_static_extra_data_item(
-        self, minion_id: PyObjectId, source: str, name: str, item_id: PyObjectId
-    ) -> NoReturn:
-        if await self.repo.get_static_extra_data_item(minion_id, source, name, item_id) is None:
-            raise ObjectNotFoundException(obj_type='extra_static_item', query={'_id': item_id})
-
-        msg = 'Extra data items collected automatically cannot be changed manually.'
-        raise PermissionDeniedException(msg)
-
-    async def add_static_extra_data_items(
-        self, minion_ids: list[PyObjectId], source: str, name: str, data: dict[str, Any], *, replace_manual: bool
-    ) -> list[dict[str, Any]]:
-        existing_minion_ids = await self.repo.get_ids({'_id': {'$in': minion_ids}})
-        if not existing_minion_ids:
-            return []
-
-        updated_at = utc_now()
-        items_by_minion = {
-            minion_id: self._new_static_extra_data_item(data, is_system=False, updated_at=updated_at)
-            for minion_id in existing_minion_ids
-        }
-        await self.repo.add_static_extra_data_items(source, name, items_by_minion, replace_manual=replace_manual)
-
-        return [{'minion_id': minion_id, **item} for minion_id, item in items_by_minion.items()]
-
-    async def update_static_extra_data_item(
-        self, minion_id: PyObjectId, source: str, name: str, item_id: PyObjectId, data: dict[str, Any]
-    ) -> dict[str, Any]:
-        result = await self.repo.set_manual_static_extra_data_item_data(minion_id, source, name, item_id, data)
-        if result.matched_count == 0:
-            await self._raise_for_unchanged_static_extra_data_item(minion_id, source, name, item_id)
-
-        item = await self.repo.get_static_extra_data_item(minion_id, source, name, item_id)
-        if item is None:
-            raise ObjectNotFoundException(obj_type='extra_static_item', query={'_id': item_id})
-
-        return item
-
-    async def delete_static_extra_data_item(
-        self, minion_id: PyObjectId, source: str, name: str, item_id: PyObjectId
-    ) -> None:
-        result = await self.repo.pull_manual_static_extra_data_item(minion_id, source, name, item_id)
-        if result.matched_count == 0:
-            await self._raise_for_unchanged_static_extra_data_item(minion_id, source, name, item_id)
-
-    async def remove_static_category_data(self, source: str, name: str) -> None:
-        await self.repo.unset_static_category_field(source, name)
-
-    async def replace_system_static_extra_data(
-        self, minion_id: PyObjectId, data_by_category: dict[tuple[str, str], list[dict[str, Any]]], updated_at: datetime
-    ) -> None:
-        items_by_category = {
-            category: [self._new_static_extra_data_item(data, is_system=True, updated_at=updated_at) for data in datas]
-            for category, datas in data_by_category.items()
-        }
-
-        result = await self.repo.replace_system_static_extra_data_items(minion_id, items_by_category)
-        if result.matched_count == 0:
-            raise ObjectNotFoundException(obj_type='minion', query={'_id': minion_id})
 
 
 def get_minion_service(

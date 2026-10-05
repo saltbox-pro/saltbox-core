@@ -6,11 +6,11 @@ from fastapi.responses import StreamingResponse
 from saltbox_core.minion_collections.schemas.extra_data import (
     CollectionExtraDataListItemSchema,
     ExtraDataActions,
+    ExtraDataItemCreateRequestSchema,
+    ExtraDataItemSchema,
+    ExtraDataItemsCreateResponseSchema,
+    ExtraDataItemUpdateRequestSchema,
     ExtraDataListItemSchema,
-    StaticExtraDataItemCreateRequestSchema,
-    StaticExtraDataItemSchema,
-    StaticExtraDataItemsCreateResponseSchema,
-    StaticExtraDataItemUpdateRequestSchema,
 )
 from saltbox_core.minion_collections.schemas.extra_data_category import (
     CollectionExtraDataListBody,
@@ -18,6 +18,8 @@ from saltbox_core.minion_collections.schemas.extra_data_category import (
     ExtraDataCategoryActions,
     ExtraDataCategoryCreateRequestSchema,
     ExtraDataCategoryCreateSchema,
+    ExtraDataCategoryFieldCreateRequestSchema,
+    ExtraDataCategoryFieldsOrderRequestSchema,
     ExtraDataCategoryListBody,
     ExtraDataCategoryModel,
     ExtraDataCategoryUpdateSchema,
@@ -26,6 +28,7 @@ from saltbox_core.minion_collections.schemas.extra_data_category import (
 )
 from saltbox_core.minion_collections.schemas.minion import MinionTgtOnlySchema
 from saltbox_core.minion_collections.services.collection import CollectionService, get_collection_service
+from saltbox_core.minion_collections.services.extra_data import ExtraDataService, get_extra_data_service
 from saltbox_core.minion_collections.services.extra_data_category import (
     ExtraDataCategoryService,
     get_extra_data_category_service,
@@ -39,6 +42,7 @@ from saltbox_sdk.fastapi_utils.csv_export import csv_response
 router = APIRouter(prefix='/extra-data', tags=['Extra Data'])
 
 ExtraDataCategoryServiceDep = Annotated[ExtraDataCategoryService, Depends(get_extra_data_category_service)]
+ExtraDataServiceDep = Annotated[ExtraDataService, Depends(get_extra_data_service)]
 MinionServiceDep = Annotated[MinionService, Depends(get_minion_service)]
 CollectionServiceDep = Annotated[CollectionService, Depends(get_collection_service)]
 
@@ -127,6 +131,63 @@ async def extra_data_category_delete(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.post(
+    '/categories/{source}/{name}/fields',
+    operation_id='extra_data_category_field_create',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.extra_data.categories.update',
+        action=ExtraDataCategoryActions.UPDATE,
+    ).model_dump(by_alias=True),
+)
+async def extra_data_category_field_create(
+    source: str,
+    name: str,
+    field: ExtraDataCategoryFieldCreateRequestSchema,
+    category_service: ExtraDataCategoryServiceDep,
+) -> ExtraDataCategoryModel:
+    await category_service.add_field(source, name, field)
+
+    return await category_service.get(query={'source': source, 'name': name})
+
+
+@router.delete(
+    '/categories/{source}/{name}/fields/{field_name}',
+    operation_id='extra_data_category_field_delete',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.extra_data.categories.update',
+        action=ExtraDataCategoryActions.UPDATE,
+    ).model_dump(by_alias=True),
+)
+async def extra_data_category_field_delete(
+    source: str,
+    name: str,
+    field_name: str,
+    category_service: ExtraDataCategoryServiceDep,
+) -> ExtraDataCategoryModel:
+    await category_service.delete_field(source, name, field_name)
+
+    return await category_service.get(query={'source': source, 'name': name})
+
+
+@router.post(
+    '/categories/{source}/{name}/fields/order',
+    operation_id='extra_data_category_fields_order',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.extra_data.categories.update',
+        action=ExtraDataCategoryActions.UPDATE,
+    ).model_dump(by_alias=True),
+)
+async def extra_data_category_fields_order(
+    source: str,
+    name: str,
+    body: ExtraDataCategoryFieldsOrderRequestSchema,
+    category_service: ExtraDataCategoryServiceDep,
+) -> ExtraDataCategoryModel:
+    await category_service.set_fields_order(source, name, body.field_names)
+
+    return await category_service.get(query={'source': source, 'name': name})
+
+
 # Items
 
 
@@ -144,6 +205,7 @@ async def extra_data_items_by_minion(
     minion_service: MinionServiceDep,
     category_service: ExtraDataCategoryServiceDep,
     collection_service: CollectionServiceDep,
+    extra_data_service: ExtraDataServiceDep,
 ) -> PaginatedResponse[ExtraDataListItemSchema]:
     collection = await collection_service.get_by_slug(body.collection_slug) if body.collection_slug else None
     minion = await minion_service.get_in_collection(body.minion_id, collection, projection_model=MinionTgtOnlySchema)
@@ -151,12 +213,9 @@ async def extra_data_items_by_minion(
         body.category_id, body.category_source, body.category_name
     )
 
-    return await minion_service.get_paginated_extra_data_list(
+    return await extra_data_service.get_minion_items_paginated(
+        category,
         query={'minion_id': minion.minion_id, 'master': minion.master},
-        category_source=category.source,
-        category_name=category.name,
-        category_type=category.type,
-        field_names=[field.name for field in category.fields],
         search_str=body.search,
         limit=body.limit,
         skip=body.skip,
@@ -175,21 +234,18 @@ async def extra_data_items_by_minion(
 )
 async def extra_data_items_by_collection(
     body: Annotated[CollectionExtraDataListBody, Body()],
-    minion_service: MinionServiceDep,
     category_service: ExtraDataCategoryServiceDep,
     collection_service: CollectionServiceDep,
+    extra_data_service: ExtraDataServiceDep,
 ) -> PaginatedResponse[CollectionExtraDataListItemSchema]:
     collection = await collection_service.get_by_id_or_slug(body.collection_id, body.collection_slug)
     category = await category_service.get_by_id_or_source_and_name(
         body.category_id, body.category_source, body.category_name
     )
 
-    return await minion_service.get_paginated_grouped_extra_data_list(
-        group_by_fields=category.category_fields,
+    return await extra_data_service.get_grouped_items_paginated(
+        category,
         query=collection.full_query,
-        category_source=category.source,
-        category_name=category.name,
-        category_type=category.type,
         search_str=body.search,
         limit=body.limit,
         skip=body.skip,
@@ -212,24 +268,21 @@ async def extra_data_items_by_minion_export(
     minion_service: MinionServiceDep,
     category_service: ExtraDataCategoryServiceDep,
     collection_service: CollectionServiceDep,
+    extra_data_service: ExtraDataServiceDep,
 ) -> StreamingResponse:
     collection = await collection_service.get_by_slug(body.collection_slug) if body.collection_slug else None
     minion = await minion_service.get_in_collection(body.minion_id, collection, projection_model=MinionTgtOnlySchema)
     category = await category_service.get_by_id_or_source_and_name(
         body.category_id, body.category_source, body.category_name
     )
-    field_names = [field.name for field in category.fields]
 
-    rows = minion_service.iter_extra_data_list(
+    rows = extra_data_service.iter_minion_items(
+        category,
         query={'minion_id': minion.minion_id, 'master': minion.master},
-        category_source=category.source,
-        category_name=category.name,
-        category_type=category.type,
-        field_names=field_names,
         search_str=body.search,
         sort=body.sort,
     )
-    columns = [(name, name) for name in field_names] + [('updated_at', 'updated_at')]
+    columns = [(field.name, field.name) for field in category.fields] + [('updated_at', 'updated_at')]
 
     return csv_response(columns, rows, ['extra_data', category.source, category.name, minion.minion_id])
 
@@ -246,21 +299,18 @@ async def extra_data_items_by_minion_export(
 )
 async def extra_data_items_by_collection_export(
     body: Annotated[CollectionExtraDataQueryBody, Body()],
-    minion_service: MinionServiceDep,
     category_service: ExtraDataCategoryServiceDep,
     collection_service: CollectionServiceDep,
+    extra_data_service: ExtraDataServiceDep,
 ) -> StreamingResponse:
     collection = await collection_service.get_by_id_or_slug(body.collection_id, body.collection_slug)
     category = await category_service.get_by_id_or_source_and_name(
         body.category_id, body.category_source, body.category_name
     )
 
-    rows = minion_service.iter_grouped_extra_data_list(
-        group_by_fields=category.category_fields,
+    rows = extra_data_service.iter_grouped_items(
+        category,
         query=collection.full_query,
-        category_source=category.source,
-        category_name=category.name,
-        category_type=category.type,
         search_str=body.search,
         sort=body.sort,
     )
@@ -278,18 +328,15 @@ async def extra_data_items_by_collection_export(
     ).model_dump(by_alias=True),
 )
 async def extra_data_item_create(
-    item: StaticExtraDataItemCreateRequestSchema,
+    item: ExtraDataItemCreateRequestSchema,
     category_service: ExtraDataCategoryServiceDep,
-    minion_service: MinionServiceDep,
-) -> StaticExtraDataItemsCreateResponseSchema:
-    category = await category_service.get_manual_static_category(item.category_source, item.category_name)
-    data = category_service.clean_manual_data(category, item.data)
+    extra_data_service: ExtraDataServiceDep,
+) -> ExtraDataItemsCreateResponseSchema:
+    category = await category_service.get_manual_data_category(item.category_source, item.category_name)
 
-    created_items = await minion_service.add_static_extra_data_items(
-        item.minion_ids, item.category_source, item.category_name, data, replace_manual=category.is_single_item
-    )
+    created_items = await extra_data_service.add_items(category, item.minion_ids, item.data, is_system=False)
 
-    return StaticExtraDataItemsCreateResponseSchema.model_validate(
+    return ExtraDataItemsCreateResponseSchema.model_validate(
         {'minions_count': len(created_items), 'items': created_items}
     )
 
@@ -304,18 +351,15 @@ async def extra_data_item_create(
 )
 async def extra_data_item_update(
     item_id: PyObjectId,
-    item: StaticExtraDataItemUpdateRequestSchema,
+    item: ExtraDataItemUpdateRequestSchema,
     category_service: ExtraDataCategoryServiceDep,
-    minion_service: MinionServiceDep,
-) -> StaticExtraDataItemSchema:
-    category = await category_service.get_manual_static_category(item.category_source, item.category_name)
-    data = category_service.clean_manual_data(category, item.data)
+    extra_data_service: ExtraDataServiceDep,
+) -> ExtraDataItemSchema:
+    category = await category_service.get_manual_data_category(item.category_source, item.category_name)
 
-    updated_item = await minion_service.update_static_extra_data_item(
-        item.minion_id, item.category_source, item.category_name, item_id, data
-    )
+    updated_item = await extra_data_service.update_item(category, item.minion_id, item_id, item.data)
 
-    return StaticExtraDataItemSchema.model_validate(updated_item)
+    return ExtraDataItemSchema.model_validate(updated_item)
 
 
 @router.delete(
@@ -333,9 +377,9 @@ async def extra_data_item_delete(
     category_name: Annotated[str, Query()],
     minion_id: Annotated[PyObjectId, Query()],
     category_service: ExtraDataCategoryServiceDep,
-    minion_service: MinionServiceDep,
+    extra_data_service: ExtraDataServiceDep,
 ) -> Response:
-    await category_service.get_manual_static_category(category_source, category_name)
-    await minion_service.delete_static_extra_data_item(minion_id, category_source, category_name, item_id)
+    category = await category_service.get_manual_data_category(category_source, category_name)
+    await extra_data_service.delete_item(category, minion_id, item_id)
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)

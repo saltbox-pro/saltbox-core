@@ -3,7 +3,6 @@ from datetime import UTC, datetime
 import pytest
 
 from saltbox_core.minion_collections.schemas.extra_data_category import ExtraDataCategoryModel
-from saltbox_core.minion_collections.services.extra_data_category import ExtraDataCategoryService
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.exceptions import SaltBoxValidationException
 
@@ -38,7 +37,7 @@ def test_valid_data_is_cleaned():
         'anything': [1, 'two'],
     }
 
-    cleaned = ExtraDataCategoryService.clean_manual_data(_category(), data)
+    cleaned = _category().clean_data(data)
 
     assert cleaned == {**data, 'bought_at': datetime(2026, 9, 1, 10, tzinfo=UTC)}
 
@@ -56,12 +55,12 @@ def test_valid_data_is_cleaned():
 )
 def test_invalid_data_is_rejected(data, error):
     with pytest.raises(SaltBoxValidationException, match=error):
-        ExtraDataCategoryService.clean_manual_data(_category(), data)
+        _category().clean_data(data)
 
 
 def test_all_errors_are_reported_together():
     with pytest.raises(SaltBoxValidationException) as exc_info:
-        ExtraDataCategoryService.clean_manual_data(_category(), {'owner': 1, 'room': '204'})
+        _category().clean_data({'owner': 1, 'room': '204'})
 
     assert '`owner`' in exc_info.value.detail
     assert '`room`' in exc_info.value.detail
@@ -69,6 +68,6 @@ def test_all_errors_are_reported_together():
 
 @pytest.mark.parametrize('extra_fields_policy', ['save_to_category', 'save_to_minion'])
 def test_unknown_fields_are_kept_when_policy_saves_them(extra_fields_policy):
-    cleaned = ExtraDataCategoryService.clean_manual_data(_category(extra_fields_policy), {'room': '204'})
+    cleaned = _category(extra_fields_policy).clean_data({'room': '204'})
 
     assert cleaned == {'room': '204'}

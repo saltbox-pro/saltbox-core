@@ -20,8 +20,10 @@ from saltbox_sdk.db.mongo.aggregations import (
     AnySearchAggregationStage,
     GroupAggregationStage,
     LookupAggregationStage,
+    MatchAggregationStage,
     ProjectAggregationStage,
     UnsetAggregationStage,
+    UnwindAggregationStage,
 )
 from saltbox_sdk.db.mongo.config import get_mongo
 from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository, ProjectionModel
@@ -157,33 +159,45 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
 
         return next((item for item in items if item.get('_id') == item_id), None)
 
-    async def add_static_extra_data_items(
+    async def push_static_extra_data_items(
         self,
         source: str,
         name: str,
-        items_by_minion: dict[PyObjectId, dict[str, Any]],
+        items_by_minion: dict[PyObjectId, list[dict[str, Any]]],
         *,
-        replace_manual: bool,
         session: MongoAsyncClientSession | None = None,
     ) -> None:
         field_path = f'extra_static.{source}.{name}'
         now = utc_now()
         operations: list[UpdateOne] = []
 
-        for minion_id, item in items_by_minion.items():
-            if replace_manual:
-                system_items = {
-                    '$filter': {
-                        'input': {'$ifNull': [f'${field_path}', []]},
-                        'cond': {'$eq': ['$$this.is_system', True]},
-                    }
-                }
-                update: dict[str, Any] | list[dict[str, Any]] = [
-                    {'$set': {field_path: {'$concatArrays': [system_items, {'$literal': [item]}]}, 'modified': now}}
-                ]
-            else:
-                update = {'$push': {field_path: item}, '$set': {'modified': now}}
+        for minion_id, items in items_by_minion.items():
+            update = {'$push': {field_path: {'$each': items}}, '$set': {'modified': now}}
+            operations.append(UpdateOne({'_id': minion_id}, update))
 
+        await self.collection.bulk_write(operations, session=session)
+
+    async def replace_static_extra_data_items(
+        self,
+        source: str,
+        name: str,
+        items_by_minion: dict[PyObjectId, list[dict[str, Any]]],
+        *,
+        is_system: bool,
+        session: MongoAsyncClientSession | None = None,
+    ) -> None:
+        field_path = f'extra_static.{source}.{name}'
+        now = utc_now()
+        kept_items = {
+            '$filter': {
+                'input': {'$ifNull': [f'${field_path}', []]},
+                'cond': {'$ne': ['$$this.is_system', is_system]},
+            }
+        }
+        operations: list[UpdateOne] = []
+
+        for minion_id, items in items_by_minion.items():
+            update = [{'$set': {field_path: {'$concatArrays': [kept_items, {'$literal': items}]}, 'modified': now}}]
             operations.append(UpdateOne({'_id': minion_id}, update))
 
         await self.collection.bulk_write(operations, session=session)
@@ -229,24 +243,6 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
             session=session,
         )
 
-    async def replace_system_static_extra_data_items(
-        self,
-        minion_id: PyObjectId,
-        items_by_category: dict[tuple[str, str], list[dict[str, Any]]],
-        *,
-        session: MongoAsyncClientSession | None = None,
-    ) -> UpdateResult:
-        fields: dict[str, Any] = {'modified': utc_now()}
-
-        for (source, name), items in items_by_category.items():
-            field_path = f'extra_static.{source}.{name}'
-            manual_items = {
-                '$filter': {'input': {'$ifNull': [f'${field_path}', []]}, 'cond': {'$eq': ['$$this.is_system', False]}}
-            }
-            fields[field_path] = {'$concatArrays': [manual_items, {'$literal': items}]}
-
-        return await self.collection.update_one(filter={'_id': minion_id}, update=[{'$set': fields}], session=session)
-
     async def unset_static_category_field(
         self, source: str, name: str, *, session: MongoAsyncClientSession | None = None
     ) -> None:
@@ -254,6 +250,27 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
         await self.collection.update_many(
             filter={field_path: {'$exists': True}},
             update={'$unset': {field_path: ''}},
+            session=session,
+        )
+
+    async def remove_static_category_data_field(
+        self, source: str, name: str, field_name: str, *, session: MongoAsyncClientSession | None = None
+    ) -> None:
+        field_path = f'extra_static.{source}.{name}'
+        data_without_field = {'$unsetField': {'field': {'$literal': field_name}, 'input': '$$this.data'}}
+        kept_items = {
+            '$filter': {
+                'input': f'${field_path}',
+                'cond': {'$or': [{'$ne': [data_without_field, {}]}, {'$eq': ['$$this.data', {}]}]},
+            }
+        }
+        items_without_field = {
+            '$map': {'input': kept_items, 'in': {'$mergeObjects': ['$$this', {'data': data_without_field}]}}
+        }
+
+        await self.collection.update_many(
+            filter={f'{field_path}.data.{field_name}': {'$exists': True}},
+            update=[{'$set': {field_path: items_without_field, 'modified': utc_now()}}],
             session=session,
         )
 
@@ -290,12 +307,18 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
             }
         }
 
-        entry_filter = {'$filter': {'input': '$minions', 'as': 'm', 'cond': {'$eq': ['$$m.minion_id', '$$mid']}}}
-        merge_with_meta = {'$mergeObjects': ['$data', '$_entry.data', {'_source': '$source', '_name': '$name'}]}
+        entry_meta = {
+            '_id': {'$toString': '$minions._id'},
+            'is_system': '$minions.is_system',
+            'updated_at': '$minions.updated_at',
+            '_source': '$source',
+            '_name': '$name',
+        }
         lookup_pipeline: list[dict[str, Any]] = [
             {'$match': {'source': category_source, 'name': category_name}},
-            {'$addFields': {'_entry': {'$first': entry_filter}}},
-            {'$replaceRoot': {'newRoot': merge_with_meta}},
+            {'$unwind': '$minions'},
+            {'$match': {'$expr': {'$eq': ['$minions.minion_id', '$$mid']}}},
+            {'$replaceRoot': {'newRoot': {'$mergeObjects': ['$data', '$minions.data', entry_meta]}}},
         ]
 
         static_map = {
@@ -493,21 +516,10 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
                             foreign_field='minions.minion_id',
                             let={'minion_id': '$_id'},
                             pipeline=[
+                                UnwindAggregationStage(path='$minions'),
+                                MatchAggregationStage(query={'$expr': {'$eq': ['$minions.minion_id', '$$minion_id']}}),
                                 AddFieldsAggregationStage(
-                                    fields={
-                                        '_minion_entry': {
-                                            '$first': {
-                                                '$filter': {
-                                                    'input': '$minions',
-                                                    'as': 'm',
-                                                    'cond': {'$eq': ['$$m.minion_id', '$$minion_id']},
-                                                }
-                                            }
-                                        }
-                                    }
-                                ),
-                                AddFieldsAggregationStage(
-                                    fields={'_merged_value': {'$mergeObjects': ['$data', '$_minion_entry.data']}}
+                                    fields={'_merged_value': {'$mergeObjects': ['$data', '$minions.data']}}
                                 ),
                                 GroupAggregationStage(
                                     group_id={'source': '$source', 'name': '$name'},
