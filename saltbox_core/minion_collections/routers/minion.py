@@ -19,9 +19,10 @@ from saltbox_core.minion_collections.services.collection import CollectionServic
 from saltbox_core.minion_collections.services.minion import MinionService, get_minion_service
 from saltbox_core.tasks.schemas.tasks_minion import MinionPolicyGroupSchema
 from saltbox_core.tasks.services.tasks_minion import TaskMinionService, get_task_minion_service
-from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
+from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.fastapi_utils.csv_export import csv_response
 from saltbox_sdk.fastapi_utils.dependencies import get_current_user
 
@@ -194,11 +195,15 @@ async def minion_delete(
 ) -> Response:
     collection = await collection_service.get_by_slug(collection_slug)
 
-    ids = await minion_service.get_ids_by_query(query=collection.full_query)
-    if mid not in [i.id for i in ids]:
-        raise HTTPException(status_code=404, detail='Minion not found')
+    query: dict[str, Any] = {'_id': mid}
+    if collection.full_query:
+        query = {'$and': [query, collection.full_query]}
 
-    await minion_service.delete(mid)
+    try:
+        await minion_service.delete(query)
+    except ObjectNotFoundException:
+        raise HTTPException(status_code=404, detail='Minion not found') from None
+
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -220,12 +225,12 @@ async def minion_bulk_delete(
     deleted_count = 0
     collection = await collection_service.get_by_slug(body.collection_slug)
 
-    ids = [i.id for i in await minion_service.get_ids_by_query(query=collection.full_query)]
-    for mid in body.minions:
-        if mid not in ids:
-            continue
+    query: dict[str, Any] = {'_id': {'$in': body.minions}}
+    if collection.full_query:
+        query = {'$and': [query, collection.full_query]}
 
-        deleted_count += await minion_service.delete(mid)
+    for minion in await minion_service.get_list(query, projection_model=EmptyModel):
+        deleted_count += await minion_service.delete(minion.id)
 
     logger.debug(
         f'Deleted {deleted_count} minions from "{body.collection_slug}" collection '

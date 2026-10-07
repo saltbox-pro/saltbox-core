@@ -13,7 +13,6 @@ from saltbox_core.minion_collections.schemas.minion import (
     GrainsSchema,
     MinionCreateSchema,
     MinionExportSchema,
-    MinionIDs,
     MinionModel,
     MinionTgtOnlySchema,
     MinionUpdateSchema,
@@ -65,9 +64,6 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
             query = {'$and': [query, collection.full_query]}
 
         return await self.get(query=query, projection_model=projection_model)
-
-    async def get_ids_by_query(self, query: dict[str, Any]) -> list[MinionIDs]:
-        return await self.repo.get_list(query, skip=0, limit=0, projection_model=MinionIDs)
 
     async def get_unique_grain_values_by_field(
         self, field: str, query: dict[str, Any], skip: int = 0, limit: int | None = None

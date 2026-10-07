@@ -216,10 +216,6 @@ class MinionSimpleSchema(IDMixin):
     last_activity: TimezoneAwareDatetime | None = Field(title='Last activity', default=None)
 
 
-class MinionIDs(IDMixin):
-    pass
-
-
 # REST
 
 
