@@ -1,7 +1,7 @@
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Response, status
-from fastapi.responses import FileResponse
+from fastapi.responses import StreamingResponse
 
 from saltbox_bridge_messages import BridgeGatherMinionsResponse, CoreGatherMinionsRequest, MasterStatus, SaltTgtType
 from saltbox_core.config import logger
@@ -22,6 +22,7 @@ from saltbox_core.tasks.services.tasks_minion import TaskMinionService, get_task
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
+from saltbox_sdk.fastapi_utils.csv_export import csv_response
 from saltbox_sdk.fastapi_utils.dependencies import get_current_user
 
 router = APIRouter(prefix='/minions', tags=['Minions'])
@@ -64,13 +65,13 @@ async def minions_list(
         policy='core.minions.export',
         action=MinionsActions.EXPORT,
     ).model_dump(by_alias=True),
-    response_class=FileResponse,
+    response_class=StreamingResponse,
 )
 async def minions_export(
     body: Annotated[MinionListBody, Body()],
     minion_service: Annotated[MinionService, Depends(get_minion_service)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
-) -> FileResponse:
+) -> StreamingResponse:
     collection = await collection_service.get_by_slug(body.collection_slug)
 
     if collection.full_query and body.query:
@@ -78,15 +79,10 @@ async def minions_export(
     else:
         query = collection.full_query if collection.full_query else body.query
 
-    file_path = await minion_service.export_to_csv(query=query, skip=body.skip, limit=body.limit)
+    columns = [(name, name) for name in await minion_service.get_export_columns(query)]
+    rows = minion_service.iter_export_rows(query, skip=body.skip, limit=body.limit, sort=body.sort)
 
-    headers = {'Content-Disposition': f'attachment; filename={file_path.split("/")[-1]}'}
-    return FileResponse(
-        file_path,
-        filename=file_path.split('/')[-1],
-        media_type='text/csv',
-        headers=headers,
-    )
+    return csv_response(columns, rows, ['minions', collection.slug or ''])
 
 
 @router.get(

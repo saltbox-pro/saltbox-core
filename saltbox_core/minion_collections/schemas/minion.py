@@ -201,6 +201,10 @@ class MinionShortSchema(
     extra_aggregated: ClassVar[dict] = Field(exclude=True)
 
 
+class MinionExportSchema(CreatedModifiedMixin, MinionEditableFieldsMixin[GrainsSchema], IDMixin, BaseModel):
+    extra_static: ClassVar[dict[str, Any]] = Field(exclude=True)  # type: ignore
+
+
 class MinionTgtOnlySchema(IDMixin):
     minion_id: str = Field(title='Minion ID')
     master: str = Field(title='Master')

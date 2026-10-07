@@ -2,7 +2,7 @@ from datetime import datetime
 
 import pytest
 
-from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
 from saltbox_sdk.exceptions import (
     MultipleObjectsFoundException,
     ObjectNotFoundException,
@@ -325,6 +325,28 @@ async def test_get_list_with_projection(mocked_db):
     assert isinstance(items[0], SampleModelProjection)
     assert items[0].name.startswith('Projection List')
     assert not hasattr(items[0], 'description')
+
+
+@pytest.mark.asyncio
+async def test_iter_list(mocked_db):
+    repo = SampleRepository(mocked_db)
+
+    await repo.create({'name': 'Iter B', 'description': 'Second'})
+    await repo.create({'name': 'Iter A', 'description': 'First'})
+    await repo.create({'name': 'Other', 'description': 'Not for iter'})
+
+    items = [item async for item in repo.iter_list({'name': {'$regex': 'Iter'}}, sort={'name': SortOrder.ASC})]
+    assert [item.name for item in items] == ['Iter A', 'Iter B']
+    assert all(isinstance(item, SampleModel) for item in items)
+
+    items = [
+        item
+        async for item in repo.iter_list(
+            {'name': {'$regex': 'Iter'}}, limit=1, skip=1, projection_model=SampleModelProjection
+        )
+    ]
+    assert len(items) == 1
+    assert isinstance(items[0], SampleModelProjection)
 
 
 @pytest.mark.asyncio

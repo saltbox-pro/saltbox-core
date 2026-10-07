@@ -47,6 +47,7 @@ class AsyncMockCollection:
 
         mock_cursor = self.mocker.MagicMock()
         mock_cursor.to_list = self.mocker.AsyncMock(return_value=cursor_results)
+        mock_cursor.__aiter__.return_value = cursor_results
         return mock_cursor
 
     async def count_documents(self, filter, limit=0, session=None):

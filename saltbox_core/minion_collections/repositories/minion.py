@@ -144,6 +144,24 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
         docs = await self.collection.find(filter=query, projection={'_id': 1}, session=session).to_list()
         return [doc['_id'] for doc in docs]
 
+    async def get_grains_keys(self, query: dict[str, Any] | None) -> list[str]:
+        query = await self.__prepare_query__(query)
+        pipeline = await self.prepare_pipeline({'grains': 1}, query) or [{'$match': query or {}}]
+        pipeline += [
+            {
+                '$project': {
+                    'keys': {'$map': {'input': {'$objectToArray': {'$ifNull': ['$grains', {}]}}, 'in': '$$this.k'}}
+                }
+            },
+            {'$group': {'_id': '$keys'}},
+        ]
+
+        keys: set[str] = set()
+        for doc in await self.aggregate(pipeline):
+            keys.update(doc['_id'])
+
+        return sorted(keys)
+
     async def get_static_extra_data_item(
         self,
         minion_id: PyObjectId,
