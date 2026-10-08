@@ -100,10 +100,18 @@ schema_input_type_map = {
     bool: 'checkbox',
     PyObjectId: 'text',
     UUID: 'text',
-    # datetime: 'datetime-local',
-    datetime: 'date',
-    TimezoneAwareDatetime: 'date',
+    datetime: 'datetime-local',
+    TimezoneAwareDatetime: 'datetime-local',
 }
+
+
+def get_value_editor_schema(field_schema_type: str | None) -> dict[str, Any]:
+    if field_schema_type == 'checkbox':
+        return {'value_editor_type': field_schema_type, 'default_value': False}
+    if field_schema_type == 'datetime-local':
+        return {'value_editor_type': field_schema_type, 'input_type': field_schema_type}
+
+    return {'input_type': field_schema_type}
 
 
 def get_model_schema(model: type[BaseModel], pre_path: str | None = None) -> list[dict[str, Any]]:
@@ -181,21 +189,9 @@ def create_field_schema(
 
     if not field.title:
         logger.debug(f'Field: {full_field_name}, title: {field.title}')
-    field_schema = {
+    return {
         'name': full_field_name,
         'label': field.title if field.title else full_field_name,
         'operators': field_schema_lookups_computed,
+        **get_value_editor_schema(field_schema_type),
     }
-    if field_schema_type == 'checkbox':
-        field_schema['value_editor_type'] = field_schema_type
-        field_schema['default_value'] = False
-    else:
-        field_schema['input_type'] = field_schema_type
-
-    # TODO (a.baikov): use this for datetime fields
-    if full_field_name in ['created', 'modified', 'last_activity']:
-        field_schema['value_editor_type'] = 'datetime-local'
-        field_schema['input_type'] = 'datetime-local'
-        field_schema['datatype'] = 'timestamp with time zone'
-
-    return field_schema

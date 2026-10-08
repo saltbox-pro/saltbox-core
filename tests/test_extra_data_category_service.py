@@ -301,3 +301,46 @@ async def test_delete_aggregated_category_field_without_data(mocked_db):
 
     category = await category_service.repo.collection.find_one({'_id': category_id})
     assert [field['name'] for field in category['fields']] == ['author']
+
+
+@pytest.mark.asyncio
+async def test_minion_filter_schema_for_category(mocked_db):
+    category_service, *_ = _build_services(mocked_db)
+    category_id = await category_service.create(
+        ExtraDataCategoryCreateSchema(
+            source='manual',
+            name='assets',
+            type=ExtraDataCategoryType.STATIC,
+            fields=[
+                MinionExtraDataCategoryField(name='bought_at', type='datetime'),
+                MinionExtraDataCategoryField(name='is_laptop', type='bool', is_empty_allowed=False),
+                MinionExtraDataCategoryField(name='cores', type='int'),
+                MinionExtraDataCategoryField(name='owner', type='str', is_empty_allowed=False),
+                MinionExtraDataCategoryField(name='specs', type='dict', is_empty_allowed=False),
+            ],
+        )
+    )
+
+    schema = {
+        field.name.removeprefix('extra.manual.assets.'): field.model_dump(by_alias=True)
+        for field in await category_service.get_minion_filter_schema_for_category(category_id)
+    }
+
+    assert list(schema) == ['bought_at', 'is_laptop', 'cores', 'owner']
+    assert schema['bought_at']['inputType'] == 'datetime-local'
+    assert schema['bought_at']['valueEditorType'] == 'datetime-local'
+    assert [operator['name'] for operator in schema['bought_at']['operators']] == [
+        '<',
+        '>',
+        '<=',
+        '>=',
+        'null',
+        'notNull',
+    ]
+    assert schema['is_laptop']['valueEditorType'] == 'checkbox'
+    assert schema['is_laptop']['defaultValue'] is False
+    assert [operator['name'] for operator in schema['is_laptop']['operators']] == ['=']
+    assert schema['cores']['inputType'] == 'number'
+    assert schema['cores']['valueEditorType'] is None
+    assert schema['owner']['inputType'] is None
+    assert 'null' not in [operator['name'] for operator in schema['owner']['operators']]
