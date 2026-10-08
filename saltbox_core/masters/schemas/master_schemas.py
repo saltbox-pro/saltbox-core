@@ -65,9 +65,8 @@ class MasterMasterIdOnlySchema(IDMixin):
 # REST
 
 
-class MasterViewSchema(
-    CreatedModifiedMixin, MasterEditableFieldsMixin, MasterReadOnlyFieldsMixin, IDMixin, BaseModel
-): ...
+class MasterViewSchema(CreatedModifiedMixin, MasterEditableFieldsMixin, MasterReadOnlyFieldsMixin, IDMixin, BaseModel):
+    minions_count: int = Field(title='Minions count', default=0)
 
 
 class MasterListBody(SkipLimitParams, QueryParams, SortParams):

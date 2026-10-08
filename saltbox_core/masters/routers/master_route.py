@@ -52,8 +52,7 @@ async def master_get(
     master_id: str,
     master_service: Annotated[MasterService, Depends(get_master_service)],
 ) -> MasterViewSchema:
-    master: MasterModel = await master_service.get_by_master_id(master_id)
-    return MasterViewSchema.model_validate({'_id': master.id, **master.model_dump(by_alias=True)})
+    return await master_service.get(query={'master_id': master_id}, projection_model=MasterViewSchema)
 
 
 @router.post(
@@ -71,7 +70,7 @@ async def master_accept(
     master: MasterModel = await master_service.accept(mid)
 
     await notify_master_on_repos_update(master)
-    return MasterViewSchema.model_validate({'_id': master.id, **master.model_dump(by_alias=True)})
+    return await master_service.get(query=master.id, projection_model=MasterViewSchema)
 
 
 @router.post(
@@ -87,4 +86,4 @@ async def master_reject(
     master_service: Annotated[MasterService, Depends(get_master_service)],
 ) -> MasterViewSchema:
     master: MasterModel = await master_service.reject(mid)
-    return MasterViewSchema.model_validate({'_id': master.id, **master.model_dump(by_alias=True)})
+    return await master_service.get(query=master.id, projection_model=MasterViewSchema)

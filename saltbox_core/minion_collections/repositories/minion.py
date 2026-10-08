@@ -530,6 +530,7 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
         }
         collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
             'minion_id_master_unique_index_asc': [('minion_id', pymongo.ASCENDING), ('master', pymongo.ASCENDING)],
+            'master_asc': [('master', pymongo.ASCENDING)],
             'created_asc': [('created', pymongo.ASCENDING)],
             'last_activity_asc': [('last_activity', pymongo.ASCENDING)],
             'grains_wildcard': [('grain.$**', pymongo.ASCENDING)],
