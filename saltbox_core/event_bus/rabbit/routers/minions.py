@@ -35,7 +35,6 @@ async def extra_categories_sync(
                 'type': category.type,
                 'extra_fields_policy': category.extra_fields_policy,
                 'fields': [field.model_dump() for field in category.fields],
-                'minion_fields': category.minion_fields,
                 'is_system': True,
                 'is_manual_data_allowed': bool(category.is_manual_data_allowed),
                 'title': category.title,

@@ -185,11 +185,11 @@ class ExtraDataRepository(BaseMongoRepository[ExtraDataModel]):
                                 parse_query(item)
                 else:
                     for category_field_name in category.category_fields:
-                        if key.startswith(category_field_name):
+                        if key == category_field_name or key.startswith(f'{category_field_name}.'):
                             category_sub_queries.append({f'data.{key}': value})
                             break
                     for minion_field_name in category.minion_fields:
-                        if key.startswith(minion_field_name):
+                        if key == minion_field_name or key.startswith(f'{minion_field_name}.'):
                             minions_sub_queries.append({f'minions.data.{key}': value})
                             break
 

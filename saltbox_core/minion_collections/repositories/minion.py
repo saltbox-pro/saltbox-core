@@ -29,6 +29,7 @@ from saltbox_sdk.db.mongo.config import get_mongo
 from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository, ProjectionModel
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
 from saltbox_sdk.event_bus.schemas import ExtraDataCategoryType
+from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.utilities.helpers import utc_now
 
 EXTRA_STATIC_DATA_AS_KV = {
@@ -85,8 +86,16 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
         source: str = field_match.group('source')
         name: str = field_match.group('name')
         sub_field: str = field_match.group('sub_field')
+        field_path = f'extra_static.{source}.{name}.data.{sub_field}'
 
-        return {f'extra_static.{source}.{name}.data.{sub_field}': field_value}
+        try:
+            category = await self.extra_data_repository.extra_data_category_repository.get(
+                {'source': source, 'name': name}
+            )
+        except ObjectNotFoundException:
+            return {field_path: field_value}
+
+        return {field_path: category.cast_filter_value(field_name=sub_field, value=field_value)}
 
     async def extra_aggregated_query_override(
         self, field_name: str, field_match: re.Match, field_value: Any, full_raw_query: dict
@@ -95,8 +104,11 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
         name: str = field_match.group('name')
         sub_field: str = field_match.group('sub_field')
 
+        category = await self.extra_data_repository.extra_data_category_repository.get({'source': source, 'name': name})
+        cast_value = category.cast_filter_value(field_name=sub_field, value=field_value)
+
         minion_ids = await self.extra_data_repository.get_minion_ids_by_filter(
-            source=source, name=name, query={sub_field: field_value}
+            source=source, name=name, query={sub_field: cast_value}
         )
 
         return {'_id': {'$in': minion_ids}}

@@ -43,6 +43,7 @@ class ExtraDataService(
         datas: list[dict[str, Any]],
         *,
         is_system: bool,
+        is_minion_data_only: bool = False,
     ) -> list[dict[str, Any]]:
         field_names = [field.name for field in category.fields]
         cleaned_datas: list[dict[str, Any]] = []
@@ -58,7 +59,7 @@ class ExtraDataService(
                 raise SaltBoxValidationException(msg)
 
             try:
-                cleaned_datas.append(category.clean_data(data))
+                cleaned_datas.append(category.clean_data(data, is_minion_data_only=is_minion_data_only))
             except SaltBoxValidationException as error:
                 if not is_system:
                     raise
@@ -184,7 +185,13 @@ class ExtraDataService(
     async def update_item(
         self, category: ExtraDataCategoryModel, minion_id: PyObjectId, item_id: PyObjectId, data: dict[str, Any]
     ) -> dict[str, Any]:
-        data = self._clean_datas(category, [minion_id], [data], is_system=False)[0]
+        data = self._clean_datas(
+            category,
+            [minion_id],
+            [data],
+            is_system=False,
+            is_minion_data_only=category.type == ExtraDataCategoryType.AGGREGATED,
+        )[0]
 
         if category.type == ExtraDataCategoryType.STATIC:
             result = await self.minion_repo.set_manual_static_extra_data_item_data(

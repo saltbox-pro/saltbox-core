@@ -121,7 +121,7 @@ async def test_delete_static_category_removes_minion_data(mocked_db):
             source='manual',
             name='notes',
             type=ExtraDataCategoryType.STATIC,
-            fields=[MinionExtraDataCategoryField(name='text')],
+            fields=[MinionExtraDataCategoryField(name='text', type='str')],
         )
     )
     minion_id = await minion_repo.create(MinionCreateSchema(minion_id='m1', master='master1', grains=GrainsSchema()))
@@ -182,7 +182,10 @@ async def _create_category(category_service, **kwargs):
         'source': 'manual',
         'name': 'notes',
         'type': ExtraDataCategoryType.STATIC,
-        'fields': [MinionExtraDataCategoryField(name='text'), MinionExtraDataCategoryField(name='author')],
+        'fields': [
+            MinionExtraDataCategoryField(name='text', type='str'),
+            MinionExtraDataCategoryField(name='author', type='str'),
+        ],
         **kwargs,
     }
     return await category_service.create(ExtraDataCategoryCreateSchema(**data))
@@ -191,10 +194,9 @@ async def _create_category(category_service, **kwargs):
 @pytest.mark.parametrize(
     'payload',
     [
-        {'fields': [{'name': 'text'}, {'name': 'text'}]},
-        {'fields': [{'name': 'text'}], 'minion_fields': ['serial']},
-        {'fields': [{'name': 'a.b'}]},
-        {'fields': [{'name': '$text'}]},
+        {'fields': [{'name': 'text', 'type': 'str'}, {'name': 'text', 'type': 'str'}]},
+        {'fields': [{'name': 'a.b', 'type': 'str'}]},
+        {'fields': [{'name': '$text', 'type': 'str'}]},
     ],
 )
 def test_create_category_request_rejects_invalid_fields(payload):
@@ -205,7 +207,7 @@ def test_create_category_request_rejects_invalid_fields(payload):
 @pytest.mark.parametrize('field_name', ['a.b', '$text'])
 def test_field_create_request_rejects_invalid_name(field_name):
     with pytest.raises(SaltBoxValidationException):
-        ExtraDataCategoryFieldCreateRequestSchema.model_validate({'name': field_name})
+        ExtraDataCategoryFieldCreateRequestSchema.model_validate({'name': field_name, 'type': 'str'})
 
 
 def test_fields_order_request_rejects_duplicates():
@@ -227,13 +229,17 @@ async def test_add_field(mocked_db, is_minion_field):
     await category_service.add_field(
         'manual',
         'notes',
-        ExtraDataCategoryFieldCreateRequestSchema(name='room', types=['str'], is_minion_field=is_minion_field),
+        ExtraDataCategoryFieldCreateRequestSchema(name='room', type='str', is_minion_field=is_minion_field),
     )
 
     category = await category_service.repo.collection.find_one({'_id': category_id})
     assert [field['name'] for field in category['fields']] == ['text', 'author', 'room']
-    assert category['fields'][-1]['types'] == ['str']
-    assert category['minion_fields'] == (['room'] if is_minion_field else [])
+    assert category['fields'][-1] == {
+        'name': 'room',
+        'type': 'str',
+        'is_empty_allowed': True,
+        'is_minion_field': is_minion_field,
+    }
 
 
 @pytest.mark.asyncio
@@ -242,7 +248,9 @@ async def test_add_existing_field_is_rejected(mocked_db):
     await _create_category(category_service)
 
     with pytest.raises(SaltBoxValidationException):
-        await category_service.add_field('manual', 'notes', ExtraDataCategoryFieldCreateRequestSchema(name='text'))
+        await category_service.add_field(
+            'manual', 'notes', ExtraDataCategoryFieldCreateRequestSchema(name='text', type='str')
+        )
 
 
 @pytest.mark.asyncio
@@ -251,7 +259,9 @@ async def test_field_actions_on_system_category_are_forbidden(mocked_db):
     await _create_category(category_service, is_system=True)
 
     with pytest.raises(PermissionDeniedException):
-        await category_service.add_field('manual', 'notes', ExtraDataCategoryFieldCreateRequestSchema(name='room'))
+        await category_service.add_field(
+            'manual', 'notes', ExtraDataCategoryFieldCreateRequestSchema(name='room', type='str')
+        )
     with pytest.raises(PermissionDeniedException):
         await category_service.delete_field('manual', 'notes', 'text')
     with pytest.raises(PermissionDeniedException):

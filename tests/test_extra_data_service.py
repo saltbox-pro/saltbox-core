@@ -20,7 +20,8 @@ def _build_service(mocked_db):
     return ExtraDataService(extra_data_repo, minion_repo=minion_repo), minion_repo
 
 
-def _category(category_type='static', **kwargs):
+def _category(category_type='static', fields=None, minion_fields=(), **kwargs):
+    fields = fields or [{'name': 'text'}, {'name': 'serial'}]
     data = {
         '_id': PyObjectId(),
         'created': datetime(2026, 9, 1, tzinfo=UTC),
@@ -28,7 +29,7 @@ def _category(category_type='static', **kwargs):
         'source': 'manual',
         'name': 'notes',
         'type': category_type,
-        'fields': [{'name': 'text', 'types': ['str']}, {'name': 'serial', 'types': ['str']}],
+        'fields': [{'type': 'str', **field, 'is_minion_field': field['name'] in minion_fields} for field in fields],
         **kwargs,
     }
     return ExtraDataCategoryModel.model_validate(data)

@@ -2,7 +2,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId, QueryParams, SortParams
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
@@ -15,24 +15,47 @@ from saltbox_sdk.event_bus.schemas import (
 from saltbox_sdk.exceptions import SaltBoxValidationException
 
 
-def _clean_field_value(value: Any, field_types: list[MinionExtraDataCategoryFieldType]) -> tuple[bool, Any]:
-    for field_type in field_types:
-        if field_type == MinionExtraDataCategoryFieldType.DATETIME:
-            if isinstance(value, str):
-                try:
-                    return True, datetime.fromisoformat(value)
-                except ValueError:
-                    continue
-        elif field_type in (MinionExtraDataCategoryFieldType.INT, MinionExtraDataCategoryFieldType.FLOAT):
-            if isinstance(value, bool):
-                continue
-            if field_type == MinionExtraDataCategoryFieldType.FLOAT and isinstance(value, int):
-                return True, value
+def _clean_field_value(value: Any, field_type: MinionExtraDataCategoryFieldType) -> tuple[bool, Any]:
+    if field_type == MinionExtraDataCategoryFieldType.DATETIME and isinstance(value, str):
+        try:
+            return True, datetime.fromisoformat(value)
+        except ValueError:
+            return False, None
 
-        if isinstance(value, field_type.python_type):
+    if field_type in (MinionExtraDataCategoryFieldType.INT, MinionExtraDataCategoryFieldType.FLOAT):
+        if isinstance(value, bool):
+            return False, None
+        if field_type == MinionExtraDataCategoryFieldType.FLOAT and isinstance(value, int):
             return True, value
 
+    if isinstance(value, field_type.python_type):
+        return True, value
+
     return False, None
+
+
+def _cast_filter_value(value: Any, field_type: MinionExtraDataCategoryFieldType) -> Any:
+    is_valid, cleaned_value = _clean_field_value(value, field_type)
+    if is_valid:
+        return cleaned_value
+
+    if isinstance(value, str) and field_type in (
+        MinionExtraDataCategoryFieldType.INT,
+        MinionExtraDataCategoryFieldType.FLOAT,
+    ):
+        try:
+            return field_type.python_type(value)
+        except ValueError:
+            return value
+
+    if (
+        field_type == MinionExtraDataCategoryFieldType.STR
+        and isinstance(value, int | float)
+        and not isinstance(value, bool)
+    ):
+        return str(value)
+
+    return value
 
 
 class ExtraDataCategoryReadOnlyFieldsMixin(BaseModel):
@@ -43,12 +66,6 @@ class ExtraDataCategoryReadOnlyFieldsMixin(BaseModel):
     is_manual_data_allowed: bool = Field(default=False, title='Manual data entries allowed')
     is_single_item: bool = Field(default=False)
     fields: list[MinionExtraDataCategoryField] = Field(default_factory=list)
-    minion_fields: list[str] = Field(default_factory=list)
-
-    @computed_field  # type: ignore[prop-decorator]
-    @property
-    def category_fields(self) -> list[str]:
-        return [field.name for field in self.fields if field.name not in self.minion_fields]
 
 
 class ExtraDataCategoryEditableFieldsMixin(BaseModel):
@@ -74,7 +91,36 @@ class ExtraDataCategoryModel(
     ExtraDataCategoryEditableFieldsMixin,
     ExtraDataCategoryReadOnlyFieldsMixin,
 ):
-    def clean_data(self, data: dict[str, Any]) -> dict[str, Any]:
+    @property
+    def category_fields(self) -> list[str]:
+        return [field.name for field in self.fields if not field.is_minion_field]
+
+    @property
+    def minion_fields(self) -> list[str]:
+        return [field.name for field in self.fields if field.is_minion_field]
+
+    def cast_filter_value(self, field_name: str, value: Any) -> Any:
+        field = next((field for field in self.fields if field.name == field_name), None)
+
+        if field is None:
+            return value
+
+        if not isinstance(value, dict):
+            return _cast_filter_value(value, field.type)
+
+        cast_value: dict[str, Any] = {}
+
+        for lookup, lookup_value in value.items():
+            if lookup in ('$eq', '$ne', '$gt', '$gte', '$lt', '$lte'):
+                cast_value[lookup] = _cast_filter_value(lookup_value, field.type)
+            elif lookup in ('$in', '$nin') and isinstance(lookup_value, list):
+                cast_value[lookup] = [_cast_filter_value(item, field.type) for item in lookup_value]
+            else:
+                cast_value[lookup] = lookup_value
+
+        return cast_value
+
+    def clean_data(self, data: dict[str, Any], *, is_minion_data_only: bool = False) -> dict[str, Any]:
         fields = {field.name: field for field in self.fields}
         cleaned: dict[str, Any] = {}
         errors: list[str] = []
@@ -89,15 +135,23 @@ class ExtraDataCategoryModel(
                     cleaned[key] = value
                 continue
 
-            if not field.types:
-                cleaned[key] = value
+            if value is None or value == '':
+                if field.is_empty_allowed:
+                    cleaned[key] = value
+                else:
+                    errors.append(f'`{key}`: must not be empty')
                 continue
 
-            is_valid, cleaned_value = _clean_field_value(value, field.types)
+            is_valid, cleaned_value = _clean_field_value(value, field.type)
             if is_valid:
                 cleaned[key] = cleaned_value
             else:
-                errors.append(f'`{key}`: expected {" | ".join(field.types)}')
+                errors.append(f'`{key}`: expected {field.type}')
+
+        for field in self.fields:
+            is_required = not field.is_empty_allowed and (field.is_minion_field or not is_minion_data_only)
+            if is_required and field.name not in data:
+                errors.append(f'`{field.name}`: must not be empty')
 
         if errors:
             msg = f'Invalid extra data: {"; ".join(errors)}'
@@ -106,14 +160,18 @@ class ExtraDataCategoryModel(
         return cleaned
 
     def split_data(self, data: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+        fields = {field.name: field for field in self.fields}
         category_data: dict[str, Any] = {}
         minion_data: dict[str, Any] = {}
 
         for key, value in data.items():
-            if key in self.minion_fields:
-                minion_data[key] = value
-            elif key in self.category_fields:
-                category_data[key] = value
+            field = fields.get(key)
+
+            if field is not None:
+                if field.is_minion_field:
+                    minion_data[key] = value
+                else:
+                    category_data[key] = value
             elif self.extra_fields_policy == MinionExtraDataExtraFieldsPolicy.SAVE_TO_MINION:
                 minion_data[key] = value
             elif self.extra_fields_policy == MinionExtraDataExtraFieldsPolicy.SAVE_TO_CATEGORY:
@@ -146,7 +204,6 @@ class ExtraDataCategoryCreateRequestSchema(BaseModel):
     type: ExtraDataCategoryType = Field(title='Type')
     extra_fields_policy: MinionExtraDataExtraFieldsPolicy = Field(default=MinionExtraDataExtraFieldsPolicy.IGNORE)
     fields: list[MinionExtraDataCategoryField] = Field(default_factory=list)
-    minion_fields: list[str] = Field(default_factory=list)
     title: dict[str, str] | None = Field(default=None)
     description: dict[str, str] | None = Field(default=None)
     icon: str | None = Field(default=None)
@@ -162,17 +219,10 @@ class ExtraDataCategoryCreateRequestSchema(BaseModel):
                 raise SaltBoxValidationException(msg)
             field_names.append(field.name)
 
-        for minion_field in self.minion_fields:
-            if minion_field not in field_names:
-                msg = f'Minion field `{minion_field}` is not in category fields'
-                raise SaltBoxValidationException(msg)
-
         return self
 
 
 class ExtraDataCategoryFieldCreateRequestSchema(MinionExtraDataCategoryField):
-    is_minion_field: bool = Field(default=False)
-
     @field_validator('name')
     @classmethod
     def validate_name(cls, name: str) -> str:

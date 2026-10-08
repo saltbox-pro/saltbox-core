@@ -71,12 +71,7 @@ class ExtraDataCategoryService(
     async def add_field(self, source: str, name: str, field: ExtraDataCategoryFieldCreateRequestSchema) -> None:
         await self.get_editable_category({'source': source, 'name': name})
 
-        result = await self.repo.push_field(
-            source,
-            name,
-            field.model_dump(exclude={'is_minion_field'}),
-            is_minion_field=field.is_minion_field,
-        )
+        result = await self.repo.push_field(source, name, field.model_dump())
         if result.matched_count == 0:
             msg = f'Field `{field.name}` already exists'
             raise SaltBoxValidationException(msg)
@@ -138,21 +133,15 @@ class ExtraDataCategoryService(
         schema: list[MinionFilterSchema] = []
 
         for field in category.fields:
-            field_schema_lookups: list[str] = []
-            field_schema_type: str | None = None
-
-            for field_type in field.types:
-                if field_type == MinionExtraDataCategoryFieldType.NONE:
-                    field_schema_lookups.extend(schema_nullable_lookups)
-                else:
-                    field_schema_lookups.extend(
-                        [
-                            lookup
-                            for lookup in schema_lookups_map.get(field_type.python_type, schema_text_lookups)
-                            if lookup not in field_schema_lookups
-                        ]
-                    )
-                    field_schema_type = schema_input_type_map.get(field_type.python_type, None)
+            if field.type in (MinionExtraDataCategoryFieldType.DICT, MinionExtraDataCategoryFieldType.BYTES):
+                field_schema_lookups: list[str] = []
+            else:
+                field_schema_lookups = schema_lookups_map.get(field.type.python_type, schema_text_lookups)
+            if field.is_empty_allowed:
+                field_schema_lookups = field_schema_lookups + schema_nullable_lookups
+            if not field_schema_lookups:
+                continue
+            field_schema_type = schema_input_type_map.get(field.type.python_type, None)
 
             field_schema_lookups_computed = [
                 MinionFilterOperatorsSchema(**schema_lookups_js_values[lookup]) for lookup in field_schema_lookups

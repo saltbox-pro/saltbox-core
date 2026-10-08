@@ -31,16 +31,11 @@ class ExtraDataCategoryRepository(BaseMongoRepository[ExtraDataCategoryModel]):
         name: str,
         field: dict[str, Any],
         *,
-        is_minion_field: bool,
         session: MongoAsyncClientSession | None = None,
     ) -> UpdateResult:
-        push: dict[str, Any] = {'fields': field}
-        if is_minion_field:
-            push['minion_fields'] = field['name']
-
         return await self.collection.update_one(
             filter={'source': source, 'name': name, 'is_system': False, 'fields.name': {'$ne': field['name']}},
-            update={'$push': push, '$set': {'modified': utc_now()}},
+            update={'$push': {'fields': field}, '$set': {'modified': utc_now()}},
             session=session,
         )
 
@@ -49,10 +44,7 @@ class ExtraDataCategoryRepository(BaseMongoRepository[ExtraDataCategoryModel]):
     ) -> UpdateResult:
         return await self.collection.update_one(
             filter={'source': source, 'name': name, 'is_system': False, 'fields.name': field_name},
-            update={
-                '$pull': {'fields': {'name': field_name}, 'minion_fields': field_name},
-                '$set': {'modified': utc_now()},
-            },
+            update={'$pull': {'fields': {'name': field_name}}, '$set': {'modified': utc_now()}},
             session=session,
         )
 
