@@ -158,9 +158,16 @@ class ExtraDataService(
         *,
         is_system: bool,
     ) -> list[dict[str, Any]]:
-        datas = self._clean_datas(category, minion_ids, datas, is_system=is_system)
+        cleaned_datas = self._clean_datas(category, minion_ids, datas, is_system=is_system)
 
-        return await self._write_items(category, minion_ids, datas, is_system=is_system, replace=True)
+        if datas and not cleaned_datas:
+            logger.warning(
+                f'All {len(datas)} extra data item(s) of category `{category.source}.{category.name}` '
+                f'for minions {minion_ids} are invalid, existing items are kept.'
+            )
+            return []
+
+        return await self._write_items(category, minion_ids, cleaned_datas, is_system=is_system, replace=True)
 
     async def _get_item(
         self, category: ExtraDataCategoryModel, minion_id: PyObjectId, item_id: PyObjectId

@@ -240,6 +240,34 @@ async def test_system_replace_skips_invalid_and_empty_items(mocked_db, mocker):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize('category_type', ['static', 'aggregated'])
+async def test_system_replace_with_only_invalid_items_keeps_existing_items(mocked_db, mocker, category_type):
+    extra_data_service, minion_repo = _build_service(mocked_db)
+    minion_id = await _create_minion(minion_repo)
+    replace_static = mocker.patch.object(minion_repo, 'replace_static_extra_data_items')
+    pull_entries = mocker.patch.object(extra_data_service.repo, 'pull_minions_entries')
+
+    items = await extra_data_service.replace_items(
+        _category(category_type), [minion_id], [{'text': 1}, {'unknown': 1}], is_system=True
+    )
+
+    assert items == []
+    replace_static.assert_not_called()
+    pull_entries.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_system_replace_with_empty_list_clears_items(mocked_db, mocker):
+    extra_data_service, minion_repo = _build_service(mocked_db)
+    minion_id = await _create_minion(minion_repo)
+    replace = mocker.patch.object(minion_repo, 'replace_static_extra_data_items')
+
+    await extra_data_service.replace_items(_category(), [minion_id], [], is_system=True)
+
+    assert replace.call_args.args[2] == {minion_id: []}
+
+
+@pytest.mark.asyncio
 async def test_system_replace_keeps_last_item_of_single_item_category(mocked_db, mocker):
     extra_data_service, minion_repo = _build_service(mocked_db)
     minion_id = await _create_minion(minion_repo)

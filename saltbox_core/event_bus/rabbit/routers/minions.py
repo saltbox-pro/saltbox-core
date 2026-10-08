@@ -47,14 +47,12 @@ async def extra_categories_sync(
     return None
 
 
-@router.subscriber('add_extra_data')
+@router.subscriber('add_extra_data', retry=3)
 async def add_extra_data(
-    message: MinionAddOrUpdateExtraDataRequestMessage, msg: RabbitMessage, context: ContextRepo, logger: Logger
+    message: MinionAddOrUpdateExtraDataRequestMessage, context: ContextRepo, logger: Logger
 ) -> None:
     if message.target != 'core':
         return None
-
-    await msg.ack()
 
     minion_service: MinionService = context.get('minion_service')
     extra_data_category_service: ExtraDataCategoryService = context.get('extra_data_category_service')
@@ -73,7 +71,12 @@ async def add_extra_data(
         items_by_category.setdefault(category_key, []).extend(extra_data.items)
 
     for (source, name), items in items_by_category.items():
-        category = await extra_data_category_service.get(query={'source': source, 'name': name})
+        try:
+            category = await extra_data_category_service.get(query={'source': source, 'name': name})
+        except ObjectNotFoundException:
+            logger.warning(f'Extra data category `{source}.{name}` not found, skipped data for minion {minion.id}')
+            continue
+
         await extra_data_service.replace_items(category, [minion.id], items, is_system=True)
 
     return None
