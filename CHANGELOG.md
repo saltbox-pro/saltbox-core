@@ -9,9 +9,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Extra data subsystem for minions and collections: categories with `title`,
+  `description`, `icon` and `is_single_item`, category field actions, manual
+  add/edit, aggregation, list endpoints, CSV/manual export, event-bus
+  ingestion and validation.
+- Collections: `order` field, `POST /api/collections/move` endpoint with
+  sorting by `order`/`created`, and `core.collections.move` OPA policy.
+- Tasks: TTL support and refactored lifespan handling, `blocked`/`unreachable`
+  minion counts, ordered policy launch and policy grouping by collection on
+  the minion policies endpoint.
+- `duration_ms` field on job returns.
+- `minions_count` field on masters.
+- Ping endpoint to communicate with masters.
+- Source update functionality and new operation IDs for source action
+  endpoints.
+- Task templates: raw-source create schema/router, localized
+  (`dict[str, str]`) description fields, separate schema file parsing.
+- New Salt execution modules: Puppet, Ansible; `file.find` function in cmdmod.
+- Data migrations: backfill empty `source` field on job/job_return/task, drop
+  legacy `task_templates` with `repo_id`, single-type extra data fields
+  migration.
+
 ### Changed
 
+- SDK updated to support multiple MongoDB hosts, fix collections tree
+  sorting and `get_tree()`, fix additional grains, and other SDK contract
+  updates.
+- Minion export endpoint now streams the response (`StreamResponse`) instead
+  of buffering it; `extra` field excluded from minion CSV export.
+- Optimized extra data retrieval/ordering for minions and collections, and
+  minion delete.
+- Removed multitype support from extra data fields in favor of single-type
+  fields.
+- Increased Redis lock TTL for task synchronization to 300s.
+- Local source title/description are now translated.
+- Job service: default `kwargs` in job data validation, `mods` set for
+  `state.apply` when `template_id` is present, template source ID
+  aggregation.
+- CI: added lint and pytest GitHub Actions jobs, GitHub PR / GitLab MR sync
+  automation.
+
 ### Fixed
+
+- Extra data: fixed random ordering, fixed minions filtering by datetime,
+  fixed collection retrieval indexes/query, fixed receiving extra data from
+  source.
+- Collections sorting bug on move.
+- Job returns: fixed handling on race condition, fixed datetime conversion
+  and logging, now records `args`/`kwargs` received from Salt.
+- Fixed getting job by JID (mongo id or JID + salt-master pair).
+- Fixed blocking task/policy on minion, fixed locking task minions, fixed
+  ping of inactive task minions.
+- Fixed loading migrations.
+- Fixed property validation in Puppet and Cmdmod schemas, `TaskTemplateShort`
+  title type, template update from raw source, file suffix detection, secret
+  pillars, deprecated `get_validated_data` usage.
+
+### Removed
+
+- Unused user settings endpoints and related router imports.
+- `job_schemas` module, superseded by refactored schemas.
 
 ## [0.3.0] - 2026-07-10
 
