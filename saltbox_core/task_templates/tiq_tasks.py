@@ -431,7 +431,7 @@ async def source_update_apply_git_task(
                 stopped_tasks = await orchestrator.stop_dependant_tasks(
                     task_ids=[task.id for task in guard_check.dependant_tasks],
                 )
-                await progress.set_progress('IN_PROGRESS', 'Dependants stopped')
+                await progress.set_progress(TaskState.STARTED, 'Dependants stopped')
             else:
                 stopped_tasks = []
             await orchestrator.discover(PyObjectId(source_id))
@@ -472,15 +472,15 @@ async def source_update_apply_archive_task(
             if guard_check.token != token:
                 raise SourceUpdateConflictException(source_id=str(source_id))
             if stop_dependents:
-                await progress.set_progress('IN_PROGRESS', 'Stopping dependant tasks')
+                await progress.set_progress(TaskState.STARTED, 'Stopping dependant tasks')
                 stopped_tasks = await orchestrator.stop_dependant_tasks(
                     task_ids=[task.id for task in guard_check.dependant_tasks]
                 )
-                await progress.set_progress('IN_PROGRESS', 'Dependants stopped')
+                await progress.set_progress(TaskState.STARTED, 'Dependants stopped')
             else:
                 stopped_tasks = []
             await orchestrator.update_archive_apply(PyObjectId(source_id))
-            await progress.set_progress('IN_PROGRESS', 'Archive update applied')
+            await progress.set_progress(TaskState.STARTED, 'Archive update applied')
             await orchestrator.discover(PyObjectId(source_id))
             await orchestrator.prepare(PyObjectId(source_id))
             await orchestrator.sync(PyObjectId(source_id))
