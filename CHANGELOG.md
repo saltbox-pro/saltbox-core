@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tasks: TTL support and refactored lifespan handling, `blocked`/`unreachable`
   minion counts, ordered policy launch and policy grouping by collection on
   the minion policies endpoint.
+- Tasks: `POST /api/tasks/{tid}/minions/export` endpoint streaming task
+  minion results (minion ID, master, status, runs count, start/finish
+  datetime) to CSV without pagination.
 - `duration_ms` field on job returns.
 - `minions_count` field on masters.
 - Ping endpoint to communicate with masters.
@@ -60,6 +63,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fixed getting job by JID (mongo id or JID + salt-master pair).
 - Fixed blocking task/policy on minion, fixed locking task minions, fixed
   ping of inactive task minions.
+- Task statuses and task minions endpoints now use `core.tasks.read` policy
+  instead of `core.tasks.list`, which denied them to non-admin users.
 - Fixed loading migrations.
 - Fixed property validation in Puppet and Cmdmod schemas, `TaskTemplateShort`
   title type, template update from raw source, file suffix detection, secret

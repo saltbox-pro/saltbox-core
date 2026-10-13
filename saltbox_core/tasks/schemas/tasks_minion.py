@@ -128,3 +128,18 @@ class TaskMinionListResponse(CreatedModifiedMixin, IDMixin):
     minion_id: str = Field(title='Minion ID')
     master: str = Field(title='Master')
     count_runs: int = Field(title='Count runs')
+
+
+class TaskMinionExportBody(QueryParams, SortParams):
+    model_config = ConfigDict(
+        extra='ignore',
+    )
+
+
+class TaskMinionExportSchema(BaseModel):
+    minion_id: str = Field(title='Minion ID')
+    master: str = Field(title='Master')
+    status: TaskMinionStatus = Field(title='Status', default=TaskMinionStatus.pending)
+    count_runs: int = Field(title='Count runs')
+    start_last_dt: TimezoneAwareDatetime | None = Field(title='Last job start dt', default=None)
+    finished_dt: TimezoneAwareDatetime | None = Field(title='Processing finished dt', default=None)

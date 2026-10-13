@@ -1,6 +1,7 @@
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Body, Depends
+from fastapi.responses import StreamingResponse
 
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnModel
 from saltbox_core.jobs.schemas.job_schemas import JobListBody, JobsListResponse
@@ -18,6 +19,8 @@ from saltbox_core.tasks.schemas.task import (
     TaskSafeUpdateSchema,
 )
 from saltbox_core.tasks.schemas.tasks_minion import (
+    TaskMinionExportBody,
+    TaskMinionExportSchema,
     TaskMinionListBody,
     TaskMinionListResponse,
     TaskMinionStatus,
@@ -32,6 +35,7 @@ from saltbox_core.utilities.model_schema import get_model_schema
 from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse, Source, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
+from saltbox_sdk.fastapi_utils.csv_export import csv_response
 from saltbox_sdk.fastapi_utils.dependencies import get_current_user, get_opa_query
 
 router = APIRouter(prefix='/tasks', tags=['Tasks'])
@@ -139,8 +143,8 @@ async def task_update(
     '/{tid}/statuses',
     operation_id='tasks_statuses',
     openapi_extra=GatewayEndpointConfig(
-        policy='core.tasks.list',
-        action=TasksActions.LIST,
+        policy='core.tasks.read',
+        action=TasksActions.READ,
     ).model_dump(by_alias=True),
 )
 async def task_statuses(
@@ -165,8 +169,8 @@ async def task_statuses(
     '/{tid}/minions',
     operation_id='tasks_minions',
     openapi_extra=GatewayEndpointConfig(
-        policy='core.tasks.list',
-        action=TasksActions.LIST,
+        policy='core.tasks.read',
+        action=TasksActions.READ,
     ).model_dump(by_alias=True),
 )
 async def task_minions_list(
@@ -185,6 +189,28 @@ async def task_minions_list(
     )
 
     return result
+
+
+@router.post(
+    '/{tid}/minions/export',
+    operation_id='tasks_minions_export',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.read',
+        action=TasksActions.READ,
+    ).model_dump(by_alias=True),
+    response_class=StreamingResponse,
+)
+async def task_minions_export(
+    tid: PyObjectId,
+    body: Annotated[TaskMinionExportBody, Body()],
+    task_minion_service: Annotated[TaskMinionService, Depends(get_task_minion_service)],
+) -> StreamingResponse:
+    query = {'$and': [{'task_id': tid}, body.query]}
+
+    columns = [(name, name) for name in TaskMinionExportSchema.model_fields]
+    rows = task_minion_service.iter_export_rows(query, sort=body.sort)
+
+    return csv_response(columns, rows, ['task_results', str(tid)])
 
 
 @router.post(

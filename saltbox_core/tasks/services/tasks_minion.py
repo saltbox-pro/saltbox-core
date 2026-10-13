@@ -1,6 +1,6 @@
 from collections import defaultdict
-from collections.abc import Callable
-from typing import Annotated, TypeVar, cast
+from collections.abc import AsyncIterator, Callable
+from typing import Annotated, Any, TypeVar, cast
 
 from fastapi import Depends
 from pydantic import BaseModel
@@ -18,12 +18,13 @@ from saltbox_core.tasks.schemas.task import TaskType
 from saltbox_core.tasks.schemas.tasks_minion import (
     MinionPolicyGroupSchema,
     TaskMinionCreateSchema,
+    TaskMinionExportSchema,
     TaskMinionForPolicySchema,
     TaskMinionModel,
     TaskMinionUpdateSchema,
 )
 from saltbox_sdk.db.mongo.config import get_mongo_db
-from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
 from saltbox_sdk.db.redis.config import get_redis
 from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_with_notify_service import MongoBaseWithNotifyService
@@ -147,6 +148,14 @@ class TaskMinionService(
             MinionPolicyGroupSchema(target_collection=group_policies[0].target_collection, policies=group_policies)
             for group_policies in groups.values()
         ]
+
+    async def iter_export_rows(
+        self,
+        query: dict[str, Any] | None,
+        sort: dict[str, SortOrder] | None = None,
+    ) -> AsyncIterator[dict[str, Any]]:
+        async for task_minion in self.iter_list(query, sort=sort, projection_model=TaskMinionExportSchema):
+            yield task_minion.model_dump()
 
 
 def get_task_minion_service(
