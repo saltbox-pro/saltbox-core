@@ -248,16 +248,13 @@ class ExtraDataCategoryListBody(SkipLimitParams, QueryParams, SortParams):
     model_config = ConfigDict(extra='ignore')
 
 
-class ExtraDataQueryBaseBody(SortParams):
+class ExtraDataCategoryRefMixin(BaseModel):
     category_id: PyObjectId | None = Field(title='Category ID', default=None)
     category_source: str | None = Field(title='Namespace', default=None)
     category_name: str | None = Field(title='Name', default=None)
-    search: str | None = Field(title='Search', default=None)
-
-    model_config = ConfigDict(extra='ignore')
 
     @model_validator(mode='after')
-    def validate_category(self) -> 'ExtraDataQueryBaseBody':
+    def validate_category(self) -> 'ExtraDataCategoryRefMixin':
         if self.category_id is not None:
             if self.category_source is not None or self.category_name is not None:
                 msg = 'Only one of `category_id` or `category_source` + `category_name` can be set'
@@ -267,6 +264,12 @@ class ExtraDataQueryBaseBody(SortParams):
             raise SaltBoxValidationException(msg)
 
         return self
+
+
+class ExtraDataQueryBaseBody(SortParams, ExtraDataCategoryRefMixin):
+    search: str | None = Field(title='Search', default=None)
+
+    model_config = ConfigDict(extra='ignore')
 
 
 class MinionExtraDataQueryBody(ExtraDataQueryBaseBody):

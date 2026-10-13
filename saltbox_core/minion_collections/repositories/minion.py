@@ -13,6 +13,7 @@ from pymongo.results import UpdateResult
 
 from saltbox_core.minion_collections.repositories.extra_data import ExtraDataRepository, get_extra_data_repository
 from saltbox_core.minion_collections.schemas.minion import MinionModel
+from saltbox_core.minion_collections.utils.unique_values import UniqueValueKind, build_unique_values_stages
 from saltbox_sdk.db.mongo.aggregations import (
     AddFieldsAggregationStage,
     AggregatedField,
@@ -173,6 +174,41 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
             keys.update(doc['_id'])
 
         return sorted(keys)
+
+    async def get_unique_grain_values(
+        self,
+        query: dict[str, Any],
+        grain: str,
+        kind: UniqueValueKind,
+        skip: int = 0,
+        limit: int = 0,
+        *,
+        session: MongoAsyncClientSession | None = None,
+    ) -> tuple[int, list[dict[str, Any]]]:
+        pipeline = [{'$match': query}, *build_unique_values_stages(f'grains.{grain}', '_id', kind)]
+
+        return await self.aggregate_paginated(pipeline, skip, limit, session=session)
+
+    async def get_unique_static_extra_values(
+        self,
+        query: dict[str, Any],
+        source: str,
+        name: str,
+        field_name: str,
+        kind: UniqueValueKind,
+        skip: int = 0,
+        limit: int = 0,
+        *,
+        session: MongoAsyncClientSession | None = None,
+    ) -> tuple[int, list[dict[str, Any]]]:
+        field_path = f'extra_static.{source}.{name}'
+        pipeline: list[dict[str, Any]] = [
+            {'$match': query},
+            {'$unwind': f'${field_path}'},
+            *build_unique_values_stages(f'{field_path}.data.{field_name}', '_id', kind),
+        ]
+
+        return await self.aggregate_paginated(pipeline, skip, limit, session=session)
 
     async def get_static_extra_data_item(
         self,

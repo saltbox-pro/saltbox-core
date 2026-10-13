@@ -1,14 +1,13 @@
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from typing import Annotated, Any, overload
+from typing import Annotated, Any, get_args, get_origin, overload
 
 from fastapi import Depends
 from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
 
-from saltbox_core.config import logger
 from saltbox_core.minion_collections.repositories.minion import MinionRepository, get_minion_repository
 from saltbox_core.minion_collections.schemas.collection import CollectionModel
-from saltbox_core.minion_collections.schemas.filter import UniqueGrainValuesResponse
+from saltbox_core.minion_collections.schemas.filter import UniqueValuesResponse
 from saltbox_core.minion_collections.schemas.minion import (
     GrainsSchema,
     MinionCreateSchema,
@@ -17,10 +16,32 @@ from saltbox_core.minion_collections.schemas.minion import (
     MinionTgtOnlySchema,
     MinionUpdateSchema,
 )
-from saltbox_core.minion_collections.services.pipeline_builder import MongoPipelineBuilder
+from saltbox_core.minion_collections.utils.unique_values import UniqueValueKind
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
 from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService, ProjectionModel
+
+JOINED_LIST_GRAINS = ['pythonversion', 'saltversioninfo']
+
+
+def _get_grain_unique_value_kind(grain: str) -> UniqueValueKind:
+    if grain in JOINED_LIST_GRAINS:
+        return UniqueValueKind.JOINED_LIST
+
+    field = next(
+        (field for name, field in GrainsSchema.model_fields.items() if grain in (name, field.alias)),
+        None,
+    )
+    if field is None:
+        return UniqueValueKind.VALUE
+
+    for field_type in get_args(field.annotation) or (field.annotation,):
+        if field_type is list or get_origin(field_type) is list:
+            return UniqueValueKind.LIST_ITEMS
+        if field_type is dict or get_origin(field_type) is dict:
+            return UniqueValueKind.DICT_KEYS
+
+    return UniqueValueKind.VALUE
 
 
 class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreateSchema, MinionUpdateSchema]):
@@ -65,17 +86,22 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
 
         return await self.get(query=query, projection_model=projection_model)
 
-    async def get_unique_grain_values_by_field(
+    async def get_unique_grain_values(
         self, field: str, query: dict[str, Any], skip: int = 0, limit: int | None = None
-    ) -> UniqueGrainValuesResponse:
-        query = await self.repo.__prepare_query__(query)
-        pipeline_builder = MongoPipelineBuilder(field, query, skip, limit)
-        pipeline = pipeline_builder.build()
-        full_pipeline = [stage for stage in pipeline if '$skip' not in stage and '$limit' not in stage]
-        logger.debug('pipeline: %s', pipeline)
-        data = await self.repo.aggregate(pipeline)
-        full_data = await self.repo.aggregate(full_pipeline)
-        return UniqueGrainValuesResponse(total=len(full_data), data=data)
+    ) -> UniqueValuesResponse:
+        if not field.startswith('grains.'):
+            return UniqueValuesResponse(total=0, data=[])
+
+        grain = field.removeprefix('grains.')
+        total, data = await self.repo.get_unique_grain_values(
+            query=await self.repo.__prepare_query__(query),
+            grain=grain,
+            kind=_get_grain_unique_value_kind(grain),
+            skip=skip,
+            limit=limit or 0,
+        )
+
+        return UniqueValuesResponse.model_validate({'total': total, 'data': data})
 
     async def process_presence(self, master_id: str, minions: list[str], stamp: float) -> None:
         await self.bulk_update(

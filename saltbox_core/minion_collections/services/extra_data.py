@@ -14,9 +14,15 @@ from saltbox_core.minion_collections.schemas.extra_data import (
     ExtraDataUpdateSchema,
 )
 from saltbox_core.minion_collections.schemas.extra_data_category import ExtraDataCategoryModel
+from saltbox_core.minion_collections.schemas.filter import UniqueValuesResponse
+from saltbox_core.minion_collections.utils.unique_values import UniqueValueKind
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
 from saltbox_sdk.db.schemas_base import PaginatedResponse
-from saltbox_sdk.event_bus.schemas import ExtraDataCategoryType, MinionExtraDataExtraFieldsPolicy
+from saltbox_sdk.event_bus.schemas import (
+    ExtraDataCategoryType,
+    MinionExtraDataCategoryFieldType,
+    MinionExtraDataExtraFieldsPolicy,
+)
 from saltbox_sdk.exceptions import ObjectNotFoundException, PermissionDeniedException, SaltBoxValidationException
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 from saltbox_sdk.utilities.helpers import utc_now
@@ -366,6 +372,54 @@ class ExtraDataService(
 
         async for row in rows:
             yield row
+
+    async def get_unique_values(
+        self,
+        category: ExtraDataCategoryModel,
+        field_name: str,
+        *,
+        query: dict[str, Any],
+        skip: int = 0,
+        limit: int | None = None,
+    ) -> UniqueValuesResponse:
+        field = next((field for field in category.fields if field.name == field_name), None)
+        if field is None or field.type in (
+            MinionExtraDataCategoryFieldType.DICT,
+            MinionExtraDataCategoryFieldType.BYTES,
+        ):
+            return UniqueValuesResponse(total=0, data=[])
+
+        if field.type == MinionExtraDataCategoryFieldType.LIST:
+            kind = UniqueValueKind.LIST_ITEMS
+        elif field.type == MinionExtraDataCategoryFieldType.DATETIME:
+            kind = UniqueValueKind.DATE
+        else:
+            kind = UniqueValueKind.VALUE
+
+        query = await self.minion_repo.__prepare_query__(query)
+
+        if category.type == ExtraDataCategoryType.STATIC:
+            total, data = await self.minion_repo.get_unique_static_extra_values(
+                query=query,
+                source=category.source,
+                name=category.name,
+                field_name=field.name,
+                kind=kind,
+                skip=skip,
+                limit=limit or 0,
+            )
+        else:
+            total, data = await self.repo.get_unique_values(
+                source=category.source,
+                name=category.name,
+                minion_ids=await self.minion_repo.get_ids(query),
+                value_path=f'minions.data.{field.name}' if field.is_minion_field else f'data.{field.name}',
+                kind=kind,
+                skip=skip,
+                limit=limit or 0,
+            )
+
+        return UniqueValuesResponse.model_validate({'total': total, 'data': data})
 
 
 def get_extra_data_service(

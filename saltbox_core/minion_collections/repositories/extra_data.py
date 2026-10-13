@@ -17,6 +17,7 @@ from saltbox_core.minion_collections.repositories.extra_data_category import (
     get_extra_data_category_repository,
 )
 from saltbox_core.minion_collections.schemas.extra_data import ExtraDataModel
+from saltbox_core.minion_collections.utils.unique_values import UniqueValueKind, build_unique_values_stages
 from saltbox_sdk.db.mongo.aggregations import AnySearchAggregationStage
 from saltbox_sdk.db.mongo.config import get_mongo
 from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
@@ -225,6 +226,27 @@ class ExtraDataRepository(BaseMongoRepository[ExtraDataModel]):
             return []
 
         return [PyObjectId(minion_id_str) for minion_id_str in raw_result[0]['minion_ids']]
+
+    async def get_unique_values(
+        self,
+        source: str,
+        name: str,
+        minion_ids: list[PyObjectId],
+        value_path: str,
+        kind: UniqueValueKind,
+        skip: int = 0,
+        limit: int = 0,
+        *,
+        session: MongoAsyncClientSession | None = None,
+    ) -> tuple[int, list[dict[str, Any]]]:
+        pipeline: list[dict[str, Any]] = [
+            {'$match': {'source': source, 'name': name, 'minions.minion_id': {'$in': minion_ids}}},
+            {'$unwind': '$minions'},
+            {'$match': {'minions.minion_id': {'$in': minion_ids}}},
+            *build_unique_values_stages(value_path, 'minions.minion_id', kind),
+        ]
+
+        return await self.aggregate_paginated(pipeline, skip, limit, session=session)
 
     @staticmethod
     def build_grouped_pipeline(

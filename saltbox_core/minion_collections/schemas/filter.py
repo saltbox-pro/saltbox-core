@@ -1,14 +1,14 @@
 from enum import StrEnum
-from typing import TypedDict
+from typing import Any
 
-from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from saltbox_core.minion_collections.schemas.minion import GrainsSchema, MinionModel
+from saltbox_core.minion_collections.schemas.extra_data_category import ExtraDataCategoryRefMixin
 from saltbox_sdk.db.mongo.schemas_base import PipelineMongoQuery
+from saltbox_sdk.exceptions import SaltBoxValidationException
 
 
-class MinionFilterValuesBody(BaseModel):
+class UniqueValuesBaseBody(BaseModel):
     collection_slug: str = Field(
         description='Collection slug',
         default='root',
@@ -23,11 +23,6 @@ class MinionFilterValuesBody(BaseModel):
         ],
         json_schema_extra={'example': {'grains.cpu_model': {'$not': {'$regex': 'Intel'}}}},
     )
-    field: str = Field(
-        description='Field name to get unique values',
-        examples=['grains.os', 'grains.cpu_model', 'grains.mem_total'],
-        json_schema_extra={'example': 'grains.os'},
-    )
     skip: int = Field(strict=True, default=0, ge=0, le=1000)
     limit: int | None = Field(strict=True, default=None, ge=0, le=1000)
 
@@ -35,46 +30,40 @@ class MinionFilterValuesBody(BaseModel):
         extra='forbid',
     )
 
+
+class MinionFilterValuesBody(UniqueValuesBaseBody):
+    field: str = Field(
+        description='Field name to get unique values',
+        examples=['grains.os', 'grains.cpu_model', 'grains.mem_total'],
+        json_schema_extra={'example': 'grains.os'},
+    )
+
     @field_validator('field')
     @classmethod
     def validate_field(cls, value: str) -> str:
-        if '.' not in value and value not in MinionModel.model_fields:
-            raise RequestValidationError(
-                errors=[
-                    {
-                        'loc': ['body', 'field'],
-                        'msg': f'Invalid field: {value}',
-                        'type': 'value_error',
-                        'input': value,
-                    }
-                ]
-            )
+        if any(not part or part.startswith('$') for part in value.split('.')):
+            msg = f'Invalid field: {value}'
+            raise SaltBoxValidationException(msg)
 
-        if '.' in value:
-            field_name_chain = value.split('.')
-
-            if field_name_chain[0] == 'grains' and field_name_chain[1] not in GrainsSchema.model_fields:
-                raise RequestValidationError(
-                    errors=[
-                        {
-                            'loc': ['body', 'field'],
-                            'msg': f'Invalid field: {value}',
-                            'type': 'value_error',
-                            'input': value,
-                        }
-                    ]
-                )
         return value
 
 
-class GrainValue(TypedDict):
-    value: str | int | None
+class ExtraFilterValuesBody(UniqueValuesBaseBody, ExtraDataCategoryRefMixin):
+    field: str = Field(
+        description='Extra data category field name to get unique values',
+        examples=['room', 'serial_number'],
+        json_schema_extra={'example': 'room'},
+    )
+
+
+class UniqueValueSchema(BaseModel):
+    value: Any
     count: int
 
 
-class UniqueGrainValuesResponse(BaseModel):
+class UniqueValuesResponse(BaseModel):
     total: int
-    data: list[GrainValue]
+    data: list[UniqueValueSchema]
 
 
 class MinionFilterOperatorsSchema(BaseModel):
@@ -94,4 +83,5 @@ class MinionFilterSchema(BaseModel):
 
 class FiltersActions(StrEnum):
     UNIQUE_GRAIN_VALUES = 'unique_grain_values'
+    UNIQUE_EXTRA_VALUES = 'unique_extra_values'
     GET_SCHEMA = 'get_schema'

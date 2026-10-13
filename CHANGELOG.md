@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Tasks: `POST /api/tasks/{tid}/minions/export` endpoint streaming task
   minion results (minion ID, master, status, runs count, start/finish
   datetime) to CSV without pagination.
+- Filters: `POST /api/filters/unique-extra-values` endpoint returning unique
+  values of an extra data category field (static and aggregated) with minion
+  counts, and `core.filters.unique_extra_values` OPA policy.
 - `duration_ms` field on job returns.
 - `minions_count` field on masters.
 - Ping endpoint to communicate with masters.
@@ -44,6 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   minion delete.
 - Removed multitype support from extra data fields in favor of single-type
   fields.
+- Filters: `POST /api/filters/unique-grain-values` now runs a single paginated
+  aggregation, counts each minion once per value, sorts stably by count and
+  value, detects list/dict grains from the grains schema and returns an empty
+  result instead of an error for unknown or unsupported fields.
 - Increased Redis lock TTL for task synchronization to 300s.
 - Local source title/description are now translated.
 - Job service: default `kwargs` in job data validation, `mods` set for
