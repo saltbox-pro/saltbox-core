@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [0.4.0] - 2026-10-13
+
+### Added
+
 - Extra data subsystem for minions and collections: categories with `title`,
   `description`, `icon` and `is_single_item`, category field actions, manual
   add/edit, aggregation, list endpoints, CSV/manual export, event-bus
@@ -29,8 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Ping endpoint to communicate with masters.
 - Source update functionality and new operation IDs for source action
   endpoints.
-- Task templates: raw-source create schema/router, localized
-  (`dict[str, str]`) description fields, separate schema file parsing.
+- Task templates: raw-source create schema/router, localized (`dict[str, str]`) description fields, separate schema file
+  parsing.
 - New Salt execution modules: Puppet, Ansible; `file.find` function in cmdmod.
 - Data migrations: backfill empty `source` field on job/job_return/task, drop
   legacy `task_templates` with `repo_id`, single-type extra data fields
@@ -86,7 +94,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- New task templates module with end-to-end source and template management (local/URL/archive sources, mounted repos, SSHFS file operations, schema endpoints, bootstrap stage, and TaskIQ background workflows)
+- New task templates module with end-to-end source and template management (local/URL/archive sources, mounted repos,
+  SSHFS file operations, schema endpoints, bootstrap stage, and TaskIQ background workflows)
 - Minion extra data subsystem: categories, list endpoints, aggregation, filtering, and event bus ingestion
 - POST endpoints for job returns export in table and CSV formats
 - Collection description field
@@ -107,7 +116,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Removed unused orchestrator dependency from routes
 - Stabilized tests and linting configuration
 
-
 ## [0.2.1] - 2026-05-21
 
 ### Added
@@ -127,7 +135,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Refactor services and repos to use `create`/`update` without `projection_model` argument; adopt `bulk_create`/`bulk_update` across tasks, collections and minions
+- Refactor services and repos to use `create`/`update` without `projection_model` argument; adopt `bulk_create`/
+  `bulk_update` across tasks, collections and minions
 - Optimize job creation and job return processing; tune MongoDB projections in salt event handlers
 - Move task-filling notification to a dedicated TaskIQ task
 - Split job return arguments from Salt into separate `args` and `kwargs` fields
@@ -147,7 +156,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Fix `bulk_create` on duplicate or empty data via SDK update
 - Fix MongoDB aggregation pipeline preparation
 
-
 ## [0.2.0] - 2026-04-06
 
 ### Added
@@ -163,22 +171,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Job statuses updated:
-  - `in_queue` → `starting`
-  - `started` → `running`
-  - `error` → `launch_error`
-  - removed `waiting_returns`
+    - `in_queue` → `starting`
+    - `started` → `running`
+    - `error` → `launch_error`
+    - removed `waiting_returns`
 - Renamed job field `error_type` to `launch_error_type`.
 - Collections list endpoint now uses `POST` with body payload mixins.
 - List endpoints switched to a universal response format.
 - Task template list endpoint moved to `/list`.
 - Task template description model updated:
-  - removed `full_description`
-  - `short_description` renamed to `description`
-  - added localized `dict[str, str]` support for descriptions
+    - removed `full_description`
+    - `short_description` renamed to `description`
+    - added localized `dict[str, str]` support for descriptions
 - Pillar API and internal structure refactored:
-  - deprecated pillar modules/services removed
-  - Pillar v2 became the primary implementation
-  - updated router prefixes and related schemas/policies
+    - deprecated pillar modules/services removed
+    - Pillar v2 became the primary implementation
+    - updated router prefixes and related schemas/policies
 - Improved pillar handling and schema definitions.
 - Optimized task creation and related DB queries.
 - Added/updated MongoDB indexes for jobs, task minions, and related entities.
@@ -203,17 +211,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.1.2] - 2025-12-22
 
 ### Added
+
 - Helpers for migrations
 - Permissions for SSHFS
 - Secured pillars (by GPG)
 
 ### Changed
-- Minions list endpoint (removed `osfullname`, `cpu_model` and `mem_total`; added `saltversion`, `osfinger` and `efi_secure_boot`)
+
+- Minions list endpoint (removed `osfullname`, `cpu_model` and `mem_total`; added `saltversion`, `osfinger` and
+  `efi_secure_boot`)
 
 ### Fixed
+
 - Grains with aliases
 - Job creation by tasks (when minion list is empty)
-
 
 ## [0.1.1] - 2025-11-15
 
@@ -225,7 +236,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Downloading AUX files not depends on `content-disposition` header.
 - Manifest `sshfs_files` archive entry requires `unpack_as` field to contain an
-archive format string. `unpack` field is deprecated.
+  archive format string. `unpack` field is deprecated.
 
 ### Fixed
 
@@ -246,18 +257,23 @@ archive format string. `unpack` field is deprecated.
 - Add `TaskCreateSchemaValidationException` to surface task create validation errors.
 - Add `source` field to Task model.
 - Add RabbitMQ-based event bus and support for syncing scheduler templates over the bus.
-- Add initial Inventory persistence to MongoDB: polymorphic models, inventory prototypes, bulk_update_and_create, precise indices and signal-based extraction; make inventory fields optional and warn on ignored extra fields.
+- Add initial Inventory persistence to MongoDB: polymorphic models, inventory prototypes, bulk_update_and_create,
+  precise indices and signal-based extraction; make inventory fields optional and warn on ignored extra fields.
 - Add FastAPI metrics export endpoint.
 - Create default job template during repository initialization.
 
 ### Changed
 
 - Add cooldown when creating jobs linked to task lifespan and refactor related task/job logic.
-- Replace `get_httpx_async_client` with `HttpxClientSingletoneFactory` (singleton AsyncClient) and update authentication handling for HTTPX clients.
-- Refactor job creation: trim whitespace in job data and add `user` and `returning` fields; set JobReturn.success based on retcode.
-- Refactor task schemas and list endpoints: improved field titles, POST-based list filtering, filter schema endpoint and sortable get_list methods.
+- Replace `get_httpx_async_client` with `HttpxClientSingletoneFactory` (singleton AsyncClient) and update authentication
+  handling for HTTPX clients.
+- Refactor job creation: trim whitespace in job data and add `user` and `returning` fields; set JobReturn.success based
+  on retcode.
+- Refactor task schemas and list endpoints: improved field titles, POST-based list filtering, filter schema endpoint and
+  sortable get_list methods.
 - Move faststream scheduler handlers to the SDK and refactor scheduler task creation/run flow.
-- Refactor collection and OpenAPI configuration, simplify routers and improve OpenAPI integration for job and collection endpoints.
+- Refactor collection and OpenAPI configuration, simplify routers and improve OpenAPI integration for job and collection
+  endpoints.
 
 ### Fixed
 
