@@ -79,15 +79,15 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
     extra_data_repository = get_extra_data_repository(
         db=mongo_db, extra_data_category_repository=extra_data_category_repository
     )
+    collection_repository: CollectionRepository = get_collection_repository(db=mongo_db)
     minion_repository: MinionRepository = get_minion_repository(
-        db=mongo_db, extra_data_repository=extra_data_repository
+        db=mongo_db, extra_data_repository=extra_data_repository, collection_repository=collection_repository
     )
     minion_service: MinionService = get_minion_service(repo=minion_repository)
     job_return_repository: JobReturnRepository = get_job_return_repository(db=mongo_db, rdb=redis_db)
     job_return_service: JobReturnService = get_job_return_service(rdb=redis_db, repo=job_return_repository)
     job_repository: JobRepository = get_job_repository(db=mongo_db)
 
-    collection_repository: CollectionRepository = get_collection_repository(db=mongo_db)
     collection_service: CollectionService = get_collection_service(repo=collection_repository)
     pillar_repository: PillarRepository = get_pillar_repository(db=mongo_db)
     pillar_crypto_service: PillarCryptoService = get_pillar_crypto_service()

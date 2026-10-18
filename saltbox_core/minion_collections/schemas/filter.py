@@ -79,6 +79,7 @@ class MinionFilterSchema(BaseModel):
     input_type: str | None = Field(serialization_alias='inputType', default=None)
     value_editor_type: str | None = Field(serialization_alias='valueEditorType', default=None)
     default_value: bool | None = Field(serialization_alias='defaultValue', default=None)
+    case_sensitive: bool | None = Field(serialization_alias='caseSensitive', default=None)
 
 
 class FiltersActions(StrEnum):

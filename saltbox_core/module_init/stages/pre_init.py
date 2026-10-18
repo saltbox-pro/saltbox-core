@@ -65,7 +65,7 @@ async def remove_local_sources_without_namespace() -> None:
     collection_repo = get_collection_repository(db)
     extra_data_category_repo = get_extra_data_category_repository(db)
     minion_extra_data_repo = get_extra_data_repository(db, extra_data_category_repo)
-    minion_repo = get_minion_repository(db, minion_extra_data_repo)
+    minion_repo = get_minion_repository(db, minion_extra_data_repo, collection_repo)
     master_repo = get_master_repository(db)
     job_repo = get_job_repository(db)
     job_return_repo = get_job_return_repository(db=db, rdb=rdb)

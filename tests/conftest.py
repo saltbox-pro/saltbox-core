@@ -106,6 +106,9 @@ class AsyncMockCollection:
         result = self.collection.find_one_and_update(
             filter, update, upsert=upsert, return_document=return_document, projection=projection
         )
+        # Обновляем документ во внутреннем хранилище из mongomock
+        if result and result.get('_id') in self._inserted_docs:
+            self._inserted_docs[result['_id']] = self.collection.find_one({'_id': result['_id']})
         return result
         # return self.mocker.MagicMock(modified_count=result)
 
@@ -133,19 +136,9 @@ class AsyncMockCollection:
 
     async def delete_many(self, filter, session=None):
         """Эмуляция метода delete_many"""
-        # Удаляем документы из нашего внутреннего хранилища, если они соответствуют фильтру
-        to_delete = []
-        for doc_id, doc in list(self._inserted_docs.items()):
-            matches = True
-            for key, value in filter.items():
-                if key not in doc or doc[key] != value:
-                    matches = False
-                    break
-            if matches:
-                to_delete.append(doc_id)
-
-        for doc_id in to_delete:
-            del self._inserted_docs[doc_id]
+        # Удаляем из нашего внутреннего хранилища документы, которые mongomock находит по фильтру
+        for doc in self.collection.find(filter=filter, projection={'_id': 1}):
+            self._inserted_docs.pop(doc['_id'], None)
 
         # Удаляем документы из mongomock
         result = self.collection.delete_many(filter)
@@ -165,6 +158,30 @@ class AsyncMockDatabase:
         if collection_name not in self.collections:
             self.collections[collection_name] = AsyncMockCollection(self.db[collection_name], self.mocker)
         return self.collections[collection_name]
+
+
+class MockSession:
+    """Mongo client session stub, transactions are not emulated"""
+
+    in_transaction = False
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *args):
+        return False
+
+    async def start_transaction(self, **kwargs):
+        return self
+
+
+@pytest.fixture(autouse=True)
+def mocked_mongo_client(mocker):
+    """Fixture for mocking MongoDB client used by `get_mongo_session_with_transaction`."""
+    client = mocker.MagicMock()
+    client.start_session = MockSession
+
+    return mocker.patch('saltbox_sdk.db.mongo.config._get_mongo_client', return_value=client)
 
 
 @pytest.fixture

@@ -43,9 +43,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Data migrations: backfill empty `source` field on job/job_return/task, drop
   legacy `task_templates` with `repo_id`, single-type extra data fields
   migration.
+- Filters: `collection` field to filter minions by collections slugs with
+  `$in`/`$nin` operators, including in collection queries; added to
+  `GET /api/filters/schema` with `caseSensitive` flag.
+- Collections: validation of `collection` filters in collection queries on
+  create, update and move (referenced collections must exist, references and
+  parents must not form a cycle); deletion of collections referenced by other
+  collections is rejected with 409.
 
 ### Changed
 
+- Collections create, update, move and delete run in a MongoDB transaction;
+  move logic moved to the SDK tree repository.
 - SDK updated to support multiple MongoDB hosts, fix collections tree
   sorting and `get_tree()`, fix additional grains, and other SDK contract
   updates.

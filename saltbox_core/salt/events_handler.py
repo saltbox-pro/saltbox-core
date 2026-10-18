@@ -49,11 +49,13 @@ class SaltEventsHandler:
         self.extra_data_repository = get_extra_data_repository(
             db=self.mongo_db, extra_data_category_repository=self.extra_data_category_repository
         )
+        self.collection_repository = get_collection_repository(db=self.mongo_db)
         self.minion_repository = get_minion_repository(
-            db=self.mongo_db, extra_data_repository=self.extra_data_repository
+            db=self.mongo_db,
+            extra_data_repository=self.extra_data_repository,
+            collection_repository=self.collection_repository,
         )
         self.minion_service = get_minion_service(repo=self.minion_repository)
-        self.collection_repository = get_collection_repository(db=self.mongo_db)
         self.collection_service = get_collection_service(repo=self.collection_repository)
 
         self.job_return_repository = get_job_return_repository(db=self.mongo_db, rdb=self.redis)

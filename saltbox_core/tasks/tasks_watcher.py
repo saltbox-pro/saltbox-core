@@ -49,7 +49,11 @@ class TasksWatcher:
         self.extra_data_repository = ExtraDataRepository(
             self.db, extra_data_category_repository=self.extra_data_category_repository
         )
-        self.minions_repository = MinionRepository(self.db, extra_data_repository=self.extra_data_repository)
+        self.minions_repository = MinionRepository(
+            self.db,
+            extra_data_repository=self.extra_data_repository,
+            collection_repository=self.collections_repository,
+        )
         self.task_repository = TaskRepository(self.db)
         self.task_status_repository = TaskStatusRepository(self.db)
         self.task_minion_repository = TaskMinionRepository(self.db)

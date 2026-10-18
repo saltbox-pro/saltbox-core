@@ -3,7 +3,6 @@ from uuid import uuid4
 
 from fastapi import Depends
 from pydantic import BaseModel
-from pymongo import UpdateOne
 from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
 from slugify import slugify
 
@@ -17,8 +16,8 @@ from saltbox_core.minion_collections.schemas.collection import (
     CollectionModel,
     CollectionUpdateSchema,
 )
-from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId, SortOrder
-from saltbox_sdk.exceptions import SaltBoxValidationException
+from saltbox_sdk.db.mongo.config import get_mongo_session_with_transaction
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 
 ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
@@ -70,39 +69,40 @@ class CollectionService(
         *,
         session: MongoAsyncClientSession | None = None,
     ) -> CollectionModel:
-        collection = await self.get_by_slug(slug=slug, session=session)
-        descendants_ids = await self.repo.get_descendants_ids(target=collection.id, include_self=False, session=session)
-        descendants_collections = await self.get_list(
-            query={'_id': {'$in': descendants_ids}}, session=session, projection_model=CollectionModel
-        )
-        descendants_slugs = [descendant.slug for descendant in descendants_collections]
-
-        if data.parent_slug == slug or data.parent_slug in descendants_slugs:
-            raise InvalidParentCollectionException()
-
-        if data.parent_slug is not None and data.parent_slug != collection.parent_slug:
-            parent_collection = await self.get_by_slug(slug=data.parent_slug, session=session)
-            new_parent_id: PyObjectId | None = parent_collection.id
-        else:
-            new_parent_id = collection.parent_id
-
-        if new_parent_id is not None:
-            siblings = await self.repo.get_children(
-                target=new_parent_id,
-                projection_model=CollectionModel,
-                session=session,
+        async with get_mongo_session_with_transaction(session) as s:
+            collection = await self.get_by_slug(slug=slug, session=s)
+            descendants_ids = await self.repo.get_descendants_ids(target=collection.id, include_self=False, session=s)
+            descendants_collections = await self.get_list(
+                query={'_id': {'$in': descendants_ids}}, session=s, projection_model=CollectionModel
             )
-            sibling_titles = {child.title for child in siblings if child.id != collection.id}
-            if data.title in sibling_titles:
-                raise DuplicateChildCollectionTitleException()
+            descendants_slugs = [descendant.slug for descendant in descendants_collections]
 
-        obj_id = await self.update(
-            query={'slug': slug},
-            data={**data.model_dump(exclude={'parent_slug'}), 'parent_id': new_parent_id},
-            session=session,
-        )
+            if data.parent_slug == slug or data.parent_slug in descendants_slugs:
+                raise InvalidParentCollectionException()
 
-        return await self.get(query=obj_id, session=session)
+            if data.parent_slug is not None and data.parent_slug != collection.parent_slug:
+                parent_collection = await self.get_by_slug(slug=data.parent_slug, session=s)
+                new_parent_id: PyObjectId | None = parent_collection.id
+            else:
+                new_parent_id = collection.parent_id
+
+            if new_parent_id is not None:
+                siblings = await self.repo.get_children(
+                    target=new_parent_id,
+                    projection_model=CollectionModel,
+                    session=s,
+                )
+                sibling_titles = {child.title for child in siblings if child.id != collection.id}
+                if data.title in sibling_titles:
+                    raise DuplicateChildCollectionTitleException()
+
+            obj_id = await self.update(
+                query={'slug': slug},
+                data={**data.model_dump(exclude={'parent_slug'}), 'parent_id': new_parent_id},
+                session=s,
+            )
+
+            return await self.get(query=obj_id, session=s)
 
     async def delete_by_slug(
         self,
@@ -110,8 +110,8 @@ class CollectionService(
         *,
         session: MongoAsyncClientSession | None = None,
     ) -> int:
-        result = await self.delete(query={'slug': slug}, session=session)
-        return result
+        async with get_mongo_session_with_transaction(session) as s:
+            return await self.delete(query={'slug': slug}, session=s)
 
     async def move(
         self,
@@ -121,44 +121,14 @@ class CollectionService(
         insert_before_id: PyObjectId | None = None,
         session: MongoAsyncClientSession | None = None,
     ) -> PyObjectId:
-        if parent_id == target_id:
-            msg = 'Cannot move node into itself'
-            raise SaltBoxValidationException(msg)
-
-        descendants_ids = await self.repo.get_descendants_ids(target_id, session=session)
-        if parent_id in descendants_ids:
-            msg = 'Cannot move node into its own descendant'
-            raise SaltBoxValidationException(msg)
-
-        parent_children = await self.repo.get_children(
-            target=parent_id,
-            session=session,
-            sort=self.TREE_SORT,
-            projection_model=EmptyModel,
-        )
-
-        children_ordered_ids = [child.id for child in parent_children if child.id != target_id]
-
-        if insert_before_id is None:
-            insert_at = len(children_ordered_ids)
-        else:
-            try:
-                insert_at = children_ordered_ids.index(insert_before_id)
-            except ValueError:
-                insert_at = len(children_ordered_ids)
-
-        children_ordered_ids.insert(insert_at, target_id)
-
-        operations = [
-            UpdateOne({'_id': target_id}, {'$set': {'parent_id': parent_id}}),
-            *[
-                UpdateOne({'_id': doc_id}, {'$set': {'order': order}})
-                for order, doc_id in enumerate(children_ordered_ids, start=1)
-            ],
-        ]
-        await self.repo.collection.bulk_write(operations, session=session)
-
-        return target_id
+        async with get_mongo_session_with_transaction(session) as s:
+            return await self.repo.move(
+                target_id=target_id,
+                parent_id=parent_id,
+                insert_before_id=insert_before_id,
+                session=s,
+                sort=self.TREE_SORT,
+            )
 
     async def get_tree(
         self,
@@ -185,15 +155,16 @@ class CollectionService(
     ) -> PyObjectId:
         if not isinstance(data, CollectionCreateSchema):
             data = CollectionCreateSchema.model_validate(data)
-        slug = slugify(data.title, separator='-', lowercase=True)
-        while True:
-            existing = await self.exists(query={'slug': slug}, session=session)
-            if not existing:
-                break
-            cleaned_slug = slugify(data.title, separator='-', lowercase=True)
-            slug = f'{cleaned_slug}-{uuid4().hex[:8]}'
+        async with get_mongo_session_with_transaction(session) as s:
+            slug = slugify(data.title, separator='-', lowercase=True)
+            while True:
+                existing = await self.exists(query={'slug': slug}, session=s)
+                if not existing:
+                    break
+                cleaned_slug = slugify(data.title, separator='-', lowercase=True)
+                slug = f'{cleaned_slug}-{uuid4().hex[:8]}'
 
-        return await super().create(data={**data.model_dump(exclude={'slug'}), 'slug': slug}, session=session)
+            return await super().create(data={**data.model_dump(exclude={'slug'}), 'slug': slug}, session=s)
 
     async def get_root_collection_id(self) -> PyObjectId:
         root_collection = await self.get_by_slug(slug='root')

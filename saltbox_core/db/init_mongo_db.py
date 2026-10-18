@@ -23,6 +23,7 @@ async def init_mongo_db() -> None:
 
     extra_data_category_repository = ExtraDataCategoryRepository(database)
     extra_data_repository = ExtraDataRepository(database, extra_data_category_repository)
+    collection_repository = CollectionRepository(database)
 
     reps: list[BaseMongoRepository] = [
         JobRepository(database),
@@ -30,8 +31,8 @@ async def init_mongo_db() -> None:
         MasterRepository(database),
         extra_data_category_repository,
         extra_data_repository,
-        MinionRepository(database, extra_data_repository),
-        CollectionRepository(database),
+        MinionRepository(database, extra_data_repository, collection_repository),
+        collection_repository,
         TaskRepository(database),
         TaskMinionRepository(database),
         TaskStatusRepository(database),

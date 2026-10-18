@@ -2,6 +2,7 @@ from datetime import UTC, datetime
 
 import pytest
 
+from saltbox_core.minion_collections.repositories.collection import CollectionRepository
 from saltbox_core.minion_collections.repositories.extra_data import ExtraDataRepository
 from saltbox_core.minion_collections.repositories.extra_data_category import ExtraDataCategoryRepository
 from saltbox_core.minion_collections.repositories.minion import MinionRepository
@@ -15,7 +16,9 @@ from saltbox_sdk.exceptions import ObjectNotFoundException, PermissionDeniedExce
 def _build_service(mocked_db):
     category_repo = ExtraDataCategoryRepository(mocked_db)
     extra_data_repo = ExtraDataRepository(mocked_db, extra_data_category_repository=category_repo)
-    minion_repo = MinionRepository(mocked_db, extra_data_repository=extra_data_repo)
+    minion_repo = MinionRepository(
+        mocked_db, extra_data_repository=extra_data_repo, collection_repository=CollectionRepository(mocked_db)
+    )
 
     return ExtraDataService(extra_data_repo, minion_repo=minion_repo), minion_repo
 

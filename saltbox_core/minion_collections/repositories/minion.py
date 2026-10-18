@@ -11,8 +11,12 @@ from pymongo.asynchronous.database import AsyncDatabase as MongoAsyncDatabase
 from pymongo.operations import UpdateOne, _IndexKeyHint
 from pymongo.results import UpdateResult
 
+from saltbox_core.minion_collections.exceptions import CyclicCollectionReferenceException
+from saltbox_core.minion_collections.repositories.collection import CollectionRepository, get_collection_repository
 from saltbox_core.minion_collections.repositories.extra_data import ExtraDataRepository, get_extra_data_repository
+from saltbox_core.minion_collections.schemas.collection import CollectionBaseTreeModel
 from saltbox_core.minion_collections.schemas.minion import MinionModel
+from saltbox_core.minion_collections.utils.collection_filter import COLLECTION_FILTER_FIELD, parse_collection_filter
 from saltbox_core.minion_collections.utils.unique_values import UniqueValueKind, build_unique_values_stages
 from saltbox_sdk.db.mongo.aggregations import (
     AddFieldsAggregationStage,
@@ -55,10 +59,15 @@ EXTRA_STATIC_DATA_AS_KV = {
 
 class MinionRepository(BaseMongoRepository[MinionModel]):
     def __init__(
-        self, database: MongoAsyncDatabase[Any], extra_data_repository: ExtraDataRepository, **kwargs: Any
+        self,
+        database: MongoAsyncDatabase[Any],
+        extra_data_repository: ExtraDataRepository,
+        collection_repository: CollectionRepository,
+        **kwargs: Any,
     ) -> None:
         super().__init__(database=database)
         self.extra_data_repository = extra_data_repository
+        self.collection_repository = collection_repository
 
     async def last_activity_seconds_query_override(
         self, field_name: str, field_match: re.Match, field_value: Any, full_raw_query: dict
@@ -132,6 +141,46 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
             )
 
         raise KeyError
+
+    async def collection_query_override(
+        self, field_name: str, field_match: re.Match, field_value: Any, full_raw_query: dict
+    ) -> dict[str, Any]:
+        return await self.__prepare_query__(await self._expand_collection_condition(field_value, parent_slugs=()))
+
+    async def _expand_collection_condition(self, field_value: Any, *, parent_slugs: tuple[str, ...]) -> dict[str, Any]:
+        lookup, slugs = parse_collection_filter(field_value)
+
+        for slug in slugs:
+            if slug in parent_slugs:
+                raise CyclicCollectionReferenceException([*parent_slugs[parent_slugs.index(slug) :], slug])
+
+        collections = await self.collection_repository.get_list(
+            query={'slug': {'$in': slugs}}, projection_model=CollectionBaseTreeModel
+        )
+        queries = [
+            await self._expand_query_collections(collection.full_query, parent_slugs=(*parent_slugs, collection.slug))
+            for collection in collections
+        ]
+
+        if lookup == '$in':
+            return {'$or': queries} if queries else {'_id': {'$in': []}}
+
+        return {'$nor': queries} if queries else {}
+
+    async def _expand_query_collections(self, query: Any, *, parent_slugs: tuple[str, ...]) -> Any:
+        if isinstance(query, dict):
+            expanded_query: dict[str, Any] = {}
+            for key, value in query.items():
+                if key == COLLECTION_FILTER_FIELD:
+                    expanded_query.update(await self._expand_collection_condition(value, parent_slugs=parent_slugs))
+                else:
+                    expanded_query[key] = await self._expand_query_collections(value, parent_slugs=parent_slugs)
+            return expanded_query
+
+        if isinstance(query, list):
+            return [await self._expand_query_collections(item, parent_slugs=parent_slugs) for item in query]
+
+        return query
 
     @overload
     async def get_by_master_and_id(self, master: str, minion_id: str) -> MinionModel: ...
@@ -563,6 +612,7 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
                 r'^extra\.aggregated\.(?P<source>[^.]+)\.(?P<name>[^.]+)\.(?P<sub_field>.+)$'
             ): 'extra_aggregated_query_override',
             re.compile(r'^extra\.(?P<source>[^.]+)\.(?P<name>[^.]+)\.(?P<sub_field>.+)$'): 'extra_query_override',
+            re.compile(r'^collection$'): 'collection_query_override',
         }
         collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
             'minion_id_master_unique_index_asc': [('minion_id', pymongo.ASCENDING), ('master', pymongo.ASCENDING)],
@@ -679,5 +729,8 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
 def get_minion_repository(
     db: Annotated[AsyncDatabase, Depends(get_mongo)],
     extra_data_repository: Annotated[ExtraDataRepository, Depends(get_extra_data_repository)],
+    collection_repository: Annotated[CollectionRepository, Depends(get_collection_repository)],
 ) -> MinionRepository:
-    return MinionRepository(database=db, extra_data_repository=extra_data_repository)
+    return MinionRepository(
+        database=db, extra_data_repository=extra_data_repository, collection_repository=collection_repository
+    )

@@ -44,6 +44,7 @@ class JobsWatcher:
 
         extra_data_category_repository = ExtraDataCategoryRepository(db)
         extra_data_repository = ExtraDataRepository(db, extra_data_category_repository=extra_data_category_repository)
+        collection_repository = CollectionRepository(db)
         task_status_service = TaskStatusService(repo=TaskStatusRepository(db))
         task_template_service = TaskTemplateService(
             repo=TaskTemplateRepository(db), pillar_repo=get_pillar_repository(db=db)
@@ -64,8 +65,12 @@ class JobsWatcher:
             task_status_service=task_status_service,
             task_template_service=task_template_service,
             task_minion_service=self.task_minion_service,
-            collections_service=CollectionService(repo=CollectionRepository(db)),
-            minion_service=MinionService(repo=MinionRepository(db, extra_data_repository=extra_data_repository)),
+            collections_service=CollectionService(repo=collection_repository),
+            minion_service=MinionService(
+                repo=MinionRepository(
+                    db, extra_data_repository=extra_data_repository, collection_repository=collection_repository
+                )
+            ),
             job_service=self.job_service,
         )
 

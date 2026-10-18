@@ -4,6 +4,7 @@ from typing import Annotated, Any, ClassVar
 
 import pymongo
 from fastapi import Depends
+from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
 from pymongo.asynchronous.database import AsyncDatabase
 from pymongo.operations import _IndexKeyHint
 from redis.asyncio import Redis
@@ -117,9 +118,13 @@ class JobReturnRepository(BaseMongoRepository[JobReturnModel]):
         super().__init__(database=database)
 
     async def prepare_object_data(
-        self, data: dict[str, Any], projection_model: type[ProjectionModel] | None = None
+        self,
+        data: dict[str, Any],
+        projection_model: type[ProjectionModel] | None = None,
+        *,
+        session: MongoAsyncClientSession | None = None,
     ) -> dict[str, Any]:
-        data = await super().prepare_object_data(data=data, projection_model=projection_model)
+        data = await super().prepare_object_data(data=data, projection_model=projection_model, session=session)
         projection_model_class = projection_model if projection_model is not None else JobReturnModel
 
         if 'data' in projection_model_class.model_fields:

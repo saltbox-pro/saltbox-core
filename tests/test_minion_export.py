@@ -1,5 +1,6 @@
 import pytest
 
+from saltbox_core.minion_collections.repositories.collection import CollectionRepository
 from saltbox_core.minion_collections.repositories.extra_data import ExtraDataRepository
 from saltbox_core.minion_collections.repositories.extra_data_category import ExtraDataCategoryRepository
 from saltbox_core.minion_collections.repositories.minion import MinionRepository
@@ -11,7 +12,11 @@ def _build_service(mocked_db):
     category_repo = ExtraDataCategoryRepository(mocked_db)
     extra_data_repo = ExtraDataRepository(mocked_db, extra_data_category_repository=category_repo)
 
-    return MinionService(MinionRepository(mocked_db, extra_data_repository=extra_data_repo))
+    return MinionService(
+        MinionRepository(
+            mocked_db, extra_data_repository=extra_data_repo, collection_repository=CollectionRepository(mocked_db)
+        )
+    )
 
 
 @pytest.mark.asyncio

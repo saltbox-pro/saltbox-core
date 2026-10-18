@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 from saltbox_core.minion_collections.schemas.filter import (
     ExtraFilterValuesBody,
     FiltersActions,
+    MinionFilterOperatorsSchema,
     MinionFilterSchema,
     MinionFilterValuesBody,
     UniqueValuesResponse,
@@ -17,7 +18,7 @@ from saltbox_core.minion_collections.services.extra_data_category import (
     get_extra_data_category_service,
 )
 from saltbox_core.minion_collections.services.minion import MinionService, get_minion_service
-from saltbox_core.utilities.model_schema import get_model_schema
+from saltbox_core.utilities.model_schema import get_model_schema, schema_lookups_js_values
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 from saltbox_sdk.exceptions import ObjectNotFoundException
 
@@ -36,6 +37,15 @@ async def filter_schema(
     extra_data_category_service: Annotated[ExtraDataCategoryService, Depends(get_extra_data_category_service)],
 ) -> list[MinionFilterSchema]:
     schema = [MinionFilterSchema(**field) for field in get_model_schema(MinionModel)]
+    schema.append(
+        MinionFilterSchema(
+            name='collection',
+            label='Collection',
+            operators=[MinionFilterOperatorsSchema(**schema_lookups_js_values[lookup]) for lookup in ('in', 'notIn')],
+            input_type='text',
+            case_sensitive=True,
+        )
+    )
     schema.extend(await extra_data_category_service.get_minion_filter_schema())
 
     return schema
