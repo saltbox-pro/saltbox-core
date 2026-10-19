@@ -50,6 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   create, update and move (referenced collections must exist, references and
   parents must not form a cycle); deletion of collections referenced by other
   collections is rejected with 409.
+- Collections: `POST /api/collections/flat-list` endpoint returning all
+  collections of the system (`id`, `slug`, `title`, `description`) to any
+  authenticated user regardless of permissions, sorted by title, with
+  `search` by these fields.
 - Extra data: `POST /api/extra-data/items/export` endpoint streaming extra data
   items of a collection to CSV one row per item (`minion_id`, `master`,
   category fields, `updated_at`).

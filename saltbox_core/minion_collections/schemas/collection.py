@@ -106,6 +106,18 @@ class CollectionListBody(SkipLimitParams, QueryParams, SortParams):
     model_config = ConfigDict(extra='ignore')
 
 
+class CollectionFlatListBody(BaseModel):
+    search: str | None = Field(default=None)
+
+    model_config = ConfigDict(extra='ignore')
+
+
+class CollectionFlatListItemSchema(IDMixin):
+    slug: str
+    title: str
+    description: str = Field(default='')
+
+
 # Permissions
 
 

@@ -7,6 +7,8 @@ from saltbox_core.minion_collections.schemas.collection import (
     CollectionCreateRequestSchema,
     CollectionCreateSchema,
     CollectionDetailSchema,
+    CollectionFlatListBody,
+    CollectionFlatListItemSchema,
     CollectionListBody,
     CollectionModel,
     CollectionMoveRequestSchema,
@@ -56,6 +58,22 @@ async def collections_list(
         limit=params.limit,
         sort=params.sort,
     )
+
+
+@router.post(
+    '/flat-list',
+    operation_id='minion_collections_flat_list',
+    openapi_extra=GatewayEndpointConfig(
+        policy='public',
+        action=CollectionActions.LIST,
+        cache_ttl=0,
+    ).model_dump(by_alias=True),
+)
+async def collections_flat_list(
+    body: Annotated[CollectionFlatListBody, Body()],
+    collection_service: Annotated[CollectionService, Depends(get_collection_service)],
+) -> list[CollectionFlatListItemSchema]:
+    return await collection_service.get_flat_list(body.search)
 
 
 @router.post(

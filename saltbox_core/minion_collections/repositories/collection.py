@@ -19,10 +19,11 @@ from saltbox_core.minion_collections.schemas.collection import (
     CollectionModel,
 )
 from saltbox_core.minion_collections.utils.collection_filter import find_cycle, get_referenced_slugs
+from saltbox_sdk.db.mongo.aggregations import AnySearchAggregationStage
 from saltbox_sdk.db.mongo.config import get_mongo
 from saltbox_sdk.db.mongo.repository_base import ModelType, ProjectionModel
 from saltbox_sdk.db.mongo.repository_tree_base import BaseTreeMongoRepository, OnDelete
-from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
 from saltbox_sdk.exceptions import ObjectNotFoundException
 
 
@@ -206,6 +207,16 @@ class CollectionRepository(BaseTreeMongoRepository[CollectionModel]):
 
         if cycle := find_cycle(target_id, edges):
             raise CyclicCollectionReferenceException([nodes[node_id].get('slug') or str(node_id) for node_id in cycle])
+
+    async def get_flat_list(
+        self, search_str: str | None = None, *, session: MongoAsyncClientSession | None = None
+    ) -> list[dict[str, Any]]:
+        pipeline: list[dict[str, Any]] = [{'$project': {'slug': 1, 'title': 1, 'description': 1}}]
+        if search_str:
+            pipeline.append(AnySearchAggregationStage(search=search_str).render_stage())
+        pipeline.append({'$sort': {'title': SortOrder.ASC, 'slug': SortOrder.ASC}})
+
+        return await self.aggregate(pipeline, session=session)
 
     async def _post_create_collection(self) -> None:
         is_exist = bool(await self.collection.count_documents(filter={'slug': 'root'}))

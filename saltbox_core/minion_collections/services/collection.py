@@ -13,6 +13,7 @@ from saltbox_core.minion_collections.exceptions import (
 from saltbox_core.minion_collections.repositories.collection import CollectionRepository, get_collection_repository
 from saltbox_core.minion_collections.schemas.collection import (
     CollectionCreateSchema,
+    CollectionFlatListItemSchema,
     CollectionModel,
     CollectionUpdateSchema,
 )
@@ -165,6 +166,11 @@ class CollectionService(
                 slug = f'{cleaned_slug}-{uuid4().hex[:8]}'
 
             return await super().create(data={**data.model_dump(exclude={'slug'}), 'slug': slug}, session=s)
+
+    async def get_flat_list(self, search_str: str | None = None) -> list[CollectionFlatListItemSchema]:
+        collections = await self.repo.get_flat_list(search_str)
+
+        return [CollectionFlatListItemSchema.model_validate(collection) for collection in collections]
 
     async def get_root_collection_id(self) -> PyObjectId:
         root_collection = await self.get_by_slug(slug='root')
