@@ -6,7 +6,7 @@ import pytest
 from saltbox_core.minion_collections.repositories.extra_data import ExtraDataRepository
 from saltbox_core.minion_collections.repositories.minion import MinionRepository
 from saltbox_core.minion_collections.schemas.extra_data_category import ExtraDataCategoryModel
-from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
 from saltbox_sdk.event_bus.schemas import ExtraDataCategoryType
 
 
@@ -39,6 +39,32 @@ def test_pipeline_ends_with_sort_and_has_no_facet(group_by_fields):
 
     assert '$sort' in pipeline[-1]
     assert not any('$facet' in stage for stage in pipeline)
+
+
+@pytest.mark.parametrize('category_type', [ExtraDataCategoryType.STATIC, ExtraDataCategoryType.AGGREGATED])
+@pytest.mark.parametrize('search_str', [None, 'abc'])
+def test_with_minion_pipeline_streams_rows_with_minion_fields(category_type, search_str):
+    pipeline = MinionRepository.build_extra_data_pipeline(
+        query={'grains.os': 'ALT'},
+        category_source='manual',
+        category_name='notes',
+        category_type=category_type,
+        field_names=['text'],
+        search_str=search_str,
+        sort={'text': SortOrder.DESC},
+        with_minion=True,
+    )
+    projection = next(stage['$project'] for stage in pipeline if '$project' in stage)
+    replace_roots = [stage['$replaceRoot'] for stage in pipeline if '$replaceRoot' in stage]
+
+    assert pipeline[0] == {'$match': {'grains.os': 'ALT'}}
+    assert projection['_minion_id'] == '$minion_id'
+    assert projection['_master'] == '$master'
+    assert replace_roots[-1] == {
+        'newRoot': {'$mergeObjects': ['$items', {'_minion_id': '$_minion_id', '_master': '$_master'}]}
+    }
+    assert not any('$group' in stage or '$sort' in stage for stage in pipeline)
+    assert ('$match' in pipeline[-1]) == bool(search_str)
 
 
 class _Cursor:

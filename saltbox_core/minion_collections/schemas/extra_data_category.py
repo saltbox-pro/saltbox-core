@@ -277,12 +277,12 @@ class MinionExtraDataQueryBody(ExtraDataQueryBaseBody):
     collection_slug: str | None = Field(title='Collection slug', default=None)
 
 
-class CollectionExtraDataQueryBody(ExtraDataQueryBaseBody):
+class CollectionRefMixin(BaseModel):
     collection_id: PyObjectId | None = Field(title='Collection ID', default=None)
     collection_slug: str | None = Field(title='Collection slug', default=None)
 
     @model_validator(mode='after')
-    def validate_collection(self) -> 'CollectionExtraDataQueryBody':
+    def validate_collection(self) -> 'CollectionRefMixin':
         if self.collection_id is None and self.collection_slug is None:
             msg = 'One of `collection_id` or `collection_slug` must be set'
             raise SaltBoxValidationException(msg)
@@ -292,6 +292,15 @@ class CollectionExtraDataQueryBody(ExtraDataQueryBaseBody):
             raise SaltBoxValidationException(msg)
 
         return self
+
+
+class CollectionExtraDataQueryBody(ExtraDataQueryBaseBody, CollectionRefMixin): ...
+
+
+class ExtraDataExportBody(CollectionRefMixin, ExtraDataCategoryRefMixin):
+    search: str | None = Field(title='Search', default=None)
+
+    model_config = ConfigDict(extra='ignore')
 
 
 class ExtraDataListBody(SkipLimitParams, MinionExtraDataQueryBody): ...

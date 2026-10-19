@@ -50,6 +50,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   create, update and move (referenced collections must exist, references and
   parents must not form a cycle); deletion of collections referenced by other
   collections is rejected with 409.
+- Extra data: `POST /api/extra-data/items/export` endpoint streaming extra data
+  items of a collection to CSV one row per item (`minion_id`, `master`,
+  category fields, `updated_at`).
+- Extra data: `POST /api/extra-data/items/import` endpoint importing manual
+  extra data items from a CSV file of the export format into minions of a
+  collection with `append`/`replace` mode and `error`/`skip` handling of
+  unknown minions; the whole file is validated before writing, items are
+  written in a MongoDB transaction.
 
 ### Changed
 

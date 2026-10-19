@@ -74,6 +74,17 @@ class ExtraDataActions(StrEnum):
     DELETE = 'delete'
     LIST = 'list'
     EXPORT = 'export'
+    IMPORT = 'import'
+
+
+class ExtraDataImportMode(StrEnum):
+    APPEND = 'append'
+    REPLACE = 'replace'
+
+
+class UnknownMinionPolicy(StrEnum):
+    ERROR = 'error'
+    SKIP = 'skip'
 
 
 class ExtraDataItemBaseRequestSchema(BaseModel):
@@ -103,3 +114,9 @@ class ExtraDataItemSchema(BaseModel):
 class ExtraDataItemsCreateResponseSchema(BaseModel):
     minions_count: int = Field(title='Minions count')
     items: list[ExtraDataItemSchema] = Field(title='Items')
+
+
+class ExtraDataImportResponseSchema(BaseModel):
+    minions_count: int
+    items_count: int
+    skipped_rows: list[int]

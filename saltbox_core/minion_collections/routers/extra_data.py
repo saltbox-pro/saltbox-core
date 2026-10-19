@@ -1,16 +1,19 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Body, Depends, Query, Response, status
+from fastapi import APIRouter, Body, Depends, File, Form, Query, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
 
 from saltbox_core.minion_collections.schemas.extra_data import (
     CollectionExtraDataListItemSchema,
     ExtraDataActions,
+    ExtraDataImportMode,
+    ExtraDataImportResponseSchema,
     ExtraDataItemCreateRequestSchema,
     ExtraDataItemSchema,
     ExtraDataItemsCreateResponseSchema,
     ExtraDataItemUpdateRequestSchema,
     ExtraDataListItemSchema,
+    UnknownMinionPolicy,
 )
 from saltbox_core.minion_collections.schemas.extra_data_category import (
     CollectionExtraDataListBody,
@@ -23,6 +26,7 @@ from saltbox_core.minion_collections.schemas.extra_data_category import (
     ExtraDataCategoryListBody,
     ExtraDataCategoryModel,
     ExtraDataCategoryUpdateSchema,
+    ExtraDataExportBody,
     ExtraDataListBody,
     MinionExtraDataQueryBody,
 )
@@ -37,6 +41,7 @@ from saltbox_core.minion_collections.services.minion import MinionService, get_m
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
+from saltbox_sdk.exceptions import SaltBoxValidationException
 from saltbox_sdk.fastapi_utils.csv_export import csv_response
 
 router = APIRouter(prefix='/extra-data', tags=['Extra Data'])
@@ -317,6 +322,73 @@ async def extra_data_items_by_collection_export(
     columns = [(name, name) for name in category.category_fields] + [('minions_count', '_minions_count')]
 
     return csv_response(columns, rows, ['extra_data', category.source, category.name, collection.slug or ''])
+
+
+@router.post(
+    '/items/export',
+    operation_id='extra_data_items_export',
+    response_class=StreamingResponse,
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.extra_data.items.by_collection',
+        action=ExtraDataActions.EXPORT,
+        cache_ttl=0,
+    ).model_dump(by_alias=True),
+)
+async def extra_data_items_export(
+    body: Annotated[ExtraDataExportBody, Body()],
+    category_service: ExtraDataCategoryServiceDep,
+    collection_service: CollectionServiceDep,
+    extra_data_service: ExtraDataServiceDep,
+) -> StreamingResponse:
+    collection = await collection_service.get_by_id_or_slug(body.collection_id, body.collection_slug)
+    category = await category_service.get_by_id_or_source_and_name(
+        body.category_id, body.category_source, body.category_name
+    )
+
+    rows = extra_data_service.iter_minion_items(
+        category, query=collection.full_query, search_str=body.search, with_minion=True
+    )
+    columns = [
+        ('minion_id', '_minion_id'),
+        ('master', '_master'),
+        *[(field.name, field.name) for field in category.fields],
+        ('updated_at', 'updated_at'),
+    ]
+
+    return csv_response(columns, rows, ['extra_data', category.source, category.name, collection.slug or ''])
+
+
+@router.post(
+    '/items/import',
+    operation_id='extra_data_items_import',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.extra_data.items.import_items',
+        action=ExtraDataActions.IMPORT,
+    ).model_dump(by_alias=True),
+)
+async def extra_data_items_import(
+    file: Annotated[UploadFile, File()],
+    collection_slug: Annotated[str, Form()],
+    category_source: Annotated[str, Form()],
+    category_name: Annotated[str, Form()],
+    mode: Annotated[ExtraDataImportMode, Form()],
+    category_service: ExtraDataCategoryServiceDep,
+    collection_service: CollectionServiceDep,
+    extra_data_service: ExtraDataServiceDep,
+    on_unknown_minion: Annotated[UnknownMinionPolicy, Form()] = UnknownMinionPolicy.ERROR,
+) -> ExtraDataImportResponseSchema:
+    collection = await collection_service.get_by_slug(collection_slug)
+    category = await category_service.get_manual_data_category(category_source, category_name)
+
+    try:
+        content = (await file.read()).decode('utf-8-sig')
+    except UnicodeDecodeError:
+        msg = 'CSV file must be UTF-8 encoded'
+        raise SaltBoxValidationException(msg) from None
+
+    return await extra_data_service.import_items(
+        category, content, query=collection.full_query, mode=mode, on_unknown_minion=on_unknown_minion
+    )
 
 
 @router.post(

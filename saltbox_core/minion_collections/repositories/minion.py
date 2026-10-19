@@ -401,6 +401,7 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
         group_by_fields: list[str] | None = None,
         field_names: list[str] | None = None,
         sort: dict[str, SortOrder] | None = None,
+        with_minion: bool = False,
     ) -> list[dict[str, Any]]:
         pipeline: list[dict[str, Any]] = []
 
@@ -472,12 +473,13 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
 
         skip_lookup = category_type == ExtraDataCategoryType.STATIC
         is_grouped = group_by_fields is not None
+        minion_fields = {'_minion_id': '$minion_id', '_master': '$master'} if with_minion else {}
 
         if skip_lookup:
             pipeline.extend(
                 [
                     {'$addFields': {'_static_items': outer_reduce}},
-                    {'$project': {'_id': 1 if is_grouped else 0, 'items': '$_static_items'}},
+                    {'$project': {'_id': 1 if is_grouped else 0, **minion_fields, 'items': '$_static_items'}},
                     {'$unwind': '$items'},
                 ]
             )
@@ -498,6 +500,7 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
                     {
                         '$project': {
                             '_id': 1 if is_grouped else 0,
+                            **minion_fields,
                             'items': {'$concatArrays': ['$_static_items', '$_aggregated_items']},
                         }
                     },
@@ -520,6 +523,14 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
                     },
                 ]
             )
+        elif with_minion:
+            pipeline.append(
+                {
+                    '$replaceRoot': {
+                        'newRoot': {'$mergeObjects': ['$items', {'_minion_id': '$_minion_id', '_master': '$_master'}]}
+                    }
+                }
+            )
         else:
             pipeline.extend(
                 [
@@ -531,6 +542,9 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
 
         if search_str:
             pipeline.append(AnySearchAggregationStage(search=search_str, escape=escape_search_str).render_stage())
+
+        if with_minion:
+            return pipeline
 
         full_sort = {'_source': SortOrder.ASC, '_name': SortOrder.ASC, **(sort or {})}
         tiebreaker_fields = group_by_fields or field_names or []
@@ -582,6 +596,7 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
         group_by_fields: list[str] | None = None,
         field_names: list[str] | None = None,
         sort: dict[str, SortOrder] | None = None,
+        with_minion: bool = False,
         session: MongoAsyncClientSession | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
         pipeline = self.build_extra_data_pipeline(
@@ -594,6 +609,7 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
             group_by_fields=group_by_fields,
             field_names=field_names,
             sort=sort,
+            with_minion=with_minion,
         )
 
         async for row in self.aggregate_iter(pipeline, session=session):

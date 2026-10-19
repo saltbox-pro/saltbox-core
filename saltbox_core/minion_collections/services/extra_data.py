@@ -1,7 +1,9 @@
+import json
 from collections.abc import AsyncIterator
 from typing import Annotated, Any, NoReturn
 
 from fastapi import Depends
+from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
 
 from saltbox_core.config import logger
 from saltbox_core.minion_collections.repositories.extra_data import ExtraDataRepository, get_extra_data_repository
@@ -9,13 +11,19 @@ from saltbox_core.minion_collections.repositories.minion import MinionRepository
 from saltbox_core.minion_collections.schemas.extra_data import (
     CollectionExtraDataListItemSchema,
     ExtraDataCreateSchema,
+    ExtraDataImportMode,
+    ExtraDataImportResponseSchema,
     ExtraDataListItemSchema,
     ExtraDataModel,
     ExtraDataUpdateSchema,
+    UnknownMinionPolicy,
 )
 from saltbox_core.minion_collections.schemas.extra_data_category import ExtraDataCategoryModel
 from saltbox_core.minion_collections.schemas.filter import UniqueValuesResponse
+from saltbox_core.minion_collections.schemas.minion import MinionTgtOnlySchema
+from saltbox_core.minion_collections.utils.extra_data_csv import parse_import_csv
 from saltbox_core.minion_collections.utils.unique_values import UniqueValueKind
+from saltbox_sdk.db.mongo.config import get_mongo_session_with_transaction
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
 from saltbox_sdk.db.schemas_base import PaginatedResponse
 from saltbox_sdk.event_bus.schemas import (
@@ -26,6 +34,8 @@ from saltbox_sdk.event_bus.schemas import (
 from saltbox_sdk.exceptions import ObjectNotFoundException, PermissionDeniedException, SaltBoxValidationException
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 from saltbox_sdk.utilities.helpers import utc_now
+
+IMPORT_ERRORS_LIMIT = 100
 
 
 class ExtraDataService(
@@ -83,17 +93,17 @@ class ExtraDataService(
 
         return cleaned_datas
 
-    async def _write_items(
+    async def _write_items(  # noqa: C901
         self,
         category: ExtraDataCategoryModel,
-        minion_ids: list[PyObjectId],
-        datas: list[dict[str, Any]],
+        datas_by_minion: dict[PyObjectId, list[dict[str, Any]]],
         *,
         is_system: bool,
         replace: bool,
+        session: MongoAsyncClientSession | None = None,
     ) -> list[dict[str, Any]]:
-        existing_minion_ids = await self.minion_repo.get_ids({'_id': {'$in': minion_ids}})
-        if not existing_minion_ids or (not datas and not replace):
+        existing_minion_ids = await self.minion_repo.get_ids({'_id': {'$in': list(datas_by_minion)}}, session=session)
+        if not existing_minion_ids:
             return []
 
         updated_at = utc_now()
@@ -103,7 +113,7 @@ class ExtraDataService(
             items_by_minion: dict[PyObjectId, list[dict[str, Any]]] = {}
             for minion_id in existing_minion_ids:
                 minion_items: list[dict[str, Any]] = []
-                for data in datas:
+                for data in datas_by_minion[minion_id]:
                     item = {'_id': PyObjectId(), 'is_system': is_system, 'updated_at': updated_at, 'data': data}
                     minion_items.append(item)
                     items.append({'minion_id': minion_id, **item})
@@ -111,22 +121,24 @@ class ExtraDataService(
 
             if replace:
                 await self.minion_repo.replace_static_extra_data_items(
-                    category.source, category.name, items_by_minion, is_system=is_system
+                    category.source, category.name, items_by_minion, is_system=is_system, session=session
                 )
-            else:
-                await self.minion_repo.push_static_extra_data_items(category.source, category.name, items_by_minion)
+            elif items:
+                await self.minion_repo.push_static_extra_data_items(
+                    category.source, category.name, items_by_minion, session=session
+                )
 
             return items
 
         if replace:
             await self.repo.pull_minions_entries(
-                category.source, category.name, existing_minion_ids, is_system=is_system
+                category.source, category.name, existing_minion_ids, is_system=is_system, session=session
             )
 
-        for data in datas:
-            category_data, minion_data = category.split_data(data)
-            entries: list[dict[str, Any]] = []
-            for minion_id in existing_minion_ids:
+        entries_by_category_data: dict[str, tuple[dict[str, Any], list[dict[str, Any]]]] = {}
+        for minion_id in existing_minion_ids:
+            for data in datas_by_minion[minion_id]:
+                category_data, minion_data = category.split_data(data)
                 entry = {
                     '_id': PyObjectId(),
                     'minion_id': minion_id,
@@ -134,10 +146,14 @@ class ExtraDataService(
                     'updated_at': updated_at,
                     'data': minion_data,
                 }
-                entries.append(entry)
+                key = json.dumps(category_data, sort_keys=True, default=str)
+                entries_by_category_data.setdefault(key, (category_data, []))[1].append(entry)
                 items.append({**entry, 'data': {**category_data, **minion_data}})
 
-            await self.repo.push_minions_entries(category.source, category.name, category_data, entries)
+        for category_data, entries in entries_by_category_data.values():
+            await self.repo.push_minions_entries(
+                category.source, category.name, category_data, entries, session=session
+            )
 
         return items
 
@@ -154,7 +170,7 @@ class ExtraDataService(
 
         datas = self._clean_datas(category, minion_ids, [data], is_system=is_system)
 
-        return await self._write_items(category, minion_ids, datas, is_system=is_system, replace=False)
+        return await self._write_items(category, dict.fromkeys(minion_ids, datas), is_system=is_system, replace=False)
 
     async def replace_items(
         self,
@@ -173,7 +189,78 @@ class ExtraDataService(
             )
             return []
 
-        return await self._write_items(category, minion_ids, cleaned_datas, is_system=is_system, replace=True)
+        return await self._write_items(
+            category, dict.fromkeys(minion_ids, cleaned_datas), is_system=is_system, replace=True
+        )
+
+    async def import_items(  # noqa: C901
+        self,
+        category: ExtraDataCategoryModel,
+        content: str,
+        *,
+        query: dict[str, Any],
+        mode: ExtraDataImportMode,
+        on_unknown_minion: UnknownMinionPolicy,
+    ) -> ExtraDataImportResponseSchema:
+        rows, errors = parse_import_csv(category, content)
+
+        minion_ids: list[str] = []
+        for row in rows:
+            minion_ids.append(row.minion_id)
+
+        minions = await self.minion_repo.get_list(
+            {'minion_id': {'$in': minion_ids}}, projection_model=MinionTgtOnlySchema
+        )
+        ids_by_minion: dict[tuple[str, str], PyObjectId] = {}
+        for minion in minions:
+            ids_by_minion[(minion.minion_id, minion.master)] = minion.id
+
+        collection_query = await self.minion_repo.__prepare_query__(query)
+        ids_in_collection = set(
+            await self.minion_repo.get_ids({'$and': [collection_query, {'_id': {'$in': list(ids_by_minion.values())}}]})
+        )
+
+        datas_by_minion: dict[PyObjectId, list[dict[str, Any]]] = {}
+        rows_by_minion: dict[PyObjectId, list[int]] = {}
+        skipped_rows: list[int] = []
+
+        for row in rows:
+            minion_label = f'minion `{row.minion_id}` with master `{row.master}`'
+            minion_id = ids_by_minion.get((row.minion_id, row.master))
+
+            if minion_id is None or minion_id not in ids_in_collection:
+                if on_unknown_minion == UnknownMinionPolicy.SKIP:
+                    skipped_rows.append(row.row_number)
+                elif minion_id is None:
+                    errors.append(f'Row {row.row_number}: {minion_label} not found')
+                else:
+                    errors.append(f'Row {row.row_number}: {minion_label} is not in the collection')
+                continue
+
+            datas_by_minion.setdefault(minion_id, []).append(row.data)
+            rows_by_minion.setdefault(minion_id, []).append(row.row_number)
+
+        if category.is_single_item:
+            for row_numbers in rows_by_minion.values():
+                if len(row_numbers) > 1:
+                    errors.append(f'Rows {", ".join(map(str, row_numbers))}: category allows only one item per minion')
+
+        if errors:
+            shown_errors = errors[:IMPORT_ERRORS_LIMIT]
+            if len(errors) > IMPORT_ERRORS_LIMIT:
+                shown_errors.append(f'... and {len(errors) - IMPORT_ERRORS_LIMIT} more errors')
+            msg = f'Invalid CSV file: {"; ".join(shown_errors)}'
+            raise SaltBoxValidationException(msg)
+
+        replace = mode == ExtraDataImportMode.REPLACE or category.is_single_item
+        async with get_mongo_session_with_transaction() as session:
+            items = await self._write_items(
+                category, datas_by_minion, is_system=False, replace=replace, session=session
+            )
+
+        return ExtraDataImportResponseSchema(
+            minions_count=len(datas_by_minion), items_count=len(items), skipped_rows=skipped_rows
+        )
 
     async def _get_item(
         self, category: ExtraDataCategoryModel, minion_id: PyObjectId, item_id: PyObjectId
@@ -288,6 +375,7 @@ class ExtraDataService(
         query: dict[str, Any],
         search_str: str | None = None,
         sort: dict[str, SortOrder] | None = None,
+        with_minion: bool = False,
     ) -> AsyncIterator[dict[str, Any]]:
         rows = self.minion_repo.iter_extra_data(
             query=await self.minion_repo.__prepare_query__(query),
@@ -297,6 +385,7 @@ class ExtraDataService(
             field_names=[field.name for field in category.fields],
             search_str=search_str,
             sort=sort,
+            with_minion=with_minion,
         )
 
         async for row in rows:
