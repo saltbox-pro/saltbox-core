@@ -13,22 +13,37 @@ def service(mocked_db, mocker):
     return CollectionService(repo)
 
 
+PROJECT_AND_SORT = [
+    {'$project': {'slug': 1, 'title': 1, 'description': 1, 'parent_id': 1}},
+    {'$sort': {'title': 1, 'slug': 1}},
+]
+
+
 @pytest.mark.asyncio
-@pytest.mark.parametrize('search_str', [None, '', 'lin'])
-async def test_flat_list_pipeline(service, search_str):
+@pytest.mark.parametrize('search_str', [None, ''])
+async def test_flat_list_pipeline_without_search(service, search_str):
     await service.get_flat_list(search_str)
 
-    pipeline = service.repo.aggregate.await_args.args[0]
-    assert pipeline[0] == {'$project': {'slug': 1, 'title': 1, 'description': 1}}
-    assert pipeline[-1] == {'$sort': {'title': 1, 'slug': 1}}
-    assert len(pipeline) == (3 if search_str else 2)
+    assert service.repo.aggregate.await_args.args[0] == [{'$match': {}}, *PROJECT_AND_SORT]
+
+
+@pytest.mark.asyncio
+async def test_flat_list_pipeline_searches_only_slug_title_description(service):
+    await service.get_flat_list('a.b')
+
+    search = {'$regex': r'a\.b', '$options': 'i'}
+    assert service.repo.aggregate.await_args.args[0] == [
+        {'$match': {'$or': [{'slug': search}, {'title': search}, {'description': search}]}},
+        *PROJECT_AND_SORT,
+    ]
 
 
 @pytest.mark.asyncio
 async def test_flat_list_items(service):
     collection_id = PyObjectId()
+    root_id = PyObjectId()
     service.repo.aggregate.return_value = [
-        {'_id': collection_id, 'slug': 'linux', 'title': 'Linux', 'description': 'Servers'},
+        {'_id': collection_id, 'slug': 'linux', 'title': 'Linux', 'description': 'Servers', 'parent_id': root_id},
         {'_id': PyObjectId(), 'slug': 'root', 'title': 'Root collection'},
     ]
 
@@ -39,5 +54,7 @@ async def test_flat_list_items(service):
         'slug': 'linux',
         'title': 'Linux',
         'description': 'Servers',
+        'parent_id': root_id,
     }
     assert items[1].description == ''
+    assert items[1].parent_id is None

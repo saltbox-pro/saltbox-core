@@ -116,6 +116,7 @@ class CollectionFlatListItemSchema(IDMixin):
     slug: str
     title: str
     description: str = Field(default='')
+    parent_id: PyObjectId | None = Field(default=None)
 
 
 # Permissions

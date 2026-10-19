@@ -1,3 +1,4 @@
+import re
 from typing import Annotated, Any, ClassVar, overload
 
 import pymongo
@@ -19,7 +20,6 @@ from saltbox_core.minion_collections.schemas.collection import (
     CollectionModel,
 )
 from saltbox_core.minion_collections.utils.collection_filter import find_cycle, get_referenced_slugs
-from saltbox_sdk.db.mongo.aggregations import AnySearchAggregationStage
 from saltbox_sdk.db.mongo.config import get_mongo
 from saltbox_sdk.db.mongo.repository_base import ModelType, ProjectionModel
 from saltbox_sdk.db.mongo.repository_tree_base import BaseTreeMongoRepository, OnDelete
@@ -211,10 +211,16 @@ class CollectionRepository(BaseTreeMongoRepository[CollectionModel]):
     async def get_flat_list(
         self, search_str: str | None = None, *, session: MongoAsyncClientSession | None = None
     ) -> list[dict[str, Any]]:
-        pipeline: list[dict[str, Any]] = [{'$project': {'slug': 1, 'title': 1, 'description': 1}}]
+        query: dict[str, Any] = {}
         if search_str:
-            pipeline.append(AnySearchAggregationStage(search=search_str).render_stage())
-        pipeline.append({'$sort': {'title': SortOrder.ASC, 'slug': SortOrder.ASC}})
+            search = {'$regex': re.escape(search_str), '$options': 'i'}
+            query = {'$or': [{'slug': search}, {'title': search}, {'description': search}]}
+
+        pipeline = [
+            {'$match': query},
+            {'$project': {'slug': 1, 'title': 1, 'description': 1, 'parent_id': 1}},
+            {'$sort': {'title': SortOrder.ASC, 'slug': SortOrder.ASC}},
+        ]
 
         return await self.aggregate(pipeline, session=session)
 
