@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Tasks: `POST /api/tasks/targeting/masters` endpoint returning masters with
+  the number of minions matched by task targeting (collection, query, minions,
+  optional task template), and `core.tasks.targeting` OPA policy.
 - Extra data subsystem for minions and collections: categories with `title`,
   `description`, `icon` and `is_single_item`, category field actions, manual
   add/edit, aggregation, list endpoints, CSV/manual export, event-bus

@@ -103,6 +103,11 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
 
         return UniqueValuesResponse.model_validate({'total': total, 'data': data})
 
+    async def get_targeting_masters(
+        self, query: dict[str, Any], sort: dict[str, SortOrder] | None = None
+    ) -> list[dict[str, Any]]:
+        return await self.repo.get_targeting_masters(query=await self.repo.__prepare_query__(query), sort=sort)
+
     async def process_presence(self, master_id: str, minions: list[str], stamp: float) -> None:
         await self.bulk_update(
             query={'master': master_id, 'minion_id': {'$in': minions}},

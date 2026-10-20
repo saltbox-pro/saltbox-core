@@ -3,6 +3,7 @@ from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field, JsonValue, model_validator
 
+from saltbox_bridge_messages import MasterStatus
 from saltbox_core.config import SETTINGS
 from saltbox_core.task_templates.schemas.template import TaskTemplateDefaultsSchema
 from saltbox_core.tasks.schemas.tasks_status import TaskStatus
@@ -205,18 +206,32 @@ class TaskData(BaseModel):  # type: ignore[no-redef]
     kwargs: dict[str, Any] | None = Field(title='Kwarg', default=None)
 
 
-class TaskCreateRequestSchema(BaseModel):
+class TaskTargetingSchema(BaseModel):
+    collection_id: PyObjectId | None = Field(title='Collection ID', default=None)
+    collection_slug: str | None = Field(title='Collection slug', default=None)
+    query: dict = Field(title='Query', default={})
+    minions: list[TaskTargetMinion] = Field(title='Minions', default=[])
+
+    @model_validator(mode='after')
+    def validate_collection(self) -> 'TaskTargetingSchema':
+        if self.collection_id is None and self.collection_slug is None:
+            msg = 'One of `collection_id` or `collection_slug` must be set'
+            raise SaltBoxValidationException(msg)
+
+        if self.collection_id is not None and self.collection_slug is not None:
+            msg = 'Only one of `collection_id` or `collection_slug` can be set'
+            raise SaltBoxValidationException(msg)
+
+        return self
+
+
+class TaskCreateRequestSchema(TaskTargetingSchema):
     task_type: TaskType = Field(title='Task type')
 
     description: str = Field(title='Description', default='')
 
     weight: int = Field(title='Weight', default=1000)
     requirements: list[TaskRequirement] = Field(title='Requirements', default_factory=list)
-
-    collection_id: PyObjectId | None = Field(title='Collection ID', default=None)
-    collection_slug: str | None = Field(title='Collection slug', default=None)
-    query: dict = Field(title='Query', default={})
-    minions: list[TaskTargetMinion] = Field(title='Minions', default=[])
 
     task_template_id: PyObjectId | None = Field(title='Task template id', default=None)
 
@@ -245,21 +260,20 @@ class TaskCreateRequestSchema(BaseModel):
 
         return self
 
-    @model_validator(mode='after')
-    def validate_collection(self) -> 'TaskCreateRequestSchema':
-        if self.collection_id is None and self.collection_slug is None:
-            msg = 'One of `collection_id` or `collection_slug` must be set'
-            raise SaltBoxValidationException(msg)
-
-        if self.collection_id is not None and self.collection_slug is not None:
-            msg = 'Only one of `collection_id` or `collection_slug` can be set'
-            raise SaltBoxValidationException(msg)
-
-        return self
-
 
 class TaskCreateInputSchema(TaskCreateRequestSchema, SourceMixin):
     user: UserShort
+
+
+class TaskTargetingMastersBody(TaskTargetingSchema, SortParams):
+    task_template_id: PyObjectId | None = Field(title='Task template id', default=None)
+
+
+class TaskTargetingMasterSchema(BaseModel):
+    master_id: str | None = Field(title='Master ID', default=None)
+    title: str | None = Field(title='Title', default=None)
+    status: MasterStatus | None = Field(title='Status', default=None)
+    minions_count: int = Field(title='Minions count', default=0)
 
 
 class RestartFailedBody(BaseModel):
@@ -312,3 +326,4 @@ class TasksActions(StrEnum):
     LIST = 'list'
     RUN = 'run'
     UPDATE = 'update'
+    TARGETING = 'targeting'

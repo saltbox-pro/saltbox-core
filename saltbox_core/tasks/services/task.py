@@ -27,6 +27,9 @@ from saltbox_core.tasks.schemas.task import (
     TaskRequirement,
     TaskShortForUpdateSchema,
     TaskStatusOnlySchema,
+    TaskTargetingMastersBody,
+    TaskTargetingMasterSchema,
+    TaskTargetingSchema,
     TaskTargetMinion,
     TaskType,
     TaskUpdateSchema,
@@ -130,20 +133,21 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
 
         return fun, task_arg, task_kwarg
 
-    async def __parse_input_create_schema(self, data: TaskCreateInputSchema) -> tuple[TaskCreateSchema, dict[str, Any]]:
+    async def __get_target_collection(self, data: TaskTargetingSchema) -> CollectionModel:
         try:
             if data.collection_slug:
-                collection = await self.collections_service.get_by_slug(
-                    slug=data.collection_slug, projection_model=EmptyModel
-                )
-            elif data.collection_id:
-                collection = await self.collections_service.get(query=data.collection_id, projection_model=EmptyModel)
-            else:
-                msg = 'Collection must be provided'
-                raise SaltBoxValidationException(msg)
+                return await self.collections_service.get_by_slug(slug=data.collection_slug)
+            if data.collection_id:
+                return await self.collections_service.get(query=data.collection_id)
         except ObjectNotFoundException as e:
             msg = 'Collection not found'
             raise SaltBoxValidationException(msg) from e
+
+        msg = 'Collection must be provided'
+        raise SaltBoxValidationException(msg)
+
+    async def __parse_input_create_schema(self, data: TaskCreateInputSchema) -> tuple[TaskCreateSchema, dict[str, Any]]:
+        collection = await self.__get_target_collection(data)
 
         task_template: TaskTemplateModel | None = None
 
@@ -235,15 +239,12 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
             )
             raise SaltBoxValidationException(msg)
 
-    async def __get_minions_by_targeting(
-        self,
-        task_id: PyObjectId,
+    @staticmethod
+    def __build_targeting_queries(
         target_collection: CollectionModel,
         target_query: dict | None = None,
         target_minions: list[TaskTargetMinion] | None = None,
-        *,
-        session: MongoAsyncClientSession | None = None,
-    ) -> list[PyObjectId]:
+    ) -> list[dict[str, Any]]:
         queries = [target_collection.full_query] if target_collection.full_query else []
         if target_query:
             queries.append(target_query)
@@ -256,6 +257,40 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                     ]
                 }
             )
+
+        return queries
+
+    async def get_targeting_masters(self, data: TaskTargetingMastersBody) -> list[TaskTargetingMasterSchema]:
+        if data.task_template_id:
+            try:
+                await self.task_template_service.get(query=data.task_template_id, projection_model=EmptyModel)
+            except ObjectNotFoundException as e:
+                msg = 'Task template not found'
+                raise SaltBoxValidationException(msg) from e
+
+        collection = await self.__get_target_collection(data)
+        queries = self.__build_targeting_queries(
+            target_collection=collection, target_query=data.query, target_minions=data.minions
+        )
+
+        masters = await self.minion_service.get_targeting_masters(
+            query={'$and': queries} if queries else {}, sort=data.sort
+        )
+
+        return [TaskTargetingMasterSchema.model_validate(master) for master in masters]
+
+    async def __get_minions_by_targeting(
+        self,
+        task_id: PyObjectId,
+        target_collection: CollectionModel,
+        target_query: dict | None = None,
+        target_minions: list[TaskTargetMinion] | None = None,
+        *,
+        session: MongoAsyncClientSession | None = None,
+    ) -> list[PyObjectId]:
+        queries = self.__build_targeting_queries(
+            target_collection=target_collection, target_query=target_query, target_minions=target_minions
+        )
 
         minions_in_task = await self.task_minion_service.get_list(
             query={'task_id': task_id},

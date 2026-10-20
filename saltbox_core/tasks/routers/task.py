@@ -17,6 +17,8 @@ from saltbox_core.tasks.schemas.task import (
     TaskModel,
     TasksActions,
     TaskSafeUpdateSchema,
+    TaskTargetingMastersBody,
+    TaskTargetingMasterSchema,
 )
 from saltbox_core.tasks.schemas.tasks_minion import (
     TaskMinionExportBody,
@@ -104,6 +106,21 @@ async def task_create(
         )
     )
     return await task_service.get(query=obj_id)
+
+
+@router.post(
+    '/targeting/masters',
+    operation_id='task_targeting_masters',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.targeting',
+        action=TasksActions.TARGETING,
+    ).model_dump(by_alias=True),
+)
+async def task_targeting_masters(
+    body: Annotated[TaskTargetingMastersBody, Body()],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
+) -> list[TaskTargetingMasterSchema]:
+    return await task_service.get_targeting_masters(body)
 
 
 @router.get(

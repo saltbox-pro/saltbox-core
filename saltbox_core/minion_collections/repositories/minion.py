@@ -238,6 +238,32 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
 
         return await self.aggregate_paginated(pipeline, skip, limit, session=session)
 
+    async def get_targeting_masters(
+        self,
+        query: dict[str, Any],
+        sort: dict[str, SortOrder] | None = None,
+        *,
+        session: MongoAsyncClientSession | None = None,
+    ) -> list[dict[str, Any]]:
+        pipeline: list[dict[str, Any]] = [
+            {'$match': query},
+            {'$group': {'_id': '$master', 'minions_count': {'$sum': 1}}},
+            {'$lookup': {'from': 'master', 'localField': '_id', 'foreignField': 'master_id', 'as': 'master'}},
+            {'$unwind': {'path': '$master', 'preserveNullAndEmptyArrays': True}},
+            {
+                '$project': {
+                    '_id': 0,
+                    'master_id': '$_id',
+                    'title': '$master.title',
+                    'status': '$master.status',
+                    'minions_count': 1,
+                }
+            },
+            {'$sort': dict(sort) if sort else {'master_id': 1}},
+        ]
+
+        return await self.aggregate(pipeline, session=session)
+
     async def get_unique_static_extra_values(
         self,
         query: dict[str, Any],
