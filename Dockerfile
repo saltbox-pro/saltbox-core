@@ -5,28 +5,56 @@
 
 # This file is a part of Salt.Box system.
 
-
-FROM registry.altlinux.org/alt/alt:p11 AS base
-LABEL version='1.3'
-EXPOSE 8000
+ARG BASE_IMAGE="registry.altlinux.org/alt/alt:p11"
+FROM "$BASE_IMAGE" AS python
+LABEL version='1.0'
 
 RUN \
-  --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked,id=apt \
+  --mount=type=cache,target=/var/lib/apt/lists,sharing=locked,id=apt-lists \
 <<EOF
 set -e
 mkdir --parents /var/cache/apt/archives/partial/ /var/lib/apt/lists/partial/
 apt-get update
-apt-get install -y glibc-pthread python3-module-pip git
+apt-get install --yes glibc-pthread python3 git
 EOF
 
-## Outer dependencies
-## Install modules which are missing or have incompatible version in the dist repo
-RUN \
-  --mount=type=bind,source=requirements.txt,target=/mnt/requirements.txt\
-  --mount=type=cache,target=/root/.cache/pip/ \
-  pip3 install --requirement /mnt/requirements.txt
 
+FROM python AS uv
+LABEL version='1.0'
+
+RUN \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked,id=apt \
+  --mount=type=cache,target=/var/lib/apt/lists,sharing=locked,id=apt-lists \
+<<EOF
+set -e
+mkdir --parents /var/cache/apt/archives/partial/ /var/lib/apt/lists/partial/
+apt-get update
+apt-get install --yes uv
+EOF
+
+
+FROM uv AS venv
+LABEL version='2.0'
+
+WORKDIR /srv/saltbox-core/
+COPY . /srv/saltbox-core/
+ARG UV_CACHE_DIR=/root/.cache/uv/
+RUN --mount=type=cache,target="$UV_CACHE_DIR",id=uv \
+  uv sync \
+    --python=/usr/bin/python3 \
+    --no-dev \
+    --no-sources \
+    --no-editable \
+  ;
+
+
+FROM python AS prod
+LABEL name='saltbox-core' version='2.0'
+
+ENV CORE_VENV='/srv/saltbox-core/.venv'
+ENV PATH="${CORE_VENV}/bin:${PATH}"
+COPY --from=venv /srv/saltbox-core/.venv "$CORE_VENV"
 COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/
 
 RUN mkdir --parents /var/lib/saltbox-core/
@@ -47,43 +75,27 @@ ENV TASKIQ_WORKERS=3
 
 WORKDIR /
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+EXPOSE 8000
 
 
-###############
-## Dev image ##
-###############
-
-FROM base AS dev
-LABEL name='saltbox-core-dev' version='1.4'
-# Install Core as an editable package
+# TODO Fix dev mode
+FROM prod AS dev
+LABEL name='saltbox-core-dev' version='2.0'
 RUN \
-  --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+  --mount=type=cache,target=/var/cache/apt,sharing=locked,id=apt \
+  --mount=type=cache,target=/var/lib/apt/lists,sharing=locked,id=apt-lists \
 <<EOF
 set -e
 mkdir --parents /var/cache/apt/archives/partial/ /var/lib/apt/lists/partial/
 apt-get update
-apt-get install -y ipython3 uv
+apt-get install --yes uv
 EOF
 WORKDIR /mnt/saltbox-core/
 ENV DEV_MODE=1
-# User should mount respective repositories to run the image
+# User MUST mount respective repositories to run the image
 VOLUME /mnt/saltbox-core/
 VOLUME /mnt/saltbox-bridge-messages/
 ENV SALTBOX_BRIDGE_MESSAGES_SRC_PATH /mnt/saltbox-bridge-messages/
 VOLUME /mnt/saltbox-sdk/
 ENV SALTBOX_SDK_SRC_PATH /mnt/saltbox-sdk/
 RUN git config --global --add safe.directory '/mnt/*'
-
-
-################
-## Main image ##
-################
-
-FROM base AS main
-LABEL name='saltbox-core' version='1.3'
-# Install Core as a normal package
-RUN \
-  --mount=type=bind,target=/mnt/saltbox-core/,readwrite \
-  --mount=type=cache,target=/root/.cache/pip/ \
-  pip3 install /mnt/saltbox-core/

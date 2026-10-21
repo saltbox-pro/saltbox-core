@@ -6,7 +6,7 @@ repos:
     hooks:
       - id: check-added-large-files
         args:
-          - '--maxkb=500'
+          - '--maxkb=1000'
       - id: check-executables-have-shebangs
       - id: check-shebang-scripts-are-executable
       - id: check-yaml
@@ -23,3 +23,8 @@ repos:
         files: "^saltbox_core/"
       - id: ruff-format
         files: "^saltbox_core/"
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    # uv version
+    rev: 0.13.4
+    hooks:
+      - id: uv-lock

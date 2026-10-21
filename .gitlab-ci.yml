@@ -13,7 +13,9 @@ stages:
 variables:
   # Set 0 to disable linting jobs
   LINTING_ENABLED: true
+  # Set 0 to disable testing job
   TESTING_ENABLED: true
+  IMAGE: 'registry.altlinux.org/alt/alt:p11'
 
 include:
   - project: 'saltbox/ci-lib'
@@ -28,9 +30,9 @@ include:
 
 .python-base:
   variables:
-    PIP_CACHE_DIR: '$CI_PROJECT_DIR/.cache/pip'
-    APK_CACHE_DIR: '$CI_PROJECT_DIR/.cache/apk'
-  image: python:3.12-alpine
+    PIP_CACHE_DIR: '${CI_PROJECT_DIR}/.cache/pip'
+    APK_CACHE_DIR: '${CI_PROJECT_DIR}/.cache/apk'
+  image: '$IMAGE'
   before_script:
     - mkdir --parents "$APK_CACHE_DIR"
     - apk add --cache-dir "$APK_CACHE_DIR" git
@@ -47,6 +49,7 @@ include:
   rules:
     - if: $LINTING_ENABLED == 'true'
 
+# TODO uv lock --check
 
 Ruff:
   extends: .lint-job
@@ -81,7 +84,7 @@ Build Core image:
   stage: build
   extends: .build-image
   variables:
-    TARGET: main
+    TARGET: prod
 
 
 Trigger API Client pipeline:

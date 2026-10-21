@@ -28,6 +28,7 @@ TASKIQ_BROKER_URL="${TASKIQ_BROKER_URL}/${REDIS_TASKIQ_DB}"
 
 export REDIS_PASSWORD MONGO_PASSWORD RABBITMQ_AMQP_PASSWORD TASKIQ_BROKER_URL KEYCLOAK_CLIENT_SECRET
 
+# TODO Fix dev mode
 if [ "$DEV_MODE" = 1 ]; then
     uv --no-progress pip install --system --editable .[reload]
     uv --no-progress pip install --system --editable "${SALTBOX_BRIDGE_MESSAGES_SRC_PATH}"
@@ -38,7 +39,7 @@ declare -r tiq_tasks_pattern='saltbox_core/**/tiq_tasks.py'
 workdir="$PWD"
 
 cmd_uvicorn() {
-  cmd=(/usr/bin/uvicorn saltbox_core.main:app --host=0.0.0.0 --port=8000)
+  cmd=(uvicorn saltbox_core.main:app --host=0.0.0.0 --port=8000)
   cmd+=(--timeout-graceful-shutdown="${TIMEOUT_GRACEFUL_SHUTDOWN}")
   if [ "$DEV_MODE" = 1 ]; then
     cmd+=(--reload)
@@ -46,7 +47,7 @@ cmd_uvicorn() {
 }
 
 cmd_taskiq_worker() {
-  cmd=(/usr/bin/taskiq worker saltbox_core.tkq:broker_for_default_worker --fs-discover)
+  cmd=(taskiq worker saltbox_core.tkq:broker_for_default_worker --fs-discover)
   cmd+=("--tasks-pattern=${tiq_tasks_pattern}" --workers=${TASKIQ_WORKERS} --max-fails=1)
   if [ "$DEV_MODE" = 1 ]; then
     cmd+=(--reload)
@@ -57,7 +58,7 @@ cmd_taskiq_worker() {
 }
 
 cmd_taskiq_salt_worker() {
-  cmd=(/usr/bin/taskiq worker saltbox_core.tkq:broker_for_salt_worker --fs-discover)
+  cmd=(taskiq worker saltbox_core.tkq:broker_for_salt_worker --fs-discover)
   cmd+=("--tasks-pattern=${tiq_tasks_pattern}" --workers=${TASKIQ_WORKERS} --max-fails=1)
   if [ "$DEV_MODE" = 1 ]; then
     cmd+=(--reload)
@@ -68,7 +69,7 @@ cmd_taskiq_salt_worker() {
 }
 
 cmd_taskiq_notify_worker() {
-  cmd=(/usr/bin/taskiq worker saltbox_core.tkq:broker_for_notify_worker --fs-discover)
+  cmd=(taskiq worker saltbox_core.tkq:broker_for_notify_worker --fs-discover)
   cmd+=("--tasks-pattern=${tiq_tasks_pattern}" --workers=${TASKIQ_WORKERS} --max-fails=1)
   if [ "$DEV_MODE" = 1 ]; then
     cmd+=(--reload)
@@ -79,7 +80,7 @@ cmd_taskiq_notify_worker() {
 }
 
 cmd_taskiq_scheduler() {
-  cmd=(/usr/bin/taskiq scheduler saltbox_core.tkq_sched:scheduler)
+  cmd=(taskiq scheduler saltbox_core.tkq_sched:scheduler)
   cmd+=(--fs-discover "--tasks-pattern=${tiq_tasks_pattern}")
   if [ "$DEV_MODE" != 1 ]; then
     workdir='/usr/lib/python3/site-packages/'
