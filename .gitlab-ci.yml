@@ -15,7 +15,8 @@ variables:
   LINTING_ENABLED: true
   # Set 0 to disable testing job
   TESTING_ENABLED: true
-  IMAGE: 'registry.altlinux.org/alt/alt:p11'
+  BASE_IMAGE: 'registry.altlinux.org/alt/alt:p11'
+  PYTHON: python3.12.13  # SHOULD match the BASE_IMAGE python3 package
 
 include:
   - project: 'saltbox/ci-lib'
@@ -30,35 +31,34 @@ include:
 
 .python-base:
   variables:
-    PIP_CACHE_DIR: '${CI_PROJECT_DIR}/.cache/pip'
     APK_CACHE_DIR: '${CI_PROJECT_DIR}/.cache/apk'
-  image: '$IMAGE'
+    UV_CACHE_DIR: '${CI_PROJECT_DIR}/.cache/uv'
+  image: alpine:latest
   before_script:
     - mkdir --parents "$APK_CACHE_DIR"
-    - apk add --cache-dir "$APK_CACHE_DIR" git
-    - pip3 install -e .[dev]
+    - apk add --cache-dir "$APK_CACHE_DIR" git uv
+    - uv sync --python="$PYTHON" --dev --no-sources
+    - source .venv/bin/activate
   cache:
     paths:
-      - '$PIP_CACHE_DIR'
       - '$APK_CACHE_DIR'
+      - '$UV_CACHE_DIR'
 
 
-.lint-job:
+Ruff:
   stage: lint
   extends: .python-base
+  script: ruff check saltbox_core
   rules:
     - if: $LINTING_ENABLED == 'true'
 
-# TODO uv lock --check
-
-Ruff:
-  extends: .lint-job
-  script: ruff check saltbox_core
-
 
 Mypy:
-  extends: .lint-job
+  stage: lint
+  extends: .python-base
   script: mypy saltbox_core
+  rules:
+    - if: $LINTING_ENABLED == 'true'
 
 
 Pytest:
@@ -85,6 +85,7 @@ Build Core image:
   extends: .build-image
   variables:
     TARGET: prod
+    EXTRA_ARGS: "--build-arg='BASE_IMAGE=$BASE_IMAGE'"
 
 
 Trigger API Client pipeline:
