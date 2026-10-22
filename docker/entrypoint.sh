@@ -1,6 +1,6 @@
 #! /bin/bash
 
-set -e
+set -eu -o pipefail
 
 warn() {
   1>&2 echo "$@"
@@ -16,11 +16,11 @@ RABBITMQ_AMQP_PASSWORD="$(cat "$RABBITMQ_AMQP_PASSWORD_FILE")"
 KEYCLOAK_CLIENT_SECRET="$(cat "$KEYCLOAK_CLIENT_SECRET_FILE")"
 
 TASKIQ_BROKER_URL="redis://${REDIS_TASKIQ_USERNAME}"
-if [ -f "$REDIS_TASKIQ_PASSWORD_SECRET" ]; then
-  redis_taskiq_password="$(cat "$REDIS_TASKIQ_PASSWORD_SECRET")"
+if [ -f "$REDIS_TASKIQ_SECRET_FILE" ]; then
+  redis_taskiq_password="$(cat "$REDIS_TASKIQ_SECRET_FILE")"
   TASKIQ_BROKER_URL="${TASKIQ_BROKER_URL}:${redis_taskiq_password}"
 else
-  warn NOT PASSWORD FOR REDIS USER
+  warn MISSING PASSWORD FOR REDIS USER
 fi
 
 TASKIQ_BROKER_URL="${TASKIQ_BROKER_URL}@${REDIS_TASKIQ_HOST}:${REDIS_TASKIQ_PORT}"
@@ -28,7 +28,6 @@ TASKIQ_BROKER_URL="${TASKIQ_BROKER_URL}/${REDIS_TASKIQ_DB}"
 
 export REDIS_PASSWORD MONGO_PASSWORD RABBITMQ_AMQP_PASSWORD TASKIQ_BROKER_URL KEYCLOAK_CLIENT_SECRET
 
-# TODO Fix dev mode
 if [ "$DEV_MODE" = 1 ]; then
     uv --no-progress pip install --system --editable .[reload]
     uv --no-progress pip install --system --editable "${SALTBOX_BRIDGE_MESSAGES_SRC_PATH}"
@@ -36,7 +35,6 @@ if [ "$DEV_MODE" = 1 ]; then
 fi
 
 declare -r tiq_tasks_pattern='saltbox_core/**/tiq_tasks.py'
-workdir="$PWD"
 
 cmd_uvicorn() {
   cmd=(uvicorn saltbox_core.main:app --host=0.0.0.0 --port=8000)
@@ -48,43 +46,31 @@ cmd_uvicorn() {
 
 cmd_taskiq_worker() {
   cmd=(taskiq worker saltbox_core.tkq:broker_for_default_worker --fs-discover)
-  cmd+=("--tasks-pattern=${tiq_tasks_pattern}" --workers=${TASKIQ_WORKERS} --max-fails=1)
+  cmd+=("--tasks-pattern=${tiq_tasks_pattern}" --workers="${TASKIQ_WORKERS}" --max-fails=1)
   if [ "$DEV_MODE" = 1 ]; then
     cmd+=(--reload)
-    workdir='/mnt/saltbox-core/'
-  else
-    workdir='/usr/lib/python3/site-packages/'
   fi
 }
 
 cmd_taskiq_salt_worker() {
   cmd=(taskiq worker saltbox_core.tkq:broker_for_salt_worker --fs-discover)
-  cmd+=("--tasks-pattern=${tiq_tasks_pattern}" --workers=${TASKIQ_WORKERS} --max-fails=1)
+  cmd+=("--tasks-pattern=${tiq_tasks_pattern}" --workers="${TASKIQ_WORKERS}" --max-fails=1)
   if [ "$DEV_MODE" = 1 ]; then
     cmd+=(--reload)
-    workdir='/mnt/saltbox-core/'
-  else
-    workdir='/usr/lib/python3/site-packages/'
   fi
 }
 
 cmd_taskiq_notify_worker() {
   cmd=(taskiq worker saltbox_core.tkq:broker_for_notify_worker --fs-discover)
-  cmd+=("--tasks-pattern=${tiq_tasks_pattern}" --workers=${TASKIQ_WORKERS} --max-fails=1)
+  cmd+=("--tasks-pattern=${tiq_tasks_pattern}" --workers="${TASKIQ_WORKERS}" --max-fails=1)
   if [ "$DEV_MODE" = 1 ]; then
     cmd+=(--reload)
-    workdir='/mnt/saltbox-core/'
-  else
-    workdir='/usr/lib/python3/site-packages/'
   fi
 }
 
 cmd_taskiq_scheduler() {
   cmd=(taskiq scheduler saltbox_core.tkq_sched:scheduler)
   cmd+=(--fs-discover "--tasks-pattern=${tiq_tasks_pattern}")
-  if [ "$DEV_MODE" != 1 ]; then
-    workdir='/usr/lib/python3/site-packages/'
-  fi
 }
 
 cmd_shell() {
@@ -106,7 +92,9 @@ case $1 in
   *) wrong_cmd "$@" ;;
 esac
 
-cd "$workdir"
+# For Tasqik discovery crucial to be in directory with `saltbox_core` module
+cd "${CORE_PATH}"
 echo "Current working directory is '$PWD'"
+
 echo "$ ${cmd[*]}"
 exec "${cmd[@]}"
