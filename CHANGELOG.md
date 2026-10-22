@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- uv-based Docker image and CI pipline. Image size reduced.
+
 ### Fixed
 
 ## [0.4.0] - 2026-10-13
