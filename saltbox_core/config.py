@@ -34,7 +34,7 @@ def validate_make_dir(value: Path) -> Path:
             msg = f'{value} exists and is not directory'
             raise ValueError(msg)
     else:
-        value.mkdir(parents=True)
+        value.mkdir(parents=True, exist_ok=True)  # exists_ok to avoid race condition
     return value
 
 
