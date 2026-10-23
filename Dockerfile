@@ -52,9 +52,10 @@ RUN --mount=type=cache,target="$UV_CACHE_DIR",id=uv \
 
 
 FROM base AS prod
-ENV CORE_PATH='/srv/saltbox-core/.venv'
-ENV PATH="${CORE_PATH}/bin:${PATH}"
-COPY --from=venv /srv/saltbox-core/.venv "$CORE_PATH"
+ENV VENV_PATH='/srv/saltbox-core/.venv'
+ENV CORE_PATH='/srv/saltbox-core/.venv/lib/python3/site-packages'
+ENV PATH="${VENV_PATH}/bin:${PATH}"
+COPY --from=venv /srv/saltbox-core/.venv "$VENV_PATH"
 
 
 FROM uv AS dev
