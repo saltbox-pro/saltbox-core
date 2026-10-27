@@ -27,9 +27,8 @@ COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/
 RUN mkdir --parents /var/lib/saltbox-core/
 ENV DEV_MODE=0
 
-# hadolint ignore=DL3064
+# hadolint global ignore=DL3064
 ENV KEYCLOAK_CLIENT_SECRET_FILE=/run/secrets/keycloak_client_saltbox_core_password
-# hadolint ignore=DL3064
 ENV REDIS_TASKIQ_SECRET_FILE=/run/secrets/redis_taskiq_password
 
 ENV TASKIQ_WORKERS=3
