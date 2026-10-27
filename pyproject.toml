@@ -1,6 +1,6 @@
 [project]
 name = "saltbox-core"
-description = ""
+description = "Salt.Box backend service"
 readme = "README.md"
 requires-python = ">=3.12"
 license-files = ["LICENSE.txt"]

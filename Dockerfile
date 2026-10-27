@@ -6,7 +6,10 @@
 # This file is a part of Salt.Box system.
 
 ARG BASE_IMAGE="registry.altlinux.org/alt/alt:p11"
+
+# hadolint ignore=DL3006
 FROM "$BASE_IMAGE" AS base
+# hadolint ignore=DL3015
 RUN \
   --mount=type=cache,target=/var/cache/apt,sharing=locked,id=apt \
   --mount=type=cache,target=/var/lib/apt/lists,sharing=locked,id=apt-lists \
@@ -14,19 +17,28 @@ RUN \
 set -e
 mkdir --parents /var/cache/apt/archives/partial/ /var/lib/apt/lists/partial/
 apt-get update
-apt-get install --yes glibc-pthread python3 git
+apt-get install --yes glibc-pthread=2.38.0.223.f053ff-alt1.p11.1 \
+                      python3=3.12.13-alt1 \
+                      git=2.50.1-alt1
 EOF
+
 COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/
+
 RUN mkdir --parents /var/lib/saltbox-core/
 ENV DEV_MODE=0
+
+# hadolint ignore=DL3064
 ENV KEYCLOAK_CLIENT_SECRET_FILE=/run/secrets/keycloak_client_saltbox_core_password
+# hadolint ignore=DL3064
 ENV REDIS_TASKIQ_SECRET_FILE=/run/secrets/redis_taskiq_password
+
 ENV TASKIQ_WORKERS=3
 ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 EXPOSE 8000
 
 
 FROM base AS uv
+# hadolint ignore=DL3015
 RUN \
   --mount=type=cache,target=/var/cache/apt,sharing=locked,id=apt \
   --mount=type=cache,target=/var/lib/apt/lists,sharing=locked,id=apt-lists \
@@ -34,7 +46,8 @@ RUN \
 set -e
 mkdir --parents /var/cache/apt/archives/partial/ /var/lib/apt/lists/partial/
 apt-get update
-apt-get install --yes uv
+
+apt-get install --yes uv=0.10.7-alt1
 EOF
 
 
@@ -62,7 +75,7 @@ FROM uv AS dev
 ENV CORE_PATH='/mnt/saltbox-core/'
 WORKDIR "$CORE_PATH"
 ENV DEV_MODE=1
-# User MUST mount respective repositories to run the image
+#NOTE: User MUST mount respective repositories to run the image
 VOLUME /mnt/saltbox-core/
 VOLUME /mnt/saltbox-bridge-messages/
 ENV SALTBOX_BRIDGE_MESSAGES_SRC_PATH /mnt/saltbox-bridge-messages/
