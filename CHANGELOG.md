@@ -9,9 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Minions: `is_never_active` and `is_not_active` flags computed in MongoDB
+  from `last_activity` and the `MINION_INACTIVE_PERIOD` setting (90 seconds by
+  default), returned by minion endpoints and available in the filter schema.
+
 ### Changed
 
 - uv-based Docker image and CI pipline. Image size reduced.
+- Minion filters: legacy `extra.static.*` and `extra.aggregated.*` keys are
+  no longer supported, stored collection, task template and task queries are
+  migrated to `extra.<source>.<name>.<field>`; `extra` removed from the filter
+  schema.
+- Minions: `last_activity` is set from the backend time when a presence or
+  job return event is processed instead of the Salt master event stamp.
 
 ### Fixed
 

@@ -1,5 +1,4 @@
 import re
-from datetime import datetime
 from typing import ClassVar
 
 import redis.asyncio as aioredis
@@ -22,10 +21,6 @@ class PresenceMessageHandler(BaseMessageHandler):
         self.minion_service = minion_service
 
     async def process(self, match: re.Match, master_id: str, data: MessageDataType) -> None:
-        await self.minion_service.process_presence(
-            master_id=master_id,
-            minions=data['present'],
-            stamp=datetime.fromisoformat(data['_stamp']).timestamp(),
-        )
+        await self.minion_service.process_presence(master_id=master_id, minions=data['present'])
 
         raise StopProcessing()

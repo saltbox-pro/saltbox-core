@@ -1,5 +1,4 @@
 from collections.abc import AsyncIterator
-from datetime import UTC, datetime
 from typing import Annotated, Any, get_args, get_origin, overload
 
 from fastapi import Depends
@@ -20,6 +19,7 @@ from saltbox_core.minion_collections.utils.unique_values import UniqueValueKind
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
 from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService, ProjectionModel
+from saltbox_sdk.utilities.helpers import utc_now
 
 JOINED_LIST_GRAINS = ['pythonversion', 'saltversioninfo']
 
@@ -108,10 +108,10 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
     ) -> list[dict[str, Any]]:
         return await self.repo.get_targeting_masters(query=await self.repo.__prepare_query__(query), sort=sort)
 
-    async def process_presence(self, master_id: str, minions: list[str], stamp: float) -> None:
+    async def process_presence(self, master_id: str, minions: list[str]) -> None:
         await self.bulk_update(
             query={'master': master_id, 'minion_id': {'$in': minions}},
-            data={'last_activity': datetime.fromtimestamp(stamp, tz=UTC)},
+            data={'last_activity': utc_now()},
         )
 
     async def process_grains(self, master_id: str, minion_id: str, grains: dict[str, Any]) -> None:

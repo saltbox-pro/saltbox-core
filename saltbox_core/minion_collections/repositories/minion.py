@@ -16,9 +16,11 @@ from saltbox_core.minion_collections.repositories.collection import CollectionRe
 from saltbox_core.minion_collections.repositories.extra_data import ExtraDataRepository, get_extra_data_repository
 from saltbox_core.minion_collections.schemas.collection import CollectionBaseTreeModel
 from saltbox_core.minion_collections.schemas.minion import MinionModel
+from saltbox_core.minion_collections.utils.activity_filter import get_minion_active_dt, parse_bool_filter
 from saltbox_core.minion_collections.utils.collection_filter import COLLECTION_FILTER_FIELD, parse_collection_filter
 from saltbox_core.minion_collections.utils.unique_values import UniqueValueKind, build_unique_values_stages
 from saltbox_sdk.db.mongo.aggregations import (
+    AbstractAggregationStage,
     AddFieldsAggregationStage,
     AggregatedField,
     AggregationsStore,
@@ -57,6 +59,20 @@ EXTRA_STATIC_DATA_AS_KV = {
 }
 
 
+class IsNotActiveAggregationStage(AbstractAggregationStage):
+    def render_stage(self) -> dict[str, Any]:
+        return {
+            '$addFields': {
+                'is_not_active': {
+                    '$or': [
+                        {'$eq': [{'$ifNull': ['$last_activity', None]}, None]},
+                        {'$lt': ['$last_activity', get_minion_active_dt()]},
+                    ]
+                }
+            }
+        }
+
+
 class MinionRepository(BaseMongoRepository[MinionModel]):
     def __init__(
         self,
@@ -89,6 +105,24 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
                 return {field_name_override: {lookup: datetime.now(UTC) - timedelta(seconds=float(value))}}
         else:
             return {field_name_override: datetime.now(UTC) - timedelta(seconds=float(field_value))}
+
+    async def is_never_active_query_override(
+        self, field_name: str, field_match: re.Match, field_value: Any, full_raw_query: dict
+    ) -> dict[str, Any]:
+        if parse_bool_filter(field_name, field_value):
+            return {'last_activity': None}
+
+        return {'last_activity': {'$ne': None}}
+
+    async def is_not_active_query_override(
+        self, field_name: str, field_match: re.Match, field_value: Any, full_raw_query: dict
+    ) -> dict[str, Any]:
+        active_dt = get_minion_active_dt()
+
+        if parse_bool_filter(field_name, field_value):
+            return {'last_activity': {'$not': {'$gte': active_dt}}}
+
+        return {'last_activity': {'$gte': active_dt}}
 
     async def extra_static_query_override(
         self, field_name: str, field_match: re.Match, field_value: Any, full_raw_query: dict
@@ -647,12 +681,8 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
         auto_now_fields: ClassVar[list[str]] = ['modified']
         query_overrides: ClassVar[dict[re.Pattern, str]] = {
             re.compile(r'^last_activity_seconds$'): 'last_activity_seconds_query_override',
-            re.compile(
-                r'^extra\.static\.(?P<source>[^.]+)\.(?P<name>[^.]+)\.(?P<sub_field>.+)'
-            ): 'extra_static_query_override',
-            re.compile(
-                r'^extra\.aggregated\.(?P<source>[^.]+)\.(?P<name>[^.]+)\.(?P<sub_field>.+)$'
-            ): 'extra_aggregated_query_override',
+            re.compile(r'^is_never_active$'): 'is_never_active_query_override',
+            re.compile(r'^is_not_active$'): 'is_not_active_query_override',
             re.compile(r'^extra\.(?P<source>[^.]+)\.(?P<name>[^.]+)\.(?P<sub_field>.+)$'): 'extra_query_override',
             re.compile(r'^collection$'): 'collection_query_override',
         }
@@ -666,6 +696,15 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
         }
         aggregations: ClassVar[AggregationsStore] = AggregationsStore(
             aggregations=[
+                AggregatedField(
+                    field_name='is_never_active',
+                    stages=[
+                        AddFieldsAggregationStage(
+                            fields={'is_never_active': {'$eq': [{'$ifNull': ['$last_activity', None]}, None]}}
+                        )
+                    ],
+                ),
+                AggregatedField(field_name='is_not_active', stages=[IsNotActiveAggregationStage()]),
                 AggregatedField(
                     field_name='extra_aggregated',
                     stages=[

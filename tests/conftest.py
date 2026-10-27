@@ -72,9 +72,9 @@ class AsyncMockCollection:
         result = self.collection.update_one(filter, update, upsert=upsert, array_filters=array_filters)
         return self.mocker.MagicMock(modified_count=result.modified_count, matched_count=result.matched_count)
 
-    async def update_many(self, filter, update, session=None):
+    async def update_many(self, filter, update, upsert=False, session=None):
         """Эмуляция метода update_many"""
-        result = self.collection.update_many(filter, update)
+        result = self.collection.update_many(filter, update, upsert=upsert)
         return self.mocker.MagicMock(modified_count=result.modified_count, matched_count=result.matched_count)
 
     async def find_one(self, filter=None, projection=None, session=None):

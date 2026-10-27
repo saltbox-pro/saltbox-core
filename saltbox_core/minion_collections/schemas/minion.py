@@ -147,6 +147,11 @@ class MinionAggregatedFieldsMixin(BaseModel):
     extra: dict = Field(title='Extra aggregated data', default_factory=dict)
 
 
+class MinionActivityFieldsMixin(BaseModel):
+    is_never_active: bool = Field(title='Never active', default=False)
+    is_not_active: bool = Field(title='Not active', default=False)
+
+
 class MinionReadonlyFieldsMixin(BaseModel):
     @computed_field(title='Seconds from last activity')  # type: ignore[prop-decorator]
     @property
@@ -170,6 +175,7 @@ class MinionUpdateSchema(MinionEditableFieldsMixin[GrainsSchema]):
 class MinionModel(
     CreatedModifiedMixin,
     MinionAggregatedFieldsMixin,
+    MinionActivityFieldsMixin,
     MinionReadonlyFieldsMixin,
     MinionEditableFieldsMixin[GrainsSchema],
     IDMixin,
@@ -195,7 +201,12 @@ class MinionDetailSchema(MinionModel):
 
 
 class MinionShortSchema(
-    CreatedModifiedMixin, MinionReadonlyFieldsMixin, MinionEditableFieldsMixin[GrainsShortSchema], IDMixin, BaseModel
+    CreatedModifiedMixin,
+    MinionActivityFieldsMixin,
+    MinionReadonlyFieldsMixin,
+    MinionEditableFieldsMixin[GrainsShortSchema],
+    IDMixin,
+    BaseModel,
 ):
     extra_static: ClassVar[dict[str, Any]] = Field(exclude=True)  # type: ignore
     extra_aggregated: ClassVar[dict] = Field(exclude=True)

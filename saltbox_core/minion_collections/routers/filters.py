@@ -36,7 +36,7 @@ router = APIRouter(prefix='/filters', tags=['Filters'])
 async def filter_schema(
     extra_data_category_service: Annotated[ExtraDataCategoryService, Depends(get_extra_data_category_service)],
 ) -> list[MinionFilterSchema]:
-    schema = [MinionFilterSchema(**field) for field in get_model_schema(MinionModel)]
+    schema = [MinionFilterSchema(**field) for field in get_model_schema(MinionModel) if field['name'] != 'extra']
     schema.append(
         MinionFilterSchema(
             name='collection',

@@ -126,6 +126,13 @@ class Settings(BaseSettings):
     taskiq_retry_use_delay_exponent: bool = Field(default=False, description='TaskIQ retry use delay exponent')
     taskiq_retry_max_delay_exponent: float = Field(default=60, description='TaskIQ retry max delay exponent')
 
+    # MINIONS
+    minion_inactive_period: int = Field(
+        ge=0,
+        default=90,
+        description='Number of seconds since the last minion activity after which it is considered inactive',
+    )
+
     # TASKS
     tasks_job_create_cooldown: int = Field(
         default=5, description='Number of seconds to wait from tasks job creation to new job'

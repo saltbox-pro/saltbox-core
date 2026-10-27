@@ -114,7 +114,7 @@ class JobReturnMessageHandler(BaseJobMessageHandler[JobForJobReturnSaltHandlerSc
             await process_task_job_return.kiq(jid=jid, salt_master=master_id, minion_id=mid)  # type: ignore
 
         process_return_coro = self._process_return(job_return=job_return, is_new_return=is_new_return)
-        send_presence_coro = self._send_presence(master_id=master_id, mid=mid, data=data)
+        send_presence_coro = self._send_presence(master_id=master_id, mid=mid)
 
         await process_return_coro
         await send_presence_coro
@@ -290,8 +290,8 @@ class JobReturnMessageHandler(BaseJobMessageHandler[JobForJobReturnSaltHandlerSc
             master_id=job_return.salt_master, minion_id=job_return.minion_id, grains=job_return.data
         )
 
-    async def _send_presence(self, master_id: str, mid: str, data: dict[str, Any]) -> None:
-        await self.minion_service.process_presence(master_id=master_id, minions=[mid], stamp=data['stamp'].timestamp())
+    async def _send_presence(self, master_id: str, mid: str) -> None:
+        await self.minion_service.process_presence(master_id=master_id, minions=[mid])
 
     async def _extract_job_status(self, data: MessageDataType) -> str:
         if data.get(self._STATUS_SUCCESS, False):
