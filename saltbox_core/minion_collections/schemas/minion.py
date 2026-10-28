@@ -230,6 +230,13 @@ class MinionSimpleSchema(IDMixin):
 # REST
 
 
+class MinionCreateRequestSchema(BaseModel):
+    minion_id: str = Field(min_length=1)
+    master: str = Field(min_length=1)
+
+    model_config = ConfigDict(extra='ignore', str_strip_whitespace=True)
+
+
 class MinionListBody(SkipLimitParams, QueryParams, SortParams):
     collection_slug: str
 
@@ -248,6 +255,7 @@ class MinionBulkDeleteBody(BaseModel):
 
 class MinionsActions(StrEnum):
     LIST = 'list'
+    CREATE = 'create'
     READ = 'read'
     DELETE = 'delete'
     EXPORT = 'export'

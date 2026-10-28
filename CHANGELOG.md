@@ -16,10 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in `/api/masters` and `POST /api/tasks/targeting/masters` responses.
 - Minion filters: `group` (`collection` / `general` / `grains` / `extra`) and
   `extra_category` (`source`, `name`) for extra data fields in `/filters/schema`.
+- Minions: `POST /api/minions` creates a minion by `minion_id` and `master`
+  (master must exist), policy `core.minions.create`.
 
 ### Changed
 
 - uv-based Docker image and CI pipline. Image size reduced.
+- Minions: list endpoint moved from `POST /api/minions` to
+  `POST /api/minions/list`.
 - Minion filters: legacy `extra.static.*` and `extra.aggregated.*` keys are
   no longer supported, stored collection, task template and task queries are
   migrated to `extra.<source>.<name>.<field>`; `extra` removed from the filter

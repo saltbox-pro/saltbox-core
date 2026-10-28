@@ -9,7 +9,10 @@ from saltbox_core.event_bus.redis.masters_bus import send_message_and_wait_respo
 from saltbox_core.masters.schemas.master_schemas import MasterModel
 from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_core.minion_collections.schemas.minion import (
+    GrainsSchema,
     MinionBulkDeleteBody,
+    MinionCreateRequestSchema,
+    MinionCreateSchema,
     MinionDetailSchema,
     MinionListBody,
     MinionsActions,
@@ -30,7 +33,7 @@ router = APIRouter(prefix='/minions', tags=['Minions'])
 
 
 @router.post(
-    '',
+    '/list',
     operation_id='minions_list',
     openapi_extra=GatewayEndpointConfig(
         policy='core.minions.list',
@@ -57,6 +60,29 @@ async def minions_list(
         projection_model=MinionShortSchema,
         sort=body.sort,
     )
+
+
+@router.post(
+    '',
+    operation_id='minion_create',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.minions.create',
+        action=MinionsActions.CREATE,
+    ).model_dump(by_alias=True),
+)
+async def minion_create(
+    body: Annotated[MinionCreateRequestSchema, Body()],
+    minion_service: Annotated[MinionService, Depends(get_minion_service)],
+    master_service: Annotated[MasterService, Depends(get_master_service)],
+) -> MinionDetailSchema:
+    master = await master_service.get_by_master_id(body.master)
+
+    minion_id = await minion_service.create(
+        MinionCreateSchema(minion_id=body.minion_id, master=master.master_id, grains=GrainsSchema())
+    )
+    minion = await minion_service.get(query=minion_id)
+
+    return MinionDetailSchema(**minion.model_dump(exclude={'id'}, by_alias=True), _id=minion.id)
 
 
 @router.post(
