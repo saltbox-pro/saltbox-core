@@ -67,6 +67,8 @@ class MasterMasterIdOnlySchema(IDMixin):
 
 class MasterViewSchema(CreatedModifiedMixin, MasterEditableFieldsMixin, MasterReadOnlyFieldsMixin, IDMixin, BaseModel):
     minions_count: int = Field(title='Minions count', default=0)
+    never_active_minions_count: int = Field(title='Never active minions count', default=0)
+    not_active_minions_count: int = Field(title='Not active minions count', default=0)
 
 
 class MasterListBody(SkipLimitParams, QueryParams, SortParams):

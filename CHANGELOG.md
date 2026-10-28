@@ -12,8 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Minions: `is_never_active` and `is_not_active` flags computed in MongoDB
   from `last_activity` and the `MINION_INACTIVE_PERIOD` setting (90 seconds by
   default), returned by minion endpoints and available in the filter schema.
-- Tasks: `never_active_minions_count` and `not_active_minions_count` in
-  `POST /api/tasks/targeting/masters` response.
+- Masters, tasks: `never_active_minions_count` and `not_active_minions_count`
+  in `/api/masters` and `POST /api/tasks/targeting/masters` responses.
 
 ### Changed
 
