@@ -31,8 +31,9 @@ from saltbox_core.tasks.services.task import TaskService
 from saltbox_core.tasks.services.tasks_minion import TaskMinionService
 from saltbox_core.tasks.services.tasks_status import TaskStatusService
 from saltbox_core.tkq import shutdown_broker, startup_broker
+from saltbox_core.utilities.shutdown import run_until_sigterm
 from saltbox_sdk.config.redis_config import REDIS_SETTINGS
-from saltbox_sdk.db.mongo.config import get_mongo_db
+from saltbox_sdk.db.mongo.config import get_mongo_db, reset_mongo_client
 from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
 from saltbox_sdk.exceptions import MultipleObjectsFoundException, ObjectNotFoundException
 from saltbox_sdk.utilities.helpers import utc_now
@@ -191,14 +192,17 @@ async def async_main() -> None:
     watcher = JobsWatcher(redis=redis)
 
     await startup_broker()
-    await watcher.process()
-    await shutdown_broker()
+    try:
+        await watcher.process()
+    finally:
+        await shutdown_broker()
+        await reset_mongo_client()
 
-    logger.info('Jobs watcher finished')
+        logger.info('Jobs watcher finished')
 
 
 def main() -> None:
-    asyncio.run(async_main())
+    run_until_sigterm(async_main)
 
 
 if __name__ == '__main__':

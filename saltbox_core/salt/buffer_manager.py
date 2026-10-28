@@ -7,6 +7,7 @@ from taskiq.exceptions import SendTaskError
 from saltbox_core.config import SETTINGS, logger
 from saltbox_core.salt.tiq_tasks import process_salt_event_task
 from saltbox_core.tkq import shutdown_broker, startup_broker
+from saltbox_core.utilities.shutdown import run_until_sigterm
 from saltbox_sdk.config.redis_config import REDIS_SETTINGS
 
 
@@ -67,12 +68,14 @@ async def async_main() -> None:
     buffer_manager = SaltBufferManager()
 
     await startup_broker()
-    await buffer_manager.run()
-    await shutdown_broker()
+    try:
+        await buffer_manager.run()
+    finally:
+        await shutdown_broker()
 
 
 def main() -> None:
-    asyncio.run(async_main())
+    run_until_sigterm(async_main)
 
 
 if __name__ == '__main__':

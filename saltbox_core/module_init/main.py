@@ -7,7 +7,7 @@ from saltbox_core.module_init.stages.db import run_stage as run_stage_db
 from saltbox_core.module_init.stages.pre_init import run_stage as run_stage_pre_init
 from saltbox_core.module_init.stages.scheduler import run_stage as run_stage_scheduler
 from saltbox_core.module_init.stages.task_templates import run_stage as run_stage_task_templates
-from saltbox_sdk.db.mongo.config import get_mongo_db
+from saltbox_sdk.db.mongo.config import get_mongo_db, reset_mongo_client
 
 
 async def wait_for_mongo() -> None:
@@ -25,16 +25,19 @@ async def wait_for_mongo() -> None:
 async def async_main() -> None:
     logger.info('Starting Core initialization...')
 
-    await wait_for_mongo()
+    try:
+        await wait_for_mongo()
 
-    stages = [
-        run_stage_pre_init,
-        run_stage_db,
-        run_stage_scheduler,
-        run_stage_task_templates,
-    ]
-    for stage in stages:
-        await stage()
+        stages = [
+            run_stage_pre_init,
+            run_stage_db,
+            run_stage_scheduler,
+            run_stage_task_templates,
+        ]
+        for stage in stages:
+            await stage()
+    finally:
+        await reset_mongo_client()
 
     logger.info('Core initialization has been completed successfully')
 

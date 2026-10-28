@@ -25,6 +25,7 @@ from saltbox_core.tasks.routers.task import router as task_router
 from saltbox_core.tkq import broker, shutdown_broker, startup_broker
 from saltbox_core.utilities.httpx_client import HttpxClientSingletoneFactory
 from saltbox_core.utilities.redis_cache import CustomRedisCache
+from saltbox_sdk.db.mongo.config import reset_mongo_client
 from saltbox_sdk.db.redis.config import POOL, get_redis_now
 from saltbox_sdk.discovery_client.client import DiscoveryClient
 from saltbox_sdk.exceptions import SaltBoxBaseException
@@ -52,6 +53,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator:
         if not broker.is_worker_process:
             await shutdown_broker()
         await POOL.aclose()  # type: ignore[attr-defined] # ty: ignore[unresolved-attribute]
+        await reset_mongo_client()
 
 
 app_config: dict[str, Any] = {

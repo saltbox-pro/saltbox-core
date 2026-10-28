@@ -33,7 +33,7 @@ from saltbox_core.task_templates.repositories.template import get_task_template_
 from saltbox_core.task_templates.services.template import get_task_tpl_service
 from saltbox_core.tkq import shutdown_broker, startup_broker
 from saltbox_sdk.config.redis_config import REDIS_SETTINGS
-from saltbox_sdk.db.mongo.config import get_mongo_db
+from saltbox_sdk.db.mongo.config import get_mongo_db, reset_mongo_client
 
 
 def get_faststream_broker(middlewares: list[BrokerMiddleware] | None = None) -> RedisBroker:
@@ -114,7 +114,10 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
     context.set_global('pillar_service', pillar_service)
     context.set_global('collection_service', collection_service)
 
-    yield
+    try:
+        yield
+    finally:
+        await reset_mongo_client()
 
 
 def get_faststream_app() -> FastStream:

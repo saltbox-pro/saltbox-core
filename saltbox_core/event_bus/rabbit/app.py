@@ -34,7 +34,7 @@ from saltbox_core.tasks.services.tasks_minion import get_task_minion_service
 from saltbox_core.tasks.services.tasks_status import get_task_status_service
 from saltbox_core.tkq import shutdown_broker, startup_broker
 from saltbox_sdk.config.logger_config import logger
-from saltbox_sdk.db.mongo.config import get_mongo_db
+from saltbox_sdk.db.mongo.config import get_mongo_db, reset_mongo_client
 from saltbox_sdk.db.redis.config import get_redis_now
 from saltbox_sdk.event_bus.faststream_app import get_faststream_app, get_faststream_broker
 
@@ -127,6 +127,7 @@ async def lifespan(context: ContextRepo) -> AsyncIterator[None]:
         del collection_repository
         del master_service
         del master_repository
+        await reset_mongo_client()
 
 
 async def async_main() -> None:
