@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 from saltbox_core.minion_collections.schemas.filter import (
     ExtraFilterValuesBody,
     FiltersActions,
+    MinionFilterGroup,
     MinionFilterOperatorsSchema,
     MinionFilterSchema,
     MinionFilterValuesBody,
@@ -36,7 +37,15 @@ router = APIRouter(prefix='/filters', tags=['Filters'])
 async def filter_schema(
     extra_data_category_service: Annotated[ExtraDataCategoryService, Depends(get_extra_data_category_service)],
 ) -> list[MinionFilterSchema]:
-    schema = [MinionFilterSchema(**field) for field in get_model_schema(MinionModel) if field['name'] != 'extra']
+    schema: list[MinionFilterSchema] = []
+    for field in get_model_schema(MinionModel):
+        if field['name'] == 'extra':
+            continue
+        if field['name'].startswith('grains.'):
+            group = MinionFilterGroup.GRAINS
+        else:
+            group = MinionFilterGroup.GENERAL
+        schema.append(MinionFilterSchema(**field, group=group))
     schema.append(
         MinionFilterSchema(
             name='collection',
@@ -44,6 +53,7 @@ async def filter_schema(
             operators=[MinionFilterOperatorsSchema(**schema_lookups_js_values[lookup]) for lookup in ('in', 'notIn')],
             input_type='text',
             case_sensitive=True,
+            group=MinionFilterGroup.COLLECTION,
         )
     )
     schema.extend(await extra_data_category_service.get_minion_filter_schema())

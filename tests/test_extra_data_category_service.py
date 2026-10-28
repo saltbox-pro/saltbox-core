@@ -347,3 +347,6 @@ async def test_minion_filter_schema_for_category(mocked_db):
     assert schema['cores']['valueEditorType'] is None
     assert schema['owner']['inputType'] is None
     assert 'null' not in [operator['name'] for operator in schema['owner']['operators']]
+    for field in schema.values():
+        assert field['group'] == 'extra'
+        assert field['extra_category'] == {'source': 'manual', 'name': 'assets'}

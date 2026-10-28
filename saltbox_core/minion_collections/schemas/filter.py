@@ -72,6 +72,18 @@ class MinionFilterOperatorsSchema(BaseModel):
     label: str
 
 
+class MinionFilterGroup(StrEnum):
+    COLLECTION = 'collection'
+    GENERAL = 'general'
+    GRAINS = 'grains'
+    EXTRA = 'extra'
+
+
+class MinionFilterExtraCategorySchema(BaseModel):
+    source: str
+    name: str
+
+
 class MinionFilterSchema(BaseModel):
     name: str
     label: str
@@ -80,6 +92,8 @@ class MinionFilterSchema(BaseModel):
     value_editor_type: str | None = Field(serialization_alias='valueEditorType', default=None)
     default_value: bool | None = Field(serialization_alias='defaultValue', default=None)
     case_sensitive: bool | None = Field(serialization_alias='caseSensitive', default=None)
+    group: MinionFilterGroup | None = None
+    extra_category: MinionFilterExtraCategorySchema | None = None
 
 
 class FiltersActions(StrEnum):

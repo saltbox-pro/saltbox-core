@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   default), returned by minion endpoints and available in the filter schema.
 - Masters, tasks: `never_active_minions_count` and `not_active_minions_count`
   in `/api/masters` and `POST /api/tasks/targeting/masters` responses.
+- Minion filters: `group` (`collection` / `general` / `grains` / `extra`) and
+  `extra_category` (`source`, `name`) for extra data fields in `/filters/schema`.
 
 ### Changed
 

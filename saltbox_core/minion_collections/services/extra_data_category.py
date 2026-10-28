@@ -13,7 +13,12 @@ from saltbox_core.minion_collections.schemas.extra_data_category import (
     ExtraDataCategoryModel,
     ExtraDataCategoryUpdateSchema,
 )
-from saltbox_core.minion_collections.schemas.filter import MinionFilterOperatorsSchema, MinionFilterSchema
+from saltbox_core.minion_collections.schemas.filter import (
+    MinionFilterExtraCategorySchema,
+    MinionFilterGroup,
+    MinionFilterOperatorsSchema,
+    MinionFilterSchema,
+)
 from saltbox_core.minion_collections.services.extra_data import ExtraDataService, get_extra_data_service
 from saltbox_core.utilities.model_schema import (
     get_value_editor_schema,
@@ -153,6 +158,8 @@ class ExtraDataCategoryService(
                     name=f'extra.{category.source}.{category.name}.{field.name}',
                     label=f'Extra data field "{category.source}.{category.name}.{field.name}"',
                     operators=field_schema_lookups_computed,
+                    group=MinionFilterGroup.EXTRA,
+                    extra_category=MinionFilterExtraCategorySchema(source=category.source, name=category.name),
                     **get_value_editor_schema(field_schema_type),
                 )
             )

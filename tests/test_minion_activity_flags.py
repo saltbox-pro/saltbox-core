@@ -139,6 +139,11 @@ async def test_filter_schema(mocker):
     for name in ('is_never_active', 'is_not_active'):
         assert [operator.name for operator in schema[name].operators] == ['=']
         assert schema[name].value_editor_type == 'checkbox'
+    assert schema['collection'].group == 'collection'
+    assert schema['last_activity'].group == 'general'
+    assert schema['grains.os'].group == 'grains'
+    for field in schema.values():
+        assert field.extra_category is None
 
 
 @pytest.mark.parametrize(
