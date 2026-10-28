@@ -11,16 +11,16 @@ from saltbox_sdk.db.mongo.config import get_mongo_db
 
 
 async def wait_for_mongo() -> None:
-
     db = get_mongo_db()
 
     while True:
         try:
-            _ = await db.command("ping")
+            _ = await db.command('ping')
             return
         except ServerSelectionTimeoutError:
-            #NOTE: 30 seconds is a default value for ServerSelectionTimeoutMS in MongoClient
+            # NOTE: 30 seconds is a default value for ServerSelectionTimeoutMS in MongoClient
             logger.warning('MongoDB is unavailable, retrying in 30 seconds')
+
 
 async def async_main() -> None:
     logger.info('Starting Core initialization...')

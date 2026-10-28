@@ -274,6 +274,8 @@ class TaskTargetingMasterSchema(BaseModel):
     title: str | None = Field(title='Title', default=None)
     status: MasterStatus | None = Field(title='Status', default=None)
     minions_count: int = Field(title='Minions count', default=0)
+    never_active_minions_count: int = Field(title='Never active minions count', default=0)
+    not_active_minions_count: int = Field(title='Not active minions count', default=0)
 
 
 class RestartFailedBody(BaseModel):

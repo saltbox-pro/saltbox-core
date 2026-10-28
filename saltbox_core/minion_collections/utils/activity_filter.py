@@ -10,6 +10,14 @@ def get_minion_active_dt() -> datetime:
     return utc_now().replace(microsecond=0) - timedelta(seconds=SETTINGS.minion_inactive_period)
 
 
+def get_never_active_condition() -> dict[str, Any]:
+    return {'$eq': [{'$ifNull': ['$last_activity', None]}, None]}
+
+
+def get_not_active_condition() -> dict[str, Any]:
+    return {'$or': [get_never_active_condition(), {'$lt': ['$last_activity', get_minion_active_dt()]}]}
+
+
 def parse_bool_filter(field_name: str, value: Any) -> bool:
     if isinstance(value, dict) and len(value) == 1:
         lookup, lookup_value = next(iter(value.items()))

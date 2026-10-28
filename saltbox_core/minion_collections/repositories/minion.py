@@ -16,7 +16,12 @@ from saltbox_core.minion_collections.repositories.collection import CollectionRe
 from saltbox_core.minion_collections.repositories.extra_data import ExtraDataRepository, get_extra_data_repository
 from saltbox_core.minion_collections.schemas.collection import CollectionBaseTreeModel
 from saltbox_core.minion_collections.schemas.minion import MinionModel
-from saltbox_core.minion_collections.utils.activity_filter import get_minion_active_dt, parse_bool_filter
+from saltbox_core.minion_collections.utils.activity_filter import (
+    get_minion_active_dt,
+    get_never_active_condition,
+    get_not_active_condition,
+    parse_bool_filter,
+)
 from saltbox_core.minion_collections.utils.collection_filter import COLLECTION_FILTER_FIELD, parse_collection_filter
 from saltbox_core.minion_collections.utils.unique_values import UniqueValueKind, build_unique_values_stages
 from saltbox_sdk.db.mongo.aggregations import (
@@ -61,16 +66,7 @@ EXTRA_STATIC_DATA_AS_KV = {
 
 class IsNotActiveAggregationStage(AbstractAggregationStage):
     def render_stage(self) -> dict[str, Any]:
-        return {
-            '$addFields': {
-                'is_not_active': {
-                    '$or': [
-                        {'$eq': [{'$ifNull': ['$last_activity', None]}, None]},
-                        {'$lt': ['$last_activity', get_minion_active_dt()]},
-                    ]
-                }
-            }
-        }
+        return {'$addFields': {'is_not_active': get_not_active_condition()}}
 
 
 class MinionRepository(BaseMongoRepository[MinionModel]):
@@ -281,7 +277,14 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
     ) -> list[dict[str, Any]]:
         pipeline: list[dict[str, Any]] = [
             {'$match': query},
-            {'$group': {'_id': '$master', 'minions_count': {'$sum': 1}}},
+            {
+                '$group': {
+                    '_id': '$master',
+                    'minions_count': {'$sum': 1},
+                    'never_active_minions_count': {'$sum': {'$cond': [get_never_active_condition(), 1, 0]}},
+                    'not_active_minions_count': {'$sum': {'$cond': [get_not_active_condition(), 1, 0]}},
+                }
+            },
             {'$lookup': {'from': 'master', 'localField': '_id', 'foreignField': 'master_id', 'as': 'master'}},
             {'$unwind': {'path': '$master', 'preserveNullAndEmptyArrays': True}},
             {
@@ -291,6 +294,8 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
                     'title': '$master.title',
                     'status': '$master.status',
                     'minions_count': 1,
+                    'never_active_minions_count': 1,
+                    'not_active_minions_count': 1,
                 }
             },
             {'$sort': dict(sort) if sort else {'master_id': 1}},
@@ -698,11 +703,7 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
             aggregations=[
                 AggregatedField(
                     field_name='is_never_active',
-                    stages=[
-                        AddFieldsAggregationStage(
-                            fields={'is_never_active': {'$eq': [{'$ifNull': ['$last_activity', None]}, None]}}
-                        )
-                    ],
+                    stages=[AddFieldsAggregationStage(fields={'is_never_active': get_never_active_condition()})],
                 ),
                 AggregatedField(field_name='is_not_active', stages=[IsNotActiveAggregationStage()]),
                 AggregatedField(

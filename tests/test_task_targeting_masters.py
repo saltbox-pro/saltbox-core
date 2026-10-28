@@ -1,3 +1,5 @@
+from datetime import datetime, timedelta
+
 import pytest
 
 from saltbox_core.minion_collections.repositories.collection import CollectionRepository
@@ -10,8 +12,20 @@ from saltbox_core.tasks.services.task import TaskService
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
 from saltbox_sdk.exceptions import ObjectNotFoundException, SaltBoxValidationException
 
+ACTIVE_DT = datetime(2026, 1, 1)
+NEVER_ACTIVE = {'$eq': [{'$ifNull': ['$last_activity', None]}, None]}
+
 GROUP_LOOKUP_PROJECT = [
-    {'$group': {'_id': '$master', 'minions_count': {'$sum': 1}}},
+    {
+        '$group': {
+            '_id': '$master',
+            'minions_count': {'$sum': 1},
+            'never_active_minions_count': {'$sum': {'$cond': [NEVER_ACTIVE, 1, 0]}},
+            'not_active_minions_count': {
+                '$sum': {'$cond': [{'$or': [NEVER_ACTIVE, {'$lt': ['$last_activity', ACTIVE_DT]}]}, 1, 0]}
+            },
+        }
+    },
     {'$lookup': {'from': 'master', 'localField': '_id', 'foreignField': 'master_id', 'as': 'master'}},
     {'$unwind': {'path': '$master', 'preserveNullAndEmptyArrays': True}},
     {
@@ -21,21 +35,29 @@ GROUP_LOOKUP_PROJECT = [
             'title': '$master.title',
             'status': '$master.status',
             'minions_count': 1,
+            'never_active_minions_count': 1,
+            'not_active_minions_count': 1,
         }
     },
 ]
 
 
 @pytest.fixture
-def minion_service(mocked_db, mocker):
+def minion_repo(mocked_db):
     category_repo = ExtraDataCategoryRepository(mocked_db)
     extra_data_repo = ExtraDataRepository(mocked_db, extra_data_category_repository=category_repo)
-    repo = MinionRepository(
+
+    return MinionRepository(
         mocked_db, extra_data_repository=extra_data_repo, collection_repository=CollectionRepository(mocked_db)
     )
-    mocker.patch.object(repo, 'aggregate', mocker.AsyncMock(return_value=[]))
 
-    return MinionService(repo)
+
+@pytest.fixture
+def minion_service(minion_repo, mocker):
+    mocker.patch('saltbox_core.minion_collections.utils.activity_filter.get_minion_active_dt', return_value=ACTIVE_DT)
+    mocker.patch.object(minion_repo, 'aggregate', mocker.AsyncMock(return_value=[]))
+
+    return MinionService(minion_repo)
 
 
 @pytest.fixture
@@ -61,6 +83,28 @@ async def test_pipeline_sorts_by_master_id_by_default(minion_service):
         *GROUP_LOOKUP_PROJECT,
         {'$sort': {'master_id': 1}},
     ]
+
+
+@pytest.mark.asyncio
+async def test_activity_counts_per_master(minion_service):
+    collection = minion_service.repo.collection.collection
+    minion_service.repo.aggregate.side_effect = lambda pipeline, **_: list(collection.aggregate(pipeline))
+    collection.insert_many(
+        [
+            {'minion_id': 'missing', 'master': 'm1'},
+            {'minion_id': 'none', 'master': 'm1', 'last_activity': None},
+            {'minion_id': 'old', 'master': 'm1', 'last_activity': ACTIVE_DT - timedelta(minutes=1)},
+            {'minion_id': 'recent', 'master': 'm1', 'last_activity': ACTIVE_DT},
+            {'minion_id': 'recent', 'master': 'm2', 'last_activity': ACTIVE_DT + timedelta(minutes=1)},
+        ]
+    )
+
+    rows = await minion_service.get_targeting_masters(query={})
+
+    assert [
+        (row['master_id'], row['minions_count'], row['never_active_minions_count'], row['not_active_minions_count'])
+        for row in rows
+    ] == [('m1', 4, 2, 3), ('m2', 1, 0, 0)]
 
 
 @pytest.mark.asyncio
