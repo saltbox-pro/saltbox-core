@@ -15,13 +15,16 @@ from saltbox_core.minion_collections.schemas.minion import (
     MinionCreateSchema,
     MinionDetailSchema,
     MinionListBody,
+    MinionMergeBody,
     MinionsActions,
     MinionShortSchema,
+    MinionUpdateRequestSchema,
 )
 from saltbox_core.minion_collections.services.collection import CollectionService, get_collection_service
 from saltbox_core.minion_collections.services.minion import MinionService, get_minion_service
 from saltbox_core.tasks.schemas.tasks_minion import MinionPolicyGroupSchema
 from saltbox_core.tasks.services.tasks_minion import TaskMinionService, get_task_minion_service
+from saltbox_sdk.db.mongo.config import get_mongo_session_with_transaction
 from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
@@ -204,6 +207,66 @@ async def minion_retrieve_by_master_and_id(
     return minion
 
 
+@router.patch(
+    '/{mid}',
+    operation_id='minion_update',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.minions.update',
+        action=MinionsActions.UPDATE,
+    ).model_dump(by_alias=True),
+)
+async def minion_update(
+    collection_slug: str,
+    mid: PyObjectId,
+    body: Annotated[MinionUpdateRequestSchema, Body()],
+    minion_service: Annotated[MinionService, Depends(get_minion_service)],
+    master_service: Annotated[MasterService, Depends(get_master_service)],
+    collection_service: Annotated[CollectionService, Depends(get_collection_service)],
+) -> MinionDetailSchema:
+    collection = await collection_service.get_by_slug(collection_slug)
+    data = body.model_dump(exclude_none=True)
+
+    if body.master:
+        await master_service.get_by_master_id(body.master)
+
+    await minion_service.update_never_active(mid, collection, data)
+    minion = await minion_service.get(query=mid)
+
+    return MinionDetailSchema(**minion.model_dump(exclude={'id'}, by_alias=True), _id=minion.id)
+
+
+@router.post(
+    '/merge',
+    operation_id='minion_merge',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.minions.merge',
+        action=MinionsActions.MERGE,
+    ).model_dump(by_alias=True),
+)
+async def minion_merge(
+    body: Annotated[MinionMergeBody, Body()],
+    minion_service: Annotated[MinionService, Depends(get_minion_service)],
+    collection_service: Annotated[CollectionService, Depends(get_collection_service)],
+    task_minion_service: Annotated[TaskMinionService, Depends(get_task_minion_service)],
+) -> MinionDetailSchema:
+    collection = await collection_service.get_by_slug(body.collection_slug)
+
+    async with get_mongo_session_with_transaction() as session:
+        await minion_service.merge(
+            body.source_id,
+            body.target_id,
+            collection,
+            extra_data_strategy=body.extra_data_strategy,
+            conflict_strategy=body.conflict_strategy,
+            session=session,
+        )
+        await task_minion_service.delete_by_minion_ids([body.source_id], session=session)
+
+    minion = await minion_service.get(query=body.target_id)
+
+    return MinionDetailSchema(**minion.model_dump(exclude={'id'}, by_alias=True), _id=minion.id)
+
+
 @router.delete(
     '/delete/{mid}',
     operation_id='minion_delete',
@@ -218,17 +281,17 @@ async def minion_delete(
     mid: PyObjectId,
     minion_service: Annotated[MinionService, Depends(get_minion_service)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
+    task_minion_service: Annotated[TaskMinionService, Depends(get_task_minion_service)],
 ) -> Response:
     collection = await collection_service.get_by_slug(collection_slug)
 
-    query: dict[str, Any] = {'_id': mid}
-    if collection.full_query:
-        query = {'$and': [query, collection.full_query]}
-
     try:
-        await minion_service.delete(query)
+        await minion_service.get_in_collection(mid, collection, projection_model=EmptyModel)
     except ObjectNotFoundException:
         raise HTTPException(status_code=404, detail='Minion not found') from None
+
+    await minion_service.delete_by_ids([mid])
+    await task_minion_service.delete_by_minion_ids([mid])
 
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -247,8 +310,9 @@ async def minion_bulk_delete(
     user: Annotated[UserShort, Depends(get_current_user)],
     minion_service: Annotated[MinionService, Depends(get_minion_service)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
+    task_minion_service: Annotated[TaskMinionService, Depends(get_task_minion_service)],
 ) -> Response:
-    deleted_count = 0
+    minion_ids: list[PyObjectId] = []
     collection = await collection_service.get_by_slug(body.collection_slug)
 
     query: dict[str, Any] = {'_id': {'$in': body.minions}}
@@ -256,7 +320,10 @@ async def minion_bulk_delete(
         query = {'$and': [query, collection.full_query]}
 
     for minion in await minion_service.get_list(query, projection_model=EmptyModel):
-        deleted_count += await minion_service.delete(minion.id)
+        minion_ids.append(minion.id)
+
+    deleted_count = await minion_service.delete_by_ids(minion_ids)
+    await task_minion_service.delete_by_minion_ids(minion_ids)
 
     logger.debug(
         f'Deleted {deleted_count} minions from "{body.collection_slug}" collection '

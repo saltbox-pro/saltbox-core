@@ -237,6 +237,35 @@ class MinionCreateRequestSchema(BaseModel):
     model_config = ConfigDict(extra='ignore', str_strip_whitespace=True)
 
 
+class MinionUpdateRequestSchema(BaseModel):
+    minion_id: str | None = Field(default=None, min_length=1)
+    master: str | None = Field(default=None, min_length=1)
+
+    model_config = ConfigDict(extra='ignore', str_strip_whitespace=True)
+
+
+class MinionMergeExtraDataStrategy(StrEnum):
+    USE_TARGET = 'use_target'
+    USE_SOURCE = 'use_source'
+    MERGE = 'merge'
+
+
+class MinionMergeConflictStrategy(StrEnum):
+    ERROR = 'error'
+    USE_TARGET = 'use_target'
+    USE_SOURCE = 'use_source'
+
+
+class MinionMergeBody(BaseModel):
+    collection_slug: str
+    source_id: PyObjectId
+    target_id: PyObjectId
+    extra_data_strategy: MinionMergeExtraDataStrategy = MinionMergeExtraDataStrategy.MERGE
+    conflict_strategy: MinionMergeConflictStrategy = MinionMergeConflictStrategy.ERROR
+
+    model_config = ConfigDict(extra='ignore')
+
+
 class MinionListBody(SkipLimitParams, QueryParams, SortParams):
     collection_slug: str
 
@@ -257,6 +286,8 @@ class MinionsActions(StrEnum):
     LIST = 'list'
     CREATE = 'create'
     READ = 'read'
+    UPDATE = 'update'
+    MERGE = 'merge'
     DELETE = 'delete'
     EXPORT = 'export'
     GATHER = 'gather'

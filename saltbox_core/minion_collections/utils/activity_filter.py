@@ -10,6 +10,10 @@ def get_minion_active_dt() -> datetime:
     return utc_now().replace(microsecond=0) - timedelta(seconds=SETTINGS.minion_inactive_period)
 
 
+def get_never_active_query() -> dict[str, Any]:
+    return {'last_activity': None, 'grains.id': None}
+
+
 def get_never_active_condition() -> dict[str, Any]:
     return {'$eq': [{'$ifNull': ['$last_activity', None]}, None]}
 

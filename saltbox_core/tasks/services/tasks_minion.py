@@ -4,6 +4,7 @@ from typing import Annotated, Any, TypeVar, cast
 
 from fastapi import Depends
 from pydantic import BaseModel
+from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
 from redis import exceptions as redis_exceptions
 from redis.asyncio import Redis
 
@@ -148,6 +149,11 @@ class TaskMinionService(
             MinionPolicyGroupSchema(target_collection=group_policies[0].target_collection, policies=group_policies)
             for group_policies in groups.values()
         ]
+
+    async def delete_by_minion_ids(
+        self, minion_ids: list[PyObjectId], *, session: MongoAsyncClientSession | None = None
+    ) -> int:
+        return await self.repo.delete_many({'minion_inner_id': {'$in': minion_ids}}, session=session)
 
     async def iter_export_rows(
         self,

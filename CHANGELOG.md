@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `extra_category` (`source`, `name`) for extra data fields in `/filters/schema`.
 - Minions: `POST /api/minions` creates a minion by `minion_id` and `master`
   (master must exist), policy `core.minions.create`.
+- Minions: `PATCH /api/minions/{mid}` changes `minion_id` and/or `master` of a
+  minion that has never been active, policy `core.minions.update`.
+- Minions: `POST /api/minions/merge` merges a never active minion (`source_id`)
+  into another one (`target_id`) within `collection_slug` and deletes it. Extra
+  data is taken by `extra_data_strategy` (`merge` / `use_source` /
+  `use_target`), conflicts in single item categories by `conflict_strategy`
+  (`error` / `use_source` / `use_target`). Policy `core.minions.merge`.
 
 ### Changed
 
@@ -39,6 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   FastStream apps, watchers and module init.
 - Jobs watcher, tasks watcher and salt buffer manager stop on SIGTERM and
   close their resources instead of being killed after the stop timeout.
+- Minions: grains event sets `last_activity`, so a minion that sent grains is
+  no longer treated as never active.
+- Minions: deleting a minion also deletes its task minions and its entries in
+  aggregated extra data records, so tasks no longer wait for deleted minions.
 
 ## [0.4.0] - 2026-10-13
 

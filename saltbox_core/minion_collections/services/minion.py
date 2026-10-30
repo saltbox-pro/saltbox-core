@@ -3,7 +3,13 @@ from typing import Annotated, Any, get_args, get_origin, overload
 
 from fastapi import Depends
 from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
+from pymongo.errors import DuplicateKeyError as MongoDuplicateKeyError
 
+from saltbox_core.minion_collections.exceptions import (
+    MinionHasBeenActiveException,
+    MinionMergeConflictException,
+    MinionMergeIntoItselfException,
+)
 from saltbox_core.minion_collections.repositories.minion import MinionRepository, get_minion_repository
 from saltbox_core.minion_collections.schemas.collection import CollectionModel
 from saltbox_core.minion_collections.schemas.filter import UniqueValuesResponse
@@ -11,13 +17,16 @@ from saltbox_core.minion_collections.schemas.minion import (
     GrainsSchema,
     MinionCreateSchema,
     MinionExportSchema,
+    MinionMergeConflictStrategy,
+    MinionMergeExtraDataStrategy,
     MinionModel,
     MinionTgtOnlySchema,
     MinionUpdateSchema,
 )
+from saltbox_core.minion_collections.utils.activity_filter import get_never_active_query
 from saltbox_core.minion_collections.utils.unique_values import UniqueValueKind
-from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
-from saltbox_sdk.exceptions import ObjectNotFoundException
+from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId, SortOrder
+from saltbox_sdk.exceptions import DuplicateKeyException, ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService, ProjectionModel
 from saltbox_sdk.utilities.helpers import utc_now
 
@@ -44,20 +53,129 @@ def _get_grain_unique_value_kind(grain: str) -> UniqueValueKind:
     return UniqueValueKind.VALUE
 
 
+def _get_static_manual_categories(extra_static: dict[str, dict[str, list[dict[str, Any]]]]) -> set[tuple[str, str]]:
+    categories: set[tuple[str, str]] = set()
+    for source, items_by_name in extra_static.items():
+        for name, items in items_by_name.items():
+            for item in items:
+                if not item.get('is_system'):
+                    categories.add((source, name))
+
+    return categories
+
+
 class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreateSchema, MinionUpdateSchema]):
-    async def delete(
+    async def delete_by_ids(
         self,
-        query: dict[str, Any] | PyObjectId,
+        minion_ids: list[PyObjectId],
         *,
         session: MongoAsyncClientSession | None = None,
     ) -> int:
         from saltbox_core.salt.tiq_tasks import delete_minion_salt_keys_task
 
-        minion = await self.get(query=query, session=session, projection_model=MinionTgtOnlySchema)
-        await delete_minion_salt_keys_task.kiq(minion_id=minion.minion_id, master_id=minion.master)  # type: ignore
-        deleted_count = await super().delete(query=query, session=session)
+        minions = await self.get_list(
+            {'_id': {'$in': minion_ids}}, session=session, projection_model=MinionTgtOnlySchema
+        )
+        deleted_count = await self.repo.delete_many({'_id': {'$in': minion_ids}}, session=session)
+        await self.repo.extra_data_repository.pull_all_minions_entries(minion_ids, session=session)
+
+        for minion in minions:
+            await delete_minion_salt_keys_task.kiq(minion_id=minion.minion_id, master_id=minion.master)  # type: ignore
 
         return deleted_count
+
+    async def update_never_active(
+        self, minion_id: PyObjectId, collection: CollectionModel, data: dict[str, Any]
+    ) -> None:
+        queries: list[dict[str, Any]] = [{'_id': minion_id}, get_never_active_query()]
+        if collection.full_query:
+            queries.append(collection.full_query)
+
+        try:
+            await self.update(query={'$and': queries}, data=data)
+        except ObjectNotFoundException:
+            await self.get_in_collection(minion_id, collection, projection_model=EmptyModel)
+            raise MinionHasBeenActiveException() from None
+        except MongoDuplicateKeyError as e:
+            if e.details and 'keyValue' in e.details:
+                raise DuplicateKeyException(key_value=e.details['keyValue']) from None
+            raise DuplicateKeyException(str(e)) from None
+
+    async def merge(  # noqa: C901
+        self,
+        source_id: PyObjectId,
+        target_id: PyObjectId,
+        collection: CollectionModel,
+        *,
+        extra_data_strategy: MinionMergeExtraDataStrategy,
+        conflict_strategy: MinionMergeConflictStrategy,
+        session: MongoAsyncClientSession | None = None,
+    ) -> None:
+        if source_id == target_id:
+            raise MinionMergeIntoItselfException()
+
+        await self.get_in_collection(target_id, collection, projection_model=EmptyModel)
+        await self.get_in_collection(source_id, collection, projection_model=EmptyModel)
+        if not await self.repo.count({'$and': [{'_id': source_id}, get_never_active_query()]}, session=session):
+            raise MinionHasBeenActiveException()
+
+        extra_data_repo = self.repo.extra_data_repository
+
+        if extra_data_strategy != MinionMergeExtraDataStrategy.USE_TARGET:
+            source_static = await self.repo.get_static_extra_data(source_id, session=session)
+            target_static = await self.repo.get_static_extra_data(target_id, session=session)
+            target_manual = await extra_data_repo.get_minion_categories(target_id, is_system=False, session=session)
+            target_manual |= _get_static_manual_categories(target_static)
+
+            replaced: set[tuple[str, str]] = set()
+            dropped: set[tuple[str, str]] = set()
+
+            if extra_data_strategy == MinionMergeExtraDataStrategy.USE_SOURCE:
+                replaced = target_manual
+            else:
+                source_manual = await extra_data_repo.get_minion_categories(source_id, is_system=False, session=session)
+                source_manual |= _get_static_manual_categories(source_static)
+
+                single_item_categories: set[tuple[str, str]] = set()
+                for category in await extra_data_repo.extra_data_category_repository.get_list(
+                    {'is_single_item': True}, session=session
+                ):
+                    single_item_categories.add((category.source, category.name))
+
+                conflicts = single_item_categories & source_manual & target_manual
+                if conflicts and conflict_strategy == MinionMergeConflictStrategy.ERROR:
+                    raise MinionMergeConflictException([f'{source}.{name}' for source, name in sorted(conflicts)])
+                if conflict_strategy == MinionMergeConflictStrategy.USE_SOURCE:
+                    replaced = conflicts
+                elif conflict_strategy == MinionMergeConflictStrategy.USE_TARGET:
+                    dropped = conflicts
+
+            items_by_category: dict[tuple[str, str], list[dict[str, Any]]] = {}
+            for source, items_by_name in target_static.items():
+                for name, items in items_by_name.items():
+                    if (source, name) in replaced:
+                        items_by_category[(source, name)] = [item for item in items if item.get('is_system')]
+
+            for source, items_by_name in source_static.items():
+                for name, items in items_by_name.items():
+                    if (source, name) in dropped:
+                        continue
+                    if (source, name) not in items_by_category:
+                        items_by_category[(source, name)] = list(target_static.get(source, {}).get(name) or [])
+                    items_by_category[(source, name)].extend(items)
+
+            if items_by_category:
+                await self.repo.set_static_extra_data_items(target_id, items_by_category, session=session)
+
+            for source, name in sorted(replaced):
+                await extra_data_repo.pull_minions_entries(source, name, [target_id], is_system=False, session=session)
+
+            await extra_data_repo.move_minion_entries(
+                source_id, target_id, excluded_categories=sorted(dropped), session=session
+            )
+
+        await self.repo.delete_many({'_id': source_id}, session=session)
+        await extra_data_repo.pull_all_minions_entries([source_id], session=session)
 
     @overload
     async def get_by_master_and_id(self, master: str, minion_id: str) -> MinionModel: ...
@@ -118,13 +236,17 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
         try:
             await self.update(
                 query={'master': master_id, 'minion_id': minion_id},
-                data={'grains': GrainsSchema.model_validate(grains).model_dump(by_alias=True)},
+                data={
+                    'grains': GrainsSchema.model_validate(grains).model_dump(by_alias=True),
+                    'last_activity': utc_now(),
+                },
             )
         except ObjectNotFoundException:
             minion_obj = {
                 'minion_id': minion_id,
                 'master': master_id,
                 'grains': grains,
+                'last_activity': utc_now(),
             }
             await self.create(data=MinionCreateSchema.model_validate(minion_obj).model_dump(by_alias=True))
 

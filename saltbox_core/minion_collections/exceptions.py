@@ -54,3 +54,30 @@ class ReferencedCollectionDeleteException(MinionCollectionException):
     def __init__(self, slugs: list[str]) -> None:
         self.slugs = slugs
         super().__init__(f'Collection is referenced by other collections: {", ".join(slugs)}')
+
+
+class MinionHasBeenActiveException(MinionCollectionException):
+    """Exception raised when an operation allowed only for never active minions is applied to an active one."""
+
+    status_code: int = status.HTTP_409_CONFLICT
+    detail: str = 'Operation is allowed only for minions that have never been active.'
+
+
+class MinionMergeIntoItselfException(MinionCollectionException):
+    """Exception raised when a minion is merged into itself."""
+
+    status_code: int = status.HTTP_400_BAD_REQUEST
+    detail: str = 'Minion cannot be merged into itself.'
+
+
+class MinionMergeConflictException(MinionCollectionException):
+    """Exception raised when both merged minions have manual items in single item extra data categories."""
+
+    status_code: int = status.HTTP_409_CONFLICT
+    detail: str = 'Both minions have manual items in single item extra data categories.'
+
+    def __init__(self, categories: list[str]) -> None:
+        self.categories = categories
+        super().__init__(
+            f'Both minions have manual items in single item extra data categories: {", ".join(categories)}'
+        )

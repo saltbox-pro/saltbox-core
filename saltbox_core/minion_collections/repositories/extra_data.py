@@ -93,6 +93,48 @@ class ExtraDataRepository(BaseMongoRepository[ExtraDataModel]):
             session=session,
         )
 
+    async def pull_all_minions_entries(
+        self, minion_ids: list[PyObjectId], *, session: MongoAsyncClientSession | None = None
+    ) -> None:
+        await self.collection.update_many(
+            filter={'minions.minion_id': {'$in': minion_ids}},
+            update={'$pull': {'minions': {'minion_id': {'$in': minion_ids}}}, '$set': {'modified': utc_now()}},
+            session=session,
+        )
+
+    async def move_minion_entries(
+        self,
+        source_minion_id: PyObjectId,
+        target_minion_id: PyObjectId,
+        *,
+        excluded_categories: list[tuple[str, str]],
+        session: MongoAsyncClientSession | None = None,
+    ) -> None:
+        query: dict[str, Any] = {'minions.minion_id': source_minion_id}
+        if excluded_categories:
+            query['$nor'] = [{'source': source, 'name': name} for source, name in excluded_categories]
+
+        await self.collection.update_many(
+            filter=query,
+            update={'$set': {'minions.$[entry].minion_id': target_minion_id, 'modified': utc_now()}},
+            array_filters=[{'entry.minion_id': source_minion_id}],
+            session=session,
+        )
+
+    async def get_minion_categories(
+        self, minion_id: PyObjectId, *, is_system: bool, session: MongoAsyncClientSession | None = None
+    ) -> set[tuple[str, str]]:
+        categories: set[tuple[str, str]] = set()
+        cursor = self.collection.find(
+            filter={'minions': {'$elemMatch': {'minion_id': minion_id, 'is_system': is_system}}},
+            projection={'source': 1, 'name': 1},
+            session=session,
+        )
+        async for doc in cursor:
+            categories.add((doc['source'], doc['name']))
+
+        return categories
+
     async def get_minion_entry(
         self,
         source: str,

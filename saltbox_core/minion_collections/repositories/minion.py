@@ -339,6 +339,25 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
 
         return next((item for item in items if item.get('_id') == item_id), None)
 
+    async def get_static_extra_data(
+        self, minion_id: PyObjectId, *, session: MongoAsyncClientSession | None = None
+    ) -> dict[str, dict[str, list[dict[str, Any]]]]:
+        doc = await self.collection.find_one(filter={'_id': minion_id}, projection={'extra_static': 1}, session=session)
+        return (doc or {}).get('extra_static') or {}
+
+    async def set_static_extra_data_items(
+        self,
+        minion_id: PyObjectId,
+        items_by_category: dict[tuple[str, str], list[dict[str, Any]]],
+        *,
+        session: MongoAsyncClientSession | None = None,
+    ) -> None:
+        data: dict[str, Any] = {'modified': utc_now()}
+        for (source, name), items in items_by_category.items():
+            data[f'extra_static.{source}.{name}'] = items
+
+        await self.collection.update_one({'_id': minion_id}, {'$set': data}, session=session)
+
     async def push_static_extra_data_items(
         self,
         source: str,
