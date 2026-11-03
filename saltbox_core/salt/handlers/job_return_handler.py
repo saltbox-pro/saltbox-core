@@ -9,7 +9,7 @@ from faststream.rabbit import RabbitBroker
 from saltbox_core.config import SETTINGS, logger
 from saltbox_core.event_bus.rabbit.common_messages import InventoryPutEventBusMessage, InventoryPutForMinion
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnModel, JobReturnStatus, JobReturnUpdateSchema
-from saltbox_core.jobs.schemas.job_schemas import JobForJobReturnSaltHandlerSchema
+from saltbox_core.jobs.schemas.job_schemas import AUTO_PILLAR_REFRESH_SOURCE, JobForJobReturnSaltHandlerSchema
 from saltbox_core.jobs.services.job_return_service import JobReturnService
 from saltbox_core.jobs.services.job_services import JobService
 from saltbox_core.minion_collections.services.minion import MinionService
@@ -35,6 +35,7 @@ class JobReturnMessageHandler(BaseJobMessageHandler[JobForJobReturnSaltHandlerSc
     METRIC_TASK_TAG = 'metrics:task:job_return'
     INVENTORY_SAVED_MSG_TAG = 'inventory_saved'
     INVENTORY_STATE = 'inventory'
+    PILLAR_RENDER_ERROR = 'Pillar failed to render with the following messages:'
 
     _STATUS_SUCCESS = 'success'
     _STATUS_PARTIAL_SUCCESS = 'partial_success'
@@ -126,6 +127,8 @@ class JobReturnMessageHandler(BaseJobMessageHandler[JobForJobReturnSaltHandlerSc
         if tid:
             await process_task_job_return.kiq(jid=jid, salt_master=master_id, minion_id=mid)  # type: ignore
 
+        await self._refresh_broken_pillar(master_id=master_id, mid=mid, return_data=return_data)
+
         process_return_coro = self._process_return(job_return=job_return, is_new_return=is_new_return)
         send_presence_coro = self._send_presence(master_id=master_id, mid=mid)
 
@@ -133,6 +136,25 @@ class JobReturnMessageHandler(BaseJobMessageHandler[JobForJobReturnSaltHandlerSc
         await send_presence_coro
 
         raise StopProcessing()
+
+    async def _refresh_broken_pillar(self, master_id: str, mid: str, return_data: Any) -> None:
+        if not isinstance(return_data, list) or not return_data or return_data[0] != self.PILLAR_RENDER_ERROR:
+            return
+
+        if await self.job_service.get_minion_ids_with_active_jobs(
+            master_id=master_id, minion_ids=[mid], source=AUTO_PILLAR_REFRESH_SOURCE
+        ):
+            return
+
+        await self._create_auto_job(
+            master_id=master_id,
+            fun='saltutil.refresh_pillar',
+            tgt=mid,
+            tgt_type='glob',
+            source=AUTO_PILLAR_REFRESH_SOURCE,
+            ttl=SETTINGS.auto_pillar_refresh_ttl,
+            kwarg={'wait': True},
+        )
 
     @classmethod
     def _inventory_state_predicate(cls, job_return: JobReturnModel) -> bool:

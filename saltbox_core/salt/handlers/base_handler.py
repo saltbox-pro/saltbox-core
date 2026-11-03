@@ -12,7 +12,7 @@ from saltbox_core.jobs.exceptions import JobCreateException
 from saltbox_core.jobs.schemas.job_schemas import AUTO_GRAINS_REQUEST_SOURCE, JobCreateSchema
 from saltbox_core.jobs.services.job_services import JobService
 from saltbox_core.minion_collections.services.minion import MinionService
-from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER
+from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER, Source
 
 MessageDataType = dict[str, Any]
 
@@ -82,8 +82,8 @@ class BaseMessageHandler(abc.ABC):
         if not minion_ids_needing_grains:
             return
 
-        requested_ids = await self.job_service.get_auto_grains_requested_minion_ids(
-            master_id=master_id, minion_ids=minion_ids_needing_grains
+        requested_ids = await self.job_service.get_minion_ids_with_active_jobs(
+            master_id=master_id, minion_ids=minion_ids_needing_grains, source=AUTO_GRAINS_REQUEST_SOURCE
         )
 
         minion_ids_to_request = []
@@ -92,9 +92,25 @@ class BaseMessageHandler(abc.ABC):
                 minion_ids_to_request.append(minion_id)
 
         if minion_ids_to_request:
-            await self._request_grains(master_id=master_id, tgt=minion_ids_to_request, tgt_type='list')
+            await self._create_auto_job(
+                master_id=master_id,
+                fun='grains.items',
+                tgt=minion_ids_to_request,
+                tgt_type='list',
+                source=AUTO_GRAINS_REQUEST_SOURCE,
+                ttl=SETTINGS.auto_grains_request_ttl,
+            )
 
-    async def _request_grains(self, master_id: str, tgt: str | list[str], tgt_type: SaltTgtType) -> None:
+    async def _create_auto_job(
+        self,
+        master_id: str,
+        fun: str,
+        tgt: str | list[str],
+        tgt_type: SaltTgtType,
+        source: Source,
+        ttl: int,
+        kwarg: dict[str, Any] | None = None,
+    ) -> None:
         try:
             await self.job_service.create(
                 data=JobCreateSchema.model_validate(
@@ -102,15 +118,16 @@ class BaseMessageHandler(abc.ABC):
                         'tgt': tgt,
                         'tgt_type': tgt_type,
                         'salt_master': master_id,
-                        'fun': 'grains.items',
+                        'fun': fun,
+                        'kwarg': kwarg,
                         'user': SYSTEM_SHORT_USER,
-                        'source': AUTO_GRAINS_REQUEST_SOURCE,
-                        'ttl': SETTINGS.auto_grains_request_ttl,
+                        'source': source,
+                        'ttl': ttl,
                     }
                 ),
             )
         except JobCreateException as e:
-            logger.warning('Failed to request grains from minions on master "%s": %s', master_id, e)
+            logger.warning('Failed to create %s job for minions %s on master "%s": %s', fun, tgt, master_id, e)
 
     async def _handle(self, match: re.Match, master_id: str, tag: str, data: MessageDataType) -> None:
         data = await self.normalize_data(match=match, master_id=master_id, tag=tag, data=data)

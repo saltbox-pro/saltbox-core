@@ -169,6 +169,11 @@ class Settings(BaseSettings):
     auto_grains_request_ttl: int = Field(
         ge=1, default=300, description='TTL in seconds of grains.items jobs created automatically for minions'
     )
+    auto_pillar_refresh_ttl: int = Field(
+        ge=1,
+        default=300,
+        description='TTL in seconds of saltutil.refresh_pillar jobs created automatically for minions',
+    )
     jobs_return_data_expire_ttl: int = Field(
         default=60 * 60 * 24 * 30, description='Job return data expiration time in seconds'
     )

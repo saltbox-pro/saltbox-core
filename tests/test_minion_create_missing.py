@@ -5,7 +5,7 @@ import pytest
 from saltbox_core.config import SETTINGS
 from saltbox_core.jobs.exceptions import JobCreateException
 from saltbox_core.jobs.repositories.job_repository import JobRepository
-from saltbox_core.jobs.schemas.job_schemas import AUTO_GRAINS_REQUEST_SOURCE
+from saltbox_core.jobs.schemas.job_schemas import AUTO_GRAINS_REQUEST_SOURCE, AUTO_PILLAR_REFRESH_SOURCE
 from saltbox_core.jobs.services.job_services import JobService
 from saltbox_core.minion_collections.repositories.collection import CollectionRepository
 from saltbox_core.minion_collections.repositories.extra_data import ExtraDataRepository
@@ -69,7 +69,7 @@ def services(mocker):
     minion_service.create_missing = mocker.AsyncMock(return_value=(['new'], ['never-active']))
     job_service = mocker.MagicMock()
     job_service.create = mocker.AsyncMock()
-    job_service.get_auto_grains_requested_minion_ids = mocker.AsyncMock(return_value=set())
+    job_service.get_minion_ids_with_active_jobs = mocker.AsyncMock(return_value=set())
 
     return minion_service, job_service
 
@@ -100,46 +100,53 @@ async def test_presence_creates_minions_and_requests_grains(services):
 
 async def test_minions_with_active_auto_grains_request_are_skipped(services):
     minion_service, job_service = services
-    job_service.get_auto_grains_requested_minion_ids.return_value = {'never-active'}
+    job_service.get_minion_ids_with_active_jobs.return_value = {'never-active'}
     handler = PresenceMessageHandler(redis_client=None, minion_service=minion_service, job_service=job_service)
     match = _match(handler, 'salt/presence/present')
 
     await handler._create_missing_minions(match=match, master_id='salt', data={'present': ['new', 'never-active']})
 
-    job_service.get_auto_grains_requested_minion_ids.assert_awaited_once_with(
-        master_id='salt', minion_ids=['new', 'never-active']
+    job_service.get_minion_ids_with_active_jobs.assert_awaited_once_with(
+        master_id='salt', minion_ids=['new', 'never-active'], source=AUTO_GRAINS_REQUEST_SOURCE
     )
     assert job_service.create.await_args.kwargs['data'].tgt == ['new']
 
     job_service.create.reset_mock()
-    job_service.get_auto_grains_requested_minion_ids.return_value = {'new', 'never-active'}
+    job_service.get_minion_ids_with_active_jobs.return_value = {'new', 'never-active'}
 
     await handler._create_missing_minions(match=match, master_id='salt', data={'present': ['new', 'never-active']})
 
     job_service.create.assert_not_awaited()
 
 
-async def test_minion_start_always_requests_grains(services):
+async def test_minion_start_always_requests_grains_and_refreshes_pillar(services):
     minion_service, job_service = services
-    job_service.get_auto_grains_requested_minion_ids.return_value = {'m1'}
+    job_service.get_minion_ids_with_active_jobs.return_value = {'m1'}
     handler = MinionStartedMessageHandler(redis_client=None, minion_service=minion_service, job_service=job_service)
     match = _match(handler, 'salt/minion/m1/start')
 
     with pytest.raises(StopProcessing):
         await handler.process(match=match, master_id='salt', data={})
 
-    job = job_service.create.await_args.kwargs['data']
-    assert (job.tgt, job.tgt_type, job.fun, job.source, job.ttl) == (
-        'm1',
-        'glob',
-        'grains.items',
-        AUTO_GRAINS_REQUEST_SOURCE,
-        SETTINGS.auto_grains_request_ttl,
-    )
-    job_service.get_auto_grains_requested_minion_ids.assert_not_awaited()
+    jobs = []
+    for call in job_service.create.await_args_list:
+        job = call.kwargs['data']
+        jobs.append((job.tgt, job.tgt_type, job.fun, job.kwarg, job.source, job.ttl))
+    assert jobs == [
+        ('m1', 'glob', 'grains.items', None, AUTO_GRAINS_REQUEST_SOURCE, SETTINGS.auto_grains_request_ttl),
+        (
+            'm1',
+            'glob',
+            'saltutil.refresh_pillar',
+            {'wait': True},
+            AUTO_PILLAR_REFRESH_SOURCE,
+            SETTINGS.auto_pillar_refresh_ttl,
+        ),
+    ]
+    job_service.get_minion_ids_with_active_jobs.assert_not_awaited()
 
 
-async def test_get_auto_grains_requested_minion_ids(mocked_db, mocker):
+async def test_get_minion_ids_with_active_jobs(mocked_db, mocker):
     job_service = JobService(
         rdb=mocker.MagicMock(),
         job_repository=JobRepository(mocked_db),
@@ -159,8 +166,8 @@ async def test_get_auto_grains_requested_minion_ids(mocked_db, mocker):
         ]
     )
 
-    requested_ids = await job_service.get_auto_grains_requested_minion_ids(
-        master_id='salt', minion_ids=['m1', 'm2', 'm3', 'm4', 'm5']
+    requested_ids = await job_service.get_minion_ids_with_active_jobs(
+        master_id='salt', minion_ids=['m1', 'm2', 'm3', 'm4', 'm5'], source=AUTO_GRAINS_REQUEST_SOURCE
     )
 
     assert requested_ids == {'m1', 'm2'}
@@ -233,3 +240,56 @@ async def test_grains_request_failure_does_not_break_processing(services):
     )
 
     minion_service.create_missing.assert_awaited_once()
+
+
+def _job_return_handler(minion_service, job_service):
+    return JobReturnMessageHandler(
+        redis_client=None, minion_service=minion_service, job_service=job_service, job_return_service=None, broker=None
+    )
+
+
+PILLAR_ERROR_RETURN = [
+    'Pillar failed to render with the following messages:',
+    'Failed to load ext_pillar core_pillar: Timeout while waiting for pillar data response from Core',
+]
+
+
+async def test_pillar_render_error_refreshes_pillar(services):
+    minion_service, job_service = services
+    handler = _job_return_handler(minion_service, job_service)
+
+    await handler._refresh_broken_pillar(master_id='salt', mid='m1', return_data=PILLAR_ERROR_RETURN)
+
+    job_service.get_minion_ids_with_active_jobs.assert_awaited_once_with(
+        master_id='salt', minion_ids=['m1'], source=AUTO_PILLAR_REFRESH_SOURCE
+    )
+    job = job_service.create.await_args.kwargs['data']
+    assert (job.tgt, job.tgt_type, job.fun, job.kwarg, job.source, job.ttl) == (
+        'm1',
+        'glob',
+        'saltutil.refresh_pillar',
+        {'wait': True},
+        AUTO_PILLAR_REFRESH_SOURCE,
+        SETTINGS.auto_pillar_refresh_ttl,
+    )
+
+
+async def test_pillar_refresh_is_not_duplicated(services):
+    minion_service, job_service = services
+    job_service.get_minion_ids_with_active_jobs.return_value = {'m1'}
+    handler = _job_return_handler(minion_service, job_service)
+
+    await handler._refresh_broken_pillar(master_id='salt', mid='m1', return_data=PILLAR_ERROR_RETURN)
+
+    job_service.create.assert_not_awaited()
+
+
+@pytest.mark.parametrize('return_data', [True, {'result': False}, [], ['Some other error'], 'Pillar failed to render'])
+async def test_other_returns_do_not_refresh_pillar(services, return_data):
+    minion_service, job_service = services
+    handler = _job_return_handler(minion_service, job_service)
+
+    await handler._refresh_broken_pillar(master_id='salt', mid='m1', return_data=return_data)
+
+    job_service.get_minion_ids_with_active_jobs.assert_not_awaited()
+    job_service.create.assert_not_awaited()

@@ -17,7 +17,6 @@ from saltbox_core.jobs.exceptions import JobCreateException, JobServiceException
 from saltbox_core.jobs.repositories.job_repository import JobRepository, get_job_repository
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnStatus, JobReturnTgtOnlySchema
 from saltbox_core.jobs.schemas.job_schemas import (
-    AUTO_GRAINS_REQUEST_SOURCE,
     JobCreateSchema,
     JobForSetTtlSchema,
     JobModel,
@@ -34,6 +33,7 @@ from saltbox_core.utilities.context import replace_raised
 from saltbox_core.utilities.jid import JID
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.redis.config import get_redis
+from saltbox_sdk.db.schemas_base import Source
 from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_with_notify_service import MongoBaseWithNotifyService
 
@@ -281,12 +281,12 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
 
         return job_id
 
-    async def get_auto_grains_requested_minion_ids(self, master_id: str, minion_ids: list[str]) -> set[str]:
+    async def get_minion_ids_with_active_jobs(self, master_id: str, minion_ids: list[str], source: Source) -> set[str]:
         jobs = await self.get_list(
             {
                 'salt_master': master_id,
-                'source.type': AUTO_GRAINS_REQUEST_SOURCE.type,
-                'source.id': AUTO_GRAINS_REQUEST_SOURCE.id,
+                'source.type': source.type,
+                'source.id': source.id,
                 'status': {'$in': [JobStatus.starting, JobStatus.running]},
                 'tgt': {'$in': minion_ids},
             },

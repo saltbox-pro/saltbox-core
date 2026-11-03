@@ -21,6 +21,7 @@ from saltbox_sdk.db.schemas_base import (
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
 
 AUTO_GRAINS_REQUEST_SOURCE = Source(type='system', id='auto_grains_request')
+AUTO_PILLAR_REFRESH_SOURCE = Source(type='system', id='auto_pillar_refresh')
 
 
 def jidable[JID_T: str | int](value: JID_T) -> JID_T:

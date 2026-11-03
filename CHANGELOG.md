@@ -34,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already starting or running.
 - Jobs: `AUTO_GRAINS_REQUEST_TTL` setting (300 seconds by default), the TTL of
   automatic `grains.items` jobs.
+- Jobs: `AUTO_PILLAR_REFRESH_TTL` setting (300 seconds by default), the TTL of
+  automatic `saltutil.refresh_pillar` jobs.
 
 ### Changed
 
@@ -56,6 +58,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Jobs: a job stuck in `starting` after its TTL becomes `launch_error` with
   `launch_error_type` `expired` (task minions of task jobs are failed). The
   job is not removed from the master queue yet.
+- Minions: a minion that got a pillar with render errors (e.g. it connected
+  while Core was unavailable) no longer fails every state run until a manual
+  pillar refresh. `saltutil.refresh_pillar` (source
+  `{type: system, id: auto_pillar_refresh}`) is requested on minion start and
+  when a job return reports `Pillar failed to render`, unless such a refresh is
+  already starting or running.
 - HTTP 500 on parallel first requests after restart caused by a race in the
   SDK Mongo client initialization (SDK updated).
 - Mongo client is closed on shutdown of the HTTP API, TaskIQ workers,
