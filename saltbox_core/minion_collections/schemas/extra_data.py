@@ -85,6 +85,7 @@ class ExtraDataImportMode(StrEnum):
 class UnknownMinionPolicy(StrEnum):
     ERROR = 'error'
     SKIP = 'skip'
+    CREATE = 'create'
 
 
 class ExtraDataItemBaseRequestSchema(BaseModel):
@@ -118,5 +119,6 @@ class ExtraDataItemsCreateResponseSchema(BaseModel):
 
 class ExtraDataImportResponseSchema(BaseModel):
     minions_count: int
+    created_minions_count: int
     items_count: int
     skipped_rows: list[int]

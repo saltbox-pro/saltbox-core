@@ -23,6 +23,15 @@ class JobNewMessageHandler(BaseJobMessageHandler[JobForNewJobSaltHandlerSchema])
     # Mention: on salt-call call there is no salt/job/*/new event
     # (but salt/job/*/ret/* it is)
 
+    def extract_minion_ids(self, match: re.Match, master_id: str, data: MessageDataType) -> list[str]:
+        return data.get('minions') or []
+
+    def is_should_create_minions(self, data: MessageDataType) -> bool:
+        return True
+
+    def is_should_request_grains(self, data: MessageDataType) -> bool:
+        return data.get('fun') != 'grains.items'
+
     async def normalize_data(self, match: re.Match, master_id: str, tag: str, data: MessageDataType) -> MessageDataType:
         data = await super().normalize_data(match, master_id, tag, data)
         data['system_user'] = data.pop('user')

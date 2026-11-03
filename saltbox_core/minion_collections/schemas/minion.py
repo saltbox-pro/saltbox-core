@@ -227,6 +227,16 @@ class MinionSimpleSchema(IDMixin):
     last_activity: TimezoneAwareDatetime | None = Field(title='Last activity', default=None)
 
 
+class GrainsIdOnlySchema(BaseModel):
+    id: str | None = None
+
+
+class MinionForGrainsRequestSchema(IDMixin):
+    minion_id: str
+    last_activity: TimezoneAwareDatetime | None = None
+    grains: GrainsIdOnlySchema = Field(default_factory=GrainsIdOnlySchema)
+
+
 # REST
 
 

@@ -17,12 +17,14 @@ from saltbox_core.jobs.exceptions import JobCreateException, JobServiceException
 from saltbox_core.jobs.repositories.job_repository import JobRepository, get_job_repository
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnStatus, JobReturnTgtOnlySchema
 from saltbox_core.jobs.schemas.job_schemas import (
+    AUTO_GRAINS_REQUEST_SOURCE,
     JobCreateSchema,
     JobForSetTtlSchema,
     JobModel,
     JobSetTtlResponse,
     JobSimpleSchema,
     JobStatus,
+    JobTgtOnlySchema,
     JobUpdateSchema,
 )
 from saltbox_core.jobs.services.job_return_service import JobReturnService, get_job_return_service
@@ -278,6 +280,27 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
             await self._notify(obj_id=job_id, action='create')
 
         return job_id
+
+    async def get_auto_grains_requested_minion_ids(self, master_id: str, minion_ids: list[str]) -> set[str]:
+        jobs = await self.get_list(
+            {
+                'salt_master': master_id,
+                'source.type': AUTO_GRAINS_REQUEST_SOURCE.type,
+                'source.id': AUTO_GRAINS_REQUEST_SOURCE.id,
+                'status': {'$in': [JobStatus.starting, JobStatus.running]},
+                'tgt': {'$in': minion_ids},
+            },
+            projection_model=JobTgtOnlySchema,
+        )
+
+        requested_ids = set()
+        for job in jobs:
+            if isinstance(job.tgt, str):
+                requested_ids.add(job.tgt)
+            else:
+                requested_ids.update(job.tgt)
+
+        return requested_ids & set(minion_ids)
 
     async def update_status(
         self,

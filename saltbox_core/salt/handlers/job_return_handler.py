@@ -43,15 +43,28 @@ class JobReturnMessageHandler(BaseJobMessageHandler[JobForJobReturnSaltHandlerSc
     def __init__(
         self,
         redis_client: aioredis.Redis,
+        minion_service: MinionService,
         job_service: JobService,
         job_return_service: JobReturnService,
-        minion_service: MinionService,
         broker: RabbitBroker,
     ) -> None:
-        super().__init__(redis_client=redis_client, job_service=job_service, job_return_service=job_return_service)
+        super().__init__(
+            redis_client=redis_client,
+            minion_service=minion_service,
+            job_service=job_service,
+            job_return_service=job_return_service,
+        )
 
-        self.minion_service = minion_service
         self.broker = broker
+
+    def extract_minion_ids(self, match: re.Match, master_id: str, data: MessageDataType) -> list[str]:
+        return [match.group('mid')]
+
+    def is_should_create_minions(self, data: MessageDataType) -> bool:
+        return True
+
+    def is_should_request_grains(self, data: MessageDataType) -> bool:
+        return data.get('fun') != 'grains.items'
 
     async def normalize_data(self, match: re.Match, master_id: str, tag: str, data: MessageDataType) -> MessageDataType:
         normalized_data = await super().normalize_data(match=match, master_id=master_id, tag=tag, data=data)

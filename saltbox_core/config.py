@@ -166,6 +166,9 @@ class Settings(BaseSettings):
     # JOBS
     jobs_max_ttl: int = Field(title='Max Job TTL', ge=0, default=60 * 60 * 24 * 7)
     jobs_default_ttl: int = Field(title='Default Job TTL', ge=0, default=60 * 60 * 24 * 7)
+    auto_grains_request_ttl: int = Field(
+        ge=1, default=300, description='TTL in seconds of grains.items jobs created automatically for minions'
+    )
     jobs_return_data_expire_ttl: int = Field(
         default=60 * 60 * 24 * 30, description='Job return data expiration time in seconds'
     )

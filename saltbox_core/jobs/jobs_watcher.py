@@ -8,7 +8,7 @@ from saltbox_core.config import logger
 from saltbox_core.jobs.repositories.job_repository import JobRepository
 from saltbox_core.jobs.repositories.job_return_repository import JobReturnRepository
 from saltbox_core.jobs.schemas.job_return_schemas import JobReturnForJobWatcherSchema, JobReturnStatus
-from saltbox_core.jobs.schemas.job_schemas import JobStatus
+from saltbox_core.jobs.schemas.job_schemas import JobSimpleWithSourceSchema, JobStatus
 from saltbox_core.jobs.services.job_return_service import JobReturnService
 from saltbox_core.jobs.services.job_services import JobService
 from saltbox_core.masters.repositories.master_repository import MasterRepository
@@ -30,11 +30,12 @@ from saltbox_core.tasks.schemas.tasks_minion import TaskMinionForTaskStatusUpdat
 from saltbox_core.tasks.services.task import TaskService
 from saltbox_core.tasks.services.tasks_minion import TaskMinionService
 from saltbox_core.tasks.services.tasks_status import TaskStatusService
+from saltbox_core.tasks.tiq_tasks import process_task_job_error
 from saltbox_core.tkq import shutdown_broker, startup_broker
 from saltbox_core.utilities.shutdown import run_until_sigterm
 from saltbox_sdk.config.redis_config import REDIS_SETTINGS
 from saltbox_sdk.db.mongo.config import get_mongo_db, reset_mongo_client
-from saltbox_sdk.db.mongo.schemas_base import EmptyModel, PyObjectId
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.exceptions import MultipleObjectsFoundException, ObjectNotFoundException
 from saltbox_sdk.utilities.helpers import utc_now
 
@@ -137,10 +138,22 @@ class JobsWatcher:
 
     async def process_expired_jobs(self, now: datetime) -> None:
         jobs = await self.job_service.get_list(
-            query={'status': JobStatus.running, 'waiting_expires_at_dt': {'$lt': now}},
-            projection_model=EmptyModel,
+            query={'status': {'$in': [JobStatus.starting, JobStatus.running]}, 'waiting_expires_at_dt': {'$lt': now}},
+            projection_model=JobSimpleWithSourceSchema,
         )
 
+        starting_jobs = []
+        running_jobs = []
+        for job in jobs:
+            if job.status == JobStatus.starting:
+                starting_jobs.append(job)
+            elif job.status == JobStatus.running:
+                running_jobs.append(job)
+
+        await self._process_expired_starting_jobs(starting_jobs)
+        await self._process_expired_running_jobs(running_jobs)
+
+    async def _process_expired_running_jobs(self, jobs: list[JobSimpleWithSourceSchema]) -> None:
         job_ids: set[PyObjectId] = set()
 
         for job in jobs:
@@ -155,6 +168,35 @@ class JobsWatcher:
             job_ids.add(job.id)
 
         await self.finish_completed_jobs(job_ids)
+
+    async def _process_expired_starting_jobs(self, jobs: list[JobSimpleWithSourceSchema]) -> None:
+        job_ids = []
+        for job in jobs:
+            if await self._remove_from_create_queue(job):
+                job_ids.append(job.id)
+
+        if not job_ids:
+            return
+
+        expired_ids = set(
+            await self.job_service.bulk_update(
+                query={'_id': {'$in': job_ids}, 'status': JobStatus.starting},
+                data={'status': JobStatus.launch_error, 'launch_error_type': 'expired'},
+            )
+        )
+
+        for job in jobs:
+            if job.id not in expired_ids:
+                continue
+
+            logger.debug(f'Job: #{job.jid} on master {job.salt_master} expired before start')
+
+            if job.source.type in ['task', 'task_system']:
+                await process_task_job_error.kiq(jid=job.jid, salt_master=job.salt_master)  # type: ignore
+
+    async def _remove_from_create_queue(self, job: JobSimpleWithSourceSchema) -> bool:
+        # TODO: remove the job from the Redis queue of jobs to create, until then the master can still start it
+        return True
 
     async def process_expired_job_returns(self, now: datetime) -> None:
         job_returns = await self.job_return_service.get_list(

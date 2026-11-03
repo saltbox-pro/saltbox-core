@@ -3,6 +3,7 @@ from typing import Annotated, Any, get_args, get_origin, overload
 
 from fastapi import Depends
 from pymongo.asynchronous.client_session import AsyncClientSession as MongoAsyncClientSession
+from pymongo.errors import BulkWriteError
 from pymongo.errors import DuplicateKeyError as MongoDuplicateKeyError
 
 from saltbox_core.minion_collections.exceptions import (
@@ -17,6 +18,7 @@ from saltbox_core.minion_collections.schemas.minion import (
     GrainsSchema,
     MinionCreateSchema,
     MinionExportSchema,
+    MinionForGrainsRequestSchema,
     MinionMergeConflictStrategy,
     MinionMergeExtraDataStrategy,
     MinionModel,
@@ -30,6 +32,7 @@ from saltbox_sdk.exceptions import DuplicateKeyException, ObjectNotFoundExceptio
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService, ProjectionModel
 from saltbox_sdk.utilities.helpers import utc_now
 
+DUPLICATE_KEY_ERROR_CODE = 11000
 JOINED_LIST_GRAINS = ['pythonversion', 'saltversioninfo']
 
 
@@ -231,6 +234,40 @@ class MinionService(MongoBaseService[MinionRepository, MinionModel, MinionCreate
             query={'master': master_id, 'minion_id': {'$in': minions}},
             data={'last_activity': utc_now()},
         )
+
+    async def create_missing(self, master_id: str, minion_ids: list[str]) -> tuple[list[str], list[str]]:
+        minions = await self.get_list(
+            {'master': master_id, 'minion_id': {'$in': minion_ids}}, projection_model=MinionForGrainsRequestSchema
+        )
+
+        existing_ids = set()
+        existing_ids_needing_grains = []
+        for minion in minions:
+            existing_ids.add(minion.minion_id)
+            if minion.last_activity is None or minion.grains.id is None:
+                existing_ids_needing_grains.append(minion.minion_id)
+
+        created_ids = []
+        minions_to_create = []
+        for minion_id in minion_ids:
+            if minion_id not in existing_ids:
+                existing_ids.add(minion_id)
+                created_ids.append(minion_id)
+                minions_to_create.append(
+                    MinionCreateSchema(minion_id=minion_id, master=master_id, grains=GrainsSchema())
+                )
+
+        if not minions_to_create:
+            return created_ids, existing_ids_needing_grains
+
+        try:
+            await self.repo.create_many(minions_to_create, ordered=False)
+        except BulkWriteError as e:
+            for error in e.details['writeErrors']:
+                if error['code'] != DUPLICATE_KEY_ERROR_CODE:
+                    raise
+
+        return created_ids, existing_ids_needing_grains
 
     async def process_grains(self, master_id: str, minion_id: str, grains: dict[str, Any]) -> None:
         try:

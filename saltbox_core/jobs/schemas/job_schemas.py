@@ -10,8 +10,17 @@ from saltbox_core.config import SETTINGS
 from saltbox_core.utilities.jid import JID, JidError
 from saltbox_core.utilities.salt import fill_salt_kwarg_from_arg
 from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId, QueryParams, SortParams
-from saltbox_sdk.db.schemas_base import SYSTEM_SHORT_USER, CreatedModifiedMixin, SkipLimitParams, SourceMixin, UserShort
+from saltbox_sdk.db.schemas_base import (
+    SYSTEM_SHORT_USER,
+    CreatedModifiedMixin,
+    SkipLimitParams,
+    Source,
+    SourceMixin,
+    UserShort,
+)
 from saltbox_sdk.utilities.helpers import Iso8601ZDatetime as TimezoneAwareDatetime
+
+AUTO_GRAINS_REQUEST_SOURCE = Source(type='system', id='auto_grains_request')
 
 
 def jidable[JID_T: str | int](value: JID_T) -> JID_T:
@@ -142,6 +151,10 @@ class JobWithJidAndSaltMasterOnlySchema(IDMixin):
 class JobForSetTtlSchema(CreatedModifiedMixin, IDMixin):
     ttl: int
     template_id: PyObjectId | None = None
+
+
+class JobTgtOnlySchema(IDMixin):
+    tgt: str | list[str]
 
 
 class JobForTaskStatusUpdateSchema(SourceMixin, IDMixin):

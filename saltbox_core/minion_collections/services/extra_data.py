@@ -20,7 +20,7 @@ from saltbox_core.minion_collections.schemas.extra_data import (
 )
 from saltbox_core.minion_collections.schemas.extra_data_category import ExtraDataCategoryModel
 from saltbox_core.minion_collections.schemas.filter import UniqueValuesResponse
-from saltbox_core.minion_collections.schemas.minion import MinionTgtOnlySchema
+from saltbox_core.minion_collections.schemas.minion import GrainsSchema, MinionCreateSchema, MinionTgtOnlySchema
 from saltbox_core.minion_collections.utils.extra_data_csv import parse_import_csv
 from saltbox_core.minion_collections.utils.unique_values import UniqueValueKind
 from saltbox_sdk.db.mongo.config import get_mongo_session_with_transaction
@@ -193,6 +193,17 @@ class ExtraDataService(
             category, dict.fromkeys(minion_ids, cleaned_datas), is_system=is_system, replace=True
         )
 
+    @staticmethod
+    def _raise_import_errors(errors: list[str]) -> None:
+        if not errors:
+            return
+
+        shown_errors = errors[:IMPORT_ERRORS_LIMIT]
+        if len(errors) > IMPORT_ERRORS_LIMIT:
+            shown_errors.append(f'... and {len(errors) - IMPORT_ERRORS_LIMIT} more errors')
+        msg = f'Invalid CSV file: {"; ".join(shown_errors)}'
+        raise SaltBoxValidationException(msg)
+
     async def import_items(  # noqa: C901
         self,
         category: ExtraDataCategoryModel,
@@ -201,6 +212,7 @@ class ExtraDataService(
         query: dict[str, Any],
         mode: ExtraDataImportMode,
         on_unknown_minion: UnknownMinionPolicy,
+        master_ids: set[str],
     ) -> ExtraDataImportResponseSchema:
         rows, errors = parse_import_csv(category, content)
 
@@ -220,15 +232,23 @@ class ExtraDataService(
             await self.minion_repo.get_ids({'$and': [collection_query, {'_id': {'$in': list(ids_by_minion.values())}}]})
         )
 
-        datas_by_minion: dict[PyObjectId, list[dict[str, Any]]] = {}
-        rows_by_minion: dict[PyObjectId, list[int]] = {}
+        datas_by_minion_key: dict[tuple[str, str], list[dict[str, Any]]] = {}
+        rows_by_minion_key: dict[tuple[str, str], list[int]] = {}
+        minion_keys_to_create: list[tuple[str, str]] = []
         skipped_rows: list[int] = []
 
         for row in rows:
+            minion_key = (row.minion_id, row.master)
             minion_label = f'minion `{row.minion_id}` with master `{row.master}`'
-            minion_id = ids_by_minion.get((row.minion_id, row.master))
+            minion_id = ids_by_minion.get(minion_key)
 
-            if minion_id is None or minion_id not in ids_in_collection:
+            if minion_id is None and on_unknown_minion == UnknownMinionPolicy.CREATE:
+                if row.master not in master_ids:
+                    errors.append(f'Row {row.row_number}: master `{row.master}` not found')
+                    continue
+                if minion_key not in rows_by_minion_key:
+                    minion_keys_to_create.append(minion_key)
+            elif minion_id is None or minion_id not in ids_in_collection:
                 if on_unknown_minion == UnknownMinionPolicy.SKIP:
                     skipped_rows.append(row.row_number)
                 elif minion_id is None:
@@ -237,29 +257,56 @@ class ExtraDataService(
                     errors.append(f'Row {row.row_number}: {minion_label} is not in the collection')
                 continue
 
-            datas_by_minion.setdefault(minion_id, []).append(row.data)
-            rows_by_minion.setdefault(minion_id, []).append(row.row_number)
+            datas_by_minion_key.setdefault(minion_key, []).append(row.data)
+            rows_by_minion_key.setdefault(minion_key, []).append(row.row_number)
 
         if category.is_single_item:
-            for row_numbers in rows_by_minion.values():
+            for row_numbers in rows_by_minion_key.values():
                 if len(row_numbers) > 1:
                     errors.append(f'Rows {", ".join(map(str, row_numbers))}: category allows only one item per minion')
 
-        if errors:
-            shown_errors = errors[:IMPORT_ERRORS_LIMIT]
-            if len(errors) > IMPORT_ERRORS_LIMIT:
-                shown_errors.append(f'... and {len(errors) - IMPORT_ERRORS_LIMIT} more errors')
-            msg = f'Invalid CSV file: {"; ".join(shown_errors)}'
-            raise SaltBoxValidationException(msg)
+        self._raise_import_errors(errors)
 
         replace = mode == ExtraDataImportMode.REPLACE or category.is_single_item
         async with get_mongo_session_with_transaction() as session:
+            if minion_keys_to_create:
+                minions_to_create = []
+                for minion_key in minion_keys_to_create:
+                    minions_to_create.append(
+                        MinionCreateSchema(minion_id=minion_key[0], master=minion_key[1], grains=GrainsSchema())
+                    )
+
+                created_ids = await self.minion_repo.create_many(minions_to_create, session=session)
+                created_ids_in_collection = set(
+                    await self.minion_repo.get_ids(
+                        {'$and': [collection_query, {'_id': {'$in': created_ids}}]}, session=session
+                    )
+                )
+
+                for minion_key, created_id in zip(minion_keys_to_create, created_ids, strict=True):
+                    ids_by_minion[minion_key] = created_id
+                    if created_id not in created_ids_in_collection:
+                        row_numbers = rows_by_minion_key[minion_key]
+                        errors.append(
+                            f'Rows {", ".join(map(str, row_numbers))}: created minion `{minion_key[0]}` '
+                            f'with master `{minion_key[1]}` would not be in the collection'
+                        )
+
+                self._raise_import_errors(errors)
+
+            datas_by_minion: dict[PyObjectId, list[dict[str, Any]]] = {}
+            for minion_key, datas in datas_by_minion_key.items():
+                datas_by_minion[ids_by_minion[minion_key]] = datas
+
             items = await self._write_items(
                 category, datas_by_minion, is_system=False, replace=replace, session=session
             )
 
         return ExtraDataImportResponseSchema(
-            minions_count=len(datas_by_minion), items_count=len(items), skipped_rows=skipped_rows
+            minions_count=len(datas_by_minion),
+            created_minions_count=len(minion_keys_to_create),
+            items_count=len(items),
+            skipped_rows=skipped_rows,
         )
 
     async def _get_item(

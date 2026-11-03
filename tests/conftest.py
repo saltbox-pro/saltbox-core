@@ -2,6 +2,24 @@ import mongomock
 import pytest
 
 
+def _project(doc, projection):
+    result = {}
+    for key in projection:
+        *parents, field = key.split('.')
+        source = doc
+        target = result
+        for parent in parents:
+            if not isinstance(source, dict) or parent not in source:
+                break
+            source = source[parent]
+            target = target.setdefault(parent, {})
+        else:
+            if isinstance(source, dict) and field in source:
+                target[field] = source[field]
+
+    return result
+
+
 class AsyncMockCollection:
     """Asynchronous wrapper for mongomock collection"""
 
@@ -21,6 +39,14 @@ class AsyncMockCollection:
         # Save the inserted document in the mock
         self._inserted_docs[result.inserted_id] = document
         return self.mocker.MagicMock(inserted_id=result.inserted_id)
+
+    async def insert_many(self, documents, ordered=True, session=None):
+        inserted_ids = []
+        for document in documents:
+            result = await self.insert_one(document, session=session)
+            inserted_ids.append(result.inserted_id)
+
+        return self.mocker.MagicMock(inserted_ids=inserted_ids)
 
     def find(self, filter=None, projection=None, limit=0, skip=0, sort=None, session=None):
         """Эмуляция метода find"""
@@ -43,7 +69,7 @@ class AsyncMockCollection:
             if limit > 0:
                 cursor_results = cursor_results[:limit]
             if projection:
-                cursor_results = [{key: doc[key] for key in projection if key in doc} for doc in cursor_results]
+                cursor_results = [_project(doc, projection) for doc in cursor_results]
 
         mock_cursor = self.mocker.MagicMock()
         mock_cursor.to_list = self.mocker.AsyncMock(return_value=cursor_results)

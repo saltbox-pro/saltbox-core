@@ -93,22 +93,29 @@ class SaltEventsHandler:
         self.broker = get_faststream_broker()
 
         self.salt_handlers: list[BaseMessageHandler] = [
-            SaltMessageMetricMessageHandler(redis_client=self.redis),
+            SaltMessageMetricMessageHandler(
+                redis_client=self.redis, minion_service=self.minion_service, job_service=self.job_service
+            ),
             JobNewMessageHandler(
                 redis_client=self.redis,
+                minion_service=self.minion_service,
                 job_service=self.job_service,
                 job_return_service=self.job_return_service,
             ),
-            JobErrorHandler(redis_client=self.redis, job_service=self.job_service),
+            JobErrorHandler(redis_client=self.redis, minion_service=self.minion_service, job_service=self.job_service),
             JobReturnMessageHandler(
                 redis_client=self.redis,
+                minion_service=self.minion_service,
                 job_service=self.job_service,
                 job_return_service=self.job_return_service,
-                minion_service=self.minion_service,
                 broker=self.broker,
             ),
-            PresenceMessageHandler(redis_client=self.redis, minion_service=self.minion_service),
-            MinionStartedMessageHandler(redis_client=self.redis, job_service=self.job_service),
+            PresenceMessageHandler(
+                redis_client=self.redis, minion_service=self.minion_service, job_service=self.job_service
+            ),
+            MinionStartedMessageHandler(
+                redis_client=self.redis, minion_service=self.minion_service, job_service=self.job_service
+            ),
         ]
 
     async def push_failed_event(self, master_id: str, tag: str, data: dict, retries: int) -> None:

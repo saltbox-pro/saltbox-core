@@ -15,7 +15,7 @@ from saltbox_core.minion_collections.exceptions import CyclicCollectionReference
 from saltbox_core.minion_collections.repositories.collection import CollectionRepository, get_collection_repository
 from saltbox_core.minion_collections.repositories.extra_data import ExtraDataRepository, get_extra_data_repository
 from saltbox_core.minion_collections.schemas.collection import CollectionBaseTreeModel
-from saltbox_core.minion_collections.schemas.minion import MinionModel
+from saltbox_core.minion_collections.schemas.minion import MinionCreateSchema, MinionModel
 from saltbox_core.minion_collections.utils.activity_filter import (
     get_minion_active_dt,
     get_never_active_condition,
@@ -229,6 +229,20 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
             return await self.get(query=query, projection_model=projection_model)
         else:
             return await self.get(query=query)
+
+    async def create_many(
+        self,
+        data: list[MinionCreateSchema],
+        *,
+        ordered: bool = True,
+        session: MongoAsyncClientSession | None = None,
+    ) -> list[PyObjectId]:
+        documents = []
+        for item in data:
+            documents.append(await self.prepare_creation_data(item, session=session))
+
+        result = await self.collection.insert_many(documents=documents, ordered=ordered, session=session)
+        return result.inserted_ids
 
     async def get_ids(
         self, query: dict[str, Any], *, session: MongoAsyncClientSession | None = None

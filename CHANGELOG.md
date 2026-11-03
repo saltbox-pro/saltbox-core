@@ -25,6 +25,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   data is taken by `extra_data_strategy` (`merge` / `use_source` /
   `use_target`), conflicts in single item categories by `conflict_strategy`
   (`error` / `use_source` / `use_target`). Policy `core.minions.merge`.
+- Extra data: `on_unknown_minion=create` in `POST /api/extra-data/items/import`
+  creates never active minions for unknown rows (master must exist, created
+  minions must match the collection), `created_minions_count` in the response.
+- Minions: unknown minions from presence, new job and job return events are
+  created, and `grains.items` is requested from created minions and from minions
+  that have never been active or have no grains, unless such a request is
+  already starting or running.
+- Jobs: `AUTO_GRAINS_REQUEST_TTL` setting (300 seconds by default), the TTL of
+  automatic `grains.items` jobs.
 
 ### Changed
 
@@ -37,9 +46,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   schema.
 - Minions: `last_activity` is set from the backend time when a presence or
   job return event is processed instead of the Salt master event stamp.
+- Jobs: automatic `grains.items` jobs (on minion start and for minions created
+  from events, never active or without grains) get source `{type: system, id: auto_grains_request}` and the
+  `AUTO_GRAINS_REQUEST_TTL` TTL. The `source_asc` index of jobs is replaced by
+  `source_status_asc` (`source.type`, `source.id`, `status`).
 
 ### Fixed
 
+- Jobs: a job stuck in `starting` after its TTL becomes `launch_error` with
+  `launch_error_type` `expired` (task minions of task jobs are failed). The
+  job is not removed from the master queue yet.
 - HTTP 500 on parallel first requests after restart caused by a race in the
   SDK Mongo client initialization (SDK updated).
 - Mongo client is closed on shutdown of the HTTP API, TaskIQ workers,

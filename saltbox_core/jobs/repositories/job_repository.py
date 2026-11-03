@@ -42,7 +42,11 @@ class JobRepository(BaseMongoRepository[JobModel]):
             'jid_and_salt_master_unique_index_asc': [('jid', pymongo.ASCENDING), ('salt_master', pymongo.ASCENDING)],
             'status_asc': [('status', pymongo.ASCENDING)],
             'created_asc': [('created', pymongo.ASCENDING)],
-            'source_asc': [('source.type', pymongo.ASCENDING), ('source.id', pymongo.ASCENDING)],
+            'source_status_asc': [
+                ('source.type', pymongo.ASCENDING),
+                ('source.id', pymongo.ASCENDING),
+                ('status', pymongo.ASCENDING),
+            ],
         }
         aggregations: ClassVar[AggregationsStore] = AggregationsStore(
             aggregations=[

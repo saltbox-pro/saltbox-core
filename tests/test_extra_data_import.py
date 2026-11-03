@@ -188,6 +188,7 @@ async def _import(service, category, content, mode=ExtraDataImportMode.APPEND, *
         query=kwargs.pop('query', {'grains.os': 'ALT'}),
         mode=mode,
         on_unknown_minion=kwargs.pop('on_unknown_minion', UnknownMinionPolicy.ERROR),
+        master_ids=kwargs.pop('master_ids', set()),
     )
 
 
@@ -214,7 +215,12 @@ async def test_import_static_items_appends(service, create_minion):
         ),
     )
 
-    assert result.model_dump() == {'minions_count': 2, 'items_count': 3, 'skipped_rows': []}
+    assert result.model_dump() == {
+        'minions_count': 2,
+        'created_minions_count': 0,
+        'items_count': 3,
+        'skipped_rows': [],
+    }
     assert await _static_items(service, first_id) == [
         {'owner': 'Old'},
         {'owner': 'Alice', 'number': 1},
@@ -264,7 +270,73 @@ async def test_import_unknown_and_outside_minions(service, create_minion):
 
     result = await _import(service, category, content, on_unknown_minion=UnknownMinionPolicy.SKIP)
 
-    assert result.model_dump() == {'minions_count': 1, 'items_count': 1, 'skipped_rows': [3, 4, 5]}
+    assert result.model_dump() == {
+        'minions_count': 1,
+        'created_minions_count': 0,
+        'items_count': 1,
+        'skipped_rows': [3, 4, 5],
+    }
+
+
+@pytest.mark.asyncio
+async def test_import_creates_unknown_minions(service, create_minion):
+    existing_id = await create_minion('m1')
+    category = _category(fields=[{'name': 'owner'}])
+    content = _csv(
+        ['minion_id', 'master', 'owner'],
+        ['m1', 'salt', 'Alice'],
+        ['new', 'salt', 'Bob'],
+        ['new', 'salt', 'Carol'],
+    )
+
+    result = await _import(
+        service, category, content, query={}, on_unknown_minion=UnknownMinionPolicy.CREATE, master_ids={'salt'}
+    )
+
+    created = await service.minion_repo.collection.find_one({'minion_id': 'new', 'master': 'salt'})
+    assert result.model_dump() == {
+        'minions_count': 2,
+        'created_minions_count': 1,
+        'items_count': 3,
+        'skipped_rows': [],
+    }
+    assert created['last_activity'] is None
+    assert await _static_items(service, existing_id) == [{'owner': 'Alice'}]
+    assert await _static_items(service, created['_id']) == [{'owner': 'Bob'}, {'owner': 'Carol'}]
+
+
+@pytest.mark.asyncio
+async def test_import_create_errors(service, create_minion):
+    await create_minion('m2', os='Ubuntu')
+    category = _category(fields=[{'name': 'owner'}])
+    content = _csv(
+        ['minion_id', 'master', 'owner'],
+        ['new', 'unknown-master', 'Alice'],
+        ['m2', 'salt', 'Bob'],
+    )
+
+    with pytest.raises(SaltBoxValidationException) as exc_info:
+        await _import(service, category, content, on_unknown_minion=UnknownMinionPolicy.CREATE, master_ids={'salt'})
+
+    assert 'Row 2: master `unknown-master` not found' in exc_info.value.detail
+    assert 'Row 3: minion `m2` with master `salt` is not in the collection' in exc_info.value.detail
+    assert await service.minion_repo.collection.find_one({'minion_id': 'new'}) is None
+
+
+@pytest.mark.asyncio
+async def test_import_create_rejects_minions_outside_collection(service):
+    with pytest.raises(SaltBoxValidationException) as exc_info:
+        await _import(
+            service,
+            _category(fields=[{'name': 'owner'}]),
+            _csv(['minion_id', 'master', 'owner'], ['new', 'salt', 'Alice'], ['new', 'salt', 'Bob']),
+            on_unknown_minion=UnknownMinionPolicy.CREATE,
+            master_ids={'salt'},
+        )
+
+    assert 'Rows 2, 3: created minion `new` with master `salt` would not be in the collection' in (
+        exc_info.value.detail
+    )
 
 
 @pytest.mark.asyncio

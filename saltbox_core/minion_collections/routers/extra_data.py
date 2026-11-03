@@ -3,6 +3,8 @@ from typing import Annotated
 from fastapi import APIRouter, Body, Depends, File, Form, Query, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
 
+from saltbox_core.masters.schemas.master_schemas import MasterMasterIdOnlySchema
+from saltbox_core.masters.services.master_service import MasterService, get_master_service
 from saltbox_core.minion_collections.schemas.extra_data import (
     CollectionExtraDataListItemSchema,
     ExtraDataActions,
@@ -375,10 +377,16 @@ async def extra_data_items_import(
     category_service: ExtraDataCategoryServiceDep,
     collection_service: CollectionServiceDep,
     extra_data_service: ExtraDataServiceDep,
+    master_service: Annotated[MasterService, Depends(get_master_service)],
     on_unknown_minion: Annotated[UnknownMinionPolicy, Form()] = UnknownMinionPolicy.ERROR,
 ) -> ExtraDataImportResponseSchema:
     collection = await collection_service.get_by_slug(collection_slug)
     category = await category_service.get_manual_data_category(category_source, category_name)
+
+    master_ids = set()
+    if on_unknown_minion == UnknownMinionPolicy.CREATE:
+        for master in await master_service.get_list({}, projection_model=MasterMasterIdOnlySchema):
+            master_ids.add(master.master_id)
 
     try:
         content = (await file.read()).decode('utf-8-sig')
@@ -387,7 +395,12 @@ async def extra_data_items_import(
         raise SaltBoxValidationException(msg) from None
 
     return await extra_data_service.import_items(
-        category, content, query=collection.full_query, mode=mode, on_unknown_minion=on_unknown_minion
+        category,
+        content,
+        query=collection.full_query,
+        mode=mode,
+        on_unknown_minion=on_unknown_minion,
+        master_ids=master_ids,
     )
 
 
