@@ -1,3 +1,4 @@
+import re
 from typing import Annotated, ClassVar
 
 import pymongo
@@ -15,14 +16,18 @@ from saltbox_sdk.db.mongo.aggregations import (
     UnwindAggregationStage,
 )
 from saltbox_sdk.db.mongo.config import get_mongo
-from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository
+from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository, MultilanguageFieldRepositoryMixin
 
 
-class TaskRepository(BaseMongoRepository[TaskModel]):
+class TaskRepository(BaseMongoRepository[TaskModel], MultilanguageFieldRepositoryMixin):
     class Meta:
         collection_name = 'tasks'
         auto_now_add_fields: ClassVar[list[str]] = ['created']
         auto_now_fields: ClassVar[list[str]] = ['modified']
+        query_overrides: ClassVar[dict[re.Pattern, str]] = {
+            re.compile(r'^task_template\.title$'): 'multilanguage_field_query_override',
+            re.compile(r'^task_template\.description$'): 'multilanguage_field_query_override',
+        }
         collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
             'source_asc': [('source.type', pymongo.ASCENDING), ('source.id', pymongo.ASCENDING)],
             'task_type_asc': [('task_type', pymongo.ASCENDING)],
