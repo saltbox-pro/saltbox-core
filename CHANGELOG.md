@@ -55,6 +55,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Tasks and task minions: negative filters by multilanguage template title/description now exclude matches in any language.
 - Jobs: a job stuck in `starting` after its TTL becomes `launch_error` with
   `launch_error_type` `expired` (task minions of task jobs are failed). The
   job is not removed from the master queue yet.
