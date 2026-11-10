@@ -729,7 +729,7 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
             'master_asc': [('master', pymongo.ASCENDING)],
             'created_asc': [('created', pymongo.ASCENDING)],
             'last_activity_asc': [('last_activity', pymongo.ASCENDING)],
-            'grains_wildcard': [('grain.$**', pymongo.ASCENDING)],
+            'grains_wildcard': [('grains.$**', pymongo.ASCENDING)],
             'extra_static_wildcard': [('extra_static.$**', pymongo.ASCENDING)],
         }
         aggregations: ClassVar[AggregationsStore] = AggregationsStore(

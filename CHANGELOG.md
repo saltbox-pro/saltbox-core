@@ -8,7 +8,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [x.x.x] - YYYY-MM-DD
 
 ### Added
-- Tasks and task minions: filter by template title and description (`task_template.title`, `task_template.description`); multilanguage template fields match a plain string or per-language values.
+
+- Tasks and task minions: filter by template title and description (`task_template.title`, `task_template.description`);
+  multilanguage template fields match a plain string or per-language values.
 - Minions: `is_never_active` and `is_not_active` flags computed in MongoDB
   from `last_activity` and the `MINION_INACTIVE_PERIOD` setting (90 seconds by
   default), returned by minion endpoints and available in the filter schema.
@@ -55,7 +57,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Tasks and task minions: negative filters by multilanguage template title/description now exclude matches in any language.
+- Minions: corrected the grains wildcard index from `grain.$**` to `grains.$**`; existing indexes are repaired by
+  migration (SBX-1018).
+- Tasks and task minions: negative filters by multilanguage template title/description now exclude matches in any
+  language.
 - Jobs: a job stuck in `starting` after its TTL becomes `launch_error` with
   `launch_error_type` `expired` (task minions of task jobs are failed). The
   job is not removed from the master queue yet.
