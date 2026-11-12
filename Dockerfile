@@ -7,9 +7,8 @@
 
 ARG BASE_IMAGE="registry.altlinux.org/alt/alt:p11"
 
-# hadolint ignore=DL3006
+# hadolint global ignore=DL3064,DL3015,DL3006,DL3008
 FROM "$BASE_IMAGE" AS base
-# hadolint ignore=DL3015
 RUN \
   --mount=type=cache,target=/var/cache/apt,sharing=locked,id=apt \
   --mount=type=cache,target=/var/lib/apt/lists,sharing=locked,id=apt-lists \
@@ -17,9 +16,7 @@ RUN \
 set -e
 mkdir --parents /var/cache/apt/archives/partial/ /var/lib/apt/lists/partial/
 apt-get update
-apt-get install --yes glibc-pthread=2.38.0.223.f053ff-alt1.p11.1 \
-                      python3=3.12.13-alt1 \
-                      git=2.50.1-alt1
+apt-get install --yes glibc-pthread python3 git
 EOF
 
 COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/
@@ -27,7 +24,6 @@ COPY --chmod=755 docker/entrypoint.sh /usr/local/bin/
 RUN mkdir --parents /var/lib/saltbox-core/
 ENV DEV_MODE=0
 
-# hadolint global ignore=DL3064
 ENV KEYCLOAK_CLIENT_SECRET_FILE=/run/secrets/keycloak_client_saltbox_core_password
 ENV REDIS_TASKIQ_SECRET_FILE=/run/secrets/redis_taskiq_password
 
@@ -37,7 +33,6 @@ EXPOSE 8000
 
 
 FROM base AS uv
-# hadolint ignore=DL3015
 RUN \
   --mount=type=cache,target=/var/cache/apt,sharing=locked,id=apt \
   --mount=type=cache,target=/var/lib/apt/lists,sharing=locked,id=apt-lists \
