@@ -30,7 +30,7 @@ dependencies = [
     # Dependencies from Salt.Box Team server.
     # - Prefer tag or commit hash over branch to specify version.
     # - Prefer long hash over short hash for pip efficiency.
-    "saltbox-sdk @ git+https://dev.saltbox.pro/saltbox/saltbox-sdk/@f3b64eaeaf54031e07146b295a572a8346aa496c",
+    "saltbox-sdk @ git+https://dev.saltbox.pro/saltbox/saltbox-sdk/@131ce57b5d41af36771694d7c09f4e6e8f1af486",
     "saltbox-bridge-messages @ git+https://dev.saltbox.pro/saltbox/saltbox-bridge-messages/@88f817de131d31518d1068c4c458b32e3f1706a1",
 ]
 

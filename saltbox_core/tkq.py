@@ -15,12 +15,13 @@ from taskiq_redis import RedisAsyncResultBackend
 from saltbox_core.config import SETTINGS
 from saltbox_sdk.config.rabbitmq_config import RABBIT_SETTINGS
 from saltbox_sdk.utilities.taskiq import SmartRetryMiddleware, UniqueIdMiddleware
+from saltbox_sdk.utilities.taskiq_rabbit import SaltboxAioPikaBroker
 
 logger = logging.getLogger(__name__)
 
 result_backend: RedisAsyncResultBackend = RedisAsyncResultBackend(SETTINGS.taskiq_redis_url)
 broker = (
-    AioPikaBroker(
+    SaltboxAioPikaBroker(
         url=RABBIT_SETTINGS.url,
         exchange=Exchange(
             name='topic_exchange',

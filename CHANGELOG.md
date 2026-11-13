@@ -57,6 +57,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Allow a follow-up notification before reading its document while serializing execution for the same unique key.
+  Preserve the destination queue when deferring notifications and retain retries after enqueue lock release.
+
 - Minions: corrected the grains wildcard index from `grain.$**` to `grains.$**`; existing indexes are repaired by
   migration (SBX-1018).
 - Tasks and task minions: negative filters by multilanguage template title/description now exclude matches in any

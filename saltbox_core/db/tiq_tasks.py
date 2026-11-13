@@ -1,9 +1,13 @@
-from typing import ClassVar
+from typing import Annotated, ClassVar
+
+from taskiq import TaskiqDepends
 
 from saltbox_core.pillars.repository import get_pillar_repository
 from saltbox_core.tkq import broker, queue_notify
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.serivces.mongo_base_with_notify_service import MongoBaseWithNotifyService
+from saltbox_sdk.utilities.taskiq_lock import UniqueTaskLock
+from saltbox_sdk.utilities.taskiq_rabbit import get_unique_task_lock
 
 
 class _NotifyServicesStoreSingleton:
@@ -107,6 +111,7 @@ async def send_notify_by_mongo_service(
     service_name: str,
     document_id: str,
     action: str,
+    unique_lock: Annotated[UniqueTaskLock, TaskiqDepends(get_unique_task_lock)],
 ) -> None:
     did = PyObjectId(document_id)
 
@@ -116,4 +121,5 @@ async def send_notify_by_mongo_service(
         msg = f'Service {service_name} not found'
         raise RuntimeError(msg)
 
+    await unique_lock.release_enqueue_lock()
     await service.run_notify(obj_id=did, action=action)
