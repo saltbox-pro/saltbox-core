@@ -4,6 +4,7 @@ import pytest
 from taskiq import InMemoryBroker, TaskiqMessage, TaskiqResult
 
 from saltbox_sdk.utilities.taskiq import SmartRetryMiddleware, TaskAlreadyRunningException, UniqueIdMiddleware
+from saltbox_sdk.utilities.taskiq_lock import UniqueTaskLock
 
 
 @pytest.mark.parametrize(
@@ -191,3 +192,41 @@ async def test_retry_after_enqueue_release_does_not_lose_accepted_work() -> None
     assert retried.task_id == message.task_id
     assert middleware.EXECUTION_OWNER_LABEL not in retried.labels
     assert retried.labels[middleware.OWNER_LABEL] != message.labels[middleware.OWNER_LABEL]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('result', [0, 1])
+async def test_renew_execution_uses_current_owners(result: int) -> None:
+    redis = Mock(eval=AsyncMock(return_value=result))
+    lock = UniqueTaskLock(redis, 'queue-key', 'enqueue-owner', 'execution-owner')
+    assert await lock.renew_execution_lock(120) is bool(result)
+    assert redis.eval.call_args.args[1:] == (
+        2, 'queue-key', 'queue-key:execution', 'enqueue-owner', 'execution-owner', 120000,
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('ttl', [0, -1])
+async def test_renew_execution_rejects_invalid_ttl(ttl: int) -> None:
+    redis = Mock(eval=AsyncMock())
+    lock = UniqueTaskLock(redis, 'queue-key', 'enqueue-owner', 'execution-owner')
+    with pytest.raises(ValueError, match='positive'):
+        await lock.renew_execution_lock(ttl)
+    redis.eval.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_renew_execution_requires_owner() -> None:
+    redis = Mock(eval=AsyncMock())
+    lock = UniqueTaskLock(redis, 'queue-key', 'enqueue-owner')
+    with pytest.raises(ValueError, match='execution owner'):
+        await lock.renew_execution_lock(120)
+    redis.eval.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_renew_execution_propagates_redis_error() -> None:
+    redis = Mock(eval=AsyncMock(side_effect=ConnectionError('unavailable')))
+    lock = UniqueTaskLock(redis, 'queue-key', 'enqueue-owner', 'execution-owner')
+    with pytest.raises(ConnectionError, match='unavailable'):
+        await lock.renew_execution_lock(120)

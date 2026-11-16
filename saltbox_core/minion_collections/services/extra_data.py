@@ -448,8 +448,6 @@ class ExtraDataService(
         skip: int = 0,
         sort: dict[str, SortOrder] | None = None,
     ) -> PaginatedResponse[CollectionExtraDataListItemSchema]:
-        query = await self.minion_repo.__prepare_query__(query)
-
         if category.type == ExtraDataCategoryType.AGGREGATED:
             total, data = await self.repo.get_grouped_paginated(
                 minion_ids=await self.minion_repo.get_ids(query),
@@ -462,6 +460,7 @@ class ExtraDataService(
                 sort=sort,
             )
         else:
+            query = await self.minion_repo.__prepare_query__(query)
             total, data = await self.minion_repo.get_extra_data_list_paginated(
                 query=query,
                 category_source=category.source,
@@ -484,8 +483,6 @@ class ExtraDataService(
         search_str: str | None = None,
         sort: dict[str, SortOrder] | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
-        query = await self.minion_repo.__prepare_query__(query)
-
         if category.type == ExtraDataCategoryType.AGGREGATED:
             rows = self.repo.iter_grouped(
                 minion_ids=await self.minion_repo.get_ids(query),
@@ -496,6 +493,7 @@ class ExtraDataService(
                 sort=sort,
             )
         else:
+            query = await self.minion_repo.__prepare_query__(query)
             rows = self.minion_repo.iter_extra_data(
                 query=query,
                 category_source=category.source,
@@ -532,9 +530,8 @@ class ExtraDataService(
         else:
             kind = UniqueValueKind.VALUE
 
-        query = await self.minion_repo.__prepare_query__(query)
-
         if category.type == ExtraDataCategoryType.STATIC:
+            query = await self.minion_repo.__prepare_query__(query)
             total, data = await self.minion_repo.get_unique_static_extra_values(
                 query=query,
                 source=category.source,

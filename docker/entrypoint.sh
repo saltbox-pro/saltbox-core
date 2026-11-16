@@ -68,6 +68,14 @@ cmd_taskiq_notify_worker() {
   fi
 }
 
+cmd_taskiq_membership_worker() {
+  cmd=(taskiq worker saltbox_core.tkq:broker_for_membership_worker --fs-discover)
+  cmd+=("--tasks-pattern=${tiq_tasks_pattern}" --workers=1 --max-async-tasks=1 --max-prefetch=1 --max-fails=1)
+  if [ "$DEV_MODE" = 1 ]; then
+    cmd+=(--reload)
+  fi
+}
+
 cmd_taskiq_scheduler() {
   cmd=(taskiq scheduler saltbox_core.tkq_sched:scheduler)
   cmd+=(--fs-discover "--tasks-pattern=${tiq_tasks_pattern}")
@@ -87,6 +95,7 @@ case $1 in
   taskiq-worker) cmd_taskiq_worker ;;
   taskiq-salt-worker) cmd_taskiq_salt_worker ;;
   taskiq-notify-worker) cmd_taskiq_notify_worker ;;
+  taskiq-membership-worker) cmd_taskiq_membership_worker ;;
   taskiq-scheduler) cmd_taskiq_scheduler ;;
   shell) cmd_shell "$@" ;;
   *) wrong_cmd "$@" ;;

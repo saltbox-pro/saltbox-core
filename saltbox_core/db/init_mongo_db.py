@@ -2,6 +2,7 @@ from saltbox_core.jobs.repositories.job_repository import JobRepository
 from saltbox_core.jobs.repositories.job_return_repository import JobReturnRepository
 from saltbox_core.masters.repositories.master_repository import MasterRepository
 from saltbox_core.minion_collections.repositories.collection import CollectionRepository
+from saltbox_core.minion_collections.repositories.collection_membership import CollectionMembershipRepository
 from saltbox_core.minion_collections.repositories.extra_data import ExtraDataRepository
 from saltbox_core.minion_collections.repositories.extra_data_category import ExtraDataCategoryRepository
 from saltbox_core.minion_collections.repositories.minion import MinionRepository
@@ -33,6 +34,7 @@ async def init_mongo_db() -> None:
         extra_data_repository,
         MinionRepository(database, extra_data_repository, collection_repository),
         collection_repository,
+        CollectionMembershipRepository(database),
         TaskRepository(database),
         TaskMinionRepository(database),
         TaskStatusRepository(database),

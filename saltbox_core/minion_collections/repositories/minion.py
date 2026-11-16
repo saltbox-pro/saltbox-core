@@ -247,7 +247,12 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
     async def get_ids(
         self, query: dict[str, Any], *, session: MongoAsyncClientSession | None = None
     ) -> list[PyObjectId]:
-        docs = await self.collection.find(filter=query, projection={'_id': 1}, session=session).to_list()
+        query = await self.__prepare_query__(query)
+        pipeline = await self.prepare_pipeline({'_id': 1}, query)
+        if pipeline:
+            docs = await (await self.collection.aggregate(pipeline=pipeline, session=session)).to_list()
+        else:
+            docs = await self.collection.find(filter=query, projection={'_id': 1}, session=session).to_list()
         return [doc['_id'] for doc in docs]
 
     async def get_grains_keys(self, query: dict[str, Any] | None) -> list[str]:

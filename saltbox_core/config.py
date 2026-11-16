@@ -53,6 +53,9 @@ LogLevelStr = Annotated[str, AfterValidator(validate_log_level)]
 class Settings(BaseSettings):
     var_dir: MakeDirectoryPath = Path('/var/lib/saltbox-core/')
     cache_dir: MakeDirectoryPath = Path('/var/cache/saltbox-core/')
+    membership_parent_ids_limit: int = Field(default=1000, ge=0)
+    membership_run_history_ttl: int = Field(default=6 * 60 * 60, gt=0)
+    membership_static_every_iterations: int = Field(default=5, ge=1)
     taskiq_broker_url: str = ''
     log_level: LogLevelStr = 'info'
     basic_auth_username: str = ''

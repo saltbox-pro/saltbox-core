@@ -71,10 +71,13 @@ queue_notify = Queue(
 )
 
 
+queue_membership = Queue(name='queue-membership', type=QueueType.CLASSIC, durable=False)
+
+
 async def startup_broker() -> AsyncBroker:
     if not broker.is_worker_process:
         try:
-            broker.with_queues(queue_default, queue_salt, queue_notify)
+            broker.with_queues(queue_default, queue_salt, queue_notify, queue_membership)
             await broker.startup()
         except AMQPConnectionError as ex:
             logger.warning(f'RabbitMQ is unavailable during startup: {ex}. The broker will reconnect automatically.')
@@ -103,6 +106,11 @@ def broker_for_salt_worker() -> AioPikaBroker:
 def broker_for_notify_worker() -> AioPikaBroker:
     logger.info('Starting notify broker')
     return broker.with_queues(queue_common, queue_notify)
+
+
+def broker_for_membership_worker() -> AioPikaBroker:
+    logger.info('Starting membership broker')
+    return broker.with_queues(queue_common, queue_membership)
 
 
 taskiq_fastapi.init(broker, 'saltbox_core.main:app')

@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [x.x.x] - YYYY-MM-DD
 
 ### Added
+- Reuse bounded parent results when synchronizing collection trees from roots to leaves.
+- Synchronize collections without activity dependencies every configurable number of dispatcher iterations.
+- Store per-collection synchronization run history in Redis with six-hour field expiration (Redis 7.4+).
+- Add collection membership intervals and periodic synchronization with renewable Taskiq execution locks.
+- Add a dedicated membership queue and worker with per-collection tasks and independently scalable replicas.
 
 - Tasks and task minions: filter by template title and description (`task_template.title`, `task_template.description`);
   multilanguage template fields match a plain string or per-language values.
