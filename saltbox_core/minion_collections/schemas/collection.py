@@ -98,6 +98,7 @@ class CollectionBaseTreeModel(BaseTreeModel):
 
 
 class CollectionTreeNodeSchema(IDMixin, CollectionMinionsCountMixin):
+    is_available: bool = Field(default=True, title='Available to the current user')
     title: str = Field(title='Title', min_length=3, max_length=50)
     description: str = Field(title='Description', default='', max_length=500)
     slug: str = Field(title='Slug')

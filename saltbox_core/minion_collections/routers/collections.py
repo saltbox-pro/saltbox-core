@@ -1,7 +1,11 @@
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
 
+from saltbox_core.minion_collections.repositories.collection_membership import (
+    CollectionMembershipRepository,
+    get_collection_membership_repository,
+)
 from saltbox_core.minion_collections.schemas.collection import (
     CollectionActions,
     CollectionCreateRequestSchema,
@@ -18,6 +22,7 @@ from saltbox_core.minion_collections.schemas.collection import (
 from saltbox_core.minion_collections.services.collection import CollectionService, get_collection_service
 from saltbox_core.tasks.schemas.task import TaskPolicyForCollectionSchema
 from saltbox_core.tasks.services.task import TaskService, get_task_service
+from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 from saltbox_sdk.fastapi_utils.dependencies import get_current_user, get_opa_query
@@ -88,11 +93,15 @@ async def collections_flat_list(
 async def collections_tree(
     opa_query: Annotated[dict, Depends(get_opa_query)],
     collection_service: Annotated[CollectionService, Depends(get_collection_service)],
+    membership_repo: Annotated[CollectionMembershipRepository, Depends(get_collection_membership_repository)],
+    minion_inner_id: Annotated[PyObjectId | None, Query()] = None,
+    only_available: Annotated[bool, Query()] = True,
 ) -> list[CollectionTreeNodeSchema]:
-    return await collection_service.get_tree(
-        query=opa_query,
-        projection_model=CollectionTreeNodeSchema,
-        sort=CollectionService.TREE_SORT,
+    collection_ids = (
+        await membership_repo.get_minion_collection_ids(minion_inner_id) if minion_inner_id is not None else None
+    )
+    return await collection_service.get_available_tree(
+        opa_query, only_available=only_available, collection_ids=collection_ids
     )
 
 

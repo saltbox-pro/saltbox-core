@@ -15,10 +15,11 @@ from saltbox_core.minion_collections.schemas.collection import (
     CollectionCreateSchema,
     CollectionFlatListItemSchema,
     CollectionModel,
+    CollectionTreeNodeSchema,
     CollectionUpdateSchema,
 )
 from saltbox_sdk.db.mongo.config import get_mongo_session_with_transaction
-from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
+from saltbox_sdk.db.mongo.schemas_base import BaseTreeModel, IDMixin, PyObjectId, SortOrder
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 
 ProjectionModel = TypeVar('ProjectionModel', bound=BaseModel)
@@ -147,6 +148,47 @@ class CollectionService(
             session=session,
             sort=sort,
         )
+
+    async def get_available_tree(
+        self,
+        opa_query: dict[str, Any],
+        *,
+        only_available: bool = True,
+        collection_ids: list[PyObjectId] | None = None,
+    ) -> list[CollectionTreeNodeSchema]:
+        query: dict[str, Any] = {}
+        if collection_ids is not None:
+            if not collection_ids:
+                return []
+            parents = {
+                node.id: node.parent_id for node in await self.repo.get_list(query=None, projection_model=BaseTreeModel)
+            }
+            selected: set[PyObjectId] = set()
+            for collection_id in collection_ids:
+                node_id: PyObjectId | None = collection_id
+                while node_id is not None and node_id not in selected:
+                    selected.add(node_id)
+                    node_id = parents.get(node_id)
+            query = {'_id': {'$in': list(selected)}}
+
+        available_query = {'$and': [query, opa_query]} if opa_query else query
+        available_ids = None
+        if only_available:
+            query = available_query
+        elif opa_query:
+            available_ids = {node.id for node in await self.repo.get_list(available_query, projection_model=IDMixin)}
+
+        nodes = await self.repo.get_list(query=query, projection_model=CollectionTreeNodeSchema, sort=self.TREE_SORT)
+        nodes_by_id = {node.id: node for node in nodes}
+        tree: list[CollectionTreeNodeSchema] = []
+        for node in nodes:
+            node.is_available = available_ids is None or node.id in available_ids
+            parent = nodes_by_id.get(node.parent_id) if node.parent_id is not None else None
+            if parent is None:
+                tree.append(node)
+            else:
+                parent.children.append(node)
+        return tree
 
     async def create(
         self,

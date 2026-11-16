@@ -1,4 +1,4 @@
-from datetime import datetime, UTC
+from datetime import UTC, datetime
 
 import pytest
 
@@ -14,13 +14,15 @@ async def test_cached_minions_count(mocked_db):
     child = await repo.create({'title': 'Child', 'slug': 'child', 'query': {}, 'parent_id': root})
     empty = await repo.create({'title': 'Empty', 'slug': 'empty', 'query': {}})
     minion = PyObjectId()
-    await mocked_db['minion_collection_memberships'].insert_many([
-        {'collection_id': root, 'minion_inner_id': minion, 'exited_at': datetime.now(UTC)},
-        {'collection_id': root, 'minion_inner_id': minion, 'exited_at': None},
-        {'collection_id': root, 'minion_inner_id': PyObjectId(), 'exited_at': None},
-        {'collection_id': child, 'minion_inner_id': minion, 'exited_at': None},
-        {'collection_id': empty, 'minion_inner_id': minion, 'exited_at': datetime.now(UTC)},
-    ])
+    await mocked_db['minion_collection_memberships'].insert_many(
+        [
+            {'collection_id': root, 'minion_inner_id': minion, 'exited_at': datetime.now(UTC)},
+            {'collection_id': root, 'minion_inner_id': minion, 'exited_at': None},
+            {'collection_id': root, 'minion_inner_id': PyObjectId(), 'exited_at': None},
+            {'collection_id': child, 'minion_inner_id': minion, 'exited_at': None},
+            {'collection_id': empty, 'minion_inner_id': minion, 'exited_at': datetime.now(UTC)},
+        ]
+    )
     assert (await repo.get(root)).minions_count == 2
     assert (await repo.get(empty)).minions_count == 0
     expected = {root: 2, child: 1, empty: 0}

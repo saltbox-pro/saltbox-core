@@ -27,6 +27,13 @@ class CollectionMembershipRepository(BaseMongoRepository[CollectionMembershipMod
     async def get_active_collection_ids(self) -> list[PyObjectId]:
         return await self.collection.distinct('collection_id', {'exited_at': None})
 
+    async def get_minion_collection_ids(self, minion_inner_id: PyObjectId) -> list[PyObjectId]:
+        docs = await self.collection.find(
+            {'minion_inner_id': minion_inner_id, 'exited_at': None},
+            {'collection_id': 1, '_id': 0},
+        ).to_list()
+        return [doc['collection_id'] for doc in docs]
+
     async def close_intervals(
         self,
         collection_id: PyObjectId,

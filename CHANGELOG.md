@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [x.x.x] - YYYY-MM-DD
 
 ### Added
+- Add client collection trees, optional availability filtering, and per-node availability flags.
 - Reuse bounded parent results when synchronizing collection trees from roots to leaves.
 - Synchronize collections without activity dependencies every configurable number of dispatcher iterations.
 - Store per-collection synchronization run history in Redis with six-hour field expiration (Redis 7.4+).
