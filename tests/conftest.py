@@ -76,6 +76,31 @@ class AsyncMockCollection:
         mock_cursor.__aiter__.return_value = cursor_results
         return mock_cursor
 
+    async def aggregate(self, pipeline, session=None):
+        documents = list(self.collection.find())
+        for stage in pipeline:
+            if '$lookup' in stage:
+                lookup = stage['$lookup']
+                foreign = self.collection.database[lookup['from']]
+                for document in documents:
+                    query = {lookup['foreignField']: document[lookup['localField']]}
+                    document[lookup['as']] = list(foreign.aggregate([
+                        {'$match': query}, *lookup.get('pipeline', [])
+                    ]))
+            elif '$unset' in stage:
+                for document in documents:
+                    for field in stage['$unset']:
+                        document.pop(field, None)
+            else:
+                temporary = mongomock.MongoClient().db.pipeline
+                if documents:
+                    temporary.insert_many(documents)
+                documents = list(temporary.aggregate([stage]))
+        cursor = self.mocker.MagicMock()
+        cursor.to_list = self.mocker.AsyncMock(return_value=documents)
+        cursor.__aiter__.return_value = documents
+        return cursor
+
     async def count_documents(self, filter, limit=0, session=None):
         return self.collection.count_documents(filter)
 

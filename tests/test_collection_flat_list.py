@@ -14,7 +14,8 @@ def service(mocked_db, mocker):
 
 
 PROJECT_AND_SORT = [
-    {'$project': {'slug': 1, 'title': 1, 'description': 1, 'parent_id': 1}},
+    *CollectionRepository.Meta.aggregations.build_pipeline(fields_names=['minions_count']),
+    {'$project': {'slug': 1, 'title': 1, 'description': 1, 'parent_id': 1, 'minions_count': 1}},
     {'$sort': {'title': 1, 'slug': 1}},
 ]
 
@@ -55,6 +56,7 @@ async def test_flat_list_items(service):
         'title': 'Linux',
         'description': 'Servers',
         'parent_id': root_id,
+        'minions_count': 0,
     }
     assert items[1].description == ''
     assert items[1].parent_id is None

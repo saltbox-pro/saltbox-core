@@ -20,6 +20,13 @@ from saltbox_core.minion_collections.schemas.collection import (
     CollectionModel,
 )
 from saltbox_core.minion_collections.utils.collection_filter import find_cycle, get_referenced_slugs
+from saltbox_sdk.db.mongo.aggregations import (
+    AddFieldsAggregationStage,
+    AggregatedField,
+    AggregationsStore,
+    LookupAggregationStage,
+    UnsetAggregationStage,
+)
 from saltbox_sdk.db.mongo.config import get_mongo
 from saltbox_sdk.db.mongo.repository_base import ModelType, ProjectionModel
 from saltbox_sdk.db.mongo.repository_tree_base import BaseTreeMongoRepository, OnDelete
@@ -32,6 +39,28 @@ class CollectionRepository(BaseTreeMongoRepository[CollectionModel]):
         collection_name = 'minion_collections'
         auto_now_add_fields: ClassVar[list[str]] = ['created']
         auto_now_fields: ClassVar[list[str]] = ['modified']
+        aggregations: ClassVar[AggregationsStore] = AggregationsStore(
+            aggregations=[
+                AggregatedField(
+                    field_name='minions_count',
+                    stages=[
+                        LookupAggregationStage(
+                            from_collection='minion_collection_memberships',
+                            local_field='_id',
+                            foreign_field='collection_id',
+                            pipeline=[{'$match': {'exited_at': None}}, {'$count': 'count'}],
+                            as_field='_minions_count',
+                        ),
+                        AddFieldsAggregationStage(
+                            fields={
+                                'minions_count': {'$ifNull': [{'$arrayElemAt': ['$_minions_count.count', 0]}, 0]}
+                            }
+                        ),
+                        UnsetAggregationStage(fields=['_minions_count']),
+                    ],
+                ),
+            ]
+        )
         on_delete = OnDelete.cascade
         order_field_name = 'order'
         collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
@@ -218,7 +247,8 @@ class CollectionRepository(BaseTreeMongoRepository[CollectionModel]):
 
         pipeline = [
             {'$match': query},
-            {'$project': {'slug': 1, 'title': 1, 'description': 1, 'parent_id': 1}},
+            *self.aggregations.build_pipeline(fields_names=['minions_count']),
+            {'$project': {'slug': 1, 'title': 1, 'description': 1, 'parent_id': 1, 'minions_count': 1}},
             {'$sort': {'title': SortOrder.ASC, 'slug': SortOrder.ASC}},
         ]
 

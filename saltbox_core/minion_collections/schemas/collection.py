@@ -15,7 +15,11 @@ from saltbox_sdk.db.mongo.schemas_base import (
 from saltbox_sdk.db.schemas_base import CreatedModifiedMixin, SkipLimitParams
 
 
-class CollectionComputedFieldsMixin(BaseModel):
+class CollectionMinionsCountMixin(BaseModel):
+    minions_count: int = Field(default=0, ge=0, title='Minions count')
+
+
+class CollectionComputedFieldsMixin(CollectionMinionsCountMixin):
     full_query: MongoQuery = MongoQueryField
 
 
@@ -93,7 +97,7 @@ class CollectionBaseTreeModel(BaseTreeModel):
     title: str
 
 
-class CollectionTreeNodeSchema(IDMixin):
+class CollectionTreeNodeSchema(IDMixin, CollectionMinionsCountMixin):
     title: str = Field(title='Title', min_length=3, max_length=50)
     description: str = Field(title='Description', default='', max_length=500)
     slug: str = Field(title='Slug')
@@ -112,7 +116,7 @@ class CollectionFlatListBody(BaseModel):
     model_config = ConfigDict(extra='ignore')
 
 
-class CollectionFlatListItemSchema(IDMixin):
+class CollectionFlatListItemSchema(IDMixin, CollectionMinionsCountMixin):
     slug: str
     title: str
     description: str = Field(default='')
