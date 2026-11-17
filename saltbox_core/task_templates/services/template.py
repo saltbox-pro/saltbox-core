@@ -1,4 +1,5 @@
 import json
+from functools import partial
 from typing import Annotated, Any, TypeVar, overload, override
 
 from fastapi import Depends
@@ -21,6 +22,7 @@ from saltbox_core.task_templates.schemas.template import (
 )
 from saltbox_sdk.db.mongo.config import get_mongo_session_with_transaction
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.mongo.transaction import MongoTransaction
 from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 from saltbox_sdk.utilities.json_schema import Draft4ValidatorWithDefaults
@@ -87,22 +89,32 @@ class TaskTemplateService(
         session: AsyncClientSession | None = None,
     ) -> int:
         async with get_mongo_session_with_transaction(session) as s:
-            # Remove all related pillars
-            tpls = await self.get_list(query=query, session=s, projection_model=TaskTemplateAggregatedModel)
-            pillar_query = {
-                'tgt_type': PillarTgtType.TASK_TPL,
-                'pillarenv': {
-                    '$regex': f'task_tpl:{"|".join(map(str, [tpl.id for tpl in tpls]))}.*',
-                },
-            }
-            await self._pillar_repo.delete_many(query=pillar_query, session=s)
-
-            result = await super().delete_many(query=query, session=s)
+            result, tpls = await self._delete_many_records(query, session=s)
 
         for tpl in tpls:
             await self._remove_files(tpl)
 
         return result
+
+    async def delete_many_in_transaction(self, query: dict[str, Any], *, tx: MongoTransaction) -> int:
+        result, tpls = await self._delete_many_records(query, session=tx.session)
+        for tpl in tpls:
+            tx.on_commit(partial(self._remove_files, tpl))
+        return result
+
+    async def _delete_many_records(
+        self, query: dict[str, Any], *, session: AsyncClientSession
+    ) -> tuple[int, list[TaskTemplateAggregatedModel]]:
+        tpls = await self.get_list(query=query, session=session, projection_model=TaskTemplateAggregatedModel)
+        if tpls:
+            template_ids = '|'.join(str(tpl.id) for tpl in tpls)
+            pillar_query = {
+                'tgt_type': PillarTgtType.TASK_TPL,
+                'pillarenv': {'$regex': f'^task_tpl:(?:{template_ids})'},
+            }
+            await self._pillar_repo.delete_many(query=pillar_query, session=session)
+        result = await super().delete_many(query=query, session=session)
+        return result, tpls
 
     async def get_with_content(
         self,

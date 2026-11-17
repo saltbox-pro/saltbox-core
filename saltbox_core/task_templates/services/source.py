@@ -1,3 +1,4 @@
+import asyncio
 import shutil
 import uuid
 from pathlib import Path
@@ -5,9 +6,9 @@ from typing import Annotated, Any, override
 
 from fastapi import Depends
 from pymongo.asynchronous.client_session import AsyncClientSession
-from pymongo.errors import DuplicateKeyError
+from pymongo.errors import DuplicateKeyError, InvalidOperation
 
-from saltbox_core.config import SETTINGS, logger
+from saltbox_core.config import SETTINGS
 from saltbox_core.task_templates.exceptions import SourceUpdateDuplicateNameException
 from saltbox_core.task_templates.repositories.source import TemplateSourceRepository, get_template_source_repository
 from saltbox_core.task_templates.schemas.source import (
@@ -24,9 +25,9 @@ from saltbox_core.task_templates.schemas.source import (
 from saltbox_core.task_templates.services.sshfs_file import SshfsFileService, get_sshfs_file_service
 from saltbox_core.task_templates.services.template import TaskTemplateService, get_task_tpl_service
 from saltbox_core.tasks.services.task import TaskService, get_task_service
-from saltbox_sdk.db.mongo.config import get_mongo_session_with_transaction
 from saltbox_sdk.db.mongo.repository_base import MongoUpdateOperator
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.mongo.transaction import MongoTransaction, transact
 
 # from saltbox_sdk.exceptions import ObjectNotFoundException
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
@@ -169,37 +170,41 @@ class TemplateSourceService(
         *,
         session: AsyncClientSession | None = None,
     ) -> int:
-        async with get_mongo_session_with_transaction(session) as s:
-            source = await self.get(query=query, session=s)
+        if session is not None:
+            msg = 'Source deletion manages its own MongoDB transaction.'
+            raise InvalidOperation(msg)
+
+        delete_record = super().delete
+
+        async def work(tx: MongoTransaction) -> int:
+            source = await self.get(query=query, session=tx.session)
             delete_query = {'source_id': source.id}
 
             # TODO: Check for dependent tasks before deleting templates
 
-            await self._template_service.delete_many(query=delete_query, session=s)
-            await self._file_service.delete_many(query=delete_query, session=s)
+            await self._template_service.delete_many_in_transaction(query=delete_query, tx=tx)
+            await self._file_service.delete_many_in_transaction(query=delete_query, tx=tx)
+            deleted_count = await delete_record(query=query, session=tx.session)
+            tx.on_commit(lambda: asyncio.to_thread(self._remove_source_files, source))
+            return deleted_count
 
-            local_path = Path(SETTINGS.local_repos_dir) / source.local_path
-            if local_path.exists() and local_path.is_dir():
-                src_root = local_path / source.root
-                if src_root.exists() and src_root.is_dir():
-                    serve_dir = SETTINGS.salt_modules_serve_dir
-                    for entry in src_root.iterdir():
-                        serve_entry = serve_dir / entry.name
-                        if serve_entry.exists() or serve_entry.is_symlink():
-                            try:
-                                if serve_entry.is_dir() and not serve_entry.is_symlink():
-                                    shutil.rmtree(serve_entry)
-                                else:
-                                    serve_entry.unlink(missing_ok=True)
-                            except OSError as e:
-                                logger.error('Failed to remove entry from serve_dir: %s', e)
-                                raise
-                try:
-                    shutil.rmtree(local_path)
-                except OSError as e:
-                    logger.error('Failed to remove local path: %s', e)
-                    raise
-            return await super().delete(query=query, session=s)
+        return await transact(work)
+
+    @staticmethod
+    def _remove_source_files(source: TemplateSourceModel) -> None:
+        local_path = Path(SETTINGS.local_repos_dir) / source.local_path
+        if not local_path.is_dir():
+            return
+
+        src_root = local_path / source.root
+        if src_root.is_dir():
+            for entry in src_root.iterdir():
+                serve_entry = SETTINGS.salt_modules_serve_dir / entry.name
+                if serve_entry.is_dir() and not serve_entry.is_symlink():
+                    shutil.rmtree(serve_entry)
+                else:
+                    serve_entry.unlink(missing_ok=True)
+        shutil.rmtree(local_path)
 
     async def delete_many(
         self,

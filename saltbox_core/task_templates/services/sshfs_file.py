@@ -1,3 +1,4 @@
+from functools import partial
 from typing import Annotated, Any, override
 
 from fastapi import Depends
@@ -12,6 +13,7 @@ from saltbox_core.task_templates.schemas.sshfs_file import (
 )
 from saltbox_core.task_templates.utils.manifest import SshfsSync, get_sshfs_sync
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
+from saltbox_sdk.db.mongo.transaction import MongoTransaction
 from saltbox_sdk.serivces.mongo_base_service import MongoBaseService
 
 
@@ -69,6 +71,16 @@ class SshfsFileService(
                 raise
 
         return await self.repo.delete_many(query=query, session=session)
+
+    async def delete_many_in_transaction(self, query: dict[str, Any], *, tx: MongoTransaction) -> int:
+        files = await self.get_list(query=query, session=tx.session)
+        if not files:
+            return 0
+
+        result = await self.repo.delete_many(query=query, session=tx.session)
+        for file in files:
+            tx.on_commit(partial(self._sshfs_sync_service.remove, file))
+        return result
 
 
 def get_sshfs_file_service(
