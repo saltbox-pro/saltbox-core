@@ -59,9 +59,9 @@ class TaskMinionService(
             return None
 
         return {
-            'create': f'task:{obj.task_id}:task-minion:{obj.id}:create',
-            'update': f'task:{obj.task_id}:task-minion:{obj.id}:update',
-            'delete': f'task:{obj.task_id}:task-minion:{obj.id}:delete',
+            'create': f'task-minion:{obj.task_id}:{obj.id}:create',
+            'update': f'task-minion:{obj.task_id}:{obj.id}:update',
+            'delete': f'task-minion:{obj.task_id}:{obj.id}:delete',
         }.get(action)
 
     async def run_notify(self, obj_id: PyObjectId, action: str) -> None:

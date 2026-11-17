@@ -123,9 +123,9 @@ class JobReturnService(
         ):
             channels.update(
                 {
-                    'create_task': f'task:{obj.source.id}:job-return:{obj.job_id}:create',
-                    'update_task': f'task:{obj.source.id}:job-return:{obj.job_id}:update',
-                    'delete_task': f'task:{obj.source.id}:job-return:{obj.job_id}:delete',
+                    'create_task': f'task-job-return:{obj.source.id}:{obj.job_id}:create',
+                    'update_task': f'task-job-return:{obj.source.id}:{obj.job_id}:update',
+                    'delete_task': f'task-job-return:{obj.source.id}:{obj.job_id}:delete',
                 }
             )
 

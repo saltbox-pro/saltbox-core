@@ -96,9 +96,9 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         ):
             channels.update(
                 {
-                    'create_task': f'task:{obj.source.id}:job:{obj.id}:create',
-                    'update_task': f'task:{obj.source.id}:job:{obj.id}:update',
-                    'delete_task': f'task:{obj.source.id}:job:{obj.id}:delete',
+                    'create_task': f'task-job:{obj.source.id}:{obj.id}:create',
+                    'update_task': f'task-job:{obj.source.id}:{obj.id}:update',
+                    'delete_task': f'task-job:{obj.source.id}:{obj.id}:delete',
                 }
             )
 
