@@ -142,6 +142,7 @@ class MinionEditableFieldsMixin[T](BaseModel):
 
 
 class MinionAggregatedFieldsMixin(BaseModel):
+    collections_count: int = Field(title='Collections count', default=0)
     extra_static: ClassVar[dict[str, Any]] = Field(exclude=True)
     extra_aggregated: ClassVar[dict] = Field(exclude=True)
     extra: dict = Field(title='Extra aggregated data', default_factory=dict)

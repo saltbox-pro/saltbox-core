@@ -740,6 +740,26 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
         aggregations: ClassVar[AggregationsStore] = AggregationsStore(
             aggregations=[
                 AggregatedField(
+                    field_name='collections_count',
+                    stages=[
+                        LookupAggregationStage(
+                            from_collection='minion_collection_memberships',
+                            local_field='_id',
+                            foreign_field='minion_inner_id',
+                            pipeline=[{'$match': {'exited_at': None}}, {'$count': 'count'}],
+                            as_field='_collections_count',
+                        ),
+                        AddFieldsAggregationStage(
+                            fields={
+                                'collections_count': {
+                                    '$ifNull': [{'$arrayElemAt': ['$_collections_count.count', 0]}, 0]
+                                }
+                            }
+                        ),
+                        UnsetAggregationStage(fields=['_collections_count']),
+                    ],
+                ),
+                AggregatedField(
                     field_name='is_never_active',
                     stages=[AddFieldsAggregationStage(fields={'is_never_active': get_never_active_condition()})],
                 ),
