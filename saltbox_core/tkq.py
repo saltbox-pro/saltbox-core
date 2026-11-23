@@ -1,7 +1,9 @@
+import asyncio
 import logging
 import uuid
 from collections.abc import AsyncGenerator
 from contextlib import suppress
+from datetime import timedelta
 
 import taskiq_fastapi
 from aio_pika.abc import ExchangeType
@@ -74,15 +76,28 @@ queue_notify = Queue(
 queue_membership = Queue(name='queue-membership', type=QueueType.CLASSIC, durable=False)
 
 
-async def startup_broker() -> AsyncBroker:
-    if not broker.is_worker_process:
+async def startup_broker(max_attempts: int = 30) -> AsyncBroker:
+    if broker.is_worker_process:
+        return broker
+
+    _ = broker.with_queues(queue_default, queue_salt, queue_notify, queue_membership)
+    retry_delay = timedelta(seconds=2)
+
+    for attempt in range(1, max_attempts):
         try:
-            broker.with_queues(queue_default, queue_salt, queue_notify, queue_membership)
             await broker.startup()
         except AMQPConnectionError as ex:
-            logger.warning(f'RabbitMQ is unavailable during startup: {ex}. The broker will reconnect automatically.')
-    return broker
+            msg = (
+                f'RabbitMQ startup attempt {attempt}/{max_attempts} failed: {ex}. '
+                + f'Retrying in {retry_delay.total_seconds()} seconds'
+            )
+            logger.warning(msg)
+            await asyncio.sleep(retry_delay.total_seconds())
+        else:
+            return broker
 
+    await broker.startup()
+    return broker
 
 async def shutdown_broker() -> AsyncBroker:
     if not broker.is_worker_process:
