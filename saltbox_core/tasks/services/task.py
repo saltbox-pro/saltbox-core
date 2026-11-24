@@ -352,6 +352,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         session: MongoAsyncClientSession | None = None,
         notify: bool = True,
     ) -> PyObjectId:
+        self._check_notify_session(session=session, notify=notify)
         if isinstance(data, dict):
             validated_data = TaskCreateInputSchema.model_validate(data)
         else:
@@ -408,7 +409,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         )
 
         if notify:
-            await self._notify(obj_id=task_id, action='create')
+            await self._notify(obj_id=task_id, action='create', session=session)
 
         return task_id
 
@@ -464,6 +465,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         session: MongoAsyncClientSession | None,
         notify: bool,
     ) -> list[PyObjectId]:
+        self._check_notify_session(session=session, notify=notify)
         if isinstance(data, TaskUpdateSchema):
             update_data = data.model_dump(exclude={'id'}, exclude_unset=exclude_unset)
             provided_fields = data.model_fields_set
@@ -509,17 +511,13 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
 
             if bulk:
                 updated_ids = await super().bulk_update(
-                    query={'_id': {'$in': task_ids}}, data=update_data, operator=operator, session=s, notify=False
+                    query={'_id': {'$in': task_ids}}, data=update_data, operator=operator, session=s, notify=notify
                 )
             else:
                 updated_id = await super().update(
-                    query=task_ids[0], data=update_data, operator=operator, session=s, notify=False
+                    query=task_ids[0], data=update_data, operator=operator, session=s, notify=notify
                 )
                 updated_ids = [updated_id]
-
-        if notify:
-            for task_id in updated_ids:
-                await self._notify(obj_id=task_id, action='update')
 
         if 'ttl_jobs' in provided_fields:
             await self.__set_active_task_jobs_ttl(updated_ids, ttl=update_data['ttl_jobs'])

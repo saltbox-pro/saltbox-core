@@ -261,6 +261,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
         session: MongoAsyncClientSession | None = None,
         notify: bool = True,
     ) -> PyObjectId:
+        self._check_notify_session(session=session, notify=notify)
         if isinstance(data, dict):
             data = JobCreateSchema.model_validate(data)
 
@@ -277,7 +278,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
             await self.__send_job_to_master(data=data, extra_pillarenv=extra_pillarenv)
 
         if isinstance(notify, bool) and notify:
-            await self._notify(obj_id=job_id, action='create')
+            await self._notify(obj_id=job_id, action='create', session=session)
 
         return job_id
 

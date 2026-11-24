@@ -122,4 +122,7 @@ async def send_notify_by_mongo_service(
         raise RuntimeError(msg)
 
     await unique_lock.release_enqueue_lock()
-    await service.run_notify(obj_id=did, action=action)
+    if action == 'delete':
+        await service.run_delete_notify(obj_id=did)
+    else:
+        await service.run_notify(obj_id=did, action=action)
