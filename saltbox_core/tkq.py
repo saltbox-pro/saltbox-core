@@ -89,22 +89,20 @@ async def startup_broker(max_attempts: int = 30) -> AsyncBroker:
     broker.with_queues(queue_default, queue_salt, queue_notify, queue_membership)
     retry_delay = timedelta(seconds=2)
 
-    attempt = 0
-    while True:
-        attempt += 1
+    for attempt in range(1, max_attempts + 1):
         try:
             await broker.startup()
             return broker
         except AMQPConnectionError as ex:
-            if attempt == max_attempts:
-                raise RabbitMQStartupAttemptsExhaustedException() from ex
-
             msg = (
                 f'RabbitMQ startup attempt {attempt}/{max_attempts} failed: {ex}. '
                 + f'Retrying in {retry_delay.total_seconds()} seconds'
             )
             logger.warning(msg)
             await asyncio.sleep(retry_delay.total_seconds())
+
+    raise RabbitMQStartupAttemptsExhaustedException()
+
 
 async def shutdown_broker() -> AsyncBroker:
     if not broker.is_worker_process:
