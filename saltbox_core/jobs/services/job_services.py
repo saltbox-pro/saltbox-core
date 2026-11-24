@@ -331,7 +331,7 @@ class JobService(MongoBaseWithNotifyService[JobRepository, JobModel, JobCreateSc
             )
 
     async def stop_job(
-        self, jid: JID | PyObjectId, session: MongoAsyncClientSession | None = None
+        self, jid: JID | PyObjectId | list[JID] | list[PyObjectId], session: MongoAsyncClientSession | None = None
     ) -> None: ...  # TODO (i.moshkov): stop jobs
 
     async def _get_fake_jobs(

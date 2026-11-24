@@ -1,4 +1,5 @@
 from collections.abc import Callable
+from contextlib import nullcontext
 from typing import Annotated, Any, TypeVar
 
 from fastapi import Depends
@@ -200,10 +201,10 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
 
     async def __validate_requirements(
         self,
-        target_collection_id: PyObjectId,
+        target_collection_ids: set[PyObjectId],
         requirements: list[TaskRequirement],
         *,
-        exclude_task_id: PyObjectId | None = None,
+        exclude_task_ids: set[PyObjectId] | None = None,
         session: MongoAsyncClientSession | None = None,
     ) -> None:
         if not requirements:
@@ -211,7 +212,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
 
         requirement_task_ids = [requirement.task_id for requirement in requirements]
 
-        if exclude_task_id is not None and exclude_task_id in requirement_task_ids:
+        if exclude_task_ids and not exclude_task_ids.isdisjoint(requirement_task_ids):
             msg = 'A policy cannot list itself as a requirement'
             raise SaltBoxValidationException(msg)
 
@@ -230,7 +231,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         wrong_collection_ids = [
             str(task_id)
             for task_id in requirement_task_ids
-            if referenced_by_id[task_id].target_collection_id != target_collection_id
+            if target_collection_ids != {referenced_by_id[task_id].target_collection_id}
         ]
         if wrong_collection_ids:
             msg = (
@@ -362,7 +363,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
                 logger.debug(f'Save as default: {save_pillars_as_default}')
                 creation_data, pillars = await self.__parse_input_create_schema(data=validated_data)
                 await self.__validate_requirements(
-                    target_collection_id=creation_data.target_collection_id,
+                    target_collection_ids={creation_data.target_collection_id},
                     requirements=creation_data.requirements,
                     session=s,
                 )
@@ -411,7 +412,7 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
 
         return task_id
 
-    async def update(  # noqa: C901
+    async def update(
         self,
         query: dict[str, Any] | PyObjectId,
         data: TaskUpdateSchema | dict[str, Any],
@@ -421,79 +422,121 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
         session: MongoAsyncClientSession | None = None,
         notify: bool = True,
     ) -> PyObjectId:
-        obj = await self.get(query=query, session=session, projection_model=TaskShortForUpdateSchema)
-
-        new_status = None
-        if hasattr(data, 'status'):
-            new_status = data.status
-        elif isinstance(data, dict) and 'status' in data:
-            new_status = data.pop('status')
-
-        status_data = None
-        if isinstance(data, dict) and 'status_data' in data:
-            status_data = data.pop('status_data')
-
-        ttl_jobs_provided = False
-        ttl_jobs = None
-        if isinstance(data, BaseModel):
-            if 'ttl_jobs' in data.model_fields_set:
-                ttl_jobs_provided = True
-                ttl_jobs = data.ttl_jobs
-        elif isinstance(data, dict) and 'ttl_jobs' in data:
-            ttl_jobs_provided = True
-            ttl_jobs = data['ttl_jobs']
-
-        requirements = None
-        if isinstance(data, BaseModel):
-            if 'requirements' in data.model_fields_set:
-                requirements = data.requirements
-        elif isinstance(data, dict) and 'requirements' in data:
-            requirements = [
-                item if isinstance(item, TaskRequirement) else TaskRequirement.model_validate(item)
-                for item in data['requirements']
-            ]
-
-        if requirements is not None:
-            await self.__validate_requirements(
-                target_collection_id=obj.target_collection_id,
-                requirements=requirements,
-                exclude_task_id=obj.id,
-                session=session,
-            )
-
-        if new_status and obj.status.type != new_status:
-            await self.task_status_service.create(
-                data=TaskStatusCreateSchema.model_validate(
-                    {
-                        'task_id': obj.id,
-                        'type': new_status,
-                        'data': status_data or {},
-                    }
-                ),
-            )
-
-        result = await super().update(
+        task_ids = await self.__update_tasks(
             query=query,
             data=data,
             exclude_unset=exclude_unset,
+            bulk=False,
+            operator=operator,
+            session=session,
+            notify=notify,
+        )
+        return task_ids[0]
+
+    async def bulk_update(
+        self,
+        query: dict[str, Any] | PyObjectId,
+        data: TaskUpdateSchema | dict[str, Any],
+        exclude_unset: bool = True,
+        *,
+        operator: MongoUpdateOperator = MongoUpdateOperator.set,
+        session: MongoAsyncClientSession | None = None,
+        notify: bool = True,
+    ) -> list[PyObjectId]:
+        return await self.__update_tasks(
+            query=query,
+            data=data,
+            exclude_unset=exclude_unset,
+            bulk=True,
             operator=operator,
             session=session,
             notify=notify,
         )
 
-        if ttl_jobs_provided:
-            for task_job in await self.__get_active_task_jobs(obj.id):
-                await self.job_service.set_ttl(job_id=task_job.id, ttl=ttl_jobs, minions=[])
+    async def __update_tasks(
+        self,
+        query: dict[str, Any] | PyObjectId,
+        data: TaskUpdateSchema | dict[str, Any],
+        exclude_unset: bool,
+        *,
+        bulk: bool,
+        operator: MongoUpdateOperator,
+        session: MongoAsyncClientSession | None,
+        notify: bool,
+    ) -> list[PyObjectId]:
+        if isinstance(data, TaskUpdateSchema):
+            update_data = data.model_dump(exclude={'id'}, exclude_unset=exclude_unset)
+            provided_fields = data.model_fields_set
+            new_status = data.status
+            status_data: dict[str, Any] = {}
+        else:
+            update_data = data.copy()
+            new_status = update_data.pop('status', None)
+            status_data = update_data.pop('status_data', None) or {}
+            provided_fields = set(update_data)
 
-        return result
+        transaction = get_mongo_session_with_transaction(session) if new_status else nullcontext(session)
+        async with transaction as s:
+            if bulk:
+                task_query = {'_id': query} if isinstance(query, PyObjectId) else query
+                tasks = await self.get_list(query=task_query, session=s, projection_model=TaskShortForUpdateSchema)
+            else:
+                tasks = [await self.get(query=query, session=s, projection_model=TaskShortForUpdateSchema)]
+
+            if not tasks:
+                return []
+
+            task_ids = [task.id for task in tasks]
+            if 'requirements' in provided_fields:
+                requirements = [
+                    item if isinstance(item, TaskRequirement) else TaskRequirement.model_validate(item)
+                    for item in update_data['requirements']
+                ]
+                await self.__validate_requirements(
+                    target_collection_ids={task.target_collection_id for task in tasks},
+                    requirements=requirements,
+                    exclude_task_ids=set(task_ids),
+                    session=s,
+                )
+
+            status_changes = [
+                TaskStatusCreateSchema(task_id=task.id, type=new_status, data=status_data)
+                for task in tasks
+                if new_status and task.status.type != new_status
+            ]
+            if status_changes:
+                await self.task_status_service.bulk_create(data=status_changes, session=s)
+
+            if bulk:
+                updated_ids = await super().bulk_update(
+                    query={'_id': {'$in': task_ids}}, data=update_data, operator=operator, session=s, notify=False
+                )
+            else:
+                updated_id = await super().update(
+                    query=task_ids[0], data=update_data, operator=operator, session=s, notify=False
+                )
+                updated_ids = [updated_id]
+
+        if notify:
+            for task_id in updated_ids:
+                await self._notify(obj_id=task_id, action='update')
+
+        if 'ttl_jobs' in provided_fields:
+            await self.__set_active_task_jobs_ttl(updated_ids, ttl=update_data['ttl_jobs'])
+
+        return updated_ids
+
+    async def __set_active_task_jobs_ttl(self, task_ids: list[PyObjectId], ttl: int | None) -> None:
+        for task_job in await self.__get_active_task_jobs(task_ids):
+            await self.job_service.set_ttl(job_id=task_job.id, ttl=ttl, minions=[])
 
     async def __get_active_task_jobs(
-        self, task_id: PyObjectId, session: MongoAsyncClientSession | None = None
+        self, task_ids: list[PyObjectId], session: MongoAsyncClientSession | None = None
     ) -> list[EmptyModel]:
         return await self.job_service.get_list(
             query={
                 'source.type': 'task',
-                'source.id': str(task_id),
+                'source.id': {'$in': [str(task_id) for task_id in task_ids]},
                 'status': {'$nin': [JobStatus.finished, JobStatus.launch_error]},
             },
             limit=0,
@@ -512,25 +555,41 @@ class TaskService(MongoBaseWithNotifyService[TaskRepository, TaskModel, TaskCrea
 
     async def stop(
         self,
-        query: dict[str, Any] | PyObjectId,
+        query: dict[str, Any] | list[PyObjectId] | PyObjectId,
         reason: TaskStopReason = TaskStopReason.user,
         session: MongoAsyncClientSession | None = None,
     ) -> None:
+        task_query: dict[str, Any]
+        if isinstance(query, list):
+            task_query = {'_id': {'$in': query}}
+        elif isinstance(query, PyObjectId):
+            task_query = {'_id': query}
+        else:
+            task_query = query
+
+        active_task_query = {
+            '$and': [task_query, {'status.type': {'$in': [TaskStatus.running, TaskStatus.wait_minions]}}]
+        }
+
         async with get_mongo_session_with_transaction(session) as s:
-            task = await self.get(query=query, session=s, projection_model=TaskStatusOnlySchema)
+            tasks = await self.get_list(query=active_task_query, session=s, projection_model=EmptyModel)
+            if not tasks:
+                return
 
-            if task.status and task.status.type in [TaskStatus.running, TaskStatus.wait_minions]:
-                for task_job in await self.__get_active_task_jobs(task.id, session=s):
-                    await self.job_service.stop_job(task_job.id, session=s)
+            task_ids = [task.id for task in tasks]
+            job_ids = [job.id for job in await self.__get_active_task_jobs(task_ids, session=s)]
 
-                await self.task_minion_service.bulk_update(
-                    query={'task_id': task.id, 'status': TaskMinionStatus.busy},
-                    data={'status': TaskMinionStatus.pending},
-                    session=s,
-                )
-                await self.update(
-                    query=task.id, data={'status': TaskStatus.stopping, 'status_data': {'reason': reason}}, session=s
-                )
+            await self.job_service.stop_job(job_ids, session=s)
+            await self.task_minion_service.bulk_update(
+                query={'task_id': {'$in': task_ids}, 'status': TaskMinionStatus.busy},
+                data={'status': TaskMinionStatus.pending},
+                session=s,
+            )
+            await self.bulk_update(
+                query={'_id': {'$in': task_ids}},
+                data={'status': TaskStatus.stopping, 'status_data': {'reason': reason}},
+                session=s,
+            )
 
     async def get_policies_for_collection(
         self, target_collection_id: PyObjectId

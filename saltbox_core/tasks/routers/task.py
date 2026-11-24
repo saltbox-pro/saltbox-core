@@ -10,6 +10,8 @@ from saltbox_core.jobs.services.job_services import JobService, get_job_service
 from saltbox_core.minion_collections.schemas.filter import FiltersActions, MinionFilterSchema
 from saltbox_core.tasks.schemas.task import (
     RestartFailedBody,
+    TaskBulkStopBody,
+    TaskBulkStopResult,
     TaskCreateInputSchema,
     TaskCreateRequestSchema,
     TaskListBody,
@@ -320,6 +322,27 @@ async def task_stop(
     await task_service.stop(query=tid)
 
     return await task_service.get(query=tid)
+
+
+@router.post(
+    '/bulk_stop',
+    operation_id='tasks_bulk_stop',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.tasks.run',
+        action=TasksActions.RUN,
+    ).model_dump(by_alias=True),
+)
+async def tasks_bulk_stop(
+    body: Annotated[TaskBulkStopBody, Body()],
+    task_service: Annotated[TaskService, Depends(get_task_service)],
+) -> list[TaskBulkStopResult]:
+    task_ids = list(dict.fromkeys(body.task_ids))
+    await task_service.stop(query=task_ids)
+    statuses = await task_service.get_task_statuses(task_ids=task_ids)
+
+    return [
+        TaskBulkStopResult(task_id=task_id, status=statuses[task_id]) for task_id in task_ids if task_id in statuses
+    ]
 
 
 @router.post(

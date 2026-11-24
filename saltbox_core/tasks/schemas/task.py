@@ -278,6 +278,15 @@ class TaskTargetingMasterSchema(BaseModel):
     not_active_minions_count: int = Field(title='Not active minions count', default=0)
 
 
+class TaskBulkStopBody(BaseModel):
+    task_ids: list[PyObjectId] = Field(min_length=1)
+
+
+class TaskBulkStopResult(BaseModel):
+    task_id: PyObjectId
+    status: TaskStatus
+
+
 class RestartFailedBody(BaseModel):
     minions_by_tgt: list[TaskTargetMinion] | None = Field(title='Minions by target', default=None)
     minions_by_ids: list[PyObjectId] | None = Field(title='Minions by ids', default=None)
