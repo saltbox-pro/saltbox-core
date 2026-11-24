@@ -15,6 +15,7 @@ from taskiq_aio_pika import AioPikaBroker, Exchange, Queue, QueueType
 from taskiq_redis import RedisAsyncResultBackend
 
 from saltbox_core.config import SETTINGS
+from saltbox_core.exceptions import RabbitMQStartupAttemptsExhaustedException
 from saltbox_sdk.config.rabbitmq_config import RABBIT_SETTINGS
 from saltbox_sdk.utilities.taskiq import SmartRetryMiddleware, UniqueIdMiddleware
 from saltbox_sdk.utilities.taskiq_rabbit import SaltboxAioPikaBroker
@@ -76,17 +77,25 @@ queue_notify = Queue(
 queue_membership = Queue(name='queue-membership', type=QueueType.CLASSIC, durable=False)
 
 
-async def startup_broker(max_attempts: int = 30) -> AsyncBroker:
+async def startup_broker(max_attempts: int = 30) -> AsyncBroker: # type: ignore[return]
+
+    if max_attempts < 1:
+        msg = 'Num of max_attempts must be greater than one'
+        raise ValueError(msg)
+
     if broker.is_worker_process:
         return broker
 
-    _ = broker.with_queues(queue_default, queue_salt, queue_notify, queue_membership)
+    broker.with_queues(queue_default, queue_salt, queue_notify, queue_membership)
     retry_delay = timedelta(seconds=2)
 
-    for attempt in range(1, max_attempts):
+    for attempt in range(1, max_attempts + 1):
         try:
             await broker.startup()
         except AMQPConnectionError as ex:
+            if attempt == max_attempts:
+                raise RabbitMQStartupAttemptsExhaustedException() from ex
+
             msg = (
                 f'RabbitMQ startup attempt {attempt}/{max_attempts} failed: {ex}. '
                 + f'Retrying in {retry_delay.total_seconds()} seconds'
@@ -95,9 +104,6 @@ async def startup_broker(max_attempts: int = 30) -> AsyncBroker:
             await asyncio.sleep(retry_delay.total_seconds())
         else:
             return broker
-
-    await broker.startup()
-    return broker
 
 async def shutdown_broker() -> AsyncBroker:
     if not broker.is_worker_process:

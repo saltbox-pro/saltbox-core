@@ -22,3 +22,10 @@ class GitlabApiException(CoreException):
 
     status_code: int = status.HTTP_502_BAD_GATEWAY
     detail: str = 'An error occurred while communicating with the GitLab API.'
+
+
+class RabbitMQStartupAttemptsExhaustedException(CoreException):
+    """Raised when Core exhausts its RabbitMQ connection attempts during startup."""
+
+    status_code: int = status.HTTP_503_SERVICE_UNAVAILABLE
+    detail: str = 'All attempts to connect to RabbitMQ during startup failed.'
