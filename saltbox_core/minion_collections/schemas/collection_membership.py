@@ -1,3 +1,6 @@
+from datetime import datetime
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 from saltbox_sdk.db.mongo.schemas_base import IDMixin, PyObjectId
@@ -28,3 +31,22 @@ class CollectionMembershipModel(
     CollectionMembershipReadOnlyFieldsMixin,
     IDMixin,
 ): ...
+
+
+# Statistic
+
+StatisticsInterval = Literal['hour', 'day', 'week', 'month']
+
+
+class CollectionCountPoint(BaseModel):
+    timestamp: datetime = Field(description='Snapshot time in UTC')
+    count: int | None = Field(description='Member count; null before recorded history or in the future')
+
+
+class CollectionCountStatistics(BaseModel):
+    interval: StatisticsInterval = Field(description='Calendar sampling interval')
+    timezone: str = Field(description='IANA timezone used for calendar boundaries')
+    history_from: datetime | None = Field(description='Earliest recorded entered_at; null if no membership records')
+    points: list[CollectionCountPoint] = Field(
+        description='Time-ordered snapshots of the entire collection, including period endpoints'
+    )

@@ -1,6 +1,9 @@
 from typing import Annotated, Any
+from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Path, Query, Response, status
+from pydantic import AwareDatetime
+from pydantic_extra_types.timezone_name import TimeZoneName
 
 from saltbox_core.minion_collections.repositories.collection_membership import (
     CollectionMembershipRepository,
@@ -19,13 +22,18 @@ from saltbox_core.minion_collections.schemas.collection import (
     CollectionTreeNodeSchema,
     CollectionUpdateSchema,
 )
+from saltbox_core.minion_collections.schemas.collection_membership import CollectionCountStatistics, StatisticsInterval
 from saltbox_core.minion_collections.services.collection import CollectionService, get_collection_service
+from saltbox_core.minion_collections.utils.membership_statistics import build_points, sample_times
 from saltbox_core.tasks.schemas.task import TaskPolicyForCollectionSchema
 from saltbox_core.tasks.services.task import TaskService, get_task_service
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 from saltbox_sdk.db.schemas_base import PaginatedResponse, UserShort
 from saltbox_sdk.discovery_client.schemas import GatewayEndpointConfig
 from saltbox_sdk.fastapi_utils.dependencies import get_current_user, get_opa_query
+from saltbox_sdk.utilities.helpers import utc_now
+
+DEFAULT_TIMEZONE = TimeZoneName('UTC')
 
 router = APIRouter(prefix='/collections', tags=['Minion Collections'])
 
@@ -244,3 +252,36 @@ async def collection_delete(
 ) -> Response:
     await collection_service.delete_by_slug(slug)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get(
+    '/{slug}/statistics/minions-count',
+    operation_id='minion_collection_minions_count_statistics',
+    openapi_extra=GatewayEndpointConfig(
+        policy='core.collections.read',
+        action=CollectionActions.READ,
+        cache_ttl=0,
+    ).model_dump(by_alias=True),
+)
+async def collection_minions_count_statistics(
+    slug: Annotated[str, Path(description='Collection slug')],
+    date_from: Annotated[AwareDatetime, Query(alias='from', description='Inclusive period start with UTC offset')],
+    date_to: Annotated[AwareDatetime, Query(alias='to', description='Inclusive period end with UTC offset')],
+    interval: Annotated[StatisticsInterval, Query(description='Calendar interval; weeks start on Monday')],
+    timezone: Annotated[TimeZoneName, Query(description='IANA timezone for calendar boundaries')] = DEFAULT_TIMEZONE,
+    *,
+    collection_service: Annotated[CollectionService, Depends(get_collection_service)],
+    membership_repo: Annotated[CollectionMembershipRepository, Depends(get_collection_membership_repository)],
+) -> CollectionCountStatistics:
+    if date_from > date_to:
+        raise HTTPException(status_code=422, detail='"date_from" must be less than or equal to "date_to"')
+
+    collection = await collection_service.get_by_slug(slug)
+    events = await membership_repo.get_count_events(collection.id)
+
+    return CollectionCountStatistics(
+        interval=interval,
+        timezone=timezone,
+        history_from=events[0][0] if events else None,
+        points=build_points(sample_times(date_from, date_to, interval, ZoneInfo(timezone)), events, utc_now()),
+    )

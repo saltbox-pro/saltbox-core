@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Any, ClassVar
 
 import pymongo
@@ -14,6 +14,26 @@ from saltbox_sdk.db.mongo.schemas_base import PyObjectId
 
 
 class CollectionMembershipRepository(BaseMongoRepository[CollectionMembershipModel]):
+    async def get_count_events(self, collection_id: PyObjectId) -> list[tuple[datetime, int]]:
+        pipeline: list[dict[str, Any]] = [
+            {'$match': {'collection_id': collection_id}},
+            {
+                '$project': {
+                    'events': [
+                        {'timestamp': '$entered_at', 'delta': 1},
+                        {'timestamp': '$exited_at', 'delta': -1},
+                    ]
+                }
+            },
+            {'$unwind': '$events'},
+            {'$match': {'events.timestamp': {'$ne': None}}},
+            {'$group': {'_id': '$events.timestamp', 'delta': {'$sum': '$events.delta'}}},
+            {'$sort': {'_id': 1}},
+        ]
+        cursor = await self.collection.aggregate(pipeline, allowDiskUse=True)
+
+        return [(doc['_id'].replace(tzinfo=UTC), doc['delta']) async for doc in cursor]
+
     async def get_active_minion_ids(
         self, collection_id: PyObjectId, *, session: AsyncClientSession | None = None
     ) -> set[PyObjectId]:
@@ -48,7 +68,7 @@ class CollectionMembershipRepository(BaseMongoRepository[CollectionMembershipMod
             session=session,
         )
 
-    class Meta:
+    class Meta(BaseMongoRepository.Meta):
         collection_name = 'minion_collection_memberships'
         collection_index_to_keys: ClassVar[dict[str, _IndexKeyHint]] = {
             'active_membership_unique_index': [
