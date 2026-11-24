@@ -36,7 +36,6 @@ POSITIVE_OPERATOR_VALUES = [
     pytest.param({'$regex': 'Обновление', '$options': 'i'}, id='contains'),
     pytest.param({'$regex': '^Обновление', '$options': 'i'}, id='beginsWith'),
     pytest.param({'$regex': 'системы$', '$options': 'i'}, id='endsWith'),
-    pytest.param(None, id='null'),
     pytest.param({'$in': [RU_TITLE, EN_TITLE]}, id='in'),
     pytest.param({'$gte': EN_TITLE, '$lte': RU_TITLE}, id='between'),
 ]
@@ -45,7 +44,6 @@ NEGATIVE_OPERATOR_VALUES = [
     pytest.param({'$not': {'$regex': 'Обновление', '$options': 'i'}}, id='doesNotContain'),
     pytest.param({'$not': {'$regex': '^Обновление', '$options': 'i'}}, id='doesNotBeginWith'),
     pytest.param({'$not': {'$regex': 'системы$', '$options': 'i'}}, id='doesNotEndWith'),
-    pytest.param({'$ne': None}, id='notNull'),
     pytest.param({'$nin': [RU_TITLE, EN_TITLE]}, id='notIn'),
     pytest.param({'$not': {'$gte': EN_TITLE, '$lte': RU_TITLE}}, id='notBetween'),
 ]
@@ -236,3 +234,38 @@ async def test_not_contains_excludes_matches_in_any_language(repo, fragment):
         'localized_cleanup',
         'localized_restart',
     ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('field_value', [None, {'$eq': None}, {'$ne': None}])
+@pytest.mark.parametrize('field_name', ['template.title', 'template.description'])
+async def test_null_filters_preserve_original_field(repo, field_name, field_value):
+    query = {'$or': [{field_name: field_value}, {'name': 'plain'}]}
+
+    assert await repo.__prepare_query__(query) == query
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ('field_value', 'expected_ids'),
+    [
+        (None, ['missing_template', 'missing_title', 'null_title']),
+        ({'$eq': None}, ['missing_template', 'missing_title', 'null_title']),
+        ({'$ne': None}, ['empty_object', 'empty_string', 'localized', 'single_language', 'string']),
+    ],
+)
+async def test_null_filters_match_whole_field(repo, field_value, expected_ids):
+    repo.collection.collection.insert_many(
+        [
+            {'_id': 'missing_template'},
+            {'_id': 'missing_title', 'template': {}},
+            {'_id': 'null_title', 'template': {'title': None}},
+            {'_id': 'string', 'template': {'title': 'Title'}},
+            {'_id': 'localized', 'template': {'title': {'ru': 'Название', 'en': 'Title'}}},
+            {'_id': 'single_language', 'template': {'title': {'ru': 'Название'}}},
+            {'_id': 'empty_string', 'template': {'title': ''}},
+            {'_id': 'empty_object', 'template': {'title': {}}},
+        ]
+    )
+
+    assert await find_matching_ids(repo, field_value) == expected_ids

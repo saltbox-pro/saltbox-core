@@ -25,7 +25,7 @@ dependencies = [
   # Dependencies from Salt.Box Team server.
   # - Prefer tag or commit hash over branch to specify version.
   # - Prefer long hash over short hash for pip efficiency.
-  "saltbox-sdk @ git+https://dev.saltbox.pro/saltbox/saltbox-sdk/@5a97972ff9a8eeddd7fa78c47cbdf3e016906c2d",
+  "saltbox-sdk @ git+https://dev.saltbox.pro/saltbox/saltbox-sdk/@5678d51a2ea5ee31b5aaf3a671de2114baf9634f",
   "taskiq~=0.12.4",
   "taskiq-aio-pika~=0.6.0",
   "taskiq-fastapi~=0.4.0",
