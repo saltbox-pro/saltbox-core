@@ -8,6 +8,7 @@
     "fileNaming": "kebab-case",
     "paramNaming": "original",
     "disallowAdditionalPropertiesIfNotPresent": false,
-    "supportsES6": true
+    "supportsES6": true,
+    "enumPropertyNamingReplaceSpecialChar": true
   }
 }
