@@ -38,10 +38,11 @@ from saltbox_sdk.db.mongo.aggregations import (
     UnwindAggregationStage,
 )
 from saltbox_sdk.db.mongo.config import get_mongo
+from saltbox_sdk.db.mongo.item_query import map_item_fields
 from saltbox_sdk.db.mongo.repository_base import BaseMongoRepository, ProjectionModel
 from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
 from saltbox_sdk.event_bus.schemas import ExtraDataCategoryType
-from saltbox_sdk.exceptions import ObjectNotFoundException
+from saltbox_sdk.exceptions import ObjectNotFoundException, SaltBoxValidationException
 from saltbox_sdk.utilities.helpers import utc_now
 
 EXTRA_STATIC_DATA_AS_KV = {
@@ -119,6 +120,38 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
             return {'last_activity': {'$not': {'$gte': active_dt}}}
 
         return {'last_activity': {'$gte': active_dt}}
+
+    async def prepare_item_group(self, query: dict, fields: list[str]) -> dict:
+        extra_roots = {'extra', 'extra_static', 'extra_aggregated'}
+        if not any(field.split('.', 1)[0] in extra_roots for field in fields):
+            return await super().prepare_item_group(query, fields)
+
+        parts = fields[0].split('.', 3)
+        path = '.'.join(parts[:3])
+        if len(parts) != 4 or parts[0] not in extra_roots or not all(field.startswith(path + '.') for field in fields):
+            msg = 'An item group must refer to one extra data category'
+            raise SaltBoxValidationException(msg)
+        root, source, name, _ = parts
+        prefix_size = len(path) + 1
+        if root != 'extra':
+            predicate = map_item_fields(query, lambda key, value: {key[prefix_size:]: value})
+            return {path: {'$elemMatch': predicate}}
+
+        category = await self.extra_data_repository.extra_data_category_repository.get({'source': source, 'name': name})
+        static = category.type == ExtraDataCategoryType.STATIC
+
+        def row_field(key: str, value: Any) -> dict:
+            field = key[prefix_size:]
+            return {f'data.{field}' if static else field: category.cast_filter_value(field_name=field, value=value)}
+
+        predicate = map_item_fields(query, row_field)
+        if static:
+            return {f'extra_static.{source}.{name}': {'$elemMatch': predicate}}
+
+        ids = await self.extra_data_repository.get_minion_ids_by_filter(
+            source=source, name=name, query=predicate, category=category
+        )
+        return {'_id': {'$in': ids}}
 
     async def extra_static_query_override(
         self, field_name: str, field_match: re.Match, field_value: Any, full_raw_query: dict
@@ -718,7 +751,7 @@ class MinionRepository(BaseMongoRepository[MinionModel]):
         async for row in self.aggregate_iter(pipeline, session=session):
             yield row
 
-    class Meta:
+    class Meta(BaseMongoRepository.Meta):
         collection_name = 'minions'
         auto_now_add_fields: ClassVar[list[str]] = ['created']
         auto_now_fields: ClassVar[list[str]] = ['modified']

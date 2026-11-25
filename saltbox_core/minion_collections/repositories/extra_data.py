@@ -17,6 +17,7 @@ from saltbox_core.minion_collections.repositories.extra_data_category import (
     get_extra_data_category_repository,
 )
 from saltbox_core.minion_collections.schemas.extra_data import ExtraDataModel
+from saltbox_core.minion_collections.schemas.extra_data_category import ExtraDataCategoryModel
 from saltbox_core.minion_collections.utils.unique_values import UniqueValueKind, build_unique_values_stages
 from saltbox_sdk.db.mongo.aggregations import AnySearchAggregationStage
 from saltbox_sdk.db.mongo.config import get_mongo
@@ -25,8 +26,30 @@ from saltbox_sdk.db.mongo.schemas_base import PyObjectId, SortOrder
 from saltbox_sdk.utilities.helpers import utc_now
 
 
+def _item_prefilter(node: dict, common_fields: set[str], minion_fields: set[str]) -> dict:
+    conditions: list[dict] = []
+    for key, value in node.items():
+        if key in ('$and', '$or'):
+            children = [_item_prefilter(child, common_fields, minion_fields) for child in value]
+            if key == '$or' and not all(children):
+                continue
+            if filtered := [child for child in children if child]:
+                conditions.append({key: filtered})
+        elif key.split('.', 1)[0] in common_fields:
+            conditions.append({f'data.{key}': value})
+        elif key.split('.', 1)[0] in minion_fields:
+            if isinstance(value, dict) or value is None:
+                # Negative and missing-field predicates must see one minion at a time.
+                conditions.append({'minions': {'$elemMatch': {f'data.{key}': value}}})
+            else:
+                conditions.append({f'minions.data.{key}': value})
+    if len(conditions) == 1:
+        return conditions[0]
+    return {'$and': conditions} if conditions else {}
+
+
 class ExtraDataRepository(BaseMongoRepository[ExtraDataModel]):
-    class Meta:
+    class Meta(BaseMongoRepository.Meta):
         collection_name = 'minion_extra_data'
         auto_now_add_fields: ClassVar[list[str]] = ['created']
         auto_now_fields: ClassVar[list[str]] = ['modified']
@@ -202,51 +225,23 @@ class ExtraDataRepository(BaseMongoRepository[ExtraDataModel]):
             session=session,
         )
 
-    async def get_minion_ids_by_filter(  # noqa: C901
+    async def get_minion_ids_by_filter(
         self,
         source: str,
         name: str,
         query: dict[str, Any],
         *,
+        category: ExtraDataCategoryModel | None = None,
         session: MongoAsyncClientSession | None = None,
     ) -> list[PyObjectId]:
-        pipeline: list[dict[str, Any]] = [
-            {'$match': {'source': source, 'name': name}},
-        ]
-        category = await self.extra_data_category_repository.get(query={'source': source, 'name': name})
-        category_sub_queries: list[Any] = []
-        minions_sub_queries: list[Any] = []
+        pipeline: list[dict[str, Any]] = [{'$match': {'source': source, 'name': name}}]
+        if category is None:
+            category = await self.extra_data_category_repository.get(query={'source': source, 'name': name})
+        common_fields = set(category.category_fields)
+        minion_fields = set(category.minion_fields)
 
-        def parse_query(_query: dict[str, Any]) -> None:  # noqa: C901
-            for key, value in _query.items():
-                if key.startswith('$'):
-                    if isinstance(value, dict):
-                        parse_query(value)
-                    elif isinstance(value, list):
-                        for item in value:
-                            if isinstance(item, dict):
-                                parse_query(item)
-                else:
-                    for category_field_name in category.category_fields:
-                        if key == category_field_name or key.startswith(f'{category_field_name}.'):
-                            category_sub_queries.append({f'data.{key}': value})
-                            break
-                    for minion_field_name in category.minion_fields:
-                        if key == minion_field_name or key.startswith(f'{minion_field_name}.'):
-                            minions_sub_queries.append({f'minions.data.{key}': value})
-                            break
-
-        parse_query(query)
-
-        if len(category_sub_queries) == 1:
-            pipeline.append({'$match': category_sub_queries[0]})
-        elif len(category_sub_queries) > 0:
-            pipeline.append({'$match': {'$or': category_sub_queries}})
-
-        if len(minions_sub_queries) == 1:
-            pipeline.append({'$match': minions_sub_queries[0]})
-        elif len(minions_sub_queries) > 0:
-            pipeline.append({'$match': {'$or': minions_sub_queries}})
+        if candidate_query := _item_prefilter(query, common_fields, minion_fields):
+            pipeline.append({'$match': candidate_query})
 
         pipeline.extend(
             [
